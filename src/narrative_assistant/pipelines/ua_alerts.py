@@ -28,6 +28,11 @@ class PipelineAlertsMixin:
     - self._memory_monitor (MemoryMonitor)
     """
 
+    if TYPE_CHECKING:
+        from .unified_analysis import UnifiedConfig
+
+        config: UnifiedConfig
+
     def _generate_all_alerts(self, context: AnalysisContext) -> None:
         """Generar todas las alertas desde los issues detectados."""
         try:
@@ -231,7 +236,7 @@ class PipelineAlertsMixin:
             for deviation in context.voice_deviations:
                 entity_name = deviation.get("entity_name", "Personaje")
                 severity_str = deviation.get("severity", "medium").upper()
-                severity = getattr(AlertSeverity, severity_str, AlertSeverity.MEDIUM)
+                severity = getattr(AlertSeverity, severity_str, AlertSeverity.INFO)
                 explanation = deviation.get("explanation", "Comportamiento fuera de carácter")
 
                 result = engine.create_alert(
@@ -300,13 +305,13 @@ class PipelineAlertsMixin:
             # Alertas de cambios de registro narrativo
             for change in context.register_changes:
                 if isinstance(change, dict):
-                    severity = change.get("severity", "medium")
-                    if severity in ("medium", "high", "critical"):
+                    reg_severity: str = change.get("severity", "medium")
+                    if reg_severity in ("medium", "high", "critical"):
                         result = engine.create_from_register_change(
                             project_id=context.project_id,
                             from_register=change.get("from_register", "unknown"),
                             to_register=change.get("to_register", "unknown"),
-                            severity_level=severity,
+                            severity_level=reg_severity,
                             chapter=change.get("chapter", 0),
                             position=change.get("position", 0),
                             context_before=change.get("context_before", "")[:200],

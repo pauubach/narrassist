@@ -97,7 +97,7 @@ def is_verb(token) -> bool:
 
 def is_auxiliary(token) -> bool:
     """Determina si un token es verbo auxiliar (haber, ser, estar)."""
-    return token.pos_ == "AUX"
+    return token.pos_ == "AUX"  # type: ignore[no-any-return]
 
 
 def is_proper_noun(token) -> bool:
@@ -110,27 +110,27 @@ def is_proper_noun(token) -> bool:
     Returns:
         True si es nombre propio
     """
-    return token.pos_ == "PROPN"
+    return token.pos_ == "PROPN"  # type: ignore[no-any-return]
 
 
 def is_noun(token) -> bool:
     """Determina si un token es sustantivo común."""
-    return token.pos_ == "NOUN"
+    return token.pos_ == "NOUN"  # type: ignore[no-any-return]
 
 
 def is_adjective(token) -> bool:
     """Determina si un token es adjetivo."""
-    return token.pos_ == "ADJ"
+    return token.pos_ == "ADJ"  # type: ignore[no-any-return]
 
 
 def is_pronoun(token) -> bool:
     """Determina si un token es pronombre."""
-    return token.pos_ == "PRON"
+    return token.pos_ == "PRON"  # type: ignore[no-any-return]
 
 
 def is_determiner(token) -> bool:
     """Determina si un token es determinante (artículo, demostrativo)."""
-    return token.pos_ == "DET"
+    return token.pos_ == "DET"  # type: ignore[no-any-return]
 
 
 def get_gender(token) -> str | None:
@@ -436,7 +436,7 @@ def is_comparison_como(token) -> bool:
     # dep_ == "advmod" → adverbio de manera ("como lo hizo")
     if token.dep_ == "advmod":
         # Verificar si modifica un verbo (manera) o un adjetivo (comparación)
-        return token.head.pos_ != "VERB"
+        return token.head.pos_ != "VERB"  # type: ignore[no-any-return]
 
     # dep_ == "case" → preposición/marcador de caso
     if token.dep_ == "case":

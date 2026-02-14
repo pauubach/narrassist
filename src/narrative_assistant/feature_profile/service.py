@@ -305,7 +305,7 @@ class FeatureProfileService:
             return "disabled"
 
         val = getattr(profile, feature, None)
-        return val.value if val else "disabled"
+        return val.value if val else "disabled"  # type: ignore[no-any-return]
 
     def get_all_feature_availability(self, project_id: int) -> dict:
         """
@@ -321,7 +321,7 @@ class FeatureProfileService:
         if not profile:
             return {}
 
-        return profile.to_dict().get("features", {})
+        return profile.to_dict().get("features", {})  # type: ignore[no-any-return]
 
     # =========================================================================
     # Detección automática (placeholder para futuro ML)

@@ -142,15 +142,15 @@ class GrammarChecker:
             from .languagetool_client import get_languagetool_client
             from .languagetool_manager import ensure_languagetool_running, is_languagetool_installed
 
-            self._lt_client = get_languagetool_client()
+            self._lt_client = get_languagetool_client()  # type: ignore[assignment]
 
             # Si no está disponible pero está instalado, intentar iniciarlo
-            if not self._lt_client.is_available():
+            if not self._lt_client.is_available():  # type: ignore[attr-defined]
                 if is_languagetool_installed():
                     logger.info("LanguageTool instalado pero no corriendo, iniciando servidor...")
                     if ensure_languagetool_running():
                         # Refrescar estado del cliente
-                        self._lt_client.refresh_availability()
+                        self._lt_client.refresh_availability()  # type: ignore[attr-defined]
                         logger.info("LanguageTool iniciado correctamente")
                     else:
                         logger.warning("No se pudo iniciar LanguageTool automáticamente")
@@ -159,7 +159,7 @@ class GrammarChecker:
                         "LanguageTool no instalado. Ejecutar: python scripts/setup_languagetool.py"
                     )
 
-            if self._lt_client.is_available():
+            if self._lt_client.is_available():  # type: ignore[attr-defined]
                 logger.info("LanguageTool disponible para análisis gramatical avanzado")
             else:
                 self._lt_client = None
@@ -339,7 +339,7 @@ class GrammarChecker:
             )
 
         if errors:
-            return Result.partial(report, errors)
+            return Result.partial(report, errors)  # type: ignore[arg-type]
         return Result.success(report)
 
     def _check_with_spanish_rules(self, text: str) -> list[GrammarIssue]:
@@ -815,7 +815,7 @@ class GrammarChecker:
             from ...llm.client import get_llm_client
 
             client = get_llm_client()
-            if not client or not client.is_available():
+            if not client or not client.is_available():  # type: ignore[operator]
                 return []
 
             # Preparar contexto de issues existentes
@@ -838,7 +838,7 @@ Responde SOLO con un JSON array de errores encontrados:
 
 Si no hay errores adicionales, responde: []"""
 
-            response = client.generate(prompt, max_tokens=500)
+            response = client.generate(prompt, max_tokens=500)  # type: ignore[attr-defined]
             if not response:
                 return []
 

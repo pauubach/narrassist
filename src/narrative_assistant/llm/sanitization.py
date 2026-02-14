@@ -177,7 +177,7 @@ def validate_llm_response(
     # Sanitizar valores de texto en la respuesta
     sanitized = _sanitize_response_values(data)
 
-    return sanitized
+    return sanitized  # type: ignore[no-any-return]
 
 
 def extract_json_from_response(text: str) -> str | None:

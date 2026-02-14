@@ -216,7 +216,7 @@ async def update_project_correction_config(
     no la configuración completa. La configuración base se hereda del tipo/subtipo.
     """
     try:
-        result = deps.project_manager.get(int(project_id))
+        result = deps.project_manager.get(int(project_id))  # type: ignore[attr-defined]
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
         project = result.value
@@ -237,7 +237,7 @@ async def update_project_correction_config(
         if update.selectedPreset:
             project.settings["correction_preset"] = update.selectedPreset
 
-        update_result = deps.project_manager.update(project)
+        update_result = deps.project_manager.update(project)  # type: ignore[attr-defined]
         if update_result.is_failure:
             logger.error(f"Failed to update project {project_id}: {update_result.errors}")
             return ApiResponse(success=False, error="Error al guardar configuración")
@@ -274,7 +274,7 @@ async def apply_correction_preset(
     Aplica un preset de configuración a un proyecto.
     """
     try:
-        result = deps.project_manager.get(int(project_id))
+        result = deps.project_manager.get(int(project_id))  # type: ignore[attr-defined]
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
         project = result.value
@@ -303,7 +303,7 @@ async def apply_correction_preset(
         # Guardar configuración en settings del proyecto
         project.settings["correction_config"] = config.to_dict()
         project.settings["correction_preset"] = preset_id
-        update_result = deps.project_manager.update(project)
+        update_result = deps.project_manager.update(project)  # type: ignore[attr-defined]
         if update_result.is_failure:
             return ApiResponse(success=False, error="Error al guardar configuración")
 
@@ -331,7 +331,7 @@ async def reset_project_correction_config(project_id: str) -> ApiResponse:
     Elimina la configuración personalizada y vuelve a la por defecto.
     """
     try:
-        result = deps.project_manager.get(int(project_id))
+        result = deps.project_manager.get(int(project_id))  # type: ignore[attr-defined]
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
         project = result.value
@@ -348,7 +348,7 @@ async def reset_project_correction_config(project_id: str) -> ApiResponse:
             needs_update = True
 
         if needs_update:
-            update_result = deps.project_manager.update(project)
+            update_result = deps.project_manager.update(project)  # type: ignore[attr-defined]
             if update_result.is_failure:
                 return ApiResponse(success=False, error="Error al guardar configuración")
             logger.info(f"Deleted custom correction config for project {project_id}")
@@ -380,7 +380,7 @@ async def detect_document_profile(project_id: str) -> ApiResponse:
     - Presencia de diálogos
     """
     try:
-        result = deps.project_manager.get(int(project_id))
+        result = deps.project_manager.get(int(project_id))  # type: ignore[attr-defined]
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
         _ = result.value  # noqa: F841
@@ -393,7 +393,7 @@ async def detect_document_profile(project_id: str) -> ApiResponse:
         from narrative_assistant.corrections.detectors.regional import RegionalDetector
 
         # Obtener texto del documento (primeros capítulos)
-        chapters = deps.chapter_repository.get_by_project(int(project_id)) if deps.chapter_repository else []
+        chapters = deps.chapter_repository.get_by_project(int(project_id)) if deps.chapter_repository else []  # type: ignore[attr-defined, var-annotated]
         if not chapters:
             return ApiResponse(
                 success=True,
@@ -448,7 +448,7 @@ async def detect_document_profile(project_id: str) -> ApiResponse:
         for term, info in BUILTIN_FIELD_TERMS.items():
             if term in sample_text:
                 field = info["field"]
-                field_scores[field] += sample_text.count(term)
+                field_scores[field] += sample_text.count(term)  # type: ignore[index]
 
         # Detectar términos jurídicos específicos
         legal_terms = ["demandante", "demandado", "sentencia", "recurso", "tribunal",
@@ -486,11 +486,11 @@ async def detect_document_profile(project_id: str) -> ApiResponse:
         # 4. Detectar variante regional
         region_scores = {"es_ES": 0, "es_MX": 0, "es_AR": 0}
 
-        for term, info in RegionalDetector.BUILTIN_REGIONAL_TERMS.items():
+        for term, info in RegionalDetector.BUILTIN_REGIONAL_TERMS.items():  # type: ignore[assignment]
             if term in sample_text:
                 region = info["region"]
                 if region in region_scores:
-                    region_scores[region] += sample_text.count(term)
+                    region_scores[region] += sample_text.count(term)  # type: ignore[index]
 
         detected_region = max(region_scores.keys(), key=lambda r: region_scores[r])
         if region_scores[detected_region] < 3:
@@ -534,7 +534,7 @@ async def detect_document_profile(project_id: str) -> ApiResponse:
         if has_dialogues:
             detection_reasons.append(f"Diálogos detectados ({dialogue_count} indicadores)")
         if detected_field != DocumentField.GENERAL:
-            detection_reasons.append(f"Terminología de {_field_label(detected_field).lower()}")
+            detection_reasons.append(f"Terminología de {_field_label(detected_field).lower()}")  # type: ignore[arg-type]
         if detected_register != "neutral":
             reg_label = "formal" if detected_register == "formal" else "coloquial"
             detection_reasons.append(f"Registro {reg_label}")
@@ -549,7 +549,7 @@ async def detect_document_profile(project_id: str) -> ApiResponse:
                 "suggested_config": config_dict,
                 "detection": {
                     "field": detected_field.value,
-                    "field_label": _field_label(detected_field),
+                    "field_label": _field_label(detected_field),  # type: ignore[arg-type]
                     "register": detected_register,
                     "region": detected_region,
                     "has_dialogues": has_dialogues,
@@ -1189,7 +1189,7 @@ async def get_project_correction_config(project_id: int):
         from narrative_assistant.correction_config import get_config_for_project
 
         # Usar el deps.project_manager global en lugar de crear nueva instancia
-        result = deps.project_manager.get(project_id)
+        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
         project = result.value
@@ -1226,7 +1226,7 @@ async def get_correction_config_diff(
         ApiResponse con parámetros sobrescritos y sus valores
     """
     try:
-        from narrative_assistant.correction_config import get_config_diff
+        from narrative_assistant.correction_config import get_config_diff  # type: ignore[attr-defined]
 
         diff = get_config_diff(type_code, subtype_code)
         return ApiResponse(success=True, data=diff)

@@ -28,6 +28,11 @@ class PipelineConsistencyMixin:
     - self._memory_monitor (MemoryMonitor)
     """
 
+    if TYPE_CHECKING:
+        from .unified_analysis import UnifiedConfig
+
+        config: UnifiedConfig
+
     def _phase_6_consistency(self, context: AnalysisContext) -> Result[None]:
         """Fase 6: Análisis de consistencia."""
         phase_start = datetime.now()
@@ -70,7 +75,7 @@ class PipelineConsistencyMixin:
             checker = AttributeConsistencyChecker()
             result = checker.check_consistency(context.attributes)
 
-            if result.is_success:
+            if result.is_success and result.value is not None:
                 context.inconsistencies = result.value
                 context.stats["inconsistencies"] = len(context.inconsistencies)
 
@@ -262,7 +267,7 @@ class PipelineConsistencyMixin:
             all_incoherences = []
 
             # Necesitamos diálogos por capítulo
-            dialogues_by_chapter = {}
+            dialogues_by_chapter: dict[int, list] = {}
             for d in context.dialogues:
                 chapter = d.get("chapter", 0)
                 if chapter not in dialogues_by_chapter:
@@ -290,7 +295,7 @@ class PipelineConsistencyMixin:
 
                 # Manejar tanto Result como list directa
                 if hasattr(result, "is_success"):
-                    incoherences = result.value if result.is_success else []
+                    incoherences = result.value if result.is_success else []  # type: ignore[union-attr, attr-defined]
                 else:
                     incoherences = result if isinstance(result, list) else []
 
@@ -348,14 +353,14 @@ class PipelineConsistencyMixin:
                     continue
 
                 # Analizar arco emocional del capítulo
-                arc_result = analyzer.analyze_emotional_arc(
+                arc_result = analyzer.analyze_emotional_arc(  # type: ignore[call-arg]
                     text=content,
                     chapter_id=chapter_num,
                     segment_size=500,  # Dividir en segmentos de ~500 chars
                 )
 
-                if arc_result.is_success and arc_result.value:
-                    arc = arc_result.value
+                if hasattr(arc_result, "is_success") and arc_result.is_success and arc_result.value:  # type: ignore[union-attr, attr-defined]
+                    arc = arc_result.value  # type: ignore[union-attr, attr-defined]
                     sentiment_arcs.append(
                         {
                             "chapter": chapter_num,

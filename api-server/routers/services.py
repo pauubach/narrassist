@@ -3,6 +3,8 @@ Router: services
 """
 
 
+import sys
+
 import deps
 from deps import (
     ApiResponse,
@@ -496,7 +498,10 @@ async def chat_with_assistant(project_id: int, request: ChatRequest):
                 logger.warning("LLM not available - Ollama might not be running")
                 return ApiResponse(
                     success=False,
-                    error="Ollama no está disponible. Ejecuta 'ollama serve' o usa scripts\\start_ollama_cpu.bat"
+                    error=(
+                        "Ollama no está disponible. Ejecuta 'ollama serve' o usa "
+                        + ("scripts\\start_ollama_cpu.bat" if sys.platform == "win32" else "OLLAMA_NUM_GPU=0 ollama serve")
+                    )
                 )
 
             llm_client = get_llm_client()
@@ -600,22 +605,41 @@ en el contexto proporcionado, indícalo claramente.
             )
 
             if response and response.strip():
+                using_cpu = getattr(llm_client, '_ollama_num_gpu', None) == 0
                 return ApiResponse(
                     success=True,
                     data={
                         "response": response.strip(),
                         "contextUsed": context_sources,
-                        "model": getattr(llm_client, 'model', 'unknown')
+                        "model": llm_client.model_name,
+                        "usingCpu": using_cpu,
                     }
                 )
             else:
+                logger.warning(f"LLM returned empty response for project {project_id}")
                 return ApiResponse(
                     success=False,
-                    error="El LLM no generó una respuesta"
+                    error=(
+                        "El modelo LLM no generó una respuesta. "
+                        "Esto puede ocurrir si Ollama se quedó sin memoria. "
+                        "Intenta reiniciar Ollama o ejecutar: "
+                        + ("scripts\\start_ollama_cpu.bat" if sys.platform == "win32" else "OLLAMA_NUM_GPU=0 ollama serve")
+                    )
                 )
 
         except Exception as e:
             logger.error(f"Error calling LLM: {e}", exc_info=True)
+            error_lower = str(e).lower()
+            if any(p in error_lower for p in ("terminated", "exit status", "memory", "allocate")):
+                return ApiResponse(
+                    success=False,
+                    error=(
+                        "Ollama se quedó sin memoria GPU. "
+                        "La próxima solicitud usará CPU automáticamente. "
+                        "Si el problema persiste, ejecuta: "
+                        + ("scripts\\start_ollama_cpu.bat" if sys.platform == "win32" else "OLLAMA_NUM_GPU=0 ollama serve")
+                    )
+                )
             return ApiResponse(
                 success=False,
                 error=f"Error al comunicarse con el LLM: {str(e)}"

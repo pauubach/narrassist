@@ -121,7 +121,7 @@ class RegionalDictionary:
             # Ver si tiene equivalente para la región objetivo
             equivalents = info.get("equivalents", {})
             if target_region in equivalents:
-                return equivalents[target_region]
+                return equivalents[target_region]  # type: ignore[no-any-return]
 
         return None
 
@@ -242,7 +242,7 @@ class RegionalDetector(BaseDetector):
             ]
 
         # Detectar términos regionales
-        found_regions = {}  # {region: [(term, start, end), ...]}
+        found_regions: dict[str, list[tuple[str, int, int]]] = {}  # {region: [(term, start, end), ...]}
 
         for word, start, end in tokens:
             word_lower = word.lower()
@@ -256,14 +256,14 @@ class RegionalDetector(BaseDetector):
                 region = builtin["region"]
 
                 if region not in found_regions:
-                    found_regions[region] = []
-                found_regions[region].append((word, start, end, builtin))
+                    found_regions[region] = []  # type: ignore[index]
+                found_regions[region].append((word, start, end, builtin))  # type: ignore[arg-type, index]
 
             elif term_info:
                 for region, info in term_info.items():
                     if region not in found_regions:
                         found_regions[region] = []
-                    found_regions[region].append((word, start, end, info))
+                    found_regions[region].append((word, start, end, info))  # type: ignore[arg-type]
 
         # Analizar resultados
         if len(found_regions) > 1 and self.config.detect_mixed_variants:

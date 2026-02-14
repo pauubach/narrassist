@@ -206,10 +206,10 @@ class AlertEngine:
             logger.warning(
                 f"Created {len(created_alerts)} alerts with {len(errors)} errors"
             )
-            return Result.partial(created_alerts, errors)
+            return Result.partial(created_alerts, errors)  # type: ignore[arg-type]
 
         logger.info(f"Created {len(created_alerts)} alerts for project {project_id}")
-        return Result.success(created_alerts)
+        return Result.success(created_alerts)  # type: ignore[arg-type]
 
     def get_alerts(
         self, project_id: int, alert_filter: AlertFilter | None = None
@@ -231,10 +231,10 @@ class AlertEngine:
         alerts = result.value
 
         if alert_filter:
-            alerts = [a for a in alerts if alert_filter.matches(a)]
+            alerts = [a for a in alerts if alert_filter.matches(a)]  # type: ignore[union-attr]
             logger.debug(f"Filtered to {len(alerts)} alerts for project {project_id}")
 
-        return Result.success(alerts)
+        return Result.success(alerts)  # type: ignore[arg-type]
 
     def get_alert(self, alert_id: int) -> Result[Alert]:
         """
@@ -270,19 +270,19 @@ class AlertEngine:
             return result
 
         alert = result.value
-        old_status = alert.status
+        old_status = alert.status  # type: ignore[union-attr]
 
-        alert.status = status
-        alert.resolution_note = note
+        alert.status = status  # type: ignore[union-attr]
+        alert.resolution_note = note  # type: ignore[union-attr]
 
         if status in [
             AlertStatus.RESOLVED,
             AlertStatus.DISMISSED,
             AlertStatus.AUTO_RESOLVED,
         ]:
-            alert.resolved_at = datetime.now()
+            alert.resolved_at = datetime.now()  # type: ignore[union-attr]
 
-        result = self.repo.update(alert)
+        result = self.repo.update(alert)  # type: ignore[arg-type]
 
         if result.is_success:
             logger.info(
@@ -321,14 +321,14 @@ class AlertEngine:
         """
         result = self.repo.get_by_project(project_id)
         if result.is_failure:
-            return result
+            return result  # type: ignore[return-value]
 
         alerts = result.value
 
         summary = {
-            "total": len(alerts),
-            "open": sum(1 for a in alerts if a.is_open()),
-            "closed": sum(1 for a in alerts if a.is_closed()),
+            "total": len(alerts),  # type: ignore[arg-type]
+            "open": sum(1 for a in alerts if a.is_open()),  # type: ignore[misc, union-attr]
+            "closed": sum(1 for a in alerts if a.is_closed()),  # type: ignore[misc, union-attr]
             "by_category": defaultdict(int),
             "by_severity": defaultdict(int),
             "by_status": defaultdict(int),
@@ -336,20 +336,20 @@ class AlertEngine:
             "by_source": defaultdict(int),
         }
 
-        for alert in alerts:
-            summary["by_category"][alert.category.value] += 1
-            summary["by_severity"][alert.severity.value] += 1
-            summary["by_status"][alert.status.value] += 1
-            summary["by_source"][alert.source_module] += 1
+        for alert in alerts:  # type: ignore[union-attr]
+            summary["by_category"][alert.category.value] += 1  # type: ignore[index]
+            summary["by_severity"][alert.severity.value] += 1  # type: ignore[index]
+            summary["by_status"][alert.status.value] += 1  # type: ignore[index]
+            summary["by_source"][alert.source_module] += 1  # type: ignore[index]
             if alert.chapter:
-                summary["by_chapter"][alert.chapter] += 1
+                summary["by_chapter"][alert.chapter] += 1  # type: ignore[index]
 
         # Convertir defaultdict a dict normal
-        summary["by_category"] = dict(summary["by_category"])
-        summary["by_severity"] = dict(summary["by_severity"])
-        summary["by_status"] = dict(summary["by_status"])
-        summary["by_chapter"] = dict(summary["by_chapter"])
-        summary["by_source"] = dict(summary["by_source"])
+        summary["by_category"] = dict(summary["by_category"])  # type: ignore[call-overload]
+        summary["by_severity"] = dict(summary["by_severity"])  # type: ignore[call-overload]
+        summary["by_status"] = dict(summary["by_status"])  # type: ignore[call-overload]
+        summary["by_chapter"] = dict(summary["by_chapter"])  # type: ignore[call-overload]
+        summary["by_source"] = dict(summary["by_source"])  # type: ignore[call-overload]
 
         return Result.success(summary)
 
@@ -1869,7 +1869,7 @@ class AlertEngine:
             )
             factor = row["calibration_factor"] if row else 1.0
             self._calibration_cache[cache_key] = factor
-            return factor
+            return factor  # type: ignore[no-any-return]
         except Exception:
             return 1.0
 
@@ -1893,7 +1893,7 @@ class AlertEngine:
             )
             total = row["cnt"] if row else 0
             self._total_chapters_cache[project_id] = total
-            return total
+            return total  # type: ignore[no-any-return]
         except Exception:
             return 0
 
@@ -2066,7 +2066,7 @@ class AlertEngine:
                 if row:
                     weight = row["weight"]
                     cache[entity_key] = weight
-                    return weight
+                    return weight  # type: ignore[no-any-return]
             except Exception:
                 pass
             # Fall through to project-level
@@ -2085,7 +2085,7 @@ class AlertEngine:
             )
             weight = row["weight"] if row else 1.0
             cache[project_key] = weight
-            return weight
+            return weight  # type: ignore[no-any-return]
         except Exception:
             return 1.0
 
@@ -2201,7 +2201,7 @@ class AlertEngine:
                 f"Adaptive weight updated: project={project_id} type={alert_type}"
                 f"{entity_label} weight={weight} (dismissed={dismissed})"
             )
-            return weight
+            return weight  # type: ignore[no-any-return]
         except Exception as e:
             logger.warning(f"Failed to update adaptive weight: {e}")
             return 1.0

@@ -93,7 +93,7 @@ _build_synonym_lookup()
 class FusionError(NarrativeError):
     """Error durante la fusión de entidades."""
 
-    entity_ids: list[int] = None
+    entity_ids: list[int] = None  # type: ignore[assignment]
     original_error: str = ""
     message: str = ""
     severity: ErrorSeverity = ErrorSeverity.RECOVERABLE
@@ -127,7 +127,7 @@ class FusionResult:
     success: bool = False
     result_entity_id: int | None = None
     merged_count: int = 0
-    aliases_added: list[str] = None
+    aliases_added: list[str] = None  # type: ignore[assignment]
     mentions_moved: int = 0
     attributes_moved: int = 0
     related_data_moved: dict[str, int] | None = None
@@ -263,7 +263,7 @@ class EntityFusionService:
 
             # Actualizar la entidad resultante
             self.repo.update_entity(
-                result_entity_id,
+                result_entity_id,  # type: ignore[arg-type]
                 canonical_name=canonical_name,
                 aliases=list(all_aliases),
                 merged_from_ids=entity_ids,
@@ -272,26 +272,26 @@ class EntityFusionService:
             # Mover menciones, atributos y datos relacionados de las otras entidades
             all_related: dict[str, int] = {}
             for entity in entities[1:]:
-                mentions_moved = self.repo.move_mentions(entity.id, result_entity_id)
-                attrs_moved = self.repo.move_attributes(entity.id, result_entity_id)
-                related_moved = self.repo.move_related_data(entity.id, result_entity_id)
+                mentions_moved = self.repo.move_mentions(entity.id, result_entity_id)  # type: ignore[arg-type]
+                attrs_moved = self.repo.move_attributes(entity.id, result_entity_id)  # type: ignore[arg-type]
+                related_moved = self.repo.move_related_data(entity.id, result_entity_id)  # type: ignore[arg-type]
                 result.mentions_moved += mentions_moved
                 result.attributes_moved += attrs_moved
                 for k, v in related_moved.items():
                     all_related[k] = all_related.get(k, 0) + v
 
                 # Desactivar la entidad fusionada (soft delete)
-                self.repo.delete_entity(entity.id, hard_delete=False)
+                self.repo.delete_entity(entity.id, hard_delete=False)  # type: ignore[arg-type]
 
             result.related_data_moved = all_related
 
             # Reconciliar conteo de menciones (asegura consistencia)
-            self.repo.reconcile_mention_count(result_entity_id)
+            self.repo.reconcile_mention_count(result_entity_id)  # type: ignore[arg-type]
 
             # Registrar en historial
             self.repo.add_merge_history(
                 project_id=project_id,
-                result_entity_id=result_entity_id,
+                result_entity_id=result_entity_id,  # type: ignore[arg-type]
                 source_entity_ids=entity_ids,
                 source_snapshots=source_snapshots,
                 canonical_names_before=canonical_names_before,
@@ -786,7 +786,7 @@ def run_automatic_fusion(
             if suggestion.similarity >= auto_merge_threshold:
                 result = service.merge_entities(
                     project_id=project_id,
-                    entity_ids=[suggestion.entity1.id, suggestion.entity2.id],
+                    entity_ids=[suggestion.entity1.id, suggestion.entity2.id],  # type: ignore[list-item]
                     canonical_name=suggestion.entity1.canonical_name,
                 )
                 if result.is_success:

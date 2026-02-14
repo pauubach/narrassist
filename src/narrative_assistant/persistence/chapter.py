@@ -73,7 +73,7 @@ class ChapterData:
             "reading_time_minutes": self.reading_time_minutes,
         }
         # Solo incluir métricas que tengan valor
-        d["metrics"] = {k: v for k, v in metrics.items() if v is not None}
+        d["metrics"] = {k: v for k, v in metrics.items() if v is not None}  # type: ignore[assignment]
         return d
 
     @classmethod
@@ -352,7 +352,7 @@ class SectionData:
     end_char: int
     created_at: str | None = None
     # Campo calculado para hijos (no persistido)
-    subsections: list["SectionData"] = None
+    subsections: list["SectionData"] = None  # type: ignore[assignment]
 
     def __post_init__(self):
         if self.subsections is None:

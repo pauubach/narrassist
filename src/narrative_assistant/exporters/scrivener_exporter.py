@@ -22,6 +22,7 @@ import uuid
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 from xml.etree import ElementTree as ET
 
 from ..core.errors import ErrorSeverity, NarrativeError
@@ -129,7 +130,7 @@ class ScrivenerExporter:
             doc_uuids["manuscript"] = manuscript_uuid
 
             # Capítulos
-            chapter_items = []
+            chapter_items: list[dict[str, Any]] = []
             for chapter in data.chapters:
                 ch_uuid = self._gen_uuid()
                 ch_key = f"chapter_{chapter.number}"
@@ -153,7 +154,7 @@ class ScrivenerExporter:
             characters_folder_uuid = self._gen_uuid()
             doc_uuids["characters_folder"] = characters_folder_uuid
 
-            character_items = []
+            character_items: list[dict[str, Any]] = []
             if options.include_character_notes:
                 for char in data.characters:
                     char_uuid = self._gen_uuid()
@@ -218,7 +219,7 @@ class ScrivenerExporter:
             return Result.failure(
                 NarrativeError(
                     message=f"Error exportando a Scrivener: {e}",
-                    severity=ErrorSeverity.HIGH,
+                    severity=ErrorSeverity.RECOVERABLE,
                 )
             )
 
@@ -414,15 +415,16 @@ def export_to_scrivener(
     try:
         from ..entities.repository import get_entity_repository
         from ..persistence.chapter import get_chapter_repository
-        from ..persistence.project import get_project_manager
+        from ..persistence.project import ProjectManager
 
         # Cargar proyecto
-        pm = get_project_manager()
+        pm = ProjectManager()
         result = pm.get(project_id)
         if result.is_failure:
-            return result
+            return Result.failure(result.error)  # type: ignore[arg-type]
 
         project = result.value
+        assert project is not None
 
         # Cargar capítulos
         chapter_repo = get_chapter_repository()
@@ -443,6 +445,8 @@ def export_to_scrivener(
             # Entidades mencionadas en el capítulo
             ch_entities = []
             for entity in entities:
+                if entity.id is None:
+                    continue
                 mentions = entity_repo.get_mentions_by_entity(entity.id)
                 for m in mentions:
                     if hasattr(m, "chapter_id") and m.chapter_id == ch.chapter_number:
@@ -468,7 +472,7 @@ def export_to_scrivener(
                     from ..nlp.attributes import get_attribute_extractor
 
                     extractor = get_attribute_extractor()
-                    entity_attrs = extractor.get_attributes_for_entity(entity.id)
+                    entity_attrs = extractor.get_attributes_for_entity(entity.id)  # type: ignore[attr-defined]
                     for attr in entity_attrs:
                         key = getattr(attr, "key", "")
                         value = getattr(attr, "value", "")
@@ -496,6 +500,6 @@ def export_to_scrivener(
         return Result.failure(
             NarrativeError(
                 message=f"Error exportando a Scrivener: {e}",
-                severity=ErrorSeverity.HIGH,
+                severity=ErrorSeverity.RECOVERABLE,
             )
         )

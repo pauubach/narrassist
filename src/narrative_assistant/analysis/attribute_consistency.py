@@ -376,14 +376,14 @@ def _normalize_value(value: str) -> str:
                     # Multi-word: lematizar todos los tokens
                     lemma = " ".join(token.lemma_.lower() for token in doc)
                 _lemma_cache[v] = lemma
-                return lemma
+                return lemma  # type: ignore[no-any-return]
         except Exception as e:
             logger.debug(f"Error en lematización spaCy: {e}")
 
     # Fallback to manual dictionary
     lemma = _FALLBACK_LEMMAS.get(v, v)
     _lemma_cache[v] = lemma
-    return lemma
+    return lemma  # type: ignore[no-any-return]
 
 
 def reset_lemma_cache() -> None:
@@ -1230,7 +1230,7 @@ class AttributeConsistencyChecker:
         entity_attrs = [a for a in attributes if a.entity_name.lower() == entity_name.lower()]
 
         result = self.check_consistency(entity_attrs)
-        return result.value if result.is_success else []
+        return result.value if result.is_success else []  # type: ignore[return-value]
 
 
 # =============================================================================

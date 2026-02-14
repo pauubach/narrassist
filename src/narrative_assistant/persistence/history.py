@@ -398,15 +398,15 @@ class HistoryManager:
             # Dispatch por tipo de acción
             # NOTA: Implementación básica - extender según necesidades
             if action_type == "ENTITY_MERGED":
-                self._undo_entity_merge(target_id, old_value)
+                self._undo_entity_merge(target_id, old_value)  # type: ignore[arg-type]
 
             elif action_type == "ALERT_RESOLVED":
                 # Re-abrir alerta
-                self._undo_alert_resolution(target_id)
+                self._undo_alert_resolution(target_id)  # type: ignore[arg-type]
 
             elif action_type == "ATTRIBUTE_VERIFIED":
                 # Des-verificar atributo
-                self._undo_attribute_verification(target_id)
+                self._undo_attribute_verification(target_id)  # type: ignore[arg-type]
 
             else:
                 logger.warning(f"Tipo de acción {action_type} no soportado para undo")
@@ -415,7 +415,7 @@ class HistoryManager:
             # 5. Registrar la reversión en el historial
             self.record(
                 action_type=ChangeType.UNDO,
-                target_type=undo_info.get("target_type"),
+                target_type=undo_info.get("target_type"),  # type: ignore[arg-type]
                 target_id=target_id,
                 note=f"Deshecha acción #{entry_id}: {action_type}",
             )

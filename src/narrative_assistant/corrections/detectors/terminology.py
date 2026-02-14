@@ -103,7 +103,7 @@ class TerminologyDetector(BaseDetector):
 
     @property
     def category(self) -> CorrectionCategory:
-        return CorrectionCategory.STYLE
+        return CorrectionCategory.STYLE  # type: ignore[no-any-return, attr-defined]
 
     @property
     def requires_spacy(self) -> bool:
@@ -237,14 +237,14 @@ class TerminologyDetector(BaseDetector):
         term_positions: dict[str, list[tuple[int, int]]],
     ) -> list[TermCluster]:
         """Agrupa términos por similitud de embeddings."""
-        clusters = []
+        clusters = []  # type: ignore[var-annotated]
 
         if len(terms) < 2:
             return clusters
 
         try:
             # Obtener embeddings
-            embeddings = self._embeddings_model.encode(terms)
+            embeddings = self._embeddings_model.encode(terms)  # type: ignore[attr-defined]
 
             # Calcular similitudes
             from numpy import dot
@@ -304,7 +304,7 @@ class TerminologyDetector(BaseDetector):
         chapter_index: int | None,
     ) -> list[CorrectionIssue]:
         """Crea issues para un cluster de términos variantes."""
-        issues = []
+        issues = []  # type: ignore[var-annotated]
 
         # Solo reportar si hay suficiente variación
         total_occurrences = sum(len(positions) for positions in cluster.positions.values())

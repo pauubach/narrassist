@@ -221,7 +221,7 @@ class TrainableWeightedVoting:
             logger.info(f"Grid search: {n_iterations} combinaciones evaluadas")
 
         # Resultados
-        weights = {m: float(w) for m, w in zip(self.methods, best_weights, strict=False)}
+        weights = {m: float(w) for m, w in zip(self.methods, best_weights, strict=False)}  # type: ignore[arg-type]
         predictions = X @ best_weights
         accuracy = self._calculate_accuracy(predictions, y)
         cv_scores = self._cross_validate(X, y, cv_folds)

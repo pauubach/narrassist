@@ -595,7 +595,7 @@ def generate_person_aliases(canonical_name: str, all_canonical_names: set[str]) 
     Para nombres compuestos como "María García", extrae partes útiles
     que pueden usarse como alias para búsqueda de menciones.
     """
-    aliases = []
+    aliases = []  # type: ignore[var-annotated]
     parts = canonical_name.split()
 
     if len(parts) < 2:

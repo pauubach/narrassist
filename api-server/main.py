@@ -298,12 +298,12 @@ except Exception as e:
 if _DB_MODULES_LOADED:
     _write_debug("=== PHASE 1b: Initializing database ===")
     try:
-        deps.project_manager = ProjectManager()
-        deps.chapter_repository = ChapterRepository()
-        deps.section_repository = SectionRepository()
-        deps.get_config = get_config
-        deps.get_database = get_database
-        deps.Database = Database
+        deps.project_manager = ProjectManager()  # type: ignore[assignment]
+        deps.chapter_repository = ChapterRepository()  # type: ignore[assignment]
+        deps.section_repository = SectionRepository()  # type: ignore[assignment]
+        deps.get_config = get_config  # type: ignore[assignment]
+        deps.get_database = get_database  # type: ignore[assignment]
+        deps.Database = Database  # type: ignore[assignment]
 
         db = get_database()
         _write_debug(f"Database path: {db.db_path}")
@@ -330,12 +330,12 @@ if _DB_MODULES_LOADED:
             else:
                 _write_debug(f"Repair failed: {msg}. Nuclear option...")
                 delete_and_recreate_database()
-            deps.project_manager = ProjectManager()
-            deps.chapter_repository = ChapterRepository()
-            deps.section_repository = SectionRepository()
-            deps.get_config = get_config
-            deps.get_database = get_database
-            deps.Database = Database
+            deps.project_manager = ProjectManager()  # type: ignore[assignment]
+            deps.chapter_repository = ChapterRepository()  # type: ignore[assignment]
+            deps.section_repository = SectionRepository()  # type: ignore[assignment]
+            deps.get_config = get_config  # type: ignore[assignment]
+            deps.get_database = get_database  # type: ignore[assignment]
+            deps.Database = Database  # type: ignore[assignment]
         except Exception as repair_err:
             _write_debug(f"All repair attempts failed: {repair_err}")
             _early_logger.error(f"All DB repair attempts failed: {repair_err}", exc_info=True)
@@ -345,7 +345,7 @@ if _DB_MODULES_LOADED:
     _write_debug("=== PHASE 2: Loading entity/alert repositories ===")
     try:
         from narrative_assistant.entities.repository import EntityRepository
-        deps.entity_repository = EntityRepository()
+        deps.entity_repository = EntityRepository()  # type: ignore[assignment]
         _write_debug("Phase 2a OK: EntityRepository loaded")
     except Exception as e:
         _write_debug(f"Phase 2a: EntityRepository not available: {type(e).__name__}: {e}")
@@ -353,7 +353,7 @@ if _DB_MODULES_LOADED:
 
     try:
         from narrative_assistant.alerts.repository import AlertRepository
-        deps.alert_repository = AlertRepository()
+        deps.alert_repository = AlertRepository()  # type: ignore[assignment]
         _write_debug("Phase 2b OK: AlertRepository loaded")
     except Exception as e:
         _write_debug(f"Phase 2b: AlertRepository not available: {type(e).__name__}: {e}")
@@ -660,11 +660,11 @@ if __name__ == "__main__":
         sys.stdin = open(_devnull)  # noqa: SIM115
 
     if not hasattr(sys.stdout, 'isatty'):
-        sys.stdout.isatty = lambda: False
+        sys.stdout.isatty = lambda: False  # type: ignore[method-assign]
     if not hasattr(sys.stderr, 'isatty'):
-        sys.stderr.isatty = lambda: False
+        sys.stderr.isatty = lambda: False  # type: ignore[method-assign]
     if not hasattr(sys.stdin, 'isatty'):
-        sys.stdin.isatty = lambda: False
+        sys.stdin.isatty = lambda: False  # type: ignore[method-assign]
 
     _early_logger.info("stdio redirects configured")
 

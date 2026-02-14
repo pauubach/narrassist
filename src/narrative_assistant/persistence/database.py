@@ -1657,7 +1657,7 @@ class Database:
     def fetchone(self, sql: str, params: tuple = ()) -> sqlite3.Row | None:
         """Ejecuta y retorna una fila."""
         with self.connection() as conn:
-            return conn.execute(sql, params).fetchone()
+            return conn.execute(sql, params).fetchone()  # type: ignore[no-any-return]
 
     def fetchall(self, sql: str, params: tuple = ()) -> list[sqlite3.Row]:
         """Ejecuta y retorna todas las filas."""

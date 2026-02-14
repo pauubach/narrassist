@@ -928,11 +928,11 @@ def check_gender_agreement(doc: Doc) -> list[GrammarIssue]:
             det_lower = det.lower_
 
             # Obtener género del determinante
-            det_gender = det.morph.get("Gender")
-            det_gender = det_gender[0] if det_gender else None
+            det_gender = det.morph.get("Gender")  # type: ignore[call-arg]
+            det_gender = det_gender[0] if det_gender else None  # type: ignore[assignment]
             if not det_gender:
                 # Inferir del texto
-                det_gender = "Masc" if det_lower in ("el", "un") else "Fem"
+                det_gender = "Masc" if det_lower in ("el", "un") else "Fem"  # type: ignore[assignment]
 
             # Buscar el sustantivo que sigue (saltando adjetivos)
             j = i + 1
@@ -966,15 +966,15 @@ def check_gender_agreement(doc: Doc) -> list[GrammarIssue]:
                     continue  # No verificar más para estos
 
                 # Obtener género del sustantivo de spaCy
-                noun_gender = noun.morph.get("Gender")
-                noun_gender = noun_gender[0] if noun_gender else None
+                noun_gender = noun.morph.get("Gender")  # type: ignore[call-arg]
+                noun_gender = noun_gender[0] if noun_gender else None  # type: ignore[assignment]
 
                 # Fallback: usar listas de palabras comunes si spaCy no tiene info
                 if not noun_gender:
                     if noun_lower in COMMON_FEMININE:
-                        noun_gender = "Fem"
+                        noun_gender = "Fem"  # type: ignore[assignment]
                     elif noun_lower in COMMON_MASCULINE:
-                        noun_gender = "Masc"
+                        noun_gender = "Masc"  # type: ignore[assignment]
                     else:
                         continue  # Sin información de género, no podemos verificar
 
@@ -1141,9 +1141,9 @@ def check_number_agreement(doc: Doc) -> list[GrammarIssue]:
     text_lower = doc.text.lower()
 
     # Detectar determinante plural + sustantivo singular
-    for noun in COMMON_SINGULAR_NOUNS:
+    for noun in COMMON_SINGULAR_NOUNS:  # type: ignore[assignment]
         for det in ["los", "las", "unos", "unas"]:
-            pattern = rf"\b{det}\s+{re.escape(noun)}\b"
+            pattern = rf"\b{det}\s+{re.escape(noun)}\b"  # type: ignore[type-var]
             for match in re.finditer(pattern, text_lower):
                 start, end = match.span()
                 # Verificar que no esté ya detectado
@@ -1193,14 +1193,14 @@ def check_adjective_agreement(doc: Doc) -> list[GrammarIssue]:
             noun = token
 
             # Obtener género y número del sustantivo de spaCy
-            noun_gender = noun.morph.get("Gender")
-            noun_number = noun.morph.get("Number")
+            noun_gender = noun.morph.get("Gender")  # type: ignore[call-arg]
+            noun_number = noun.morph.get("Number")  # type: ignore[call-arg]
 
             if not noun_gender and not noun_number:
                 continue  # Sin información morfológica, saltar
 
-            noun_gender = noun_gender[0] if noun_gender else None
-            noun_number = noun_number[0] if noun_number else None
+            noun_gender = noun_gender[0] if noun_gender else None  # type: ignore[assignment]
+            noun_number = noun_number[0] if noun_number else None  # type: ignore[assignment]
 
             # Buscar adjetivos que REALMENTE modifiquen este sustantivo
             # usando dependencias sintácticas de spaCy
@@ -1301,19 +1301,19 @@ def check_adjective_agreement(doc: Doc) -> list[GrammarIssue]:
                         continue  # Es tiempo compuesto, no verificar concordancia
 
                 # Obtener género y número del adjetivo de spaCy
-                adj_gender = adj.morph.get("Gender")
-                adj_number = adj.morph.get("Number")
+                adj_gender_list = adj.morph.get("Gender")  # type: ignore[call-arg]
+                adj_number_list = adj.morph.get("Number")  # type: ignore[call-arg]
 
-                adj_gender = adj_gender[0] if adj_gender else None
-                adj_number = adj_number[0] if adj_number else None
+                adj_gender: str | None = adj_gender_list[0] if adj_gender_list else None  # type: ignore[index]
+                adj_number: str | None = adj_number_list[0] if adj_number_list else None  # type: ignore[index]
 
                 # Corregir errores de spaCy en número de adjetivos
                 # Si termina en -es/-os/-as es muy probable que sea plural
                 adj_lower = adj.lower_
                 if adj_lower.endswith(("es", "os", "as")) and adj_number == "Sing":
-                    adj_number = "Plur"  # Corregir a plural
+                    adj_number = "Plur"  # Corregir a plural  # type: ignore[assignment]
                 elif not adj_lower.endswith(("s", "es")) and adj_number == "Plur":
-                    adj_number = "Sing"  # Corregir a singular
+                    adj_number = "Sing"  # Corregir a singular  # type: ignore[assignment]
 
                 # Verificar concordancia de género
                 if noun_gender and adj_gender and noun_gender != adj_gender:
@@ -1338,7 +1338,7 @@ def check_adjective_agreement(doc: Doc) -> list[GrammarIssue]:
                             suggestion=f"{noun.text} {suggestion}" if suggestion else None,
                             confidence=0.9,  # Alta confianza con morfología de spaCy
                             detection_method=GrammarDetectionMethod.SPACY_DEP,
-                            explanation=f"Error de concordancia de género: '{noun.text}' es {noun_gender.lower()} pero '{adj.text}' es {adj_gender.lower()}",
+                            explanation=f"Error de concordancia de género: '{noun.text}' es {noun_gender.lower()} pero '{adj.text}' es {adj_gender.lower()}",  # type: ignore[attr-defined]
                             rule_id="ADJECTIVE_GENDER_AGREEMENT",
                         )
                     )

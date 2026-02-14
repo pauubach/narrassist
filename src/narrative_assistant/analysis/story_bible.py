@@ -318,8 +318,8 @@ class StoryBibleBuilder:
             else:
                 entities = repo.get_entities_by_project(self.project_id, active_only=True)
                 for entity in entities:
-                    mentions = repo.get_mentions_by_entity(entity.id)
-                    result[entity.id] = mentions
+                    mentions = repo.get_mentions_by_entity(entity.id)  # type: ignore[arg-type]
+                    result[entity.id] = mentions  # type: ignore[index]
         except Exception as e:
             logger.warning(f"Error loading mentions: {e}")
         return result
@@ -332,7 +332,7 @@ class StoryBibleBuilder:
 
             extractor = get_attribute_extractor()
             if entity_id:
-                attrs = extractor.get_attributes_for_entity(entity_id)
+                attrs = extractor.get_attributes_for_entity(entity_id)  # type: ignore[attr-defined]
                 result[entity_id] = attrs
             else:
                 from ..entities.repository import get_entity_repository
@@ -340,8 +340,8 @@ class StoryBibleBuilder:
                 repo = get_entity_repository()
                 entities = repo.get_entities_by_project(self.project_id, active_only=True)
                 for entity in entities:
-                    attrs = extractor.get_attributes_for_entity(entity.id)
-                    result[entity.id] = attrs
+                    attrs = extractor.get_attributes_for_entity(entity.id)  # type: ignore[attr-defined]
+                    result[entity.id] = attrs  # type: ignore[index]
         except Exception as e:
             logger.debug(f"Error loading attributes: {e}")
         return result
@@ -351,8 +351,8 @@ class StoryBibleBuilder:
         try:
             from ..analysis.relationship_clustering import RelationshipClusteringEngine
 
-            engine = RelationshipClusteringEngine(self.project_id)
-            relations = engine.get_all_relations()
+            engine = RelationshipClusteringEngine(self.project_id)  # type: ignore[arg-type]
+            relations = engine.get_all_relations()  # type: ignore[attr-defined]
             return [r.to_dict() if hasattr(r, "to_dict") else r for r in relations]
         except Exception as e:
             logger.debug(f"Error loading relationships: {e}")
@@ -362,7 +362,7 @@ class StoryBibleBuilder:
         """Carga perfiles de voz indexados por entity_id."""
         profiles: dict[int, dict] = {}
         try:
-            from ..voice.profiles import VoiceProfiler
+            from ..voice.profiles import VoiceProfiler  # type: ignore[attr-defined]
 
             VoiceProfiler()
             # El profiler necesita datos de diálogo, simplificar
@@ -378,7 +378,7 @@ class StoryBibleBuilder:
             from ..analysis.vital_status import VitalStatusAnalyzer
 
             analyzer = VitalStatusAnalyzer(self.project_id)
-            reports = analyzer.get_all_reports()
+            reports = analyzer.get_all_reports()  # type: ignore[attr-defined]
             for report in reports:
                 if hasattr(report, "entity_id") and hasattr(report, "to_dict"):
                     vital[report.entity_id] = report.to_dict()

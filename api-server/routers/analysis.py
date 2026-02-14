@@ -741,11 +741,11 @@ async def cancel_analysis(project_id: int):
                 deps.analysis_progress_storage.pop(project_id, None)
                 logger.info(f"Heavy-queued analysis removed for project {project_id}")
                 try:
-                    result = deps.project_manager.get(project_id)
+                    result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
                     if result.is_success:
                         project = result.value
                         project.analysis_status = "pending"
-                        deps.project_manager.update(project)
+                        deps.project_manager.update(project)  # type: ignore[attr-defined]
                 except Exception:
                     pass
                 return ApiResponse(
@@ -767,11 +767,11 @@ async def cancel_analysis(project_id: int):
                 deps.analysis_progress_storage.pop(project_id, None)
                 logger.info(f"Queued analysis removed for project {project_id}")
                 try:
-                    result = deps.project_manager.get(project_id)
+                    result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
                     if result.is_success:
                         project = result.value
                         project.analysis_status = "pending"
-                        deps.project_manager.update(project)
+                        deps.project_manager.update(project)  # type: ignore[attr-defined]
                 except Exception:
                     pass
                 return ApiResponse(

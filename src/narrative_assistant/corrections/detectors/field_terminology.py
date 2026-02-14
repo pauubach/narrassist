@@ -435,8 +435,8 @@ class FieldTerminologyDetector(BaseDetector):
                 field = builtin["field"]
 
                 if field not in found_terms:
-                    found_terms[field] = []
-                found_terms[field].append((word, start, end, builtin))
+                    found_terms[field] = []  # type: ignore[index]
+                found_terms[field].append((word, start, end, builtin))  # type: ignore[index]
 
             elif term_info:
                 for field, info in term_info.items():

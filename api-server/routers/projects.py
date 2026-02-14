@@ -412,7 +412,7 @@ async def create_project(
                 )
             except (ValueError, PermissionError) as e:
                 raise HTTPException(status_code=400, detail=str(e))
-            file_ext = document_path.suffix.lower()
+            file_ext = document_path.suffix.lower()  # type: ignore[union-attr]
             stored_path = str(document_path)  # Guardar la ruta resuelta y validada
 
         elif file and file.filename:
@@ -420,7 +420,7 @@ async def create_project(
             file_ext = Path(file.filename).suffix.lower()
 
             # Crear directorio de documentos
-            config = deps.get_config()
+            config = deps.get_config()  # type: ignore[misc]
             documents_dir = config.data_dir / "documents"
             documents_dir.mkdir(parents=True, exist_ok=True)
 
@@ -463,19 +463,19 @@ async def create_project(
             from narrative_assistant.parsers.base import detect_format
 
             # Detectar formato del documento
-            doc_format = detect_format(document_path)
+            doc_format = detect_format(document_path)  # type: ignore[arg-type]
             format_str = doc_format.value if hasattr(doc_format, 'value') else str(doc_format).split('.')[-1].upper()
 
             # Leer contenido del documento para create_from_document
             logger.info(f"Reading document content from: {document_path}")
-            parser = get_parser(document_path)
-            parse_result = parser.parse(document_path)
+            parser = get_parser(document_path)  # type: ignore[arg-type]
+            parse_result = parser.parse(document_path)  # type: ignore[arg-type]
 
             if parse_result.is_failure:
                 raise HTTPException(status_code=400, detail=f"Error leyendo documento: {parse_result.error}")
 
             raw_doc = parse_result.value
-            document_text = raw_doc.full_text
+            document_text = raw_doc.full_text  # type: ignore[union-attr]
 
             if not document_text or not document_text.strip():
                 raise HTTPException(status_code=400, detail="El documento está vacío o no se pudo leer el contenido")
@@ -486,12 +486,12 @@ async def create_project(
             logger.info(f"Creating project '{name}' from: {document_path}")
 
             project_repo = deps.project_manager
-            create_result = project_repo.create_from_document(
+            create_result = project_repo.create_from_document(  # type: ignore[attr-defined]
                 text=document_text,
                 name=name,
                 document_format=format_str,
                 document_path=Path(stored_path),
-                description=description or f"Documento: {document_path.name}",
+                description=description or f"Documento: {document_path.name}",  # type: ignore[union-attr]
                 check_existing=True,
                 is_demo=bool(is_demo),
             )
@@ -565,7 +565,7 @@ async def delete_project(project_id: int):
     """
     try:
         project_repo = deps.project_manager
-        project_repo.delete(project_id)
+        project_repo.delete(project_id)  # type: ignore[attr-defined]
 
         # Limpiar progreso de análisis huérfano
         with deps._progress_lock:
@@ -591,7 +591,7 @@ async def list_versions(project_id: int, limit: int = Query(50, ge=1, le=200)):
         Lista de version_metrics ordenadas por version_num descendente.
     """
     try:
-        db = deps.get_database()
+        db = deps.get_database()  # type: ignore[misc]
         with db.connection() as conn:
             rows = conn.execute(
                 """SELECT id, project_id, version_num, snapshot_id,
@@ -636,7 +636,7 @@ async def get_version_trend(project_id: int, limit: int = Query(10, ge=2, le=50)
         últimas N versiones, ordenadas cronológicamente (ASC).
     """
     try:
-        db = deps.get_database()
+        db = deps.get_database()  # type: ignore[misc]
         with db.connection() as conn:
             rows = conn.execute(
                 """SELECT version_num, alert_count, health_score, word_count, created_at

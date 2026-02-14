@@ -599,7 +599,7 @@ class UnifiedAnalysisPipeline(
                 is_fatal=True,
             )
             if phase_result.is_failure:
-                return Result.failure(phase_result.error)
+                return Result.failure(phase_result.error)  # type: ignore[arg-type]
 
             self._clear_gpu_memory_if_needed()
 
@@ -766,7 +766,10 @@ class UnifiedAnalysisPipeline(
                     )
                     context.skipped_phases.add(phase_name)
                     return Result.failure(
-                        f"Memoria insuficiente para fase '{phase_name}'"
+                        NarrativeError(
+                            message=f"Memoria insuficiente para fase '{phase_name}'",
+                            severity=ErrorSeverity.RECOVERABLE,
+                        )
                     )
             elif pressure in ("critical", "warning"):
                 logger.info(
@@ -781,7 +784,7 @@ class UnifiedAnalysisPipeline(
         mem_start = self._memory_monitor.snapshot(phase_name, label="start")
 
         try:
-            result = phase_func(*args)
+            result: Result[None] = phase_func(*args)
             elapsed = (datetime.now() - phase_start).total_seconds()
             context.phase_times[phase_name] = elapsed
 
@@ -974,10 +977,11 @@ class UnifiedAnalysisPipeline(
             parser = get_parser(path)
             parse_result = parser.parse(path)
             if parse_result.is_failure:
-                return Result.failure(parse_result.error)
+                return Result.failure(parse_result.error)  # type: ignore[arg-type]
 
             raw_doc = parse_result.value
             context.raw_document = raw_doc
+            assert raw_doc is not None
             context.full_text = raw_doc.full_text
             context.stats["total_characters"] = len(context.full_text)
 
@@ -990,7 +994,7 @@ class UnifiedAnalysisPipeline(
             project_mgr = ProjectManager()
 
             existing = project_mgr.get_by_fingerprint(fingerprint.full_hash)
-            if existing:
+            if existing and existing.id is not None:
                 context.project_id = existing.id
                 if self.config.force_reanalysis:
                     self._clear_project_data(context.project_id)
@@ -1004,13 +1008,14 @@ class UnifiedAnalysisPipeline(
                     check_existing=False,
                 )
                 if create_result.is_failure:
-                    return Result.failure(create_result.error)
-                context.project_id = create_result.value.id
+                    return Result.failure(create_result.error)  # type: ignore[arg-type]
+                assert create_result.value is not None
+                context.project_id = create_result.value.id  # type: ignore[assignment]
 
             # 1.4 Sesión
             session_mgr = SessionManager(project_id=context.project_id)
             session = session_mgr.start()
-            context.session_id = session.id
+            context.session_id = session.id  # type: ignore[assignment]
 
             # 1.5 Estructura
             if self.config.run_structure:
@@ -1038,9 +1043,9 @@ class UnifiedAnalysisPipeline(
             from ..parsers.structure_detector import StructureDetector
 
             detector = StructureDetector()
-            result = detector.detect(context.raw_document)
+            result = detector.detect(context.raw_document)  # type: ignore[arg-type]
 
-            if result.is_success and hasattr(result.value, "chapters"):
+            if result.is_success and result.value is not None and hasattr(result.value, "chapters"):
                 for ch in result.value.chapters:
                     content = ch.get_text(context.full_text)
                     context.chapters.append(
@@ -1137,7 +1142,7 @@ class UnifiedAnalysisPipeline(
 
             result = detect_dialogues(context.full_text)
 
-            if result.is_success and result.value.dialogues:
+            if result.is_success and result.value is not None and result.value.dialogues:
                 for dialogue in result.value.dialogues:
                     context.dialogues.append(
                         {

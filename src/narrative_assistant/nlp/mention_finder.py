@@ -110,7 +110,7 @@ class MentionFinder:
         names_to_search.sort(key=lambda x: len(x[0]), reverse=True)
 
         # Buscar cada nombre
-        found_positions = set()  # Evitar solapamientos
+        found_positions: set[tuple[int, int]] = set()  # Evitar solapamientos
 
         for search_name, canonical_name in names_to_search:
             # Saltar palabras muy comunes

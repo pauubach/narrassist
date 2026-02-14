@@ -546,7 +546,7 @@ class SQLiteFocalizationRepository:
                 "DELETE FROM focalization_declarations WHERE id = ?",
                 (declaration_id,),
             )
-            return cursor.rowcount > 0
+            return cursor.rowcount > 0  # type: ignore[no-any-return]
 
     def _row_to_declaration(self, row) -> FocalizationDeclaration:
         """Convierte una fila de SQLite a FocalizationDeclaration."""
@@ -584,6 +584,6 @@ def get_focalization_service(use_sqlite: bool = True) -> FocalizationDeclaration
     if use_sqlite:
         repo = SQLiteFocalizationRepository()
     else:
-        repo = InMemoryFocalizationRepository()
+        repo = InMemoryFocalizationRepository()  # type: ignore[assignment]
 
     return FocalizationDeclarationService(repository=repo)

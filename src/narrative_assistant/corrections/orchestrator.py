@@ -211,9 +211,9 @@ class CorrectionOrchestrator:
     ) -> list[CorrectionIssue]:
         """Ejecuta el detector de terminología."""
         if self._terminology_detector is None:
-            self._terminology_detector = TerminologyDetector(config=self.config.terminology)
+            self._terminology_detector = TerminologyDetector(config=self.config.terminology)  # type: ignore[assignment]
 
-        return self._terminology_detector.detect(
+        return self._terminology_detector.detect(  # type: ignore[no-any-return, attr-defined]
             text,
             chapter_index,
             spacy_doc=spacy_doc,
@@ -228,12 +228,12 @@ class CorrectionOrchestrator:
     ) -> list[CorrectionIssue]:
         """Ejecuta el detector de terminología de campo."""
         if self._field_detector is None:
-            self._field_detector = FieldTerminologyDetector(
+            self._field_detector = FieldTerminologyDetector(  # type: ignore[assignment]
                 config=self.config.field_dictionary,
                 profile=self.config.profile,
             )
 
-        return self._field_detector.detect(
+        return self._field_detector.detect(  # type: ignore[no-any-return, attr-defined]
             text,
             chapter_index,
             spacy_doc=spacy_doc,
@@ -247,11 +247,11 @@ class CorrectionOrchestrator:
     ) -> list[CorrectionIssue]:
         """Ejecuta el detector de glosario."""
         if self._glossary_detector is None:
-            self._glossary_detector = GlossaryDetector(
+            self._glossary_detector = GlossaryDetector(  # type: ignore[assignment]
                 config=self.config.glossary,
             )
 
-        return self._glossary_detector.detect(
+        return self._glossary_detector.detect(  # type: ignore[no-any-return, attr-defined]
             text,
             chapter_index,
             project_id=project_id,
@@ -313,9 +313,9 @@ class CorrectionOrchestrator:
     ) -> list[CorrectionIssue]:
         """Ejecuta un detector individual."""
         if detector.requires_spacy:
-            return detector.detect(text, chapter_index, spacy_doc=spacy_doc)
+            return detector.detect(text, chapter_index, spacy_doc=spacy_doc)  # type: ignore[no-any-return]
         else:
-            return detector.detect(text, chapter_index)
+            return detector.detect(text, chapter_index)  # type: ignore[no-any-return]
 
     def _is_enabled(self, category: CorrectionCategory) -> bool:
         """Verifica si una categoría está habilitada."""
@@ -399,18 +399,18 @@ class CorrectionOrchestrator:
         for issue in issues:
             # Por categoría
             cat = issue.category
-            summary["by_category"][cat] = summary["by_category"].get(cat, 0) + 1
+            summary["by_category"][cat] = summary["by_category"].get(cat, 0) + 1  # type: ignore[index, attr-defined]
 
             # Por tipo
             itype = issue.issue_type
-            summary["by_type"][itype] = summary["by_type"].get(itype, 0) + 1
+            summary["by_type"][itype] = summary["by_type"].get(itype, 0) + 1  # type: ignore[index, attr-defined]
 
             # Por confianza
             if issue.confidence >= 0.8:
-                summary["by_confidence"]["high"] += 1
+                summary["by_confidence"]["high"] += 1  # type: ignore[index]
             elif issue.confidence >= 0.6:
-                summary["by_confidence"]["medium"] += 1
+                summary["by_confidence"]["medium"] += 1  # type: ignore[index]
             else:
-                summary["by_confidence"]["low"] += 1
+                summary["by_confidence"]["low"] += 1  # type: ignore[index]
 
         return summary

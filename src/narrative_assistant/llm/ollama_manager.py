@@ -356,7 +356,7 @@ class OllamaManager:
             try:
                 req = urllib.request.Request(f"{self._config.host}/api/tags")
                 with urllib.request.urlopen(req, timeout=self._config.network_timeout) as resp:
-                    return resp.status == 200
+                    return resp.status == 200  # type: ignore[no-any-return]
             except Exception:
                 return False
         except Exception:
@@ -497,8 +497,8 @@ class OllamaManager:
                     parts = output.split()
                     for i, part in enumerate(parts):
                         if part.lower() == "version" and i + 1 < len(parts):
-                            return parts[i + 1]
-                return output
+                            return parts[i + 1]  # type: ignore[no-any-return]
+                return output  # type: ignore[no-any-return]
         except Exception as e:
             logger.debug(f"Error obteniendo version: {e}")
 
@@ -916,7 +916,7 @@ class OllamaManager:
 
         # Reiniciar con force_cpu
         self._config.force_cpu = True
-        self._status = OllamaStatus.STOPPED
+        self._status = OllamaStatus.STOPPED  # type: ignore[attr-defined]
         return self.start_service(force_cpu=True)
 
     def ensure_running(self, force_cpu: bool = False) -> tuple[bool, str]:
@@ -996,7 +996,7 @@ class OllamaManager:
             _ansi_re = re.compile(r"\x1b\[[^a-zA-Z]*[a-zA-Z]|\[[\d;?]*[a-zA-Z]")
             last_error_line = ""
 
-            for line in process.stdout:
+            for line in process.stdout:  # type: ignore[union-attr]
                 # Limpiar ANSI escapes y caracteres de control
                 clean = _ansi_re.sub("", line).strip()
                 clean = "".join(c for c in clean if c.isprintable() or c in " \t")

@@ -28,6 +28,11 @@ class PipelineResolutionMixin:
     - self._memory_monitor (MemoryMonitor)
     """
 
+    if TYPE_CHECKING:
+        from .unified_analysis import UnifiedConfig
+
+        config: UnifiedConfig
+
     def _phase_3_resolution(self, context: AnalysisContext) -> Result[None]:
         """
         Fase 3: Correferencias, fusión de entidades, atribución de diálogos.

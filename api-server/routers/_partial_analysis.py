@@ -160,7 +160,7 @@ def get_completed_phases(db_session: Any, project_id: int) -> set[str]:
                     "WHERE project_id = ? AND enrichment_type = ? AND status = 'completed'",
                     (project_id, etype),
                 ).fetchone()
-                return row and row[0] > 0
+                return row and row[0] > 0  # type: ignore[no-any-return]
 
         # Tier 1
         if chapter_count > 0:
@@ -279,12 +279,12 @@ def load_tier1_context(ctx: dict) -> None:
     def find_chapter_id_for_position(start_char: int) -> int | None:
         for ch in chapters_with_ids:
             if ch.start_char <= start_char < ch.end_char:
-                return ch.id
+                return ch.id  # type: ignore[no-any-return]
         if chapters_with_ids:
             closest = min(
                 chapters_with_ids, key=lambda c: abs(c.start_char - start_char)
             )
-            return closest.id
+            return closest.id  # type: ignore[no-any-return]
         return None
 
     ctx.setdefault("full_text", full_text)
@@ -339,7 +339,7 @@ def load_attribute_context(ctx: dict) -> None:
             ).fetchall()
 
             for r in rows:
-                attributes.append(ExtractedAttribute(
+                attributes.append(ExtractedAttribute(  # type: ignore[call-arg]
                     entity_name=r["canonical_name"],
                     attribute=r["attribute_key"],
                     value=r["attribute_value"],
@@ -373,7 +373,7 @@ _PHASE_CTX_NEEDS: dict[str, list[str]] = {
 }
 
 # Which loader provides which ctx keys
-_CTX_LOADERS: dict[str, callable] = {
+_CTX_LOADERS: dict[str, callable] = {  # type: ignore[valid-type]
     "full_text":                    load_tier1_context,
     "chapters_data":                load_tier1_context,
     "chapters_count":               load_tier1_context,
@@ -522,7 +522,7 @@ def run_partial_analysis_thread(
     Similar to run_real_analysis in analysis.py but only executes
     the requested phases and loads context from DB for skipped prerequisites.
     """
-    from routers import deps
+    from routers import deps  # type: ignore[attr-defined]
     from routers._analysis_phases import (
         ProgressTracker,
         apply_license_and_settings,

@@ -398,21 +398,21 @@ class ResourceManager:
         """Retorna capacidades detectadas."""
         if self._capabilities is None:
             self.refresh_capabilities()
-        return self._capabilities
+        return self._capabilities  # type: ignore[return-value]
 
     @property
     def recommendation(self) -> ResourceRecommendation:
         """Retorna recomendaciones actuales."""
         if self._recommendation is None:
             self.refresh_capabilities()
-        return self._recommendation
+        return self._recommendation  # type: ignore[return-value]
 
     @property
     def heavy_task_semaphore(self) -> HeavyTaskSemaphore:
         """Retorna semáforo para tareas pesadas."""
         if self._heavy_task_semaphore is None:
             self.refresh_capabilities()
-        return self._heavy_task_semaphore
+        return self._heavy_task_semaphore  # type: ignore[return-value]
 
     def is_system_under_pressure(self) -> bool:
         """Verifica si el sistema está bajo presión de recursos."""
@@ -424,7 +424,7 @@ class ResourceManager:
             mem = psutil.virtual_memory()
 
             # Presión si CPU > 80% o RAM > 85%
-            return cpu > 80 or mem.percent > 85
+            return cpu > 80 or mem.percent > 85  # type: ignore[no-any-return]
         except Exception:
             return False
 

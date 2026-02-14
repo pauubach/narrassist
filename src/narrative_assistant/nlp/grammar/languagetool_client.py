@@ -169,7 +169,7 @@ class LanguageToolClient:
             logger.debug(f"LanguageTool not available: {e}")
             self._available = False
 
-        return self._available
+        return self._available  # type: ignore[return-value]
 
     def refresh_availability(self) -> bool:
         """
@@ -321,7 +321,7 @@ class LanguageToolClient:
                 if current_chunk:
                     result = self.check(current_chunk, **kwargs)
                     if result.is_success:
-                        for match in result.value.matches:
+                        for match in result.value.matches:  # type: ignore[union-attr]
                             # Ajustar offset
                             match.offset += current_offset
                             all_matches.append(match)
@@ -335,7 +335,7 @@ class LanguageToolClient:
         if current_chunk:
             result = self.check(current_chunk.rstrip(), **kwargs)
             if result.is_success:
-                for match in result.value.matches:
+                for match in result.value.matches:  # type: ignore[union-attr]
                     match.offset += current_offset
                     all_matches.append(match)
 

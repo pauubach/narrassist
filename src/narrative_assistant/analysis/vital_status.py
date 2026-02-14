@@ -216,7 +216,7 @@ class VitalStatusAnalyzer:
         self._entity_names: dict[int, str] = {}
         self._name_to_id: dict[str, int] = {}
 
-    def register_entity(self, entity_id: int, name: str, aliases: list[str] = None):
+    def register_entity(self, entity_id: int, name: str, aliases: list[str] = None):  # type: ignore[assignment]
         """Registra una entidad para el análisis."""
         self._entity_names[entity_id] = name
         self._name_to_id[name.lower()] = entity_id

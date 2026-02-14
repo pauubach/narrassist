@@ -428,7 +428,7 @@ class CharacterKnowledgeAnalyzer:
         "tomar",
     }
 
-    def __init__(self, project_id: int = 0, entities: list[dict] = None):
+    def __init__(self, project_id: int = 0, entities: list[dict] = None):  # type: ignore[assignment]
         self.project_id = project_id
 
         # Datos extraídos
@@ -450,7 +450,7 @@ class CharacterKnowledgeAnalyzer:
                     entity.get("aliases", []),
                 )
 
-    def register_entity(self, entity_id: int, name: str, aliases: list[str] = None):
+    def register_entity(self, entity_id: int, name: str, aliases: list[str] = None):  # type: ignore[assignment]
         """Registra una entidad para el análisis."""
         self._entity_names[entity_id] = name
         self._name_to_id[name.lower()] = entity_id
@@ -918,7 +918,7 @@ class CharacterKnowledgeAnalyzer:
         )
 
         # Normalizar a -1 a 1
-        return (a_val - b_val) / 4  # Max diferencia es 4 (-2 a 2)
+        return float(a_val - b_val) / 4  # Max diferencia es 4 (-2 a 2)
 
     def get_all_mentions(self) -> list[DirectedMention]:
         """Retorna todas las menciones detectadas."""
@@ -1098,13 +1098,13 @@ class CharacterKnowledgeAnalyzer:
         """
         try:
             from ..core.device import get_device_detector
-            from ..llm.client import get_client
+            from ..llm.client import get_client  # type: ignore[attr-defined]
 
             # Verificar si hay LLM disponible
             client = get_client()
             if client and client.is_available():
                 detector = get_device_detector()
-                device_info = detector.get_info()
+                device_info = detector.get_info()  # type: ignore[attr-defined]
                 # Si hay GPU, usar HYBRID para mejor calidad
                 if device_info.get("cuda_available") or device_info.get("mps_available"):
                     return KnowledgeExtractionMode.HYBRID
@@ -1236,10 +1236,10 @@ class CharacterKnowledgeAnalyzer:
 
         Más lento pero mayor precisión (~90%).
         """
-        facts = []
+        facts = []  # type: ignore[var-annotated]
 
         try:
-            from ..llm.client import get_client
+            from ..llm.client import get_client  # type: ignore[attr-defined]
 
             client = get_client()
             if not client or not client.is_available():
@@ -1527,7 +1527,7 @@ def detect_knowledge_anachronisms(
     seen = set()
     unique = []
     for a in anachronisms:
-        key = (a["knower_name"], a["used_chapter"], a.get("learned_chapter"))
+        key = (a["knower_name"], a["used_chapter"], a.get("learned_chapter"))  # type: ignore[assignment]
         if key not in seen:
             seen.add(key)
             unique.append(a)

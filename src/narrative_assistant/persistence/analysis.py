@@ -388,7 +388,7 @@ class AnalysisRepository:
                 """,
                 (project_id, session_id, config_json, quality_profile),
             )
-            return cursor.lastrowid
+            return cursor.lastrowid  # type: ignore[return-value]
 
     def complete_run(
         self, run_id: int, status: str = "completed", error_message: str | None = None
@@ -454,7 +454,7 @@ class AnalysisRepository:
                 """,
                 (run_id, phase_name, int(executed), result_count, error_message, metadata_json),
             )
-            return cursor.lastrowid
+            return cursor.lastrowid  # type: ignore[return-value]
 
     def get_executed_phases(self, project_id: int) -> dict[str, bool]:
         """
@@ -507,7 +507,7 @@ class AnalysisRepository:
                     int(rel.is_inferred),
                 ),
             )
-            return cursor.lastrowid
+            return cursor.lastrowid  # type: ignore[return-value]
 
     def save_relationships_batch(self, relationships: list[Relationship]) -> int:
         """Guarda múltiples relaciones en batch."""
@@ -588,7 +588,7 @@ class AnalysisRepository:
                     int(interaction.is_in_dialogue),
                 ),
             )
-            return cursor.lastrowid
+            return cursor.lastrowid  # type: ignore[return-value]
 
     def save_interactions_batch(self, interactions: list[Interaction]) -> int:
         """Guarda múltiples interacciones en batch."""
@@ -674,7 +674,7 @@ class AnalysisRepository:
                     int(change.is_justified),
                 ),
             )
-            return cursor.lastrowid
+            return cursor.lastrowid  # type: ignore[return-value]
 
     def save_register_changes_batch(self, changes: list[RegisterChange]) -> int:
         """Guarda múltiples cambios de registro en batch."""
@@ -761,7 +761,7 @@ class AnalysisRepository:
                     metrics.balance_deviation,
                 ),
             )
-            return cursor.lastrowid
+            return cursor.lastrowid  # type: ignore[return-value]
 
     def get_pacing_metrics(self, project_id: int) -> list[PacingMetrics]:
         """Obtiene métricas de pacing de un proyecto."""

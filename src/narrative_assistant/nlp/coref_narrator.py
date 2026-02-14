@@ -51,8 +51,8 @@ class CorefNarratorMixin:
             return None
 
         # Usar LLM para detectar narrador semánticamente
-        if CorefMethod.LLM in self._methods:
-            llm_method = self._methods[CorefMethod.LLM]
+        if CorefMethod.LLM in self._methods:  # type: ignore[attr-defined]
+            llm_method = self._methods[CorefMethod.LLM]  # type: ignore[attr-defined]
             if llm_method.client and llm_method.client.is_available:
                 return self._detect_narrator_with_llm(text, llm_method.client)
 

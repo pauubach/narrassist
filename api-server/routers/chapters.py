@@ -732,7 +732,7 @@ async def get_chapter_emotional_analysis(project_id: int, chapter_number: int):
         from narrative_assistant.nlp.dialogue import detect_dialogues
 
         # Obtener el capítulo
-        chapter = deps.chapter_repository.get_chapter(project_id, chapter_number)
+        chapter = deps.chapter_repository.get_chapter(project_id, chapter_number)  # type: ignore[attr-defined]
         if not chapter:
             return ApiResponse(
                 success=False,
@@ -740,7 +740,7 @@ async def get_chapter_emotional_analysis(project_id: int, chapter_number: int):
             )
 
         # Obtener personajes
-        entities = deps.entity_repository.get_entities_by_project(project_id)
+        entities = deps.entity_repository.get_entities_by_project(project_id)  # type: ignore[attr-defined]
         character_names = [
             e.canonical_name for e in entities if deps.is_character_entity(e)
         ]
@@ -755,7 +755,7 @@ async def get_chapter_emotional_analysis(project_id: int, chapter_number: int):
                     d.start_char,
                     d.end_char,
                 )
-                for d in dialogue_result.value.dialogues
+                for d in dialogue_result.value.dialogues  # type: ignore[union-attr]
             ]
         else:
             dialogues = []
@@ -1139,7 +1139,7 @@ async def suggest_chapter_focalization(project_id: int, chapter_number: int):
     """Sugiere la focalización más probable para un capítulo."""
     try:
         from narrative_assistant.entities.repository import get_entity_repository
-        from narrative_assistant.focalization import (
+        from narrative_assistant.focalization import (  # type: ignore[attr-defined]
             FocalizationDeclarationService,
             SQLiteFocalizationRepository,
         )

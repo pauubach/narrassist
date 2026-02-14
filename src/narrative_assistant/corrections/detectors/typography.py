@@ -532,7 +532,7 @@ class TypographyDetector(BaseDetector):
 
         # Rastrear signos de apertura y sus posiciones
         # Stack para cada tipo de signo
-        stacks = {
+        stacks = {  # type: ignore[var-annotated]
             "«": [],  # Posiciones de « sin cerrar
             '"': [],  # Posiciones de " sin cerrar
             "(": [],  # Posiciones de ( sin cerrar

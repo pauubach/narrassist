@@ -341,7 +341,7 @@ class ProjectManager:
         match = self.matcher.find_match(fingerprint, self.db)
 
         if match.is_exact_match or match.is_similar:
-            result = self.get(match.existing_project_id)
+            result = self.get(match.existing_project_id)  # type: ignore[arg-type]
             return result.value if result.is_success else None
 
         return None

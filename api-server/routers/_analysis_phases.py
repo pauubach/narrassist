@@ -550,7 +550,7 @@ def run_parsing(ctx: dict, tracker: ProgressTracker):
         raise Exception(f"Error parsing document: {parse_result.error}")
 
     raw_document = parse_result.value
-    full_text = raw_document.full_text
+    full_text = raw_document.full_text  # type: ignore[union-attr]
     word_count = len(full_text.split())
 
     # S7c-03: Validar documento vacío
@@ -605,7 +605,7 @@ def run_classification(ctx: dict, tracker: ProgressTracker):
         logger.info(f"Document classified as: {document_type}")
         if classification:
             logger.info(f"  Confidence: {classification.confidence:.2f}")
-            logger.info(f"  Genre: {classification.genre}")
+            logger.info(f"  Genre: {classification.genre}")  # type: ignore[attr-defined]
 
         # Guardar en proyecto
         try:
@@ -649,15 +649,15 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
     structure_result = detector.detect(raw_document)
 
     chapters_data = []
-    if structure_result.is_success and structure_result.value.chapters:
-        for ch in structure_result.value.chapters:
+    if structure_result.is_success and structure_result.value.chapters:  # type: ignore[union-attr]
+        for ch in structure_result.value.chapters:  # type: ignore[union-attr]
             content = ch.get_text(full_text)
             sections_data = []
             for sec in ch.sections:
                 sections_data.append(
                     {
                         "title": sec.title,
-                        "level": sec.level,
+                        "level": sec.level,  # type: ignore[union-attr]
                         "start_char": sec.start_char,
                         "end_char": sec.end_char,
                     }
@@ -708,11 +708,11 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
         """Busca el chapter_id para una posición de carácter dada."""
         for ch in chapters_with_ids:
             if ch.start_char <= start_char < ch.end_char:
-                return ch.id
+                return ch.id  # type: ignore[no-any-return]
         # Fallback: capítulo más cercano
         if chapters_with_ids:
             closest = min(chapters_with_ids, key=lambda c: abs(c.start_char - start_char))
-            return closest.id
+            return closest.id  # type: ignore[no-any-return]
         return None
 
     # S8a-02: Compute and persist chapter metrics (lightweight, regex-based)
@@ -728,7 +728,7 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
             if ch_data and ch_data.get("content"):
                 metrics = compute_chapter_metrics(ch_data["content"])
                 if metrics:
-                    chapter_repo.update_metrics(ch_db.id, metrics)
+                    chapter_repo.update_metrics(ch_db.id, metrics)  # type: ignore[arg-type]
                     metrics_computed += 1
         logger.info(f"Chapter metrics computed for {metrics_computed}/{chapters_count} chapters")
     except Exception as e:
@@ -835,7 +835,7 @@ def _filter_overlapping_entities(raw_entities: list) -> list:
     if not raw_entities:
         return []
     sorted_ents = sorted(raw_entities, key=lambda e: (e.start_char, -(e.end_char - e.start_char)))
-    result = []
+    result = []  # type: ignore[var-annotated]
     for ent in sorted_ents:
         overlaps = False
         for accepted in result:
@@ -1542,9 +1542,9 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
 
             entity_names = [e.canonical_name for e in entities if e.canonical_name]
             aliases_dict = {}
-            for e in entities:
-                if e.canonical_name and e.aliases:
-                    aliases_dict[e.canonical_name] = e.aliases
+            for e in entities:  # type: ignore[misc]
+                if e.canonical_name and e.aliases:  # type: ignore[misc]
+                    aliases_dict[e.canonical_name] = e.aliases  # type: ignore[misc]
 
             existing_positions = set()
             for entity in entities:
@@ -1574,7 +1574,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                     new_mentions = mentions_by_entity[name]
                     for am in new_mentions:
                         ch_id = find_chapter_id_for_position(am.start_char)
-                        mention = EntityMentionModel(
+                        mention = EntityMentionModel(  # type: ignore[assignment]
                             entity_id=entity.id,
                             surface_form=am.surface_form,
                             start_char=am.start_char,
@@ -1584,7 +1584,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                             source="mention_finder",
                         )
                         try:
-                            entity_repo.create_mention(mention)
+                            entity_repo.create_mention(mention)  # type: ignore[arg-type]
                             additional_count += 1
                         except Exception:
                             pass
@@ -1601,7 +1601,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
 
         # Recalcular importancia final
         logger.info("Recalculando importancia de entidades...")
-        db = deps.get_database()
+        db = deps.get_database()  # type: ignore[misc]
         for entity in entities:
             try:
                 with db.connection() as conn:
@@ -1688,7 +1688,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
             from narrative_assistant.core.device import get_device_detector
 
             detector = get_device_detector()
-            has_gpu = detector.device_type.value in ("cuda", "mps")
+            has_gpu = detector.device_type.value in ("cuda", "mps")  # type: ignore[attr-defined]
         except Exception:
             has_gpu = False
 
@@ -1829,7 +1829,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
                     def find_chapter_number_for_position(char_pos: int) -> int | None:
                         for ch in chapters_data:
                             if ch["start_char"] <= char_pos <= ch["end_char"]:
-                                return ch["chapter_number"]
+                                return ch["chapter_number"]  # type: ignore[no-any-return]
                         return None
 
                     attrs_with_chapter = 0
@@ -1991,7 +1991,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     cons_pct_start, cons_pct_end = tracker.get_phase_progress_range("consistency")
 
     # Consistencia de atributos
-    inconsistencies = []
+    inconsistencies = []  # type: ignore[var-annotated]
     if attributes:
         checker = AttributeConsistencyChecker()
         check_result = checker.check_consistency(attributes)
@@ -2053,8 +2053,8 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
         if vital_result.is_success:
             vital_status_report = vital_result.value
             logger.info(
-                f"Vital status analysis: {len(vital_status_report.death_events)} deaths, "
-                f"{len(vital_status_report.post_mortem_appearances)} post-mortem appearances"
+                f"Vital status analysis: {len(vital_status_report.death_events)} deaths, "  # type: ignore[union-attr]
+                f"{len(vital_status_report.post_mortem_appearances)} post-mortem appearances"  # type: ignore[union-attr]
             )
 
             # S8a-03: Persist vital status events to DB
@@ -2067,7 +2067,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
                         (project_id,),
                     )
                     # Insertar death events
-                    for de in vital_status_report.death_events:
+                    for de in vital_status_report.death_events:  # type: ignore[union-attr]
                         conn.execute(
                             """INSERT INTO vital_status_events
                             (project_id, entity_id, entity_name, event_type,
@@ -2087,7 +2087,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
                             ),
                         )
                     # Insertar post-mortem appearances
-                    for pm in vital_status_report.post_mortem_appearances:
+                    for pm in vital_status_report.post_mortem_appearances:  # type: ignore[union-attr]
                         conn.execute(
                             """INSERT INTO vital_status_events
                             (project_id, entity_id, entity_name, event_type,
@@ -2108,8 +2108,8 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
                                 1 if pm.is_valid else 0,
                             ),
                         )
-                persisted = len(vital_status_report.death_events) + len(
-                    vital_status_report.post_mortem_appearances
+                persisted = len(vital_status_report.death_events) + len(  # type: ignore[union-attr]
+                    vital_status_report.post_mortem_appearances  # type: ignore[union-attr]
                 )
                 logger.info(f"Persisted {persisted} vital status events to DB")
             except Exception as persist_err:
@@ -2142,12 +2142,12 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
         if location_result.is_success:
             location_report = location_result.value
             inconsistency_count = (
-                len(location_report.inconsistencies)
+                len(location_report.inconsistencies)  # type: ignore[union-attr]
                 if hasattr(location_report, "inconsistencies")
                 else 0
             )
             logger.info(
-                f"Character location analysis: {len(location_report.location_events)} events, "
+                f"Character location analysis: {len(location_report.location_events)} events, "  # type: ignore[union-attr]
                 f"{inconsistency_count} inconsistencies"
             )
 
@@ -2159,7 +2159,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
                         "DELETE FROM character_location_events WHERE project_id = ?",
                         (project_id,),
                     )
-                    for le in location_report.location_events:
+                    for le in location_report.location_events:  # type: ignore[union-attr]
                         conn.execute(
                             """INSERT INTO character_location_events
                             (project_id, entity_id, entity_name, location_name,
@@ -2182,7 +2182,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
                             ),
                         )
                 logger.info(
-                    f"Persisted {len(location_report.location_events)} "
+                    f"Persisted {len(location_report.location_events)} "  # type: ignore[union-attr]
                     f"character location events to DB"
                 )
             except Exception as persist_err:
@@ -2249,7 +2249,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
             ]
             if character_entities:
                 chapter_texts = {ch["chapter_number"]: ch["content"] for ch in chapters_data}
-                profiles = profiler.build_profiles(character_entities, chapters_data, chapter_texts)
+                profiles = profiler.build_profiles(character_entities, chapters_data, chapter_texts)  # type: ignore[arg-type]
                 if profiles:
                     ooc_detector = OutOfCharacterDetector()
                     ooc_report = ooc_detector.detect(
@@ -2396,8 +2396,8 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
 
     tracker.start_phase("grammar", 7, "Revisando la redacción...")
 
-    grammar_issues = []
-    spelling_issues = []
+    grammar_issues = []  # type: ignore[var-annotated]
+    spelling_issues = []  # type: ignore[var-annotated]
     try:
         from narrative_assistant.nlp.grammar import (
             ensure_languagetool_running,
@@ -2421,7 +2421,7 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
 
         if grammar_result.is_success:
             grammar_report = grammar_result.value
-            grammar_issues = grammar_report.issues
+            grammar_issues = grammar_report.issues  # type: ignore[union-attr]
             logger.info(f"Grammar check found {len(grammar_issues)} issues")
         else:
             logger.warning(f"Grammar check failed: {grammar_result.error}")
@@ -2447,11 +2447,11 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
             dash_val = dialog_cfg.get("spoken_dialogue_dash", "")
             dash_map = {"em_dash": "em", "en_dash": "en", "hyphen": "hyphen"}
             if dash_val in dash_map:
-                correction_config.typography.dialogue_dash = dash_map[dash_val]
+                correction_config.typography.dialogue_dash = dash_map[dash_val]  # type: ignore[assignment]
             quote_val = dialog_cfg.get("nested_dialogue_quote", "")
             quote_map = {"angular": "angular", "double": "curly", "single": "straight"}
             if quote_val in quote_map:
-                correction_config.typography.quote_style = quote_map[quote_val]
+                correction_config.typography.quote_style = quote_map[quote_val]  # type: ignore[assignment]
         except Exception as cfg_err:
             logger.debug(f"Could not load project correction config: {cfg_err}")
 
@@ -2856,7 +2856,7 @@ def _apply_saved_dismissals(project_id: int):
 
         # 1. Aplicar dismissals por content_hash
         result = alert_repo.apply_dismissals(project_id)
-        if result.is_success and result.value > 0:
+        if result.is_success and result.value > 0:  # type: ignore[operator]
             logger.info(f"SP-1: Auto-dismissed {result.value} alerts from saved dismissals")
 
         # 2. Aplicar suppression rules

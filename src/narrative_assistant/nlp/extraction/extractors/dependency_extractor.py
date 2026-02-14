@@ -583,7 +583,7 @@ class DependencyExtractor(BaseExtractor):
             if token.dep_ in {"nsubj", "nsubj:pass"}:
                 # Verificar si es una entidad conocida
                 if token.text.lower() in entity_names:
-                    return token.text
+                    return token.text  # type: ignore[no-any-return]
 
                 # Buscar coincidencia parcial (para nombres compuestos)
                 for name in entity_names:
@@ -603,7 +603,7 @@ class DependencyExtractor(BaseExtractor):
             for token in reversed(list(sent[: root_verb.i - sent.start])):
                 if token.pos_ == "PROPN":
                     if token.text.lower() in entity_names:
-                        return token.text
+                        return token.text  # type: ignore[no-any-return]
                     for name in entity_names:
                         if token.text.lower() in name:
                             return name
@@ -614,7 +614,7 @@ class DependencyExtractor(BaseExtractor):
         for token in sent:
             if token.pos_ == "PROPN" and token.dep_ in {"nsubj", "nsubj:pass"}:
                 if token.text.lower() in entity_names:
-                    return token.text
+                    return token.text  # type: ignore[no-any-return]
                 for name in entity_names:
                     if token.text.lower() in name:
                         return name
@@ -628,7 +628,7 @@ class DependencyExtractor(BaseExtractor):
                 token_lower = token.text.lower()
                 # Verificar si es una entidad conocida
                 if token_lower in entity_names:
-                    return token.text
+                    return token.text  # type: ignore[no-any-return]
                 # Buscar coincidencia parcial
                 for name in entity_names:
                     if token_lower in name:
@@ -1061,7 +1061,7 @@ class DependencyExtractor(BaseExtractor):
                         if token_gender != pronoun_gender:
                             continue
 
-                return matched_entity
+                return matched_entity  # type: ignore[no-any-return]
 
         return None
 
@@ -1075,7 +1075,7 @@ class DependencyExtractor(BaseExtractor):
         # Buscar en el contexto cercano
         for token in adj_token.sent:
             if token.text.lower() in entity_names:
-                return token.text
+                return token.text  # type: ignore[no-any-return]
             for name in entity_names:
                 if token.text.lower() in name.lower():
                     return name

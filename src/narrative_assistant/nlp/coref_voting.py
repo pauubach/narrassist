@@ -86,7 +86,7 @@ class CorefVotingMixin:
                 continue
 
             # Verificar si está en diálogo
-            if self._is_in_dialogue(text, m.start_char, m.end_char):
+            if self._is_in_dialogue(text, m.start_char, m.end_char):  # type: ignore[attr-defined]
                 continue  # No asignar al narrador, puede ser otro personaje
 
             # Asignar al narrador
@@ -111,7 +111,7 @@ class CorefVotingMixin:
                 continue
 
             # Respetar límites de capítulo si está configurado
-            if self.config.use_chapter_boundaries:
+            if self.config.use_chapter_boundaries:  # type: ignore[attr-defined]
                 if (
                     anaphor.chapter_idx is not None
                     and candidate.chapter_idx is not None
@@ -121,7 +121,7 @@ class CorefVotingMixin:
 
             # Distancia máxima en oraciones
             sentence_distance = abs(anaphor.sentence_idx - candidate.sentence_idx)
-            if sentence_distance > self.config.max_antecedent_distance:
+            if sentence_distance > self.config.max_antecedent_distance:  # type: ignore[attr-defined]
                 continue
 
             valid.append(candidate)
@@ -173,7 +173,7 @@ class CorefVotingMixin:
             weighted_sum = 0.0
 
             for score, method, _ in method_votes:
-                weight = self.config.method_weights.get(method, 0.1)
+                weight = self.config.method_weights.get(method, 0.1)  # type: ignore[attr-defined]
                 weighted_sum += score * weight
                 total_weight += weight
 
@@ -190,7 +190,7 @@ class CorefVotingMixin:
         # Construir detalle de votos del candidato ganador
         method_votes_detail: dict[str, dict] = {}
         for score, method, reasoning in votes.get(best_candidate, []):
-            weight = self.config.method_weights.get(method, 0.1)
+            weight = self.config.method_weights.get(method, 0.1)  # type: ignore[attr-defined]
             method_votes_detail[method.value] = {
                 "score": round(score, 3),
                 "reasoning": reasoning,

@@ -115,7 +115,7 @@ def emit_invalidation_event(
                 f"entities={entity_ids}, revision={revision}, "
                 f"stale_types={len(affected_types)}"
             )
-            return revision
+            return revision  # type: ignore[no-any-return]
 
     except Exception as e:
         logger.warning(f"Failed to emit invalidation event: {e}")
@@ -176,7 +176,7 @@ def _mark_stale(
     if affected > 0:
         logger.debug(f"Marked {affected} enrichment entries as stale")
 
-    return affected
+    return affected  # type: ignore[no-any-return]
 
 
 def get_project_revision(db_session, project_id: int) -> int:
@@ -187,7 +187,7 @@ def get_project_revision(db_session, project_id: int) -> int:
                 "SELECT COALESCE(MAX(revision), 0) FROM invalidation_events WHERE project_id = ?",
                 (project_id,),
             ).fetchone()
-            return row[0] if row else 0
+            return row[0] if row else 0  # type: ignore[no-any-return]
     except Exception:
         return 0
 

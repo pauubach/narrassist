@@ -800,7 +800,7 @@ def _get_default_coref_methods() -> list[CorefMethod]:
     - Sin GPU: Solo métodos rápidos (sin LLM)
     """
     try:
-        from ..core.device import get_device_config
+        from ..core.device import get_device_config  # type: ignore[attr-defined]
 
         device_config = get_device_config()
         has_gpu = device_config.device_type in ("cuda", "mps")
@@ -835,7 +835,7 @@ def _select_coref_model() -> str:
             if available is None:
                 # Intentar obtener modelos disponibles
                 try:
-                    import requests
+                    import requests  # type: ignore[import-untyped]
 
                     resp = requests.get("http://localhost:11434/api/tags", timeout=2)
                     if resp.status_code == 200:
@@ -878,7 +878,7 @@ class CorefConfig:
     use_chapter_boundaries: bool = True  # Respetar límites de capítulo
     ollama_model: str = "llama3.2"  # Modelo LLM por defecto
     ollama_timeout: int = 600  # 10 min - CPU sin GPU es muy lento
-    use_llm_for_coref: bool = field(default=None)  # None = auto (GPU sí, CPU no)
+    use_llm_for_coref: bool | None = field(default=None)  # None = auto (GPU sí, CPU no)
 
     # S2-04: Pesos adaptativos
     use_adaptive_weights: bool = True  # Cargar pesos aprendidos si existen
@@ -1509,7 +1509,7 @@ class CoreferenceVotingResolver(
         for method in self.config.enabled_methods:
             if method in method_classes:
                 try:
-                    self._methods[method] = method_classes[method]()
+                    self._methods[method] = method_classes[method]()  # type: ignore[assignment]
                     logger.debug(f"Método {method.value} inicializado")
                 except Exception as e:
                     logger.warning(f"No se pudo inicializar {method.value}: {e}")

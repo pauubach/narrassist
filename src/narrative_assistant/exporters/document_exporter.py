@@ -20,6 +20,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from docx import Document
 from docx.enum.style import WD_STYLE_TYPE
@@ -28,6 +29,10 @@ from docx.shared import Inches, Pt, RGBColor
 
 from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
+
+# Type alias: docx.Document() returns docx.document.Document but the function
+# itself is typed as a callable, so we use Any for parameter annotations.
+_DocxDocument = Any
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +192,7 @@ class DocumentExporter:
         except Exception as e:
             error = NarrativeError(
                 message=f"Failed to export DOCX: {str(e)}",
-                severity=ErrorSeverity.ERROR,
+                severity=ErrorSeverity.RECOVERABLE,
                 user_message=f"Error exportando a DOCX: {str(e)}",
             )
             logger.error(f"Error exporting DOCX: {e}", exc_info=True)
@@ -371,14 +376,14 @@ class DocumentExporter:
         except ImportError:
             error = NarrativeError(
                 message="reportlab not installed",
-                severity=ErrorSeverity.ERROR,
+                severity=ErrorSeverity.RECOVERABLE,
                 user_message="Para exportar a PDF es necesario instalar reportlab: pip install reportlab",
             )
             return Result.failure(error)
         except Exception as e:
             error = NarrativeError(
                 message=f"Failed to export PDF: {str(e)}",
-                severity=ErrorSeverity.ERROR,
+                severity=ErrorSeverity.RECOVERABLE,
                 user_message=f"Error exportando a PDF: {str(e)}",
             )
             logger.error(f"Error exporting PDF: {e}", exc_info=True)
@@ -388,7 +393,7 @@ class DocumentExporter:
     # DOCX Generation Methods
     # =========================================================================
 
-    def _setup_styles(self, doc: Document) -> None:
+    def _setup_styles(self, doc: _DocxDocument) -> None:
         """Configura estilos del documento."""
         styles = doc.styles
 
@@ -440,7 +445,7 @@ class DocumentExporter:
         except ValueError:
             pass
 
-    def _add_cover_page(self, doc: Document, data: ProjectExportData) -> None:
+    def _add_cover_page(self, doc: _DocxDocument, data: ProjectExportData) -> None:
         """Añade portada al documento."""
         # Espaciado superior
         for _ in range(3):
@@ -483,7 +488,7 @@ class DocumentExporter:
         # Salto de pagina
         doc.add_page_break()
 
-    def _add_table_of_contents(self, doc: Document) -> None:
+    def _add_table_of_contents(self, doc: _DocxDocument) -> None:
         """Añade tabla de contenidos."""
         # Titulo
         toc_title = doc.add_paragraph()
@@ -531,7 +536,7 @@ class DocumentExporter:
 
         doc.add_page_break()
 
-    def _add_statistics_section(self, doc: Document, data: ProjectExportData) -> None:
+    def _add_statistics_section(self, doc: _DocxDocument, data: ProjectExportData) -> None:
         """Añade seccion de estadisticas."""
         doc.add_heading("Estadisticas del Proyecto", level=1)
 
@@ -557,7 +562,7 @@ class DocumentExporter:
 
     def _add_character_sheets_section(
         self,
-        doc: Document,
+        doc: _DocxDocument,
         data: ProjectExportData,
         options: ExportOptions,
     ) -> None:
@@ -650,7 +655,7 @@ class DocumentExporter:
 
     def _add_alerts_section(
         self,
-        doc: Document,
+        doc: _DocxDocument,
         data: ProjectExportData,
         options: ExportOptions,
     ) -> None:
@@ -709,7 +714,7 @@ class DocumentExporter:
 
     def _add_alert_item(
         self,
-        doc: Document,
+        doc: _DocxDocument,
         alert: dict,
         options: ExportOptions,
         is_critical: bool = False,
@@ -769,7 +774,7 @@ class DocumentExporter:
 
         doc.add_paragraph()  # Espaciado
 
-    def _add_timeline_section(self, doc: Document, data: ProjectExportData) -> None:
+    def _add_timeline_section(self, doc: _DocxDocument, data: ProjectExportData) -> None:
         """Añade seccion de timeline."""
         doc.add_heading("Linea Temporal", level=1)
 
@@ -805,7 +810,7 @@ class DocumentExporter:
                 elif narrative_order == "prolepsis":
                     p.add_run(" [FLASHFORWARD]").italic = True
 
-    def _add_relationships_section(self, doc: Document, data: ProjectExportData) -> None:
+    def _add_relationships_section(self, doc: _DocxDocument, data: ProjectExportData) -> None:
         """Añade seccion de relaciones."""
         doc.add_heading("Relaciones entre Personajes", level=1)
 
@@ -833,7 +838,7 @@ class DocumentExporter:
             intensity = rel.get("intensity", 0.5)
             row.cells[3].text = f"{intensity:.0%}"
 
-    def _add_style_guide_section(self, doc: Document, data: ProjectExportData) -> None:
+    def _add_style_guide_section(self, doc: _DocxDocument, data: ProjectExportData) -> None:
         """Añade seccion de guia de estilo."""
         doc.add_heading("Guia de Estilo", level=1)
 
@@ -892,7 +897,7 @@ class DocumentExporter:
                 for rec in sa["recommendations"]:
                     doc.add_paragraph(rec, style="List Bullet")
 
-    def _add_footer(self, doc: Document, data: ProjectExportData) -> None:
+    def _add_footer(self, doc: _DocxDocument, data: ProjectExportData) -> None:
         """Añade footer al documento."""
         doc.add_paragraph()
         doc.add_paragraph()
@@ -1348,7 +1353,7 @@ def collect_export_data(
                 from ..relationships.repository import RelationshipRepository
 
                 rel_repo = RelationshipRepository()
-                relationships = rel_repo.get_by_project(project_id)
+                relationships = rel_repo.get_relationships_for_project(project_id)
 
                 for rel in relationships:
                     data.relationships.append(rel.to_dict())
@@ -1373,7 +1378,7 @@ def collect_export_data(
                     text=full_text,
                 )
 
-                if sg_result.is_success:
+                if sg_result.is_success and sg_result.value is not None:
                     data.style_guide = sg_result.value.to_dict()
 
             except Exception as e:
@@ -1384,7 +1389,7 @@ def collect_export_data(
     except Exception as e:
         error = NarrativeError(
             message=f"Failed to collect export data: {str(e)}",
-            severity=ErrorSeverity.ERROR,
+            severity=ErrorSeverity.RECOVERABLE,
             user_message=f"Error recopilando datos para exportar: {str(e)}",
         )
         logger.error(f"Error collecting export data: {e}", exc_info=True)

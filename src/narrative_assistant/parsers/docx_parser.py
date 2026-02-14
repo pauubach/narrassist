@@ -140,9 +140,9 @@ class DocxParser(DocumentParser):
         # Validar archivo antes de abrir
         validation_result = self.validate_file(path)
         if validation_result.is_failure:
-            return validation_result
+            return validation_result  # type: ignore[return-value]
 
-        path = validation_result.value
+        path = validation_result.value  # type: ignore[assignment]
 
         if not self._docx_available:
             from ..core.errors import ErrorSeverity, NarrativeError
@@ -367,7 +367,7 @@ class DocxParser(DocumentParser):
                 return None
 
             # Procesar el XML para extraer texto
-            text_parts = []
+            text_parts = []  # type: ignore[var-annotated]
             self._extract_text_from_element(p_element, text_parts, qn)
 
             return "".join(text_parts)

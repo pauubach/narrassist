@@ -130,7 +130,7 @@ class CrutchWordsDetector(BaseDetector):
         """Compila patrones regex para cada muletilla."""
         patterns = {}
         for _category, words in CRUTCH_CATEGORIES.items():
-            for word in words:
+            for word in words:  # type: ignore[attr-defined]
                 # Patrón case insensitive, palabra completa
                 patterns[word] = re.compile(r"\b" + re.escape(word) + r"\b", re.IGNORECASE)
         return patterns
@@ -248,7 +248,7 @@ class CrutchWordsDetector(BaseDetector):
     def _is_category_enabled(self, word: str) -> bool:
         """Verifica si la categoría de una palabra está habilitada."""
         for category, words in CRUTCH_CATEGORIES.items():
-            if word in words:
+            if word in words:  # type: ignore[operator]
                 if category == "adverbios_modo":
                     return self.config.check_adverbs
                 elif category == "conectores":
@@ -264,8 +264,8 @@ class CrutchWordsDetector(BaseDetector):
     def _get_alternatives(self, word: str) -> list[str | None]:
         """Obtiene alternativas para una muletilla."""
         for _category, words in CRUTCH_CATEGORIES.items():
-            if word in words:
-                return words[word]
+            if word in words:  # type: ignore[operator]
+                return words[word]  # type: ignore[no-any-return, index]
         return []
 
     def get_summary(self, text: str) -> dict:
@@ -292,14 +292,14 @@ class CrutchWordsDetector(BaseDetector):
 
         for category, words in CRUTCH_CATEGORIES.items():
             category_total = 0
-            for word in words:
+            for word in words:  # type: ignore[attr-defined]
                 pattern = self._patterns.get(word)
                 if pattern:
                     matches = len(pattern.findall(text))
                     if matches > 0:
                         category_total += matches
 
-            summary["by_category"][category] = category_total
+            summary["by_category"][category] = category_total  # type: ignore[index]
 
         # Top 5 más sobreutilizadas
         all_counts = []

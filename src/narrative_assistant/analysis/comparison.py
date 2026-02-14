@@ -408,7 +408,7 @@ class ComparisonService:
         match_pairs: dict[int, tuple[int, float]] = {}
 
         # Pass 1: Exact content_hash
-        old_by_hash = {}
+        old_by_hash = {}  # type: ignore[var-annotated]
         for i, alert in enumerate(old_alerts):
             if alert.content_hash:
                 old_by_hash.setdefault(alert.content_hash, []).append(i)

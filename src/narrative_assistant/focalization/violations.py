@@ -235,7 +235,7 @@ class FocalizationViolationDetector:
         self, text: str, chapter: int, scene: int | None, declaration: FocalizationDeclaration
     ) -> list[FocalizationViolation]:
         """Detecta acceso a mentes no permitidas en focalizacion interna fija."""
-        violations = []
+        violations = []  # type: ignore[var-annotated]
 
         if not declaration.focalizer_ids:
             return violations

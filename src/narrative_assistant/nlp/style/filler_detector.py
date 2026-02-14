@@ -493,7 +493,7 @@ class FillerDetector:
             logger.error(f"Error detectando muletillas: {e}", exc_info=True)
             error = NLPError(
                 message=f"Error en detección de muletillas: {e}",
-                severity=ErrorSeverity.MEDIUM,
+                severity=ErrorSeverity.RECOVERABLE,
             )
             return Result.failure(error)
 

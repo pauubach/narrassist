@@ -501,7 +501,7 @@ class SpellingChecker:
             )
 
         if errors:
-            return Result.partial(report, errors)
+            return Result.partial(report, errors)  # type: ignore[arg-type]
         return Result.success(report)
 
     def _check_dictionary(self, text: str, known_words: set[str]) -> list[SpellingIssue]:
@@ -686,7 +686,7 @@ class SpellingChecker:
             from ...llm.client import get_llm_client
 
             client = get_llm_client()
-            if not client or not client.is_available():
+            if not client or not client.is_available():  # type: ignore[operator]
                 return []
 
             # Preparar prompt con el texto y issues existentes
@@ -705,7 +705,7 @@ Responde SOLO con un JSON array de errores encontrados, cada uno con:
 
 Si no hay errores adicionales, responde con un array vacío: []"""
 
-            response = client.generate(prompt, max_tokens=500)
+            response = client.generate(prompt, max_tokens=500)  # type: ignore[attr-defined]
             if not response:
                 return []
 

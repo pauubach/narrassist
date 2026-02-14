@@ -613,7 +613,7 @@ class ModelManager:
         import zipfile
 
         try:
-            import requests
+            import requests  # type: ignore[import-untyped]
             import spacy
         except ImportError:
             return None
@@ -814,7 +814,7 @@ class ModelManager:
 
         # Resolución dinámica: consultar API de compatibilidad de spaCy
         try:
-            from spacy.cli._util import get_compatibility
+            from spacy.cli._util import get_compatibility  # type: ignore[attr-defined]
 
             compat = get_compatibility()
             spacy_compat = compat.get("spacy", {})
@@ -825,7 +825,7 @@ class ModelManager:
                 if model_name in models and models[model_name]:
                     version = models[model_name][0]
                     logger.debug(f"Versión compatible para {model_name}: {version}")
-                    return version
+                    return version  # type: ignore[no-any-return]
 
             # Buscar por major.minor
             major_minor = ".".join(spacy_version.split(".")[:2])
@@ -833,7 +833,7 @@ class ModelManager:
                 if sv.startswith(major_minor) and model_name in models and models[model_name]:
                     version = models[model_name][0]
                     logger.debug(f"Versión compatible (minor match) para {model_name}: {version}")
-                    return version
+                    return version  # type: ignore[no-any-return]
 
         except Exception as e:
             logger.debug(f"Error consultando compatibilidad spaCy: {e}")
@@ -1414,7 +1414,7 @@ class ModelManager:
 
         try:
             with open(version_file, encoding="utf-8") as f:
-                return json.load(f)
+                return json.load(f)  # type: ignore[no-any-return]
         except (OSError, json.JSONDecodeError) as e:
             logger.debug(f"No se pudo leer marcador de versión: {e}")
             return None
@@ -1603,7 +1603,7 @@ def get_model_size_from_huggingface(model_name: str, use_cache: bool = True) -> 
     except Exception as e:
         logger.debug(f"No se pudo obtener tamaño de {model_name}: {e}")
         # Cachear el fallo para evitar bucle de reintentos
-        _model_sizes_cache[model_name] = None
+        _model_sizes_cache[model_name] = None  # type: ignore[assignment]
         _model_sizes_cache_time = time.time()
     return None
 
@@ -1651,12 +1651,12 @@ def get_spacy_model_size(model_name: str) -> int | None:
                     logger.debug(f"Tamaño de spaCy {model_name} desde GitHub: {size} bytes ({size / (1024*1024):.1f} MB)")
                     _model_sizes_cache[cache_key] = size
                     _model_sizes_cache_time = time.time()
-                    return size
+                    return size  # type: ignore[no-any-return]
 
     except Exception as e:
         logger.debug(f"No se pudo obtener tamaño de spaCy {model_name}: {e}")
         # Cachear el fallo para evitar reintentos continuos
-        _model_sizes_cache[cache_key] = None
+        _model_sizes_cache[cache_key] = None  # type: ignore[assignment]
         _model_sizes_cache_time = time.time()
 
     return None

@@ -255,7 +255,7 @@ class AgreementDetector(BaseDetector):
         # Usar morfología de spaCy
         gender = token.morph.get("Gender")
         if gender:
-            return gender[0]  # "Masc" o "Fem"
+            return str(gender[0])  # "Masc" o "Fem"
 
         return None
 
@@ -263,7 +263,7 @@ class AgreementDetector(BaseDetector):
         """Obtiene el número de un token."""
         number = token.morph.get("Number")
         if number:
-            return number[0]  # "Sing" o "Plur"
+            return str(number[0])  # "Sing" o "Plur"
         return None
 
     def _is_valid_exception(self, noun, modifier) -> bool:

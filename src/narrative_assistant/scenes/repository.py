@@ -95,7 +95,7 @@ class SceneRepository:
                         scene.word_count,
                     ),
                 )
-                return cursor.lastrowid
+                return cursor.lastrowid  # type: ignore[no-any-return]
 
     def save_scenes_batch(self, scenes: list[Scene]) -> list[int]:
         """
@@ -165,7 +165,7 @@ class SceneRepository:
             "SELECT COUNT(*) as count FROM scenes WHERE project_id = ?",
             (project_id,),
         )
-        return row["count"] if row else 0
+        return row["count"] if row else 0  # type: ignore[no-any-return]
 
     def delete_scenes_by_project(self, project_id: int) -> int:
         """
@@ -179,7 +179,7 @@ class SceneRepository:
                 "DELETE FROM scenes WHERE project_id = ?",
                 (project_id,),
             )
-            return cursor.rowcount
+            return cursor.rowcount  # type: ignore[no-any-return]
 
     def delete_scenes_by_chapter(self, chapter_id: int) -> int:
         """Elimina todas las escenas de un capítulo."""
@@ -188,7 +188,7 @@ class SceneRepository:
                 "DELETE FROM scenes WHERE chapter_id = ?",
                 (chapter_id,),
             )
-            return cursor.rowcount
+            return cursor.rowcount  # type: ignore[no-any-return]
 
     # =========================================================================
     # Scene Tags CRUD
@@ -230,7 +230,7 @@ class SceneRepository:
                     tags.notes,
                 ),
             )
-            return cursor.lastrowid
+            return cursor.lastrowid  # type: ignore[no-any-return]
 
     def get_scene_tags(self, scene_id: int) -> SceneTag | None:
         """Obtiene las etiquetas predefinidas de una escena."""
@@ -247,7 +247,7 @@ class SceneRepository:
                 "DELETE FROM scene_tags WHERE scene_id = ?",
                 (scene_id,),
             )
-            return cursor.rowcount > 0
+            return cursor.rowcount > 0  # type: ignore[no-any-return]
 
     # =========================================================================
     # Custom Tags CRUD
@@ -268,7 +268,7 @@ class SceneRepository:
                 """,
                 (scene_id, tag_name, tag_color),
             )
-            return cursor.lastrowid
+            return cursor.lastrowid  # type: ignore[no-any-return]
 
     def remove_custom_tag(self, scene_id: int, tag_name: str) -> bool:
         """Elimina una etiqueta personalizada de una escena."""
@@ -277,7 +277,7 @@ class SceneRepository:
                 "DELETE FROM scene_custom_tags WHERE scene_id = ? AND tag_name = ?",
                 (scene_id, tag_name),
             )
-            return cursor.rowcount > 0
+            return cursor.rowcount > 0  # type: ignore[no-any-return]
 
     def get_custom_tags(self, scene_id: int) -> list[SceneCustomTag]:
         """Obtiene las etiquetas personalizadas de una escena."""
@@ -317,7 +317,7 @@ class SceneRepository:
                 """,
                 (project_id, tag_name, tag_color),
             )
-            return cursor.lastrowid
+            return cursor.lastrowid  # type: ignore[no-any-return]
 
     def get_catalog(self, project_id: int) -> list[CustomTagCatalog]:
         """Obtiene el catálogo de etiquetas del proyecto."""

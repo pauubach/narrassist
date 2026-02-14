@@ -473,7 +473,7 @@ class DismissalRepository:
         if result.is_failure:
             return False
 
-        for rule in result.value:
+        for rule in result.value:  # type: ignore[union-attr]
             if rule.rule_type == "alert_type":
                 if fnmatch.fnmatch(alert_type, rule.pattern):
                     return True

@@ -363,7 +363,7 @@ class CoreferenceResolver:
             )
 
             if errors:
-                return Result.partial(result, errors)
+                return Result.partial(result, errors)  # type: ignore[arg-type]
             return Result.success(result)
 
         except Exception as e:
@@ -675,7 +675,7 @@ class CoreferenceResolver:
             else:
                 ungrouped.append(entity)
 
-        return {"grouped": grouped, "ungrouped": ungrouped, "chains": chains}
+        return {"grouped": grouped, "ungrouped": ungrouped, "chains": chains}  # type: ignore[dict-item]
 
 
 # =============================================================================

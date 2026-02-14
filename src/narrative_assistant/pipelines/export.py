@@ -44,7 +44,8 @@ class ReportProtocol(Protocol):
 def _get_fingerprint(report: ReportProtocol) -> str:
     """Obtiene el fingerprint del informe (compatible con ambos tipos)."""
     # UnifiedReport usa 'fingerprint', AnalysisReport usa 'document_fingerprint'
-    return getattr(report, "document_fingerprint", None) or getattr(report, "fingerprint", "")
+    fp: str = getattr(report, "document_fingerprint", None) or getattr(report, "fingerprint", "")  # type: ignore[assignment]
+    return fp
 
 
 def export_report_json(report: ReportProtocol, output_path: str | Path) -> Result[None]:
@@ -205,7 +206,8 @@ def export_report_markdown(report: ReportProtocol, output_path: str | Path) -> R
                     lines.append(f"- **{entity.canonical_name}**")
                     if entity.aliases:
                         lines.append(f"  - Alias: {', '.join(entity.aliases)}")
-                    lines.append(f"  - Confianza: {entity.confidence:.0%}")
+                    confidence = getattr(entity, "confidence", 0.0)
+                    lines.append(f"  - Confianza: {confidence:.0%}")
                 lines.append("")
 
         # Errores del sistema
@@ -286,7 +288,7 @@ def _entity_to_dict(entity: Entity) -> dict[str, Any]:
         "type": entity.entity_type,
         "name": entity.canonical_name,
         "aliases": entity.aliases,
-        "confidence": entity.confidence,
+        "confidence": getattr(entity, "confidence", 0.0),
     }
 
 

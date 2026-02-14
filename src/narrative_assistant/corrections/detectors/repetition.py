@@ -368,7 +368,7 @@ class RepetitionDetector(BaseDetector):
                 "start": token.idx,
                 "end": token.idx + len(token.text),
             }
-            for token in self._spacy_doc
+            for token in self._spacy_doc  # type: ignore[attr-defined]
             if token.is_alpha  # Solo palabras
         ]
 

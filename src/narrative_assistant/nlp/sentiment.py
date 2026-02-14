@@ -647,7 +647,7 @@ class SentimentAnalyzer:
         Returns:
             Lista de inconsistencias por cambios abruptos
         """
-        inconsistencies = []
+        inconsistencies = []  # type: ignore[var-annotated]
 
         # Filtrar diálogos del personaje y ordenar por posición
         entity_dialogues = sorted(

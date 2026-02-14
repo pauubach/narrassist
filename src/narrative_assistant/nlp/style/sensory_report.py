@@ -808,7 +808,7 @@ class SensoryAnalyzer:
             return Result.failure(
                 NLPError(
                     message=f"Error en análisis sensorial: {e}",
-                    severity=ErrorSeverity.HIGH,
+                    severity=ErrorSeverity.RECOVERABLE,
                 )
             )
 

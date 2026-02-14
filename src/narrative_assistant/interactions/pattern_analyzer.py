@@ -108,12 +108,12 @@ class InteractionPatternAnalyzer:
             )
 
         # Contar por tipo
-        by_type = defaultdict(int)
+        by_type = defaultdict(int)  # type: ignore[var-annotated]
         for inter in interactions:
             by_type[inter.interaction_type.value] += 1
 
         # Contar por tono
-        by_tone = defaultdict(int)
+        by_tone = defaultdict(int)  # type: ignore[var-annotated]
         for inter in interactions:
             by_tone[inter.tone.value] += 1
 

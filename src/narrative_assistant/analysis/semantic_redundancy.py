@@ -254,7 +254,7 @@ class SemanticRedundancyDetector:
             embeddings = model.encode(texts, show_progress=len(texts) > 1000)
 
             if embeddings is None:
-                return Result.failure(Exception("Error generando embeddings"))
+                return Result.failure(Exception("Error generando embeddings"))  # type: ignore[arg-type]
 
             # Encontrar duplicados usando FAISS o búsqueda lineal
             if FAISS_AVAILABLE and len(sentences) > 100:
@@ -289,7 +289,7 @@ class SemanticRedundancyDetector:
 
         except Exception as e:
             logger.error(f"Error en detección de redundancia: {e}", exc_info=True)
-            return Result.failure(e)
+            return Result.failure(e)  # type: ignore[arg-type]
 
     def _extract_sentences(self, chapters: list[dict]) -> list[SentenceInfo]:
         """Extrae oraciones de los capítulos."""
@@ -428,7 +428,7 @@ class SemanticRedundancyDetector:
         max_duplicates: int,
     ) -> list[SemanticDuplicate]:
         """Encuentra duplicados con búsqueda lineal (fallback sin FAISS)."""
-        duplicates = []
+        duplicates = []  # type: ignore[var-annotated]
         seen_pairs = set()
 
         n_sentences = len(sentences)

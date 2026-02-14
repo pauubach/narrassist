@@ -39,11 +39,11 @@ try:
         update_fusion_threshold,
     )
 except ImportError:
-    SemanticFusionService = None
-    SemanticFusionResult = None
-    get_semantic_fusion_service = None
-    reset_semantic_fusion_service = None
-    update_fusion_threshold = None
+    SemanticFusionService = None  # type: ignore[misc, assignment]
+    SemanticFusionResult = None  # type: ignore[misc, assignment]
+    get_semantic_fusion_service = None  # type: ignore[assignment]
+    reset_semantic_fusion_service = None  # type: ignore[assignment]
+    update_fusion_threshold = None  # type: ignore[assignment]
 
 __all__ = [
     # Models

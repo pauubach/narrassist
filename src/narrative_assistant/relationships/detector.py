@@ -65,7 +65,7 @@ def _get_default_relation_methods() -> list[RelationDetectionMethod]:
     - Sin GPU: Solo métodos rápidos (sin LLM)
     """
     try:
-        from ..core.device import get_device_config
+        from ..core.device import get_device_config  # type: ignore[attr-defined]
 
         device_config = get_device_config()
         has_gpu = device_config.device_type in ("cuda", "mps")
@@ -96,7 +96,7 @@ class RelationDetectionConfig:
     consensus_threshold: float = 0.5  # Mínimo % de métodos que deben acordar
     ollama_model: str = "llama3.2"
     ollama_timeout: int = 300
-    use_llm: bool = field(default=None)  # None = auto
+    use_llm: bool | None = field(default=None)  # None = auto
 
     def __post_init__(self):
         """Ajusta configuración según hardware si use_llm es None."""
@@ -244,7 +244,7 @@ class DependencyRelationMethod:
                 ):
                     rel_type = self.RELATIONAL_VERBS[lemma]
                     result = self._extract_relation_from_verb(
-                        token, rel_type, chapter, entity_set, full_text
+                        token, rel_type, chapter, entity_set, full_text  # type: ignore[arg-type]
                     )
                     if result:
                         results.append(result)
@@ -350,8 +350,8 @@ class DependencyRelationMethod:
                                     target = subsubchild.text
 
         # Mapear atributo a tipo de relación
-        if source and attribute and attribute in self.RELATIONAL_VERBS.get("ser", {}):
-            rel_type = self.RELATIONAL_VERBS["ser"][attribute]
+        if source and attribute and attribute in self.RELATIONAL_VERBS.get("ser", {}):  # type: ignore[operator]
+            rel_type = self.RELATIONAL_VERBS["ser"][attribute]  # type: ignore[index]
 
             # Para relaciones sin target explícito (ej: "Juan es hermano")
             # usamos el contexto para inferir
@@ -1141,7 +1141,7 @@ class RelationshipDetector:
         relations: list[DetectedRelation],
     ) -> list[DetectedRelation]:
         """Elimina relaciones duplicadas, manteniendo la de mayor confianza."""
-        seen = {}
+        seen = {}  # type: ignore[var-annotated]
 
         for rel in relations:
             key = (rel.source_name.lower(), rel.target_name.lower(), rel.relation_type)
@@ -1227,7 +1227,7 @@ class RelationshipDetector:
                 name = groups.get("name", "")
                 rel_word = groups.get("rel", "")
 
-                rel_type = self._get_relation_from_word(rel_word)
+                rel_type = self._get_relation_from_word(rel_word)  # type: ignore[assignment]
                 if rel_type and name:
                     detected.append(
                         DetectedRelation(

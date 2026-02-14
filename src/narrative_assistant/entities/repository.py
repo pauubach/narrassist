@@ -86,7 +86,7 @@ class EntityRepository:
             )
             entity_id = cursor.lastrowid
             logger.debug(f"Entidad creada: {entity.canonical_name} (ID={entity_id})")
-            return entity_id
+            return entity_id  # type: ignore[return-value]
 
     def get_entity(self, entity_id: int) -> Entity | None:
         """
@@ -200,7 +200,7 @@ class EntityRepository:
             return False
 
         updates.append("updated_at = datetime('now')")
-        params.append(entity_id)
+        params.append(entity_id)  # type: ignore[arg-type]
 
         sql = f"UPDATE entities SET {', '.join(updates)} WHERE id = ?"
 
@@ -280,7 +280,7 @@ class EntityRepository:
             "UPDATE entities SET mention_count = ? WHERE id = ?",
             (actual_count, entity_id),
         )
-        return actual_count
+        return actual_count  # type: ignore[no-any-return]
 
     def reconcile_all_mention_counts(self, project_id: int) -> int:
         """
@@ -306,7 +306,7 @@ class EntityRepository:
             (project_id,),
         )
         return (
-            self.db.fetchone(
+            self.db.fetchone(  # type: ignore[index]
                 "SELECT COUNT(*) as cnt FROM entities WHERE project_id = ? AND is_active = 1",
                 (project_id,),
             )["cnt"]
@@ -351,7 +351,7 @@ class EntityRepository:
                     mention.metadata,
                 ),
             )
-            return cursor.lastrowid
+            return cursor.lastrowid  # type: ignore[return-value]
 
     def create_mentions_batch(self, mentions: list[EntityMention]) -> int:
         """
@@ -583,7 +583,7 @@ class EntityRepository:
             logger.debug(
                 f"Attribute created: {attribute_key}={attribute_value} for entity {entity_id} (ID={attribute_id})"
             )
-            return attribute_id
+            return attribute_id  # type: ignore[return-value]
 
     def move_attributes(self, from_entity_id: int, to_entity_id: int) -> int:
         """
@@ -990,12 +990,12 @@ class EntityRepository:
 
         if is_verified is not None:
             updates.append("is_verified = ?")
-            params.append(1 if is_verified else 0)
+            params.append(1 if is_verified else 0)  # type: ignore[arg-type]
 
         if not updates:
             return False
 
-        params.append(attribute_id)
+        params.append(attribute_id)  # type: ignore[arg-type]
         sql = f"UPDATE entity_attributes SET {', '.join(updates)} WHERE id = ?"
 
         with self.db.connection() as conn:
@@ -1187,7 +1187,7 @@ class EntityRepository:
                 sql,
                 (project_id, result_entity_id, old_value, new_value, note),
             )
-            return cursor.lastrowid
+            return cursor.lastrowid  # type: ignore[return-value]
 
     def get_merge_history(self, project_id: int) -> list[MergeHistory]:
         """

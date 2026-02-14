@@ -28,6 +28,17 @@ class PipelineDeepExtractionMixin:
     - self._memory_monitor (MemoryMonitor)
     """
 
+    if TYPE_CHECKING:
+        from .unified_analysis import UnifiedConfig
+
+        config: UnifiedConfig
+
+        def _run_parallel_tasks(
+            self, tasks: list, context: "AnalysisContext"
+        ) -> None: ...
+
+        def _persist_attributes(self, context: "AnalysisContext") -> None: ...
+
     def _phase_4_deep_extraction(self, context: AnalysisContext) -> Result[None]:
         """
         Fase 4: Atributos, relaciones, conocimiento, voz.
@@ -107,7 +118,7 @@ class PipelineDeepExtractionMixin:
                 min_confidence=0.4,
             )
 
-            all_attributes = []
+            all_attributes: list = []
 
             # Procesar por capítulos para mantener información de chapter_id
             if context.chapters:
@@ -132,7 +143,7 @@ class PipelineDeepExtractionMixin:
                         chapter_id=chapter_num,
                     )
 
-                    if result.is_success:
+                    if result.is_success and result.value is not None:
                         # Ajustar posiciones al texto completo
                         for attr in result.value.attributes:
                             attr.start_char += chapter_start
@@ -147,7 +158,7 @@ class PipelineDeepExtractionMixin:
                     context.full_text,
                     entity_mentions=entity_mentions if entity_mentions else None,
                 )
-                if result.is_success:
+                if result.is_success and result.value is not None:
                     all_attributes = result.value.attributes
 
             context.attributes = all_attributes
@@ -316,8 +327,8 @@ class PipelineDeepExtractionMixin:
 
             # Detector de interacciones
             detector = InteractionDetector(
-                known_characters=character_names,
-                character_aliases=character_aliases,
+                known_characters=character_names,  # type: ignore[call-arg]
+                character_aliases=character_aliases,  # type: ignore[call-arg]
             )
 
             all_interactions = []
@@ -330,7 +341,7 @@ class PipelineDeepExtractionMixin:
                 if not content:
                     continue
 
-                interactions = detector.detect(
+                interactions = detector.detect(  # type: ignore[attr-defined]
                     text=content,
                     chapter_id=chapter_num,
                 )
@@ -345,11 +356,11 @@ class PipelineDeepExtractionMixin:
             # Analizar patrones de interacción
             if all_interactions:
                 pattern_analyzer = InteractionPatternAnalyzer(
-                    interactions=all_interactions,
-                    entities=context.entities,
+                    interactions=all_interactions,  # type: ignore[call-arg]
+                    entities=context.entities,  # type: ignore[call-arg]
                 )
 
-                patterns = pattern_analyzer.analyze()
+                patterns = pattern_analyzer.analyze()  # type: ignore[attr-defined]
                 context.interaction_patterns = [
                     p.to_dict() if hasattr(p, "to_dict") else p for p in patterns
                 ]

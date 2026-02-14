@@ -118,7 +118,7 @@ class TransformerNERModel:
             device_info = get_device()
             self._device = "cuda" if device_info.device_type.value == "cuda" else "cpu"
 
-        model_info = TRANSFORMER_NER_MODELS.get(self._model_key)
+        model_info = TRANSFORMER_NER_MODELS.get(self._model_key)  # type: ignore[arg-type]
         if not model_info:
             logger.warning(
                 f"Modelo transformer NER desconocido: {self._model_key}. "
@@ -151,7 +151,7 @@ class TransformerNERModel:
     @property
     def model_name(self) -> str:
         """Nombre del modelo HuggingFace."""
-        return self._hf_model_name
+        return self._hf_model_name  # type: ignore[return-value]
 
     def _get_cache_dir(self) -> Path:
         """Obtiene el directorio de cache para modelos transformer NER."""
@@ -247,7 +247,7 @@ class TransformerNERModel:
                 model_source = str(local_model_path)
                 logger.info(f"Cargando transformer NER desde cache local: {model_source}")
             else:
-                model_source = self._hf_model_name
+                model_source = self._hf_model_name  # type: ignore[assignment]
                 logger.warning(
                     f"Descarga directa desde HuggingFace: {model_source}. "
                     f"Esto puede tardar varios minutos (~500 MB)..."
@@ -262,7 +262,7 @@ class TransformerNERModel:
             logger.info(f"Cargando pesos del modelo desde: {model_source}")
             model = AutoModelForTokenClassification.from_pretrained(model_source)
 
-            self._pipeline = hf_pipeline(
+            self._pipeline = hf_pipeline(  # type: ignore[call-overload]
                 "ner",
                 model=model,
                 tokenizer=tokenizer,
@@ -286,7 +286,7 @@ class TransformerNERModel:
                 self._device = "cpu"
                 try:
                     source = str(local_model_path) if local_model_path else self._hf_model_name
-                    self._pipeline = hf_pipeline(
+                    self._pipeline = hf_pipeline(  # type: ignore[call-overload]
                         "ner",
                         model=source,
                         tokenizer=source,
@@ -329,7 +329,7 @@ class TransformerNERModel:
 
             all_entities: list[TransformerNEREntity] = []
             for chunk_text, offset in chunks:
-                raw_entities = self._pipeline(chunk_text)
+                raw_entities = self._pipeline(chunk_text)  # type: ignore[misc]
                 for ent in raw_entities:
                     label = self._normalize_label(ent.get("entity_group", ""))
                     if not label:

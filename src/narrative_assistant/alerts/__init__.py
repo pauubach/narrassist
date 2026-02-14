@@ -21,8 +21,8 @@ from .repository import AlertRepository, get_alert_repository
 try:
     from .engine import AlertEngine, get_alert_engine
 except ImportError:
-    AlertEngine = None
-    get_alert_engine = None
+    AlertEngine = None  # type: ignore[misc, assignment]
+    get_alert_engine = None  # type: ignore[assignment]
 
 __all__ = [
     # Models

@@ -192,7 +192,7 @@ async def import_work_preview(
             return ApiResponse(success=False, error=str(result.error))
 
         # Devolver preview + import_data para el paso confirm
-        preview_dict = result.value.to_dict()
+        preview_dict = result.value.to_dict()  # type: ignore[union-attr]
         preview_dict["import_data"] = import_data
 
         return ApiResponse(success=True, data=preview_dict)

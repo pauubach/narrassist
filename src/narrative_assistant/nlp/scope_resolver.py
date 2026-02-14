@@ -275,7 +275,7 @@ class ScopeResolver:
         if token.ent_type_:
             for ent in self.doc.ents:
                 if ent.start <= token.i < ent.end:
-                    return ent.text
+                    return ent.text  # type: ignore[no-any-return]
 
         # Si no, expandir con dependencias (compound, flat)
         tokens_in_span = [token]
@@ -488,7 +488,7 @@ class ScopeResolver:
                     # entidades, preferir el nombre propio.
                     if identity_match:
                         is_descriptive_noun = (
-                            subject_token is not None and subject_token.pos_ == "NOUN"
+                            subject_token is not None and subject_token.pos_ == "NOUN"  # type: ignore[attr-defined]
                         )
                         if is_descriptive_noun or not subject_match:
                             logger.debug(

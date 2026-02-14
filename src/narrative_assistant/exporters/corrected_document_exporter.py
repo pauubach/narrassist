@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from typing import Any
+
 from docx import Document
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsmap, qn
@@ -20,6 +22,10 @@ from docx.oxml.ns import nsmap, qn
 from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
 from ..corrections.base import CorrectionIssue
+
+# Type alias: docx.Document() returns docx.document.Document but the function
+# itself is typed as a callable, so we use Any for parameter annotations.
+_DocxDocument = Any
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +103,7 @@ class CorrectedDocumentExporter:
                 return Result.failure(
                     NarrativeError(
                         f"El archivo no existe: {original_path}",
-                        severity=ErrorSeverity.ERROR,
+                        severity=ErrorSeverity.RECOVERABLE,
                     )
                 )
 
@@ -105,7 +111,7 @@ class CorrectedDocumentExporter:
                 return Result.failure(
                     NarrativeError(
                         "Solo se admiten archivos .docx para Track Changes",
-                        severity=ErrorSeverity.ERROR,
+                        severity=ErrorSeverity.RECOVERABLE,
                     )
                 )
 
@@ -143,7 +149,7 @@ class CorrectedDocumentExporter:
             return Result.failure(
                 NarrativeError(
                     f"Error al exportar: {str(e)}",
-                    severity=ErrorSeverity.ERROR,
+                    severity=ErrorSeverity.RECOVERABLE,
                 )
             )
 
@@ -199,7 +205,7 @@ class CorrectedDocumentExporter:
             return Result.failure(
                 NarrativeError(
                     f"Error al exportar: {str(e)}",
-                    severity=ErrorSeverity.ERROR,
+                    severity=ErrorSeverity.RECOVERABLE,
                 )
             )
 
@@ -231,7 +237,7 @@ class CorrectedDocumentExporter:
 
         return filtered
 
-    def _enable_track_changes(self, doc: Document) -> None:
+    def _enable_track_changes(self, doc: _DocxDocument) -> None:
         """Habilita Track Changes en el documento."""
         # Obtener o crear element settings
         settings = doc.settings.element
@@ -244,7 +250,7 @@ class CorrectedDocumentExporter:
 
     def _apply_corrections(
         self,
-        doc: Document,
+        doc: _DocxDocument,
         corrections: list[CorrectionIssue],
         options: TrackChangeOptions,
     ) -> int:
@@ -270,7 +276,7 @@ class CorrectedDocumentExporter:
 
         return applied
 
-    def _build_text_map(self, doc: Document) -> list[dict]:
+    def _build_text_map(self, doc: _DocxDocument) -> list[dict]:
         """
         Construye un mapa de texto con posiciones.
 
@@ -304,7 +310,7 @@ class CorrectedDocumentExporter:
 
     def _apply_single_correction(
         self,
-        doc: Document,
+        doc: _DocxDocument,
         correction: CorrectionIssue,
         text_map: list[dict],
         options: TrackChangeOptions,
@@ -325,7 +331,7 @@ class CorrectedDocumentExporter:
                 target_entry = entry
                 break
 
-        if target_run is None:
+        if target_run is None or target_entry is None:
             # Intentar búsqueda por texto literal
             return self._apply_by_text_search(doc, correction, options)
 
@@ -360,7 +366,7 @@ class CorrectedDocumentExporter:
 
     def _apply_by_text_search(
         self,
-        doc: Document,
+        doc: _DocxDocument,
         correction: CorrectionIssue,
         options: TrackChangeOptions,
     ) -> bool:
@@ -563,7 +569,7 @@ def export_with_track_changes(
     result = exporter.export(original_path, corrections, options)
 
     if result.is_failure:
-        return result
+        return Result.failure(result.error)  # type: ignore[arg-type]
 
     # Determinar ruta de salida
     if output_path is None:
@@ -574,6 +580,7 @@ def export_with_track_changes(
     # Guardar archivo
     try:
         with open(output_path, "wb") as f:
+            assert result.value is not None
             f.write(result.value)
         logger.info(f"Documento corregido guardado en: {output_path}")
         return Result.success(output_path)
@@ -581,6 +588,6 @@ def export_with_track_changes(
         return Result.failure(
             NarrativeError(
                 f"Error al guardar archivo: {e}",
-                severity=ErrorSeverity.ERROR,
+                severity=ErrorSeverity.RECOVERABLE,
             )
         )

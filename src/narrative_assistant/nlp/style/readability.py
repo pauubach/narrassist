@@ -789,7 +789,7 @@ class ReadabilityAnalyzer:
             logger.error(f"Error analizando legibilidad: {e}", exc_info=True)
             error = NLPError(
                 message=f"Error en análisis de legibilidad: {e}",
-                severity=ErrorSeverity.MEDIUM,
+                severity=ErrorSeverity.RECOVERABLE,
             )
             return Result.failure(error)
 
@@ -822,10 +822,10 @@ class ReadabilityAnalyzer:
         Returns:
             Dict de título -> ReadabilityReport
         """
-        results = {}
+        results: dict[str, ReadabilityReport] = {}
         for title, content in chapters:
             result = self.analyze(content)
-            if result.is_success:
+            if result.is_success and result.value is not None:
                 results[title] = result.value
         return results
 
@@ -857,9 +857,10 @@ class ReadabilityAnalyzer:
             # Primero, análisis base de legibilidad
             base_result = self.analyze(text)
             if base_result.is_failure:
-                return Result.failure(base_result.error)
+                return Result.failure(base_result.error)  # type: ignore[arg-type]
 
             base_report = base_result.value
+            assert base_report is not None
 
             # Extraer palabras
             words = re.findall(r"\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+\b", text.lower())
@@ -873,7 +874,7 @@ class ReadabilityAnalyzer:
             sight_word_ratio = sight_word_count / total_words
 
             # Vocabulario único y diversidad
-            word_counts = {}
+            word_counts: dict[str, int] = {}
             for w in words:
                 word_counts[w] = word_counts.get(w, 0) + 1
 
@@ -917,8 +918,8 @@ class ReadabilityAnalyzer:
             )
 
             thresholds = AGE_GROUP_THRESHOLDS.get(estimated_age_group, {})
-            estimated_age_range = thresholds.get("age_range", "Adulto")
-            estimated_grade_level = thresholds.get("grade", "")
+            estimated_age_range = str(thresholds.get("age_range", "Adulto"))
+            estimated_grade_level = str(thresholds.get("grade", ""))
 
             # Evaluar adecuación al grupo objetivo
             issues = []
@@ -931,9 +932,9 @@ class ReadabilityAnalyzer:
 
                 # Comparar con umbrales del grupo objetivo
                 if target_thresholds:
-                    max_wps = target_thresholds.get("max_words_per_sentence", 25)
-                    max_spw = target_thresholds.get("max_syllables_per_word", 3.0)
-                    min_sight = target_thresholds.get("min_sight_word_ratio", 0.0)
+                    max_wps = float(target_thresholds.get("max_words_per_sentence", 25))  # type: ignore[arg-type]
+                    max_spw = float(target_thresholds.get("max_syllables_per_word", 3.0))  # type: ignore[arg-type]
+                    min_sight = float(target_thresholds.get("min_sight_word_ratio", 0.0))  # type: ignore[arg-type]
 
                     # Evaluar longitud de oraciones
                     if base_report.avg_words_per_sentence > max_wps:
@@ -1021,7 +1022,7 @@ class ReadabilityAnalyzer:
             logger.error(f"Error en análisis de legibilidad por edad: {e}", exc_info=True)
             error = NLPError(
                 message=f"Error en análisis de legibilidad por edad: {e}",
-                severity=ErrorSeverity.MEDIUM,
+                severity=ErrorSeverity.RECOVERABLE,
             )
             return Result.failure(error)
 

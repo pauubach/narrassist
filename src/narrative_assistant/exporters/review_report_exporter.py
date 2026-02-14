@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from typing import Any
+
 from docx import Document
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -27,6 +29,10 @@ from docx.shared import Inches, Pt, RGBColor
 from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
 from ..corrections.base import CorrectionIssue
+
+# Type alias: docx.Document() returns docx.document.Document but the function
+# itself is typed as a callable, so we use Any for parameter annotations.
+_DocxDocument = Any
 
 logger = logging.getLogger(__name__)
 
@@ -313,7 +319,7 @@ class ReviewReportExporter:
         except Exception as e:
             error = NarrativeError(
                 message=f"Failed to export review report DOCX: {str(e)}",
-                severity=ErrorSeverity.ERROR,
+                severity=ErrorSeverity.RECOVERABLE,
                 user_message=f"Error exportando informe DOCX: {str(e)}",
             )
             logger.error(f"Error exporting review report DOCX: {e}", exc_info=True)
@@ -419,14 +425,14 @@ class ReviewReportExporter:
         except ImportError:
             error = NarrativeError(
                 message="reportlab not installed",
-                severity=ErrorSeverity.ERROR,
+                severity=ErrorSeverity.RECOVERABLE,
                 user_message="Para exportar a PDF es necesario instalar reportlab: pip install reportlab",
             )
             return Result.failure(error)
         except Exception as e:
             error = NarrativeError(
                 message=f"Failed to export review report PDF: {str(e)}",
-                severity=ErrorSeverity.ERROR,
+                severity=ErrorSeverity.RECOVERABLE,
                 user_message=f"Error exportando informe PDF: {str(e)}",
             )
             logger.error(f"Error exporting review report PDF: {e}", exc_info=True)
@@ -436,7 +442,7 @@ class ReviewReportExporter:
     # DOCX Generation Methods
     # =========================================================================
 
-    def _setup_docx_styles(self, doc: Document) -> None:
+    def _setup_docx_styles(self, doc: _DocxDocument) -> None:
         """Configura estilos del documento DOCX."""
         styles = doc.styles
 
@@ -481,7 +487,7 @@ class ReviewReportExporter:
         except ValueError:
             pass
 
-    def _add_docx_cover(self, doc: Document, data: ReviewReportData) -> None:
+    def _add_docx_cover(self, doc: _DocxDocument, data: ReviewReportData) -> None:
         """Añade portada al documento DOCX."""
         # Espaciado superior
         for _ in range(3):
@@ -534,7 +540,7 @@ class ReviewReportExporter:
 
         doc.add_page_break()
 
-    def _add_docx_summary(self, doc: Document, data: ReviewReportData) -> None:
+    def _add_docx_summary(self, doc: _DocxDocument, data: ReviewReportData) -> None:
         """Añade resumen ejecutivo al DOCX."""
         doc.add_heading("Resumen Ejecutivo", level=1)
 
@@ -582,7 +588,7 @@ class ReviewReportExporter:
 
         doc.add_paragraph()
 
-    def _add_docx_by_category(self, doc: Document, data: ReviewReportData) -> None:
+    def _add_docx_by_category(self, doc: _DocxDocument, data: ReviewReportData) -> None:
         """Añade desglose por categoría al DOCX."""
         doc.add_heading("Desglose por Categoría", level=1)
 
@@ -628,7 +634,7 @@ class ReviewReportExporter:
 
             doc.add_paragraph()
 
-    def _add_docx_by_chapter(self, doc: Document, data: ReviewReportData) -> None:
+    def _add_docx_by_chapter(self, doc: _DocxDocument, data: ReviewReportData) -> None:
         """Añade desglose por capítulo al DOCX."""
         doc.add_heading("Distribución por Capítulo", level=1)
 
@@ -652,7 +658,7 @@ class ReviewReportExporter:
 
     def _add_docx_detailed_list(
         self,
-        doc: Document,
+        doc: _DocxDocument,
         data: ReviewReportData,
         options: ReviewReportOptions,
     ) -> None:
@@ -705,7 +711,7 @@ class ReviewReportExporter:
 
                 doc.add_paragraph()  # Espaciado
 
-    def _add_docx_recommendations(self, doc: Document, data: ReviewReportData) -> None:
+    def _add_docx_recommendations(self, doc: _DocxDocument, data: ReviewReportData) -> None:
         """Añade recomendaciones al DOCX."""
         doc.add_heading("Recomendaciones", level=1)
 
@@ -717,7 +723,7 @@ class ReviewReportExporter:
 
         doc.add_paragraph()
 
-    def _add_docx_footer(self, doc: Document, data: ReviewReportData) -> None:
+    def _add_docx_footer(self, doc: _DocxDocument, data: ReviewReportData) -> None:
         """Añade footer al DOCX."""
         doc.add_paragraph()
 
@@ -1097,11 +1103,12 @@ def export_review_report(
         result = exporter.export_to_docx(issues, options)
 
     if result.is_failure:
-        return result
+        return Result.failure(result.error)  # type: ignore[arg-type]
 
     try:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "wb") as f:
+            assert result.value is not None
             f.write(result.value)
         logger.info(f"Review report saved to: {output_path}")
         return Result.success(output_path)
@@ -1109,6 +1116,6 @@ def export_review_report(
         return Result.failure(
             NarrativeError(
                 f"Error saving report: {e}",
-                severity=ErrorSeverity.ERROR,
+                severity=ErrorSeverity.RECOVERABLE,
             )
         )

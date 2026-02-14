@@ -151,7 +151,7 @@ class AlertFormatter:
         """
 
         def get_excerpt(source: dict) -> str:
-            return source.get("text", source.get("excerpt", ""))
+            return source.get("text", source.get("excerpt", ""))  # type: ignore[no-any-return]
 
         return [
             {

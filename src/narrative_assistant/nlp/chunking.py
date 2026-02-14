@@ -35,7 +35,7 @@ class TextChunk:
     end_char: int
     chunk_index: int
     total_chunks: int | None = None
-    metadata: dict = None
+    metadata: dict = None  # type: ignore[assignment]
 
     def __post_init__(self):
         if self.metadata is None:
@@ -195,7 +195,7 @@ class TextChunker:
         if not paragraphs:
             return
 
-        current_texts = []
+        current_texts = []  # type: ignore[var-annotated]
         current_chars = 0
         current_start = 0
         chunk_index = 0

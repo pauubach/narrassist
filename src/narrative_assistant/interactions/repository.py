@@ -565,7 +565,7 @@ class InteractionRepository:
 
         if status:
             query += " AND status = ?"
-            params.append(status)
+            params.append(status)  # type: ignore[arg-type]
 
         query += " ORDER BY created_at DESC"
 

@@ -302,7 +302,7 @@ def export_character_sheet(
 
     # Calcular menciones (simplificado - en el futuro usar menciones reales de BD)
     chapters_with_attrs = {a.chapter_id for a in entity_attrs if a.chapter_id is not None}
-    mention_frequency = defaultdict(int)
+    mention_frequency: dict[int, int] = defaultdict(int)
     for attr in entity_attrs:
         if attr.chapter_id:
             mention_frequency[attr.chapter_id] += 1
@@ -412,7 +412,7 @@ def export_all_character_sheets(
     except Exception as e:
         error = NarrativeError(
             message=f"Failed to export character sheets: {str(e)}",
-            severity=ErrorSeverity.ERROR,
+            severity=ErrorSeverity.RECOVERABLE,
             user_message=f"Error exportando fichas de personaje: {str(e)}",
         )
         logger.error(f"Error exporting character sheets: {e}", exc_info=True)

@@ -535,9 +535,9 @@ class StructureDetector:
             # Si solo hay 1 heading al nivel mínimo, probablemente es título
             # Usar el siguiente nivel si existe
             if len(headings_at_min) == 1:
-                other_levels = [h.heading_level for h in headings if h.heading_level > min_level]
+                other_levels = [h.heading_level for h in headings if h.heading_level > min_level]  # type: ignore[operator]
                 if other_levels:
-                    chapter_level = min(other_levels)
+                    chapter_level = min(other_levels)  # type: ignore[type-var]
                 else:
                     chapter_level = min_level
             else:
@@ -611,7 +611,7 @@ class StructureDetector:
                         match = pattern.match(text)
                         if match:
                             number = self._parse_number(match.group(1))
-                            title = match.group(2) if match.lastindex >= 2 else None
+                            title = match.group(2) if match.lastindex >= 2 else None  # type: ignore[operator]
                             chapter_paragraphs.append((para, StructureType.CHAPTER, number, title))
                             break
 
@@ -708,7 +708,7 @@ class StructureDetector:
                 next_heading = headings[j]
                 next_level = next_heading.heading_level
 
-                if next_level <= level:
+                if next_level <= level:  # type: ignore[operator]
                     # Heading del mismo nivel o superior: fin de sección
                     end_char = next_heading.start_char
                     break
@@ -721,7 +721,7 @@ class StructureDetector:
             section = Section(
                 number=len(sections) + 1,
                 title=heading.text.strip(),
-                heading_level=level,
+                heading_level=level,  # type: ignore[arg-type]
                 start_char=heading.start_char,
                 end_char=end_char,
                 subsections=self._build_section_tree(subsection_headings, end_char),

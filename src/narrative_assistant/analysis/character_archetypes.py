@@ -369,8 +369,8 @@ class CharacterArchetypeAnalyzer:
             profile = self._analyze_character(
                 char=char,
                 arc=arcs_by_id.get(cid),
-                relations=rels_by_id.get(cid, []),
-                interactions=ints_by_id.get(cid, []),
+                relations=rels_by_id.get(cid, []),  # type: ignore[arg-type]
+                interactions=ints_by_id.get(cid, []),  # type: ignore[arg-type]
                 total_chapters=total_chapters,
                 char_profile=profiles_by_name.get(char_name),
             )
@@ -392,7 +392,7 @@ class CharacterArchetypeAnalyzer:
         ]
         if hero_chars:
             # Si hay un solo héroe, es el protagonista
-            best = max(hero_chars, key=lambda c: c.primary_archetype.score)
+            best = max(hero_chars, key=lambda c: c.primary_archetype.score)  # type: ignore[union-attr]
             report.protagonist_suggestion = best.character_name
         elif report.characters:
             # Sin héroe claro: sugerir el de mayor importancia
@@ -887,7 +887,7 @@ class CharacterArchetypeAnalyzer:
                     static_chars.append(ch.character_name)
                     break
         if static_chars:
-            names = ", ".join(f"«{n}»" for n in static_chars[:3])
+            names = ", ".join(f"«{n}»" for n in static_chars[:3])  # type: ignore[assignment]
             notes.append(
                 f"Se detectaron arcos estáticos en {names}. "
                 "Un arco estático no implica ausencia de desarrollo: "

@@ -314,7 +314,7 @@ class NarrativeStructureDetector:
         prolepsis = self.detect_prolepsis(text, chapters, min_confidence)
 
         # TODO: Implementar detección de analepsis (flashbacks sin marcador)
-        analepsis = []
+        analepsis = []  # type: ignore[var-annotated]
 
         return NarrativeStructureReport(
             prolepsis_found=prolepsis,

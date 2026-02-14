@@ -296,7 +296,7 @@ class TimelineBuilder:
         """
         marker_instance = getattr(marker, "temporal_instance_id", None)
         if marker_instance:
-            return marker_instance
+            return marker_instance  # type: ignore[no-any-return]
 
         if marker.entity_id is None:
             return None
@@ -337,7 +337,7 @@ class TimelineBuilder:
         weekday = None
         for marker in relative_markers:
             if getattr(marker, "weekday", None):
-                weekday = marker.weekday
+                weekday = marker.weekday  # type: ignore[attr-defined]
                 break
 
         # Buscar el evento del primer capítulo
@@ -636,7 +636,7 @@ class TimelineBuilder:
                 description = f"Edad mencionada: {marker.text}"
             elif getattr(marker, "relative_year_offset", None) is not None:
                 offset = marker.relative_year_offset
-                sign = "+" if offset >= 0 else ""
+                sign = "+" if offset >= 0 else ""  # type: ignore[operator]
                 description = f"Instancia relativa ({sign}{offset} años): {marker.text}"
             else:
                 description = f"Instancia temporal: {marker.text}"
@@ -834,9 +834,9 @@ class TimelineBuilder:
             if self._non_linear_detector is None:
                 from .non_linear_detector import NonLinearNarrativeDetector
 
-                self._non_linear_detector = NonLinearNarrativeDetector()
+                self._non_linear_detector = NonLinearNarrativeDetector()  # type: ignore[assignment]
 
-            signals = self._non_linear_detector.detect_signals(
+            signals = self._non_linear_detector.detect_signals(  # type: ignore[attr-defined]
                 chapter_text, event.chapter,
             )
             matching = [s for s in signals if s.direction == direction]

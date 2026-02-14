@@ -94,7 +94,7 @@ class CollectionRepository:
                 (name, description),
             )
             conn.commit()
-            return cursor.lastrowid
+            return cursor.lastrowid  # type: ignore[no-any-return]
 
     def get(self, collection_id: int) -> Collection | None:
         """Obtiene una colección por ID."""
@@ -154,7 +154,7 @@ class CollectionRepository:
             return False
 
         updates.append("updated_at = datetime('now')")
-        params.append(collection_id)
+        params.append(collection_id)  # type: ignore[arg-type]
 
         with db.connection() as conn:
             conn.execute(
@@ -212,7 +212,7 @@ class CollectionRepository:
             result = {"success": True}
             if count + 1 > WARN_PROJECTS_THRESHOLD:
                 result["warning"] = (
-                    f"Colección con {count + 1} proyectos. "
+                    f"Colección con {count + 1} proyectos. "  # type: ignore[assignment]
                     f"El análisis cross-book puede tardar más."
                 )
             return result
@@ -499,6 +499,6 @@ class CollectionRepository:
         if not cache_file.exists():
             return None
         try:
-            return json.loads(cache_file.read_text(encoding="utf-8"))
+            return json.loads(cache_file.read_text(encoding="utf-8"))  # type: ignore[no-any-return]
         except (json.JSONDecodeError, OSError):
             return None

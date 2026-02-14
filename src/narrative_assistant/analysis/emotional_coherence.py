@@ -383,9 +383,9 @@ class EmotionalCoherenceChecker:
         dialogue_sentiment = result.value
 
         # Verificar confianza mínima
-        if dialogue_sentiment.sentiment_confidence < self.min_confidence:
+        if dialogue_sentiment.sentiment_confidence < self.min_confidence:  # type: ignore[union-attr]
             logger.debug(
-                f"Confianza baja ({dialogue_sentiment.sentiment_confidence:.2f}), ignorando"
+                f"Confianza baja ({dialogue_sentiment.sentiment_confidence:.2f}), ignorando"  # type: ignore[union-attr]
             )
             return None
 
@@ -393,20 +393,20 @@ class EmotionalCoherenceChecker:
         expected_sentiments = self._emotion_to_expected_sentiment(declared_emotion)
 
         # Verificar coherencia
-        if not self._is_coherent(expected_sentiments, dialogue_sentiment.sentiment):
+        if not self._is_coherent(expected_sentiments, dialogue_sentiment.sentiment):  # type: ignore[union-attr]
             return EmotionalIncoherence(
                 entity_name=entity_name,
                 incoherence_type=IncoherenceType.EMOTION_DIALOGUE,
                 declared_emotion=declared_emotion,
-                actual_behavior=f"{dialogue_sentiment.sentiment.value} ({dialogue_sentiment.primary_emotion.value})",
+                actual_behavior=f"{dialogue_sentiment.sentiment.value} ({dialogue_sentiment.primary_emotion.value})",  # type: ignore[union-attr]
                 declared_text=context,
                 behavior_text=dialogue_text,
-                confidence=dialogue_sentiment.sentiment_confidence,
+                confidence=dialogue_sentiment.sentiment_confidence,  # type: ignore[union-attr]
                 explanation=self._generate_explanation(
-                    entity_name, declared_emotion, dialogue_sentiment
+                    entity_name, declared_emotion, dialogue_sentiment  # type: ignore[arg-type]
                 ),
                 suggestion=self._generate_suggestion(
-                    entity_name, declared_emotion, dialogue_sentiment
+                    entity_name, declared_emotion, dialogue_sentiment  # type: ignore[arg-type]
                 ),
                 chapter_id=chapter_id,
                 start_char=start_char,
@@ -432,7 +432,7 @@ class EmotionalCoherenceChecker:
         Returns:
             Lista de incoherencias detectadas
         """
-        incoherences = []
+        incoherences = []  # type: ignore[var-annotated]
 
         if len(emotional_states) < 2:
             return incoherences

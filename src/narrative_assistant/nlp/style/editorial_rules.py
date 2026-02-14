@@ -628,7 +628,7 @@ class EditorialRulesChecker:
         if rule.id == "entonces_interrogativo":
             # Quitar la coma
             text = match.group(0)
-            return text.replace(", ¿", " ¿").replace(",¿", " ¿")
+            return text.replace(", ¿", " ¿").replace(",¿", " ¿")  # type: ignore[no-any-return]
 
         if rule.id == "aguzar_sentidos":
             return self._fix_aguzar(match)
@@ -664,7 +664,7 @@ class EditorialRulesChecker:
             noun = noun_map.get(words[1], words[1])
             return f"{poss} {noun}"
 
-        return text
+        return text  # type: ignore[no-any-return]
 
     def _remove_accent(self, word: str) -> str:
         """Quita la tilde de un demostrativo."""
@@ -704,8 +704,8 @@ class EditorialRulesChecker:
         }
         for old, new in replacements.items():
             if old in text.lower():
-                return text.replace(old, new).replace(old.capitalize(), new.capitalize())
-        return text.replace("agudiz", "aguz")
+                return text.replace(old, new).replace(old.capitalize(), new.capitalize())  # type: ignore[no-any-return]
+        return text.replace("agudiz", "aguz")  # type: ignore[no-any-return]
 
     def _generate_explanation(self, rule: EditorialRule, match: re.Match) -> str:
         """Genera una explicación para el problema."""

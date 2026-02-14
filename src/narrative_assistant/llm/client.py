@@ -91,6 +91,7 @@ class LocalLLMClient:
         self._transformers_pipeline: Any = None
         self._lock = threading.Lock()
         self._warned_unavailable = False  # Para evitar warnings repetidos
+        self._ollama_num_gpu: int | None = None  # None = Ollama decide, 0 = CPU
         self._initialize_backend()
 
     def _initialize_backend(self) -> None:
@@ -160,7 +161,55 @@ class LocalLLMClient:
                 return False
 
         # Caso 3: Ollama corriendo, verificar modelo
-        return self._verify_ollama_model(manager)
+        result = self._verify_ollama_model(manager)
+        if result:
+            self._ollama_num_gpu = self._determine_ollama_num_gpu()
+        return result
+
+    def _determine_ollama_num_gpu(self) -> int | None:
+        """
+        Determina el valor de num_gpu para solicitudes a Ollama.
+
+        Comprueba si la GPU está bloqueada (CC < 6.0) o tiene poca VRAM
+        (< 6 GB) para evitar crashes de Ollama por falta de memoria.
+
+        Returns:
+            0 para forzar CPU, None para dejar que Ollama decida (auto).
+        """
+        if self._config.force_cpu:
+            logger.info("Ollama forzado a CPU por configuración (force_cpu=True)")
+            return 0
+
+        try:
+            from ..core.device import get_blocked_gpu_info
+
+            blocked = get_blocked_gpu_info()
+            if blocked:
+                logger.info(
+                    f"GPU bloqueada ({blocked.get('name', '?')}, "
+                    f"CC {blocked.get('compute_capability', '?')}). "
+                    f"Ollama usará num_gpu=0 (CPU)."
+                )
+                return 0
+        except Exception as e:
+            logger.debug(f"Error comprobando GPU bloqueada: {e}")
+
+        try:
+            from ..core.device import DeviceType, get_device_detector
+
+            detector = get_device_detector()
+            device = detector.detect_best_device()
+            if device.device_type == DeviceType.CUDA and device.is_low_vram:
+                logger.info(
+                    f"GPU {device.device_name} con VRAM limitada "
+                    f"({device.memory_gb:.1f}GB). "
+                    f"Ollama usará num_gpu=0 (CPU)."
+                )
+                return 0
+        except Exception as e:
+            logger.debug(f"Error detectando VRAM: {e}")
+
+        return None
 
     def _verify_ollama_model(self, manager: Any) -> bool:
         """Verifica que el modelo configurado esté disponible."""
@@ -221,7 +270,7 @@ class LocalLLMClient:
         vram_gb = 0.0
 
         try:
-            from ..core.device import get_gpu_device
+            from ..core.device import get_gpu_device  # type: ignore[attr-defined]
 
             gpu = get_gpu_device()
             if gpu:
@@ -367,29 +416,40 @@ class LocalLLMClient:
 
         return None
 
-    def _complete_ollama(
+    # Patrones de error de Ollama que indican fallo de VRAM/GPU
+    _VRAM_ERROR_PATTERNS = (
+        "llama runner process has terminated",
+        "exit status 2",
+        "graph_reserve",
+        "compute buffer",
+        "out of memory",
+        "ggml_cuda",
+        "failed to allocate",
+    )
+
+    def _is_ollama_vram_error(self, status_code: int, response_text: str) -> bool:
+        """Detecta si el error de Ollama indica fallo de VRAM/GPU."""
+        if status_code != 500:
+            return False
+        text_lower = response_text.lower()
+        return any(p in text_lower for p in self._VRAM_ERROR_PATTERNS)
+
+    def _send_ollama_request(
         self,
-        prompt: str,
-        system: str | None = None,
-        max_tokens: int | None = None,
-        temperature: float | None = None,
-    ) -> str | None:
-        """Genera respuesta usando Ollama."""
+        messages: list[dict[str, str]],
+        options: dict[str, Any],
+        timeout_config: Any,
+    ) -> tuple[str | None, int | None]:
+        """
+        Envía request a Ollama y retorna (content, status_code).
+
+        Returns:
+            - Éxito: (content_string, 200)
+            - Error HTTP: (response_body, status_code)
+            - Error de red: (error_message, None)
+        """
         try:
             import httpx
-
-            messages = []
-            if system:
-                messages.append({"role": "system", "content": system})
-            messages.append({"role": "user", "content": prompt})
-
-            # Timeout alto para CPU sin GPU - puede tardar varios minutos
-            timeout_config = httpx.Timeout(
-                connect=10.0,  # 10s para conectar
-                read=self._config.timeout,  # 10 min para leer respuesta
-                write=30.0,  # 30s para enviar request
-                pool=10.0,  # 10s para obtener conexión del pool
-            )
 
             response = httpx.post(
                 f"{self._config.ollama_host}/api/chat",
@@ -397,24 +457,86 @@ class LocalLLMClient:
                     "model": self._config.ollama_model,
                     "messages": messages,
                     "stream": False,
-                    "options": {
-                        "num_predict": max_tokens or self._config.max_tokens,
-                        "temperature": temperature or self._config.temperature,
-                    },
+                    "options": options,
                 },
                 timeout=timeout_config,
             )
 
             if response.status_code == 200:
                 data = response.json()
-                return data.get("message", {}).get("content", "")
+                content = data.get("message", {}).get("content", "")
+                return content, 200
 
-            logger.error(f"Error de Ollama: {response.status_code} - {response.text}")
-            return None
+            return response.text, response.status_code
 
         except Exception as e:
             logger.error(f"Error en llamada a Ollama: {e}")
+            return str(e), None
+
+    def _complete_ollama(
+        self,
+        prompt: str,
+        system: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> str | None:
+        """Genera respuesta usando Ollama con fallback a CPU si hay crash de VRAM."""
+        try:
+            import httpx
+        except ImportError:
+            logger.error("httpx no instalado, no se puede usar Ollama")
             return None
+
+        messages: list[dict[str, str]] = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+        timeout_config = httpx.Timeout(
+            connect=10.0,
+            read=self._config.timeout,
+            write=30.0,
+            pool=10.0,
+        )
+
+        options: dict[str, Any] = {
+            "num_predict": max_tokens or self._config.max_tokens,
+            "temperature": temperature or self._config.temperature,
+        }
+        if self._ollama_num_gpu is not None:
+            options["num_gpu"] = self._ollama_num_gpu
+
+        # Primer intento
+        content, status = self._send_ollama_request(messages, options, timeout_config)
+
+        if status == 200 and content:
+            return content
+
+        # Detectar crash de VRAM → retry con CPU
+        if (
+            status is not None
+            and self._is_ollama_vram_error(status, content or "")
+            and options.get("num_gpu") != 0
+        ):
+            logger.warning(
+                "Ollama falló por VRAM insuficiente. "
+                "Reintentando con num_gpu=0 (CPU)..."
+            )
+            options["num_gpu"] = 0
+            self._ollama_num_gpu = 0  # Persistir para futuras llamadas
+
+            content, status = self._send_ollama_request(
+                messages, options, timeout_config
+            )
+            if status == 200 and content:
+                logger.info("Ollama respondió en modo CPU. Futuras llamadas usarán CPU.")
+                return content
+
+        if status is not None and status != 200:
+            logger.error(
+                f"Error de Ollama: {status} - {(content or '')[:200]}"
+            )
+        return None
 
     def _complete_transformers(
         self,
@@ -444,9 +566,9 @@ class LocalLLMClient:
             # Extraer solo la respuesta del asistente
             if "<|assistant|>" in generated_text:
                 response = generated_text.split("<|assistant|>")[-1].strip()
-                return response
+                return response  # type: ignore[no-any-return]
 
-            return generated_text[len(full_prompt) :].strip()
+            return generated_text[len(full_prompt) :].strip()  # type: ignore[no-any-return]
 
         except Exception as e:
             logger.error(f"Error en Transformers: {e}")
@@ -498,7 +620,7 @@ class LocalLLMClient:
             if start_idx != -1 and end_idx > start_idx:
                 cleaned = cleaned[start_idx:end_idx]
 
-            return json.loads(cleaned)
+            return json.loads(cleaned)  # type: ignore[no-any-return]
 
         except json.JSONDecodeError as e:
             logger.error(f"Error parseando JSON: {e}")

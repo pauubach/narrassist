@@ -131,7 +131,7 @@ class EntityMention:
         try:
             import json
 
-            return json.loads(self.metadata)
+            return json.loads(self.metadata)  # type: ignore[no-any-return]
         except (json.JSONDecodeError, TypeError):
             return None
 

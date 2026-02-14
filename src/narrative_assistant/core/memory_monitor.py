@@ -34,7 +34,7 @@ def get_process_memory_mb() -> float:
         import psutil
 
         process = psutil.Process(os.getpid())
-        return process.memory_info().rss / (1024 * 1024)
+        return process.memory_info().rss / (1024 * 1024)  # type: ignore[no-any-return]
     except ImportError:
         pass
 
@@ -43,14 +43,14 @@ def get_process_memory_mb() -> float:
         import resource
 
         # maxrss en KB en Linux, bytes en macOS
-        usage = resource.getrusage(resource.RUSAGE_SELF)
+        usage = resource.getrusage(resource.RUSAGE_SELF)  # type: ignore[attr-defined]
         maxrss = usage.ru_maxrss
         import platform
 
         if platform.system() == "Darwin":
-            return maxrss / (1024 * 1024)  # bytes → MB
+            return float(maxrss) / (1024 * 1024)  # bytes → MB
         else:
-            return maxrss / 1024  # KB → MB
+            return float(maxrss) / 1024  # KB → MB
     except (ImportError, AttributeError):
         pass
 

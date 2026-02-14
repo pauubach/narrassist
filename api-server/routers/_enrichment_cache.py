@@ -62,7 +62,7 @@ def get_cached_enrichment(
                         "computed_at": row[2],
                         "revision": row[3] if len(row) > 3 else 0,
                     }
-                return result
+                return result  # type: ignore[no-any-return]
 
     except Exception as e:
         logger.warning(f"Error reading enrichment cache for {enrichment_type}: {e}")

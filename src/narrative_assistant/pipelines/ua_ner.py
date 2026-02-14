@@ -37,6 +37,13 @@ class PipelineNERMixin:
     - self._memory_monitor (MemoryMonitor)
     """
 
+    if TYPE_CHECKING:
+        from .unified_analysis import UnifiedConfig
+
+        config: UnifiedConfig
+
+        def _clear_gpu_memory_if_needed(self) -> None: ...
+
     def _phase_2_base_extraction(self, context: AnalysisContext) -> Result[None]:
         """
         Fase 2: NER mejorado con dialogue hints.
@@ -312,7 +319,7 @@ class PipelineNERMixin:
             logger.info(f"NER: processing full text ({total_chars} chars)")
             result = extractor.extract_entities(context.full_text)
             if result.is_success:
-                return result.value.entities if hasattr(result.value, "entities") else []
+                return result.value.entities if hasattr(result.value, "entities") else []  # type: ignore[union-attr, no-any-return]
             return []
 
         # Documentos grandes con capítulos: procesar capítulo por capítulo
@@ -386,9 +393,14 @@ class PipelineNERMixin:
 
                     markers = extractor.extract(
                         text=content,
-                        chapter_id=chapter_num,
-                        offset=start_char,
+                        chapter=chapter_num,
                     )
+
+                    # Offset local positions to global document positions
+                    if start_char > 0:
+                        for m in markers:
+                            m.start_char += start_char
+                            m.end_char += start_char
 
                     all_markers.extend(markers)
             else:

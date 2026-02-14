@@ -103,14 +103,14 @@ async def list_alerts(
 
         # Obtener alertas - usar método priorizado si se especifica capítulo
         if current_chapter is not None:
-            result = alert_repo.get_by_project_prioritized(
+            result = alert_repo.get_by_project_prioritized(  # type: ignore[attr-defined]
                 project_id,
                 current_chapter=current_chapter,
                 chapter_min=chapter_min,
                 chapter_max=chapter_max,
             )
         else:
-            result = alert_repo.get_by_project(
+            result = alert_repo.get_by_project(  # type: ignore[attr-defined]
                 project_id,
                 chapter_min=chapter_min,
                 chapter_max=chapter_max,
@@ -250,7 +250,7 @@ async def update_alert_status(project_id: int, alert_id: int, body: deps.AlertSt
 
         # Actualizar el status
         alert.status = status_map[new_status_str]
-        deps.alert_repository.update(alert)
+        deps.alert_repository.update(alert)  # type: ignore[attr-defined]
 
         # Persistir dismissal para que sobreviva re-análisis
         if new_status_str == 'dismissed' and deps.dismissal_repository:
@@ -325,7 +325,7 @@ async def resolve_alert(project_id: int, alert_id: int):
     if error:
         return error
     alert.status = AlertStatus.RESOLVED
-    deps.alert_repository.update(alert)
+    deps.alert_repository.update(alert)  # type: ignore[attr-defined]
     return ApiResponse(success=True, message="Alerta marcada como resuelta")
 
 
@@ -336,7 +336,7 @@ async def dismiss_alert(project_id: int, alert_id: int):
     if error:
         return error
     alert.status = AlertStatus.DISMISSED
-    deps.alert_repository.update(alert)
+    deps.alert_repository.update(alert)  # type: ignore[attr-defined]
     return ApiResponse(success=True, message="Alerta descartada")
 
 
@@ -347,7 +347,7 @@ async def reopen_alert(project_id: int, alert_id: int):
     if error:
         return error
     alert.status = AlertStatus.OPEN
-    deps.alert_repository.update(alert)
+    deps.alert_repository.update(alert)  # type: ignore[attr-defined]
     return ApiResponse(success=True, message="Alerta reabierta")
 
 
@@ -360,7 +360,7 @@ async def resolve_all_alerts(project_id: int):
         alert_repo = deps.alert_repository
 
         # Obtener todas las alertas del proyecto
-        result = alert_repo.get_by_project(project_id)
+        result = alert_repo.get_by_project(project_id)  # type: ignore[attr-defined]
         if result.is_failure:
             return ApiResponse(success=False, error="Error obteniendo alertas")
 
@@ -372,7 +372,7 @@ async def resolve_all_alerts(project_id: int):
         for alert in all_alerts:
             if alert.status.value in ['new', 'open', 'acknowledged', 'in_progress']:
                 alert.status = AlertStatus.RESOLVED
-                alert_repo.update(alert)
+                alert_repo.update(alert)  # type: ignore[attr-defined]
                 resolved_count += 1
                 resolved_alerts.append(alert)
 
@@ -752,7 +752,7 @@ async def mark_alert_resolved(project_id: int, alert_id: int, body: deps.MarkRes
 
         alert.status = AlertStatus.RESOLVED
 
-        deps.alert_repository.update(alert)
+        deps.alert_repository.update(alert)  # type: ignore[attr-defined]
 
         # Write resolution_reason to DB
         try:

@@ -28,6 +28,15 @@ class PipelineQualityMixin:
     - self._memory_monitor (MemoryMonitor)
     """
 
+    if TYPE_CHECKING:
+        from .unified_analysis import UnifiedConfig
+
+        config: UnifiedConfig
+
+        def _run_parallel_tasks(
+            self, tasks: list, context: "AnalysisContext"
+        ) -> None: ...
+
     def _phase_5_quality(self, context: AnalysisContext) -> Result[None]:
         """
         Fase 5: Ortografía, gramática, repeticiones.
@@ -91,7 +100,7 @@ class PipelineQualityMixin:
         """
         for ch in chapters:
             if ch.start_char <= position < ch.end_char:
-                return ch.number
+                return ch.number  # type: ignore[no-any-return]
         return None
 
     def _assign_chapters_to_issues(
@@ -129,7 +138,7 @@ class PipelineQualityMixin:
                 use_llm=self.config.use_llm,
             )
 
-            if result.is_success:
+            if result.is_success and result.value is not None:
                 # Filtrar por confianza
                 context.spelling_issues = [
                     issue
@@ -156,7 +165,7 @@ class PipelineQualityMixin:
                 use_llm=self.config.use_llm,
             )
 
-            if result.is_success:
+            if result.is_success and result.value is not None:
                 context.grammar_issues = [
                     issue
                     for issue in result.value.issues
@@ -181,7 +190,7 @@ class PipelineQualityMixin:
                 context.full_text, min_distance=self.config.repetition_min_distance
             )
 
-            if result.is_success:
+            if result.is_success and result.value is not None:
                 context.lexical_repetitions = result.value.repetitions
                 context.stats["lexical_repetitions"] = len(context.lexical_repetitions)
 
@@ -201,7 +210,7 @@ class PipelineQualityMixin:
                 context.full_text, min_distance=self.config.repetition_min_distance
             )
 
-            if result.is_success:
+            if result.is_success and result.value is not None:
                 context.semantic_repetitions = result.value.repetitions
                 context.stats["semantic_repetitions"] = len(context.semantic_repetitions)
 
@@ -235,7 +244,7 @@ class PipelineQualityMixin:
                 # Analizar texto completo
                 result = detector.detect(context.full_text)
 
-            if result.is_success:
+            if result.is_success and result.value is not None:
                 context.coherence_breaks = result.value.breaks
                 context.stats["coherence_breaks"] = len(context.coherence_breaks)
                 context.stats["coherence_avg_similarity"] = result.value.avg_similarity
@@ -368,12 +377,12 @@ class PipelineQualityMixin:
 
             detector = get_sticky_sentence_detector()
 
-            all_sticky = []
+            all_sticky: list = []
             for ch in context.chapters:
                 ch_num = ch.chapter_number if hasattr(ch, "chapter_number") else 0
                 ch_content = ch.content if hasattr(ch, "content") else str(ch)
                 result = detector.analyze(ch_content, chapter=ch_num)
-                if result.is_success:
+                if result.is_success and result.value is not None:
                     all_sticky.extend(result.value.sticky_sentences)
 
             context.sticky_sentences = all_sticky

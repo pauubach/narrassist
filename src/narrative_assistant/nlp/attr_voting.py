@@ -228,7 +228,7 @@ class AttributeVotingMixin:
             new_confidence = min(1.0, max(0.0, new_confidence))
 
             # Solo incluir si supera umbral mínimo
-            if new_confidence >= self.min_confidence and best_attr is not None:
+            if new_confidence >= self.min_confidence and best_attr is not None:  # type: ignore[attr-defined]
                 final_attr = ExtractedAttribute(
                     entity_name=best_attr.entity_name,
                     category=best_attr.category,

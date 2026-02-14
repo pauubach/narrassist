@@ -215,7 +215,7 @@ class EmbeddingsModel:
         if clear_cache and self.device != "cpu":
             clear_gpu_memory()
 
-        return embeddings
+        return embeddings  # type: ignore[no-any-return]
 
     def similarity(
         self,
@@ -242,7 +242,7 @@ class EmbeddingsModel:
         if isinstance(text1, str) and isinstance(text2, str):
             return float(similarity[0, 0])
 
-        return similarity
+        return similarity  # type: ignore[no-any-return]
 
     def find_similar(
         self,

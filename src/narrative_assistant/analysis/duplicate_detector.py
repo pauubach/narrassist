@@ -444,8 +444,8 @@ class DuplicateDetector:
             text, similarity_threshold=sentence_threshold, chapters=chapters
         )
         if sentence_result.is_success:
-            combined.sentences_analyzed = sentence_result.value.sentences_analyzed
-            for dup in sentence_result.value.duplicates:
+            combined.sentences_analyzed = sentence_result.value.sentences_analyzed  # type: ignore[union-attr]
+            for dup in sentence_result.value.duplicates:  # type: ignore[union-attr]
                 combined.add_duplicate(dup)
 
         # Detectar párrafos duplicados
@@ -454,8 +454,8 @@ class DuplicateDetector:
                 paragraphs, similarity_threshold=paragraph_threshold
             )
             if para_result.is_success:
-                combined.paragraphs_analyzed = para_result.value.paragraphs_analyzed
-                for dup in para_result.value.duplicates:
+                combined.paragraphs_analyzed = para_result.value.paragraphs_analyzed  # type: ignore[union-attr]
+                for dup in para_result.value.duplicates:  # type: ignore[union-attr]
                     combined.add_duplicate(dup)
 
         return Result.success(combined)
@@ -526,6 +526,6 @@ class DuplicateDetector:
 
         for ch in chapters:
             if ch.get("start_char", 0) <= position < ch.get("end_char", float("inf")):
-                return ch.get("number", 0)
+                return ch.get("number", 0)  # type: ignore[no-any-return]
 
         return 0

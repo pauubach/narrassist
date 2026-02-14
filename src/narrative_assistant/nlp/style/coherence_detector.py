@@ -186,7 +186,7 @@ class CoherenceDetector:
         """Cargar modelo de embeddings si no está cargado."""
         if self._embeddings is None:
             try:
-                self._embeddings = get_embeddings_model()
+                self._embeddings = get_embeddings_model()  # type: ignore[assignment]
             except Exception as e:
                 logger.warning(f"No se pudo cargar modelo de embeddings: {e}")
                 raise
@@ -336,7 +336,7 @@ class CoherenceDetector:
 
             # Generar embeddings para todos los segmentos
             segment_texts = [s[1] for s in segments]
-            embeddings = self._embeddings.encode(segment_texts, normalize=True)
+            embeddings = self._embeddings.encode(segment_texts, normalize=True)  # type: ignore[attr-defined]
 
             # Calcular similitudes entre segmentos consecutivos
             similarities = []
@@ -431,9 +431,9 @@ class CoherenceDetector:
 
             if result.is_success:
                 chapter_report = result.value
-                combined_report.segments_analyzed += chapter_report.segments_analyzed
+                combined_report.segments_analyzed += chapter_report.segments_analyzed  # type: ignore[union-attr]
 
-                for brk in chapter_report.breaks:
+                for brk in chapter_report.breaks:  # type: ignore[union-attr]
                     combined_report.add_break(brk)
 
         return Result.success(combined_report)
