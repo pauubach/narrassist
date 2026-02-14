@@ -37,11 +37,8 @@ def _run_chat(project_id: int = 1, message: str = "hola"):
 
 
 def test_chat_unavailable_message_windows(monkeypatch, patched_project_manager):
-    import routers.services as services_mod
-
     import narrative_assistant.llm as llm_mod
 
-    monkeypatch.setattr(services_mod.sys, "platform", "win32")
     monkeypatch.setattr(llm_mod, "is_llm_available", lambda: False)
 
     response = _run_chat()
@@ -53,25 +50,19 @@ def test_chat_unavailable_message_windows(monkeypatch, patched_project_manager):
 
 
 def test_chat_unavailable_message_macos(monkeypatch, patched_project_manager):
-    import routers.services as services_mod
-
     import narrative_assistant.llm as llm_mod
 
-    monkeypatch.setattr(services_mod.sys, "platform", "darwin")
     monkeypatch.setattr(llm_mod, "is_llm_available", lambda: False)
 
     response = _run_chat()
 
     assert response.success is False
     assert response.error is not None
-    # Ahora el mensaje es genérico (no platform-specific) para UX amigable
     assert "Ollama" in response.error
     assert "Ajustes" in response.error
 
 
 def test_chat_success_sets_using_cpu_flag(monkeypatch, patched_project_manager):
-    import routers.services as services_mod
-
     import narrative_assistant.llm as llm_mod
 
     llm_client = SimpleNamespace(
@@ -81,7 +72,6 @@ def test_chat_success_sets_using_cpu_flag(monkeypatch, patched_project_manager):
         complete=lambda **_: "respuesta",
     )
 
-    monkeypatch.setattr(services_mod.sys, "platform", "darwin")
     monkeypatch.setattr(llm_mod, "is_llm_available", lambda: True)
     monkeypatch.setattr(llm_mod, "get_llm_client", lambda: llm_client)
 
@@ -95,8 +85,6 @@ def test_chat_success_sets_using_cpu_flag(monkeypatch, patched_project_manager):
 
 
 def test_chat_vram_error_message_uses_platform_hint(monkeypatch, patched_project_manager):
-    import routers.services as services_mod
-
     import narrative_assistant.llm as llm_mod
 
     def _raise_vram_error(**_):
@@ -109,7 +97,6 @@ def test_chat_vram_error_message_uses_platform_hint(monkeypatch, patched_project
         complete=_raise_vram_error,
     )
 
-    monkeypatch.setattr(services_mod.sys, "platform", "darwin")
     monkeypatch.setattr(llm_mod, "is_llm_available", lambda: True)
     monkeypatch.setattr(llm_mod, "get_llm_client", lambda: llm_client)
 
@@ -119,4 +106,3 @@ def test_chat_vram_error_message_uses_platform_hint(monkeypatch, patched_project
     assert response.error is not None
     assert "Ollama" in response.error
     assert "Ajustes" in response.error
-
