@@ -85,9 +85,11 @@ export default defineConfig({
 
   // Servidor de desarrollo
   webServer: {
-    command: 'npm run dev',
+    // --force evita fallos intermitentes "Outdated Optimize Dep" en Vite
+    // cuando cambian dependencias entre ejecuciones.
+    command: 'npm run dev -- --force',
     url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120 * 1000,
   },
 })

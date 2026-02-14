@@ -1226,7 +1226,9 @@ async def get_correction_config_diff(
         ApiResponse con parámetros sobrescritos y sus valores
     """
     try:
-        from narrative_assistant.correction_config import get_config_diff  # type: ignore[attr-defined]
+        from narrative_assistant.correction_config import (
+            get_config_diff,  # type: ignore[attr-defined]
+        )
 
         diff = get_config_diff(type_code, subtype_code)
         return ApiResponse(success=True, data=diff)

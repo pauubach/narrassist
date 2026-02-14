@@ -573,7 +573,9 @@ async def create_relationship(project_id: int, payload: deps.CreateRelationshipR
 
         from narrative_assistant.entities.repository import get_entity_repository
         from narrative_assistant.relationships.models import EntityRelationship, RelationType
-        from narrative_assistant.relationships.repository import get_relationship_repository  # type: ignore[attr-defined]
+        from narrative_assistant.relationships.repository import (
+            get_relationship_repository,  # type: ignore[attr-defined]
+        )
 
         source_entity_id = payload.source_entity_id
         target_entity_id = payload.target_entity_id
@@ -652,7 +654,9 @@ async def delete_relationship(project_id: int, relationship_id: str):
         ApiResponse con resultado de la eliminación
     """
     try:
-        from narrative_assistant.relationships.repository import get_relationship_repository  # type: ignore[attr-defined]
+        from narrative_assistant.relationships.repository import (
+            get_relationship_repository,  # type: ignore[attr-defined]
+        )
 
         rel_repo = get_relationship_repository()
         success = rel_repo.delete_relationship(relationship_id)
@@ -1490,7 +1494,9 @@ def get_character_archetypes(
         # Obtener relaciones
         relationships_data = []
         try:
-            from narrative_assistant.relationships.repository import get_relationship_repository  # type: ignore[attr-defined]
+            from narrative_assistant.relationships.repository import (
+                get_relationship_repository,  # type: ignore[attr-defined]
+            )
             rel_repo = get_relationship_repository()
             rels = rel_repo.get_by_project(project_id)
             for rel in rels:

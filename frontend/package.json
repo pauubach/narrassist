@@ -14,6 +14,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage && node scripts/check-coverage.cjs",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "tauri": "tauri"
   },
   "dependencies": {

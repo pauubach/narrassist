@@ -944,31 +944,31 @@ class License:
                 if row["grace_period_ends_at"]
                 else None
             ),
-            is_founding_member=bool(row["is_founding_member"]) if "is_founding_member" in row.keys() else False,
+            is_founding_member=bool(row["is_founding_member"]) if "is_founding_member" in row else False,
             founding_tier=(
                 LicenseTier(row["founding_tier"])
-                if "founding_tier" in row.keys() and row["founding_tier"]
+                if "founding_tier" in row and row["founding_tier"]
                 else None
             ),
-            founding_discount_eur=float(row["founding_discount_eur"]) if "founding_discount_eur" in row.keys() else 0.0,
+            founding_discount_eur=float(row["founding_discount_eur"]) if "founding_discount_eur" in row else 0.0,
             downgrade_grace_until=(
                 datetime.fromisoformat(row["downgrade_grace_until"])
-                if "downgrade_grace_until" in row.keys() and row["downgrade_grace_until"]
+                if "downgrade_grace_until" in row and row["downgrade_grace_until"]
                 else None
             ),
-            is_comp=bool(row["is_comp"]) if "is_comp" in row.keys() else False,
+            is_comp=bool(row["is_comp"]) if "is_comp" in row else False,
             comp_type=(
                 CompLicenseType(row["comp_type"])
-                if "comp_type" in row.keys() and row["comp_type"]
+                if "comp_type" in row and row["comp_type"]
                 else None
             ),
-            comp_discount_pct=float(row["comp_discount_pct"]) if "comp_discount_pct" in row.keys() else 0.0,
+            comp_discount_pct=float(row["comp_discount_pct"]) if "comp_discount_pct" in row else 0.0,
             comp_expires_at=(
                 datetime.fromisoformat(row["comp_expires_at"])
-                if "comp_expires_at" in row.keys() and row["comp_expires_at"]
+                if "comp_expires_at" in row and row["comp_expires_at"]
                 else None
             ),
-            comp_notes=row["comp_notes"] if "comp_notes" in row.keys() else "",
+            comp_notes=row.get("comp_notes", ""),
             extra_data=json.loads(row["extra_data"]) if row["extra_data"] else {},
         )
 

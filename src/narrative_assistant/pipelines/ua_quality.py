@@ -34,7 +34,7 @@ class PipelineQualityMixin:
         config: UnifiedConfig
 
         def _run_parallel_tasks(
-            self, tasks: list, context: "AnalysisContext"
+            self, tasks: list, context: AnalysisContext
         ) -> None: ...
 
     def _phase_5_quality(self, context: AnalysisContext) -> Result[None]:

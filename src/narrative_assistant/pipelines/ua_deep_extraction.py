@@ -34,10 +34,10 @@ class PipelineDeepExtractionMixin:
         config: UnifiedConfig
 
         def _run_parallel_tasks(
-            self, tasks: list, context: "AnalysisContext"
+            self, tasks: list, context: AnalysisContext
         ) -> None: ...
 
-        def _persist_attributes(self, context: "AnalysisContext") -> None: ...
+        def _persist_attributes(self, context: AnalysisContext) -> None: ...
 
     def _phase_4_deep_extraction(self, context: AnalysisContext) -> Result[None]:
         """

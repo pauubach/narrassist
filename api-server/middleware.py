@@ -10,9 +10,9 @@ controles son ligeros pero suficientes para evitar abusos.
 """
 
 import logging
-import time
 import threading
-from typing import Optional, Set
+import time
+from typing import Optional
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -202,7 +202,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 # ============================================================================
 
 # Orígenes permitidos para la aplicación Tauri local
-ALLOWED_ORIGINS: Set[str] = {
+ALLOWED_ORIGINS: set[str] = {
     "http://localhost:5173",    # Vite dev server
     "http://localhost:8008",    # API server (mismo origen)
     "http://127.0.0.1:5173",   # Vite dev server (IP)
@@ -231,7 +231,7 @@ class CSRFProtectionMiddleware(BaseHTTPMiddleware):
     # Métodos HTTP que no modifican estado (RFC 7231 §4.2.1)
     SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
-    def __init__(self, app, extra_origins: Optional[Set[str]] = None):
+    def __init__(self, app, extra_origins: Optional[set[str]] = None):
         """
         Args:
             app: Aplicación ASGI
