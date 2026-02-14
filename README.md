@@ -148,15 +148,7 @@ Ver [BUILD_AND_DEPLOY.md](docs/BUILD_AND_DEPLOY.md) para construcción y [PYTHON
 
 ## Documentación
 
-| Documento | Descripción |
-|-----------|-------------|
-| [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Estado actual del proyecto |
-| [IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md) | Plan de sprints (S0-S16) |
-| [BUILD_AND_DEPLOY.md](docs/BUILD_AND_DEPLOY.md) | Construcción de instaladores |
-| [PYTHON_EMBED.md](docs/PYTHON_EMBED.md) | Estrategia de empaquetado multi-plataforma |
-| [COREFERENCE_RESOLUTION.md](docs/COREFERENCE_RESOLUTION.md) | Sistema de correferencias multi-método |
-| [CHANGELOG.md](docs/CHANGELOG.md) | Historial de versiones |
-| [LICENSING_PRODUCTION_PLAN.md](docs/LICENSING_PRODUCTION_PLAN.md) | Plan de monetización y licencias |
+Documentación técnica completa en [docs/](docs/).
 
 ---
 
