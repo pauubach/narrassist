@@ -324,6 +324,7 @@ async def get_analysis_status(project_id: int):
             "attributes": has_entities,
             "relationships": relationship_count > 0,
             "interactions": False,  # Por implementar
+            "alerts": has_alerts,
             "spelling": has_alerts,  # Si hay alertas, asumimos que se ejecutó
             "grammar": has_alerts,
             "register": has_alerts,

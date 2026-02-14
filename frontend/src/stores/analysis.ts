@@ -46,6 +46,8 @@ export interface ExecutedPhases {
   register: boolean
   pacing: boolean
   coherence: boolean
+  // Alertas
+  alerts: boolean
   // Análisis avanzado
   temporal: boolean
   emotional: boolean
@@ -66,6 +68,7 @@ export const ANALYSIS_DEPENDENCIES: Record<keyof ExecutedPhases, (keyof Executed
   attributes: ['entities', 'coreference'],
   relationships: ['entities', 'coreference'],
   interactions: ['entities'],
+  alerts: ['entities', 'coherence'],
   spelling: ['parsing'],
   grammar: ['parsing'],
   register: ['parsing'],
@@ -89,6 +92,7 @@ export const PHASE_LABELS: Record<keyof ExecutedPhases, string> = {
   attributes: 'Extracción de atributos',
   relationships: 'Detección de relaciones',
   interactions: 'Detección de interacciones',
+  alerts: 'Generación de alertas',
   spelling: 'Ortografía',
   grammar: 'Gramática',
   register: 'Análisis de registro',
@@ -108,16 +112,16 @@ export const PHASE_LABELS: Record<keyof ExecutedPhases, string> = {
 export type WorkspaceTab = 'text' | 'entities' | 'relationships' | 'alerts' | 'timeline' | 'style' | 'glossary' | 'summary'
 
 export const TAB_REQUIRED_PHASES: Partial<Record<WorkspaceTab, keyof ExecutedPhases>> = {
-  // text: 'parsing', // Siempre disponible tras análisis inicial
+  // text: siempre disponible tras carga del documento
   entities: 'entities',
-  // relationships depende de coreference (fusión de entidades), disponible tras NER+fusion
   relationships: 'coreference',
-  // alerts: se generan progresivamente, siempre mostramos las disponibles
-  // timeline depende de structure (identificación de capítulos)
-  timeline: 'structure',
-  // style depende de grammar (incluye análisis de estilo y registro)
+  alerts: 'alerts',
+  // timeline necesita entidades (NER) para mostrar eventos, no solo estructura
+  timeline: 'entities',
   style: 'grammar',
-  // summary: siempre disponible
+  // glossary y summary: disponibles tras extracción de entidades
+  glossary: 'entities',
+  summary: 'entities',
 }
 
 /**
@@ -126,8 +130,11 @@ export const TAB_REQUIRED_PHASES: Partial<Record<WorkspaceTab, keyof ExecutedPha
 export const TAB_PHASE_DESCRIPTIONS: Partial<Record<WorkspaceTab, string>> = {
   entities: 'Ejecuta el análisis para identificar personajes, lugares y otros elementos de tu documento.',
   relationships: 'Ejecuta el análisis para descubrir cómo se relacionan los personajes entre sí.',
+  alerts: 'Ejecuta el análisis para detectar inconsistencias y generar alertas.',
   timeline: 'Ejecuta el análisis para construir la línea temporal de tu documento.',
   style: 'Ejecuta el análisis para evaluar la gramática, registro y estilo de tu texto.',
+  glossary: 'Ejecuta el análisis para extraer entidades y construir el glosario.',
+  summary: 'Ejecuta el análisis para generar el resumen del documento.',
 }
 
 /**
@@ -136,8 +143,11 @@ export const TAB_PHASE_DESCRIPTIONS: Partial<Record<WorkspaceTab, string>> = {
 export const TAB_RUNNING_DESCRIPTIONS: Partial<Record<WorkspaceTab, string>> = {
   entities: 'Identificando personajes, lugares y objetos...',
   relationships: 'Analizando relaciones entre personajes...',
+  alerts: 'Generando alertas de inconsistencias...',
   timeline: 'Construyendo la línea temporal...',
   style: 'Evaluando el estilo y la gramática...',
+  glossary: 'Extrayendo términos del glosario...',
+  summary: 'Generando el resumen...',
 }
 
 /**
@@ -153,7 +163,7 @@ const BACKEND_PHASE_TO_FRONTEND: Record<string, keyof ExecutedPhases | null> = {
   attributes: 'attributes',
   consistency: 'coherence',
   grammar: 'grammar',
-  alerts: null, // Las alertas no son una "fase" en el sentido del frontend
+  alerts: 'alerts',
   relationships: 'relationships',
   voice: 'voice_profiles',
   prose: 'register',
@@ -501,7 +511,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
   function getTabStatus(projectId: number, tab: WorkspaceTab): TabStatus {
     const requiredPhase = TAB_REQUIRED_PHASES[tab]
 
-    // Tabs sin requisito de fase (text, alerts, glossary, summary) → completed
+    // Tab 'text' no requiere fase → siempre disponible
     if (!requiredPhase) return 'completed'
 
     const executed = isPhaseExecuted(projectId, requiredPhase)

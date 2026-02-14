@@ -92,7 +92,7 @@ KNOWN_MODELS: dict[ModelType, ModelInfo] = {
         sha256=None,
         source_url="https://huggingface.co/mrm8488/bert-spanish-cased-finetuned-ner",
         subdirectory="transformer_ner",
-        required=False,  # Optional: NER falls back to spaCy + gazetteer
+        required=True,  # NER transformer always downloads during analysis if missing
     ),
 }
 
