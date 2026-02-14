@@ -24,7 +24,7 @@ dependencies = [
     # Core NLP
     "spacy>=3.7.0,<4.0.0",
     # coreferee incompatible con spacy>=3.7 - hacer opcional con fallback
-    "sentence-transformers>=2.2.0,<3.0.0",
+    "sentence-transformers>=2.2.0,<6.0.0",
 
     # Document parsing (MVP)
     "python-docx>=1.1.0",
