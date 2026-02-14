@@ -618,12 +618,7 @@ en el contexto proporcionado, indícalo claramente.
                 logger.warning(f"LLM returned empty response for project {project_id}")
                 return ApiResponse(
                     success=False,
-                    error=(
-                        "El modelo LLM no generó una respuesta. "
-                        "Esto puede ocurrir si Ollama se quedó sin memoria. "
-                        "Intenta reiniciar Ollama o ejecutar: "
-                        + ("scripts\\start_ollama_cpu.bat" if sys.platform == "win32" else "OLLAMA_NUM_GPU=0 ollama serve")
-                    )
+                    error="El modelo no generó respuesta. Reinicia Ollama desde Ajustes > LLM."
                 )
 
         except Exception as e:
@@ -632,12 +627,7 @@ en el contexto proporcionado, indícalo claramente.
             if any(p in error_lower for p in ("terminated", "exit status", "memory", "allocate")):
                 return ApiResponse(
                     success=False,
-                    error=(
-                        "Ollama se quedó sin memoria GPU. "
-                        "La próxima solicitud usará CPU automáticamente. "
-                        "Si el problema persiste, ejecuta: "
-                        + ("scripts\\start_ollama_cpu.bat" if sys.platform == "win32" else "OLLAMA_NUM_GPU=0 ollama serve")
-                    )
+                    error="Ollama se quedó sin memoria GPU. Reinícialo desde Ajustes > LLM en modo CPU."
                 )
             return ApiResponse(
                 success=False,

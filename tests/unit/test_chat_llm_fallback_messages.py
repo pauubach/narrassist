@@ -117,6 +117,6 @@ def test_chat_vram_error_message_uses_platform_hint(monkeypatch, patched_project
 
     assert response.success is False
     assert response.error is not None
-    assert "Ollama se quedó sin memoria GPU" in response.error
-    assert "OLLAMA_NUM_GPU=0 ollama serve" in response.error
+    assert "Ollama" in response.error
+    assert "Ajustes" in response.error
 

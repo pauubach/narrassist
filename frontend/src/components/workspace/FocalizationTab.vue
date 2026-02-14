@@ -8,8 +8,8 @@
           Focalización Narrativa
         </h3>
         <p class="subtitle">
-          Declara el punto de vista de cada capítulo y detecta violaciones.
-          <span v-tooltip.right="'La focalización es declarativa: tú defines qué tipo de narrador usa cada capítulo (omnisciente, primera persona, etc.) y el sistema detecta violaciones a esa declaración, como cuando un narrador limitado conoce pensamientos de otros personajes.'" class="info-tooltip">
+          Punto de vista de cada capítulo. El sistema sugiere automáticamente; puedes editar o corregir.
+          <span v-tooltip.right="tooltipText" class="info-tooltip">
             <i class="pi pi-info-circle"></i>
           </span>
         </p>
@@ -99,6 +99,9 @@
                 <span v-if="chapter.declaration.focalizer_ids?.length" class="focalizers">
                   {{ getFocalizerNames(chapter.declaration.focalizer_ids) }}
                 </span>
+                <Tag v-if="chapter.declaration.declared_by === 'system_suggestion'" severity="info" size="small" v-tooltip.top="'Sugerido por el sistema. Puedes editarlo.'">
+                  <i class="pi pi-sparkles" style="font-size: 0.7rem; margin-right: 2px"></i> Auto
+                </Tag>
                 <Tag v-if="chapter.violationsCount > 0" severity="danger" size="small">
                   {{ chapter.violationsCount }} violaciones
                 </Tag>
@@ -290,6 +293,7 @@ interface Declaration {
   scene?: number
   focalization_type: string
   focalizer_ids: number[]
+  declared_by?: string
   notes: string
   is_validated: boolean
   violations_count: number
@@ -323,6 +327,7 @@ const props = defineProps<{
 const toast = useToast()
 
 // State
+const tooltipText = 'El sistema detecta la focalización analizando verbos de pensamiento, percepción y persona gramatical. Las sugerencias se pueden editar o eliminar. Usa Detectar violaciones para encontrar inconsistencias.'
 const loading = ref(false)
 const declarations = ref<Declaration[]>([])
 const violations = ref<Violation[]>([])

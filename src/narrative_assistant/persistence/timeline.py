@@ -29,7 +29,7 @@ class TimelineEventData:
     discourse_position: int | None = None
     confidence: float = 0.5
     # Para timelines sin fechas absolutas (Día 0, Día +1, etc.)
-    day_offset: int | None = None
+    day_offset: float | None = None
     weekday: str | None = None
     # Instancia temporal (viajes en el tiempo: A@40 vs A@45)
     temporal_instance_id: str | None = None

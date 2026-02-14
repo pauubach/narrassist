@@ -502,10 +502,9 @@ const entityMenuItems = computed(() => [
   },
   { separator: true },
   {
-    label: 'Eliminar',
-    icon: 'pi pi-trash',
-    command: () => selectedMenuEntity.value && emit('delete', selectedMenuEntity.value),
-    class: 'text-red-500'
+    label: 'Ocultar',
+    icon: 'pi pi-eye-slash',
+    command: () => selectedMenuEntity.value && emit('delete', selectedMenuEntity.value)
   }
 ])
 

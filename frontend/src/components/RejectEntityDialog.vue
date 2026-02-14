@@ -94,7 +94,7 @@ function selectScope(value: string) {
   <Dialog
     v-model:visible="dialogVisible"
     modal
-    :header="`Rechazar: ${entityName}`"
+    :header="`&quot;${entityName}&quot; no es una entidad`"
     :style="{ width: '500px' }"
     :closable="!isSubmitting"
     :draggable="false"
@@ -105,19 +105,19 @@ function selectScope(value: string) {
         <div class="frequent-warning">
           <strong>Esta entidad aparece {{ mentionCount }} veces</strong>
           <p>
-            Rechazar una entidad frecuente podría indicar un problema con la detección.
+            Descartar una entidad frecuente podría indicar un problema con la detección.
             ¿Estás seguro de que no es un personaje o elemento relevante?
           </p>
         </div>
       </Message>
 
       <Message severity="info" :closable="false" class="mb-4">
-        Al rechazar esta entidad, no será detectada en futuros análisis.
-        Puedes restaurarla más tarde desde Configuración.
+        El sistema no volverá a detectar este texto como entidad en futuros análisis.
+        Puedes revertirlo en Configuración.
       </Message>
 
       <div class="scope-selection">
-        <label class="scope-label">¿Dónde quieres aplicar el filtro?</label>
+        <label class="scope-label">Aplicar en:</label>
 
         <div class="scope-options">
           <div
@@ -164,7 +164,7 @@ function selectScope(value: string) {
           @click="onCancel"
         />
         <Button
-          label="Rechazar"
+          label="Confirmar"
           severity="danger"
           :loading="isSubmitting"
           @click="onConfirm"

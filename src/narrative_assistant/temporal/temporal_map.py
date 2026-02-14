@@ -59,7 +59,7 @@ class TemporalSlice:
     chapter: int
     discourse_position: int = 0
     story_date: date | None = None
-    day_offset: int | None = None
+    day_offset: float | None = None
     narrative_type: NarrativeType = NarrativeType.CHRONOLOGICAL
     is_embedded: bool = False
     parent_chapter: int | None = None
@@ -84,7 +84,7 @@ class AgeReference:
     age: int
     chapter: int
     story_date: date | None = None
-    day_offset: int | None = None
+    day_offset: float | None = None
     confidence: float = 0.8
 
 

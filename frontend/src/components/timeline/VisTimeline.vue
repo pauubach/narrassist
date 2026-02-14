@@ -135,6 +135,46 @@ const tooltipStyle = computed(() => ({
   top: `${tooltipPosition.value.y}px`,
 }))
 
+// Detect if timeline uses synthetic dates (no real dates in text)
+const isSynthetic = computed(() => {
+  return !props.events.some(e => e.storyDate && e.storyDate.getFullYear() > 1)
+})
+
+// Compute the total span in days for adaptive zoom/labels
+const syntheticSpanDays = computed(() => {
+  const offsets = props.events
+    .filter(e => e.dayOffset !== null && e.dayOffset !== undefined)
+    .map(e => e.dayOffset!)
+  if (offsets.length < 2) return 1
+  return Math.max(0.01, Math.max(...offsets) - Math.min(...offsets))
+})
+
+// Synthetic base date (year 1, Jan 1) for day_offset calculations
+const syntheticBaseDate = (() => {
+  const d = new Date(0)
+  d.setFullYear(1, 0, 1)
+  d.setHours(0, 0, 0, 0)
+  return d
+})()
+
+// Convert a Date back to a label for synthetic timelines (adaptive: hours or days)
+const dateToDayLabel = (d: Date): string => {
+  const diffMs = d.getTime() - syntheticBaseDate.getTime()
+  const diffDays = diffMs / (1000 * 60 * 60 * 24)
+
+  // Sub-day span → show hours
+  if (syntheticSpanDays.value < 1) {
+    const hours = Math.round(diffDays * 24)
+    if (hours === 0) return 'Inicio'
+    return hours > 0 ? `+${hours}h` : `${hours}h`
+  }
+
+  // Multi-day span → show days
+  const roundedDays = Math.round(diffDays)
+  if (roundedDays === 0) return 'Día 0'
+  return roundedDays > 0 ? `Día +${roundedDays}` : `Día ${roundedDays}`
+}
+
 // Color mapping for narrative order
 const narrativeOrderColors: Record<NarrativeOrder, string> = {
   chronological: '#10b981',
@@ -179,9 +219,22 @@ const formatDate = (date: Date): string => {
   }).format(date)
 }
 
-// Formatea offsets relativos sin ambigüedad de signo ("Día +3", "Día -2", "Día 0").
+// Formatea offsets relativos — muestra horas si es fracción, días si es entero.
 const formatDayOffset = (offset: number): string => {
   if (offset === 0) return 'Día 0'
+  // Sub-day: show hours
+  if (Math.abs(offset) < 1) {
+    const hours = Math.round(offset * 24)
+    return hours > 0 ? `+${hours} horas` : `${hours} horas`
+  }
+  // Fractional days: show days + hours
+  if (offset % 1 !== 0) {
+    const days = Math.floor(Math.abs(offset))
+    const hours = Math.round((Math.abs(offset) - days) * 24)
+    const sign = offset > 0 ? '+' : '-'
+    if (hours > 0) return `Día ${sign}${days} (${hours}h)`
+    return `Día ${sign}${days}`
+  }
   return offset > 0 ? `Día +${offset}` : `Día ${offset}`
 }
 
@@ -211,12 +264,13 @@ const resolveEventDate = (event: TimelineEvent): Date | null => {
     return event.storyDate
   }
   // dayOffset -> synthetic date starting at year 1.
-  // Usamos setFullYear() porque new Date(1, ...) en JS significa 1901
-  // (quirk para años 0..99) y desplaza indebidamente la línea temporal.
+  // Soporta fracciones: dayOffset=0.5 → 12 horas después del Día 0
   if (event.dayOffset !== null && event.dayOffset !== undefined) {
+    const wholeDays = Math.floor(event.dayOffset)
+    const fractionalHours = (event.dayOffset - wholeDays) * 24
     const syntheticDate = new Date(0)
-    syntheticDate.setFullYear(1, 0, 1 + event.dayOffset)
-    syntheticDate.setHours(0, 0, 0, 0)
+    syntheticDate.setFullYear(1, 0, 1 + wholeDays)
+    syntheticDate.setHours(Math.round(fractionalHours), 0, 0, 0)
     return syntheticDate
   }
   // Synthetic storyDate (year === 1) — use as-is
@@ -330,12 +384,42 @@ const initTimeline = () => {
   const items = new DataSet(buildItems.value)
   const groups = groupBy.value !== 'none' ? new DataSet(buildGroups.value) : undefined
 
+  // Custom axis format for synthetic timelines (show "Día X" / "+Xh" instead of "diciembre 0000")
+  const span = syntheticSpanDays.value
+  const syntheticFormatOption = isSynthetic.value ? {
+    format: {
+      minorLabels: (date: Date, _scale: string, _step: number) => dateToDayLabel(date),
+      majorLabels: (date: Date, _scale: string, _step: number) => {
+        const diffMs = date.getTime() - syntheticBaseDate.getTime()
+        const diffDays = diffMs / (1000 * 60 * 60 * 24)
+        // Sub-day story → group by day
+        if (span < 1) {
+          const day = Math.floor(diffDays)
+          return day === 0 ? 'Día 0' : `Día ${day > 0 ? '+' : ''}${day}`
+        }
+        // Multi-day → group by week
+        const roundedDays = Math.round(diffDays)
+        if (roundedDays < 7) return 'Semana 1'
+        const weeks = Math.floor(roundedDays / 7)
+        return `Semana ${weeks + 1}`
+      },
+    },
+  } : {}
+
+  // Adaptive zoom limits based on time span
+  const zoomMin = isSynthetic.value && span < 1
+    ? 1000 * 60 * 60         // 1 hour min zoom for sub-day stories
+    : 1000 * 60 * 60 * 24    // 1 day min zoom for multi-day stories
+  const zoomMax = span > 365
+    ? 1000 * 60 * 60 * 24 * 365 * 20    // 20 years for long stories
+    : 1000 * 60 * 60 * 24 * 365 * 10    // 10 years default
+
   const options: TimelineOptions = {
     height: '100%',
     min: getMinDate(),
     max: getMaxDate(),
-    zoomMin: 1000 * 60 * 60 * 24,  // 1 day
-    zoomMax: 1000 * 60 * 60 * 24 * 365 * 10,  // 10 years
+    zoomMin,
+    zoomMax,
     orientation: 'top',
     stack: true,
     showCurrentTime: false,
@@ -350,7 +434,8 @@ const initTimeline = () => {
         vertical: 5,
       },
     },
-  }
+    ...syntheticFormatOption,
+  } as TimelineOptions
 
   timeline.value = new Timeline(timelineContainer.value, items, options)
 
@@ -390,6 +475,14 @@ const initTimeline = () => {
   })
 }
 
+// Adaptive padding: 2 hours for sub-day, 1 day for short, 30 days for long
+const getPaddingMs = (): number => {
+  const span = syntheticSpanDays.value
+  if (isSynthetic.value && span < 1) return 1000 * 60 * 60 * 2        // 2 hours
+  if (isSynthetic.value && span < 7) return 1000 * 60 * 60 * 24       // 1 day
+  return 1000 * 60 * 60 * 24 * 30                                      // 30 days
+}
+
 // Get min date from events (considers resolved dates including synthetic)
 const getMinDate = (): Date => {
   let min = new Date()
@@ -399,8 +492,7 @@ const getMinDate = (): Date => {
       min = date
     }
   }
-  // Add some padding
-  return new Date(min.getTime() - 1000 * 60 * 60 * 24 * 30)  // 30 days before
+  return new Date(min.getTime() - getPaddingMs())
 }
 
 // Get max date from events (considers resolved dates including synthetic)
@@ -412,8 +504,7 @@ const getMaxDate = (): Date => {
       max = date
     }
   }
-  // Add some padding
-  return new Date(max.getTime() + 1000 * 60 * 60 * 24 * 30)  // 30 days after
+  return new Date(max.getTime() + getPaddingMs())
 }
 
 // Zoom controls
@@ -522,7 +613,7 @@ watch(groupBy, () => {
 /* Event tooltip */
 .event-tooltip {
   position: fixed;
-  z-index: var(--ds-z-dropdown);
+  z-index: var(--ds-z-tooltip);
   max-width: 300px;
   padding: 0.75rem;
   background: var(--surface-card);
@@ -591,10 +682,25 @@ watch(groupBy, () => {
 
 .vis-time-axis .vis-grid.vis-minor {
   border-color: var(--surface-200) !important;
+  z-index: 0 !important;
 }
 
 .vis-time-axis .vis-grid.vis-major {
   border-color: var(--surface-300) !important;
+  z-index: 0 !important;
+}
+
+/* Ensure vis-timeline panels don't create competing stacking contexts */
+.vis-panel.vis-center {
+  z-index: auto !important;
+}
+
+.vis-time-axis {
+  z-index: 1 !important;
+}
+
+.vis-foreground {
+  z-index: 2 !important;
 }
 
 .vis-item {

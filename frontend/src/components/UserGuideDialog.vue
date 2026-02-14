@@ -498,7 +498,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, nextTick, watch, onBeforeUnmount } from 'vue'
 import Dialog from 'primevue/dialog'
 import Tag from 'primevue/tag'
 
@@ -512,6 +512,8 @@ defineEmits<{
 
 const guideBody = ref<HTMLElement | null>(null)
 const activeSection = ref('introduccion')
+let scrollListenerAttached = false
+let isManualScroll = false
 
 const sections = [
   { id: 'introduccion', title: 'Introducción', icon: 'pi pi-home' },
@@ -528,49 +530,74 @@ const sections = [
 ]
 
 function scrollToSection(sectionId: string) {
+  isManualScroll = true
   activeSection.value = sectionId
   const element = document.getElementById(sectionId)
   if (element && guideBody.value) {
     element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // Allow scroll events to update again after smooth scroll finishes
+    setTimeout(() => { isManualScroll = false }, 600)
   }
 }
 
-// Observar scroll para actualizar sección activa
-onMounted(() => {
-  if (guideBody.value) {
-    guideBody.value.addEventListener('scroll', updateActiveSection)
-  }
-})
-
 function updateActiveSection() {
-  if (!guideBody.value) return
+  if (!guideBody.value || isManualScroll) return
 
-  const scrollTop = guideBody.value.scrollTop
-  const offset = 100
+  const container = guideBody.value
+  const containerRect = container.getBoundingClientRect()
+  // Threshold: 30% from top of the scrollable area
+  const threshold = containerRect.top + containerRect.height * 0.3
 
-  for (const section of sections) {
-    const element = document.getElementById(section.id)
-    if (element) {
-      const top = element.offsetTop - offset
-      const bottom = top + element.offsetHeight
-      if (scrollTop >= top && scrollTop < bottom) {
-        activeSection.value = section.id
+  // Walk sections in reverse to find the last one whose top is above the threshold
+  let found = false
+  for (let i = sections.length - 1; i >= 0; i--) {
+    const el = document.getElementById(sections[i].id)
+    if (el) {
+      const rect = el.getBoundingClientRect()
+      if (rect.top <= threshold) {
+        activeSection.value = sections[i].id
+        found = true
         break
       }
     }
   }
+  // If no section found above threshold, use the first one
+  if (!found) {
+    activeSection.value = sections[0].id
+  }
 }
 
-// Reset scroll cuando se abre
+function attachScrollListener() {
+  if (guideBody.value && !scrollListenerAttached) {
+    guideBody.value.addEventListener('scroll', updateActiveSection, { passive: true })
+    scrollListenerAttached = true
+  }
+}
+
+function detachScrollListener() {
+  if (guideBody.value && scrollListenerAttached) {
+    guideBody.value.removeEventListener('scroll', updateActiveSection)
+    scrollListenerAttached = false
+  }
+}
+
+// Attach/detach when dialog visibility changes
 watch(() => props.visible, (isVisible) => {
   if (isVisible) {
     activeSection.value = 'introduccion'
-    setTimeout(() => {
+    nextTick(() => {
       if (guideBody.value) {
         guideBody.value.scrollTop = 0
       }
-    }, 100)
+      attachScrollListener()
+    })
+  } else {
+    detachScrollListener()
   }
+})
+
+onBeforeUnmount(() => {
+  detachScrollListener()
 })
 </script>
 

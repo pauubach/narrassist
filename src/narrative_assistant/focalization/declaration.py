@@ -307,6 +307,9 @@ class FocalizationDeclarationService:
         """
         Sugiere posible focalizacion basandose en el texto.
 
+        Usa deteccion de persona gramatical y verbos de acceso mental
+        del modulo de violaciones para mayor precision.
+
         Args:
             project_id: ID del proyecto
             chapter: Numero de capitulo
@@ -316,6 +319,11 @@ class FocalizationDeclarationService:
         Returns:
             Diccionario con sugerencia y evidencia
         """
+        from narrative_assistant.focalization.violations import (
+            MENTAL_ACCESS_PATTERNS,
+            MENTAL_ACCESS_VERBS,
+        )
+
         suggestions: dict[str, Any] = {
             "suggested_type": None,
             "suggested_focalizers": [],
@@ -325,52 +333,120 @@ class FocalizationDeclarationService:
 
         text_lower = text.lower()
 
-        # Buscar verbos de pensamiento/percepcion
-        thought_verbs = ["penso", "sintio", "sabia", "recordo", "imagino", "temia"]
-        perception_verbs = ["vio", "oyo", "escucho", "noto", "percibio"]
+        # --- Paso 1: Detectar persona gramatical ---
+        first_person_markers = re.findall(
+            r"\b(yo|me|mí|conmigo|soy|estoy|tengo|hago|voy|digo|sé|veo|"
+            r"quiero|puedo|debo|pensé|sentí|miré|caminé|dije|vi|hice|fui|"
+            r"pienso|siento|miro|camino|hablo|escribo)\b",
+            text_lower,
+        )
+        third_person_markers = re.findall(
+            r"\b(él|ella|ellos|ellas|lo|la|los|las|le|les|su|sus|"
+            r"suyo|suya|suyos|suyas)\b",
+            text_lower,
+        )
 
-        thought_mentions = []
-        for verb in thought_verbs + perception_verbs:
-            if verb in text_lower:
-                thought_mentions.append(verb)
+        is_first_person = len(first_person_markers) >= 3
+        is_third_person = len(third_person_markers) >= 3 and not is_first_person
 
-        # Si no hay verbos de pensamiento, podria ser externa
-        if not thought_mentions:
-            suggestions["suggested_type"] = FocalizationType.EXTERNAL
-            suggestions["confidence"] = 0.4
-            suggestions["evidence"].append("No se detectan verbos de pensamiento/percepcion")
+        if is_first_person:
+            suggestions["suggested_type"] = FocalizationType.INTERNAL_FIXED
+            suggestions["confidence"] = 0.90
+            suggestions["evidence"].append(
+                f"Narrador en primera persona ({len(first_person_markers)} marcadores: "
+                f"{', '.join(list(set(first_person_markers))[:5])})"
+            )
+            # El focalizador es el narrador (no podemos identificar entity_id aqui)
             return suggestions
 
-        # Buscar que personajes tienen acceso mental
-        characters_with_thoughts: set = set()
+        # --- Paso 2: Buscar verbos de acceso mental (diccionario completo) ---
+        all_mental_verbs: set[str] = set()
+        for verb_forms in MENTAL_ACCESS_VERBS.values():
+            all_mental_verbs.update(v.lower() for v in verb_forms)
+
+        found_verbs: list[str] = []
+        for verb in all_mental_verbs:
+            if verb in text_lower:
+                found_verbs.append(verb)
+
+        # --- Paso 3: Buscar patrones de acceso mental con sujeto ---
+        characters_with_thoughts: dict[int, list[str]] = {}  # entity_id -> evidence
+        compiled_patterns = [re.compile(p, re.IGNORECASE) for p in MENTAL_ACCESS_PATTERNS]
+
         for entity in entities:
             if not hasattr(entity, "entity_type"):
                 continue
-            if entity.entity_type not in ("person", "PERSON", "PER", "CHARACTER"):
+            etype = entity.entity_type
+            if hasattr(etype, "value"):
+                etype = etype.value
+            if etype not in ("person", "PERSON", "PER", "CHARACTER"):
                 continue
 
             name = getattr(entity, "canonical_name", getattr(entity, "name", "")).lower()
-            # Buscar patron "Nombre penso/sintio..."
-            for verb in thought_verbs:
-                pattern = f"{name}.*{verb}|{verb}.*{name}"
-                if re.search(pattern, text_lower):
-                    entity_id = getattr(entity, "id", None)
-                    if entity_id:
-                        characters_with_thoughts.add(entity_id)
-                        suggestions["evidence"].append(f"'{name}' + '{verb}'")
+            entity_id = getattr(entity, "id", None)
+            if not entity_id or not name:
+                continue
 
-        if len(characters_with_thoughts) == 0:
+            # Buscar nombre + verbo mental en proximidad (misma oracion)
+            evidence_for_entity: list[str] = []
+            for verb in found_verbs:
+                # Patron: nombre cerca de verbo (max 60 chars)
+                if re.search(
+                    rf"\b{re.escape(name)}\b.{{0,60}}\b{re.escape(verb)}\b"
+                    rf"|\b{re.escape(verb)}\b.{{0,60}}\b{re.escape(name)}\b",
+                    text_lower,
+                ):
+                    evidence_for_entity.append(f"'{name}' + '{verb}'")
+
+            # Buscar patrones estructurales con nombre como sujeto
+            for pattern in compiled_patterns:
+                for m in pattern.finditer(text_lower):
+                    # Capturar grupo 1 (sujeto) si coincide con nombre
+                    subject = m.group(1).lower() if m.groups() else ""
+                    if subject and name.startswith(subject):
+                        evidence_for_entity.append(f"patron: '{m.group()[:50]}'")
+
+            if evidence_for_entity:
+                characters_with_thoughts[entity_id] = evidence_for_entity
+
+        # --- Paso 4: Clasificar ---
+        n_focalizers = len(characters_with_thoughts)
+        n_verbs = len(found_verbs)
+
+        if n_verbs == 0:
+            # Sin acceso mental → externa
+            suggestions["suggested_type"] = FocalizationType.EXTERNAL
+            suggestions["confidence"] = 0.75 if is_third_person else 0.50
+            suggestions["evidence"].append(
+                "No se detectan verbos de acceso mental (pensamiento, emocion, percepcion interna)"
+            )
+        elif n_focalizers == 0:
+            # Verbos mentales pero sin sujeto claro → omnisciente
             suggestions["suggested_type"] = FocalizationType.ZERO
-            suggestions["confidence"] = 0.3
-            suggestions["evidence"].append("Verbos de pensamiento sin sujeto claro identificado")
-        elif len(characters_with_thoughts) == 1:
+            suggestions["confidence"] = 0.60
+            suggestions["evidence"].append(
+                f"{n_verbs} verbos de acceso mental detectados sin sujeto claro"
+            )
+        elif n_focalizers == 1:
+            # Un solo personaje con acceso mental → interna fija
+            eid = next(iter(characters_with_thoughts))
+            ev = characters_with_thoughts[eid]
             suggestions["suggested_type"] = FocalizationType.INTERNAL_FIXED
-            suggestions["suggested_focalizers"] = list(characters_with_thoughts)
-            suggestions["confidence"] = 0.6
+            suggestions["suggested_focalizers"] = [eid]
+            suggestions["confidence"] = min(0.85, 0.65 + len(ev) * 0.05)
+            suggestions["evidence"].extend(ev[:5])
         else:
-            suggestions["suggested_type"] = FocalizationType.INTERNAL_VARIABLE
-            suggestions["suggested_focalizers"] = list(characters_with_thoughts)
-            suggestions["confidence"] = 0.5
+            # Multiples personajes → variable o cero
+            total_evidence = sum(len(v) for v in characters_with_thoughts.values())
+            if total_evidence >= 4:
+                suggestions["suggested_type"] = FocalizationType.INTERNAL_VARIABLE
+                suggestions["suggested_focalizers"] = list(characters_with_thoughts.keys())
+                suggestions["confidence"] = 0.70
+            else:
+                suggestions["suggested_type"] = FocalizationType.ZERO
+                suggestions["confidence"] = 0.55
+            for eid, ev in characters_with_thoughts.items():
+                suggestions["evidence"].extend(ev[:3])
 
         return suggestions
 

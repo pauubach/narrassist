@@ -323,7 +323,7 @@ function onUndoMerge(entity: Entity) {
 }
 
 async function onEntityDelete(entity: Entity) {
-  if (!confirm(`¿Seguro que deseas eliminar la entidad "${entity.name}"?\n\nEsta acción desactivará la entidad.`)) {
+  if (!confirm(`"${entity.name}" dejará de aparecer en la lista de entidades.\n\nSi vuelves a analizar el documento, podría reaparecer.`)) {
     return
   }
 
@@ -335,13 +335,13 @@ async function onEntityDelete(entity: Entity) {
         selectedEntity.value = null
       }
       emit('refresh')
-      toast.add({ severity: 'success', summary: 'Eliminada', detail: 'Entidad eliminada correctamente', life: 3000 })
+      toast.add({ severity: 'success', summary: 'Oculta', detail: `"${entity.name}" se ha ocultado`, life: 3000 })
     } else {
-      toast.add({ severity: 'error', summary: 'Error', detail: `Error al eliminar: ${data.error}`, life: 5000 })
+      toast.add({ severity: 'error', summary: 'Error', detail: `Error al ocultar: ${data.error}`, life: 5000 })
     }
   } catch (err) {
     console.error('Error deleting entity:', err)
-    toast.add({ severity: 'error', summary: 'Error de conexión', detail: 'No se pudo eliminar la entidad', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Error de conexión', detail: 'No se pudo ocultar la entidad', life: 5000 })
   }
 }
 
@@ -1195,20 +1195,21 @@ function navigateToAttributeSource(attr: EntityAttribute) {
           <!-- Footer con acciones secundarias -->
           <div class="detail-footer">
             <Button
+              icon="pi pi-eye-slash"
+              label="Ocultar"
+              size="small"
+              text
+              severity="secondary"
+              @click="onEntityDelete(selectedEntity)"
+            />
+            <div style="flex: 1"></div>
+            <Button
               icon="pi pi-ban"
-              label="Rechazar como falso positivo"
+              label="No es una entidad"
               size="small"
               text
               severity="warning"
               @click="onRejectEntity(selectedEntity)"
-            />
-            <Button
-              icon="pi pi-trash"
-              label="Eliminar entidad"
-              size="small"
-              text
-              severity="danger"
-              @click="onEntityDelete(selectedEntity)"
             />
           </div>
         </div>

@@ -1399,14 +1399,17 @@ const saveConfig = async () => {
 
     const data = await api.putRaw<any>(url, body as any)
     if (data.success) {
+      const rescanInfo = data.data?.rescan
+        ? ` (${data.data.alerts_removed} alertas actualizadas, ${data.data.alerts_created} nuevas)`
+        : ''
       const detail = props.editingDefaults
         ? 'Defaults actualizados correctamente'
-        : 'Configuración de corrección actualizada'
+        : `Configuración actualizada${rescanInfo}`
       toast.add({
         severity: 'success',
         summary: 'Guardado',
         detail,
-        life: 2000
+        life: 3000
       })
       emit('saved')
       modifiedParams.value.clear()

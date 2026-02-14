@@ -184,11 +184,20 @@
               </Tag>
             </div>
             <p class="change-explanation">{{ change.explanation }}</p>
-            <div class="change-location">
-              <small>
+            <div class="change-actions">
+              <small class="change-location-text">
                 <i class="pi pi-map-marker"></i>
-                Capítulo {{ change.chapter }}, posición {{ change.position }}
+                Capítulo {{ change.chapter }}
               </small>
+              <Button
+                v-if="change.chapter"
+                icon="pi pi-arrow-right"
+                label="Ir al texto"
+                size="small"
+                text
+                severity="info"
+                @click="navigateToChange(change)"
+              />
             </div>
           </div>
         </div>
@@ -330,6 +339,7 @@ import Chart from 'primevue/chart'
 import SelectButton from 'primevue/selectbutton'
 import { ChapterTimeline } from '@/components/shared'
 import { useVoiceAndStyleStore } from '@/stores/voiceAndStyle'
+import { useWorkspaceStore } from '@/stores/workspace'
 import type { RegisterAnalysis, RegisterChange, RegisterSummary } from '@/types'
 
 const props = defineProps<{
@@ -337,6 +347,7 @@ const props = defineProps<{
 }>()
 
 const store = useVoiceAndStyleStore()
+const workspaceStore = useWorkspaceStore()
 
 // State
 const loading = ref(false)
@@ -392,8 +403,30 @@ function getConsistencyClass(pct: number): string {
   return 'consistency-low'
 }
 
-// Calculate register distribution
+// Calculate register distribution (prefer summary from API, fallback to analyses)
 const registerDistribution = computed(() => {
+  // Prefer distribution_pct (percentages) from API, then raw counts
+  const distPct = (summary.value as any)?.distribution_pct
+  if (distPct && Object.keys(distPct).length > 0) {
+    const distribution: Record<string, number> = {}
+    for (const [reg, pct] of Object.entries(distPct)) {
+      distribution[reg] = (pct as number) / 100
+    }
+    return distribution
+  }
+  // Raw counts: convert to fractions
+  const distRaw = summary.value?.distribution
+  if (distRaw && Object.keys(distRaw).length > 0) {
+    const vals = Object.values(distRaw) as number[]
+    const total = vals.reduce((s, v) => s + v, 0) || 1
+    const distribution: Record<string, number> = {}
+    for (const [reg, count] of Object.entries(distRaw) as [string, number][]) {
+      distribution[reg] = count / total
+    }
+    return distribution
+  }
+
+  // Fallback: compute from individual analyses
   if (analyses.value.length === 0) return {}
 
   const counts: Record<string, number> = {}
@@ -552,6 +585,12 @@ const analysesByChapter = computed(() => {
     }
   }).sort((a, b) => a.chapterNum - b.chapterNum)
 })
+
+// Navigate to a register change in the text
+function navigateToChange(change: RegisterChange) {
+  const searchText = change.contextAfter?.trim().split(/\s+/).slice(0, 6).join(' ') || undefined
+  workspaceStore.navigateToTextPosition(change.position, searchText)
+}
 
 // Load analysis
 const loadAnalysis = async () => {
@@ -990,11 +1029,17 @@ watch(() => props.projectId, (newId) => {
   color: var(--text-color);
 }
 
-.change-location {
+.change-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.change-location-text {
   color: var(--text-color-secondary);
 }
 
-.change-location i {
+.change-location-text i {
   font-size: 0.75rem;
   margin-right: 0.25rem;
 }

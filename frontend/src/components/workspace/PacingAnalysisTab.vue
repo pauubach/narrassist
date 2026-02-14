@@ -911,15 +911,18 @@ function selectChapter(chapter: any) {
 
 .percentile-bar-bg {
   position: relative;
-  height: 8px;
-  border-radius: 4px;
+  height: 16px;
+  border-radius: 8px;
   background: var(--surface-200);
+  border: 1px solid var(--surface-300);
+  margin-top: 1.25rem;
 }
 
 .percentile-bar-fill {
   height: 100%;
-  border-radius: 4px;
+  border-radius: 8px;
   transition: width 0.4s ease;
+  min-width: 6px;
 }
 
 .percentile-bar-fill.pct-normal { background: var(--green-400); }
@@ -928,14 +931,18 @@ function selectChapter(chapter: any) {
 
 .percentile-marker {
   position: absolute;
-  top: -18px;
+  top: -20px;
   transform: translateX(-50%);
 }
 
 .percentile-value {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-color);
+  background: var(--surface-card);
+  padding: 1px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--surface-300);
 }
 
 .percentile-range {

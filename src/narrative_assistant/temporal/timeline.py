@@ -73,7 +73,7 @@ class TimelineEvent:
     story_date_resolution: TimelineResolution = TimelineResolution.UNKNOWN
 
     # Para timelines sin fechas absolutas (Día 0, Día +1, etc.)
-    day_offset: int | None = None  # Offset en días desde el Día 0
+    day_offset: float | None = None  # Offset en días desde el Día 0 (soporta fracciones para horas)
     weekday: str | None = None  # Día de la semana si se menciona (lunes, martes, etc.)
 
     # Tiempo del discurso (discourse time)
@@ -489,9 +489,9 @@ class TimelineBuilder:
                 if chapter_events:
                     reference_event = chapter_events[0]
 
-            # Calcular offset
+            # Calcular offset (preservar sub-día para historias de pocas horas)
             offset = self._calculate_offset(marker)
-            offset_days = offset.days if offset else 1  # Default: +1 día
+            offset_days = offset.total_seconds() / 86400 if offset else 0.0
 
             # Calcular nueva fecha o day_offset
             new_date = None
@@ -602,15 +602,22 @@ class TimelineBuilder:
         if not marker.quantity or not marker.magnitude:
             if "día siguiente" in text_lower or "mañana siguiente" in text_lower:
                 return timedelta(days=1)
+            if "al día siguiente" in text_lower:
+                return timedelta(days=1)
             if "noche anterior" in text_lower or "día anterior" in text_lower:
                 return timedelta(days=1)
             if "poco después" in text_lower:
-                return timedelta(hours=2)
+                return timedelta(hours=1)
             if "más tarde" in text_lower:
                 return timedelta(hours=4)
-            # Expresiones con días de semana o momentos del día
+            # Expresiones de presente narrativo — mismo momento
+            if any(w in text_lower for w in ["ahora", "hoy", "en este momento", "en ese momento"]):
+                return timedelta(days=0)
+            # Expresiones de momento del día — mismo día
+            if any(w in text_lower for w in ["temprano", "mañana de", "tarde de", "noche de"]):
+                return timedelta(days=0)
+            # Expresiones con demostrativos — mismo día o cercano
             if any(d in text_lower for d in ["aquella", "aquel", "esa", "ese"]):
-                # "aquella mañana", "ese día" - asumir mismo día o cercano
                 return timedelta(days=0)
             return None
 

@@ -151,6 +151,59 @@ const errorTrend = computed(() => {
   return { direction: 'stable', percent: Math.abs(percentChange) }
 })
 
+// Colors for entity bars
+const entityColors = [
+  'var(--blue-500)', 'var(--teal-500)', 'var(--purple-500)',
+  'var(--cyan-500)', 'var(--indigo-500)', 'var(--pink-500)',
+  'var(--green-500)', 'var(--orange-500)',
+]
+
+// Severity colors for donut
+const severityColors: Record<string, string> = {
+  critical: 'var(--red-500)',
+  high: 'var(--orange-500)',
+  medium: 'var(--yellow-500)',
+  low: 'var(--blue-500)',
+  info: 'var(--gray-400)',
+}
+
+// Donut segments computed from alert distribution
+const donutSegments = computed(() => {
+  const total = stats.value.activeAlerts
+  if (total === 0) return []
+
+  const circumference = 2 * Math.PI * 48 // r=48
+  const severities = ['critical', 'high', 'medium', 'low', 'info'] as const
+  const segments: Array<{ color: string; dashArray: string; dashOffset: number }> = []
+  let cumulativeOffset = 0
+
+  for (const sev of severities) {
+    const count = alertDistribution.value[sev]
+    if (count === 0) continue
+    const fraction = count / total
+    const segLength = fraction * circumference
+    segments.push({
+      color: severityColors[sev],
+      dashArray: `${segLength} ${circumference - segLength}`,
+      dashOffset: -cumulativeOffset + circumference * 0.25, // start at top
+    })
+    cumulativeOffset += segLength
+  }
+  return segments
+})
+
+// Legend items for alert donut
+const alertLegendItems = computed(() => {
+  const items = [
+    { key: 'critical', label: 'Críticas', count: alertDistribution.value.critical, color: severityColors.critical },
+    { key: 'high', label: 'Altas', count: alertDistribution.value.high, color: severityColors.high },
+    { key: 'medium', label: 'Medias', count: alertDistribution.value.medium, color: severityColors.medium },
+    { key: 'low', label: 'Bajas', count: alertDistribution.value.low, color: severityColors.low },
+    { key: 'info', label: 'Info', count: alertDistribution.value.info, color: severityColors.info },
+  ]
+  return items.filter(i => i.count > 0)
+})
+
 // Verificar si el documento es Word (para exportar con Track Changes)
 const isWordDocument = computed(() => {
   const path = props.project.documentPath || props.project.source_path || ''
@@ -183,176 +236,126 @@ const originalDocumentName = computed(() => {
 <template>
   <div class="resumen-tab">
     <div class="resumen-content">
-      <!-- Info del proyecto -->
-      <Card class="info-card">
-        <template #title>
-          <i class="pi pi-info-circle"></i>
-          Información del Proyecto
-        </template>
-        <template #content>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="info-label">Nombre:</span>
-              <span class="info-value">{{ project.name }}</span>
-            </div>
-            <div v-if="project.description" class="info-item info-item-full">
-              <span class="info-label">Descripción:</span>
-              <span class="info-value">{{ project.description }}</span>
-            </div>
-            <div v-if="originalDocumentName" class="info-item">
-              <span class="info-label">Documento:</span>
-              <span class="info-value">{{ originalDocumentName }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Última modificación:</span>
-              <span class="info-value">{{ formatDate(project.lastModified) }}</span>
-            </div>
+      <!-- Row 1: Stat cards across the top -->
+      <div class="stats-row">
+        <div class="stat-card stat-words">
+          <div class="stat-icon-bg">
+            <i class="pi pi-file-edit"></i>
           </div>
-        </template>
-      </Card>
+          <div class="stat-info">
+            <span class="stat-value">{{ stats.words.toLocaleString() }}</span>
+            <span class="stat-label">Palabras</span>
+          </div>
+        </div>
 
-      <!-- Estadísticas principales -->
-      <div class="stats-grid">
-        <Card class="stat-card">
+        <div class="stat-card stat-chapters">
+          <div class="stat-icon-bg">
+            <i class="pi pi-book"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ stats.chapters }}</span>
+            <span class="stat-label">Capítulos</span>
+          </div>
+        </div>
+
+        <div class="stat-card stat-entities">
+          <div class="stat-icon-bg">
+            <i class="pi pi-users"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ stats.entities }}</span>
+            <span class="stat-label">Entidades</span>
+          </div>
+        </div>
+
+        <div class="stat-card stat-alerts">
+          <div class="stat-icon-bg">
+            <i class="pi pi-exclamation-triangle"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ stats.activeAlerts }}</span>
+            <span class="stat-label">Alertas activas</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2: Two-column grid for charts -->
+      <div class="charts-row">
+        <!-- Left: Alert distribution (donut-like visual) -->
+        <Card class="chart-card distribution-card">
+          <template #title>
+            <i class="pi pi-chart-pie"></i>
+            Distribución de Alertas
+          </template>
           <template #content>
-            <div class="stat-content">
-              <i class="pi pi-file-edit stat-icon"></i>
-              <div class="stat-info">
-                <span class="stat-value">{{ stats.words.toLocaleString() }}</span>
-                <span class="stat-label">Palabras</span>
+            <!-- Donut chart visualization -->
+            <div v-if="stats.activeAlerts > 0" class="donut-container">
+              <svg viewBox="0 0 120 120" class="donut-chart">
+                <circle
+                  v-for="(seg, i) in donutSegments"
+                  :key="i"
+                  cx="60" cy="60" r="48"
+                  fill="none"
+                  :stroke="seg.color"
+                  stroke-width="18"
+                  :stroke-dasharray="seg.dashArray"
+                  :stroke-dashoffset="seg.dashOffset"
+                  :class="'donut-segment'"
+                />
+                <text x="60" y="56" text-anchor="middle" class="donut-total">{{ stats.activeAlerts }}</text>
+                <text x="60" y="72" text-anchor="middle" class="donut-label">alertas</text>
+              </svg>
+            </div>
+            <div v-else class="empty-donut">
+              <i class="pi pi-check-circle"></i>
+              <span>Sin alertas activas</span>
+            </div>
+            <!-- Legend below donut -->
+            <div class="alert-legend">
+              <div v-for="item in alertLegendItems" :key="item.key" class="alert-legend-item">
+                <span class="legend-dot" :style="{ background: item.color }"></span>
+                <span class="legend-label">{{ item.label }}</span>
+                <span class="legend-count">{{ item.count }}</span>
               </div>
             </div>
           </template>
         </Card>
 
-        <Card class="stat-card">
-          <template #content>
-            <div class="stat-content">
-              <i class="pi pi-book stat-icon"></i>
-              <div class="stat-info">
-                <span class="stat-value">{{ stats.chapters }}</span>
-                <span class="stat-label">Capítulos</span>
-              </div>
-            </div>
+        <!-- Right: Entity distribution (horizontal bars with color) -->
+        <Card class="chart-card entities-card">
+          <template #title>
+            <i class="pi pi-tags"></i>
+            Entidades por Tipo
           </template>
-        </Card>
-
-        <Card class="stat-card">
           <template #content>
-            <div class="stat-content">
-              <i class="pi pi-users stat-icon"></i>
-              <div class="stat-info">
-                <span class="stat-value">{{ stats.entities }}</span>
-                <span class="stat-label">Entidades</span>
-              </div>
-            </div>
-          </template>
-        </Card>
-
-        <Card class="stat-card">
-          <template #content>
-            <div class="stat-content">
-              <i class="pi pi-exclamation-triangle stat-icon stat-icon-warning"></i>
-              <div class="stat-info">
-                <span class="stat-value">{{ stats.activeAlerts }}</span>
-                <span class="stat-label">Alertas activas</span>
+            <div class="entity-bars">
+              <div
+                v-for="(item, index) in entityDistribution"
+                :key="item.type"
+                class="entity-bar-row"
+              >
+                <div class="entity-bar-label">
+                  <i :class="item.icon" :style="{ color: entityColors[index % entityColors.length] }"></i>
+                  <span>{{ item.label }}</span>
+                </div>
+                <div class="entity-bar-track">
+                  <div
+                    class="entity-bar-fill"
+                    :style="{
+                      width: (item.count / Math.max(entityDistribution[0]?.count || 1, 1)) * 100 + '%',
+                      background: entityColors[index % entityColors.length]
+                    }"
+                  ></div>
+                </div>
+                <span class="entity-bar-count">{{ item.count }}</span>
               </div>
             </div>
           </template>
         </Card>
       </div>
 
-      <!-- Distribución de alertas -->
-      <Card class="distribution-card">
-        <template #title>
-          <i class="pi pi-chart-pie"></i>
-          Distribución de Alertas
-        </template>
-        <template #content>
-          <table class="alert-distribution-table">
-            <tbody>
-              <tr>
-                <td class="severity-cell">
-                  <span class="severity-dot severity-critical"></span>
-                  <span>Críticas</span>
-                </td>
-                <td class="bar-cell">
-                  <div class="distribution-bar">
-                    <div
-                      class="bar-segment bar-critical"
-                      :style="{ width: (alertDistribution.critical / Math.max(stats.activeAlerts, 1)) * 100 + '%' }"
-                    ></div>
-                  </div>
-                </td>
-                <td class="count-cell">{{ alertDistribution.critical }}</td>
-              </tr>
-              <tr>
-                <td class="severity-cell">
-                  <span class="severity-dot severity-high"></span>
-                  <span>Altas</span>
-                </td>
-                <td class="bar-cell">
-                  <div class="distribution-bar">
-                    <div
-                      class="bar-segment bar-high"
-                      :style="{ width: (alertDistribution.high / Math.max(stats.activeAlerts, 1)) * 100 + '%' }"
-                    ></div>
-                  </div>
-                </td>
-                <td class="count-cell">{{ alertDistribution.high }}</td>
-              </tr>
-              <tr>
-                <td class="severity-cell">
-                  <span class="severity-dot severity-medium"></span>
-                  <span>Medias</span>
-                </td>
-                <td class="bar-cell">
-                  <div class="distribution-bar">
-                    <div
-                      class="bar-segment bar-medium"
-                      :style="{ width: (alertDistribution.medium / Math.max(stats.activeAlerts, 1)) * 100 + '%' }"
-                    ></div>
-                  </div>
-                </td>
-                <td class="count-cell">{{ alertDistribution.medium }}</td>
-              </tr>
-              <tr>
-                <td class="severity-cell">
-                  <span class="severity-dot severity-low"></span>
-                  <span>Bajas</span>
-                </td>
-                <td class="bar-cell">
-                  <div class="distribution-bar">
-                    <div
-                      class="bar-segment bar-low"
-                      :style="{ width: (alertDistribution.low / Math.max(stats.activeAlerts, 1)) * 100 + '%' }"
-                    ></div>
-                  </div>
-                </td>
-                <td class="count-cell">{{ alertDistribution.low }}</td>
-              </tr>
-              <tr>
-                <td class="severity-cell">
-                  <span class="severity-dot severity-info"></span>
-                  <span>Info</span>
-                </td>
-                <td class="bar-cell">
-                  <div class="distribution-bar">
-                    <div
-                      class="bar-segment bar-info"
-                      :style="{ width: (alertDistribution.info / Math.max(stats.activeAlerts, 1)) * 100 + '%' }"
-                    ></div>
-                  </div>
-                </td>
-                <td class="count-cell">{{ alertDistribution.info }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </template>
-      </Card>
-
-      <!-- Alertas por capítulo (junto a Distribución de Alertas) -->
-      <Card v-if="chapterDensity.chapters.length > 0" class="density-card">
+      <!-- Row 3: Alerts per chapter (full width) -->
+      <Card v-if="chapterDensity.chapters.length > 0" class="chart-card density-card">
         <template #title>
           <i class="pi pi-chart-bar"></i>
           Alertas por Capítulo
@@ -425,87 +428,121 @@ const originalDocumentName = computed(() => {
         </template>
       </Card>
 
-      <!-- Entidades por tipo -->
-      <Card class="entities-card">
-        <template #title>
-          <i class="pi pi-users"></i>
-          Entidades por Tipo
-        </template>
-        <template #content>
-          <div class="entity-type-list">
-            <div
-              v-for="item in entityDistribution"
-              :key="item.type"
-              class="entity-type-item"
-            >
-              <i :class="item.icon" class="entity-type-icon"></i>
-              <span class="entity-type-label">{{ item.label }}</span>
-              <span class="entity-type-count">{{ item.count }}</span>
+      <!-- Row 4: Top characters + Info + Actions (three columns) -->
+      <div class="bottom-row">
+        <!-- Top characters -->
+        <Card v-if="topCharacters.length > 0" class="chart-card top-characters-card">
+          <template #title>
+            <i class="pi pi-star"></i>
+            Personajes Principales
+          </template>
+          <template #content>
+            <div class="top-characters-list">
+              <div
+                v-for="(char, index) in topCharacters"
+                :key="char.id"
+                class="character-item"
+              >
+                <span class="character-rank" :class="'rank-' + (index + 1)">{{ index + 1 }}</span>
+                <div class="character-info">
+                  <span class="character-name">{{ char.name }}</span>
+                  <div class="character-bar-track">
+                    <div
+                      class="character-bar-fill"
+                      :style="{ width: ((char.mentionCount || 0) / Math.max(topCharacters[0]?.mentionCount || 1, 1)) * 100 + '%' }"
+                    ></div>
+                  </div>
+                </div>
+                <span class="character-mentions">{{ char.mentionCount || 0 }}</span>
+              </div>
             </div>
-          </div>
-        </template>
-      </Card>
+          </template>
+        </Card>
 
-      <!-- Top personajes -->
-      <Card v-if="topCharacters.length > 0" class="top-characters-card">
-        <template #title>
-          <i class="pi pi-star"></i>
-          Personajes Principales
-        </template>
-        <template #content>
-          <div class="top-characters-list">
-            <div
-              v-for="(char, index) in topCharacters"
-              :key="char.id"
-              class="character-item"
-            >
-              <span class="character-rank">{{ index + 1 }}</span>
-              <span class="character-name">{{ char.name }}</span>
-              <span class="character-mentions">{{ char.mentionCount || 0 }} apariciones</span>
+        <!-- Project info -->
+        <Card class="chart-card info-card">
+          <template #title>
+            <i class="pi pi-info-circle"></i>
+            Proyecto
+          </template>
+          <template #content>
+            <div class="info-list">
+              <div class="info-row">
+                <i class="pi pi-tag info-row-icon"></i>
+                <div class="info-row-content">
+                  <span class="info-row-label">Nombre</span>
+                  <span class="info-row-value">{{ project.name }}</span>
+                </div>
+              </div>
+              <div v-if="originalDocumentName" class="info-row">
+                <i class="pi pi-file info-row-icon"></i>
+                <div class="info-row-content">
+                  <span class="info-row-label">Documento</span>
+                  <span class="info-row-value">{{ originalDocumentName }}</span>
+                </div>
+              </div>
+              <div v-if="project.description" class="info-row">
+                <i class="pi pi-align-left info-row-icon"></i>
+                <div class="info-row-content">
+                  <span class="info-row-label">Descripción</span>
+                  <span class="info-row-value">{{ project.description }}</span>
+                </div>
+              </div>
+              <div class="info-row">
+                <i class="pi pi-calendar info-row-icon"></i>
+                <div class="info-row-content">
+                  <span class="info-row-label">Última modificación</span>
+                  <span class="info-row-value">{{ formatDate(project.lastModified) }}</span>
+                </div>
+              </div>
             </div>
-          </div>
-        </template>
-      </Card>
+          </template>
+        </Card>
 
-      <!-- Acciones -->
-      <Card class="actions-card">
-        <template #title>
-          <i class="pi pi-cog"></i>
-          Acciones
-        </template>
-        <template #content>
-          <div class="actions-grid">
-            <Button
-              label="Exportar Informe"
-              icon="pi pi-download"
-              outlined
-              @click="emit('export')"
-            />
-            <Button
-              v-if="isWordDocument"
-              v-tooltip.top="'Exporta el documento Word con las correcciones como revisiones (Track Changes)'"
-              label="Documento con Correcciones"
-              icon="pi pi-file-edit"
-              outlined
-              severity="help"
-              @click="emit('export-corrected')"
-            />
-            <Button
-              label="Guía de Estilo"
-              icon="pi pi-book"
-              outlined
-              @click="emit('export-style-guide')"
-            />
-            <Button
-              label="Re-analizar"
-              icon="pi pi-refresh"
-              outlined
-              severity="secondary"
-              @click="emit('re-analyze')"
-            />
-          </div>
-        </template>
-      </Card>
+        <!-- Actions -->
+        <Card class="chart-card actions-card">
+          <template #title>
+            <i class="pi pi-download"></i>
+            Acciones
+          </template>
+          <template #content>
+            <div class="actions-stack">
+              <Button
+                label="Exportar Informe"
+                icon="pi pi-download"
+                outlined
+                class="action-btn"
+                @click="emit('export')"
+              />
+              <Button
+                v-if="isWordDocument"
+                v-tooltip.top="'Exporta el documento Word con las correcciones como revisiones (Track Changes)'"
+                label="Con Correcciones"
+                icon="pi pi-file-edit"
+                outlined
+                severity="help"
+                class="action-btn"
+                @click="emit('export-corrected')"
+              />
+              <Button
+                label="Guía de Estilo"
+                icon="pi pi-book"
+                outlined
+                class="action-btn"
+                @click="emit('export-style-guide')"
+              />
+              <Button
+                label="Re-analizar"
+                icon="pi pi-refresh"
+                outlined
+                severity="secondary"
+                class="action-btn"
+                @click="emit('re-analyze')"
+              />
+            </div>
+          </template>
+        </Card>
+      </div>
     </div>
   </div>
 </template>
@@ -520,75 +557,53 @@ const originalDocumentName = computed(() => {
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  max-width: 900px;
-  margin: 0 auto;
+  gap: 1.25rem;
 }
 
-/* Info card */
-.info-card :deep(.p-card-title) {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1rem;
-}
-
-.info-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.info-item {
-  display: flex;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 0.5rem;
-}
-
-.info-label {
-  font-size: 0.75rem;
-  color: var(--text-color-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.info-value {
-  font-size: 0.9375rem;
-  color: var(--text-color);
-  word-break: break-word;
-}
-
-/* Stats grid */
-.stats-grid {
+/* ── Row 1: Stat cards ── */
+.stats-row {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
 }
 
-.stat-card :deep(.p-card-body) {
-  padding: 1rem;
-}
-
-.stat-content {
+.stat-card {
   display: flex;
-  flex-direction: row;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.25rem 0;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: 12px;
+  border: 1px solid var(--surface-200);
+  background: var(--surface-card);
+  transition: box-shadow 0.2s;
 }
 
-.stat-icon {
-  font-size: 1.75rem;
-  color: var(--primary-color);
+.stat-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.stat-icon-bg {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 
-.stat-icon-warning {
-  color: var(--orange-500);
+.stat-icon-bg i {
+  font-size: 1.25rem;
 }
+
+.stat-words .stat-icon-bg { background: var(--blue-50); }
+.stat-words .stat-icon-bg i { color: var(--blue-600); }
+.stat-chapters .stat-icon-bg { background: var(--teal-50); }
+.stat-chapters .stat-icon-bg i { color: var(--teal-600); }
+.stat-entities .stat-icon-bg { background: var(--purple-50); }
+.stat-entities .stat-icon-bg i { color: var(--purple-600); }
+.stat-alerts .stat-icon-bg { background: var(--orange-50); }
+.stat-alerts .stat-icon-bg i { color: var(--orange-600); }
 
 .stat-info {
   display: flex;
@@ -597,166 +612,164 @@ const originalDocumentName = computed(() => {
 }
 
 .stat-value {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: var(--text-color);
   line-height: 1.2;
 }
 
 .stat-label {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   color: var(--text-color-secondary);
   white-space: nowrap;
 }
 
-/* Distribution */
-.distribution-card :deep(.p-card-title),
-.entities-card :deep(.p-card-title),
-.top-characters-card :deep(.p-card-title),
-.actions-card :deep(.p-card-title) {
+/* ── Row 2: Charts row (two columns) ── */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.chart-card :deep(.p-card-title) {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   font-size: 1rem;
+  flex-wrap: wrap;
 }
 
-/* Alert distribution table */
-.alert-distribution-table {
-  width: 100%;
-  border-collapse: collapse;
+.chart-card :deep(.p-card-body) {
+  height: 100%;
 }
 
-.alert-distribution-table tr {
-  border-bottom: 1px solid var(--surface-100);
-}
-
-.alert-distribution-table tr:last-child {
-  border-bottom: none;
-}
-
-.severity-cell {
+/* ── Donut chart ── */
+.donut-container {
   display: flex;
+  justify-content: center;
+  padding: 0.5rem 0 1rem;
+}
+
+.donut-chart {
+  width: 160px;
+  height: 160px;
+}
+
+.donut-segment {
+  transition: opacity 0.2s;
+}
+
+.donut-segment:hover {
+  opacity: 0.8;
+}
+
+.donut-total {
+  font-size: 1.5rem;
+  font-weight: 700;
+  fill: var(--text-color);
+}
+
+.donut-label {
+  font-size: 0.6875rem;
+  fill: var(--text-color-secondary);
+}
+
+.empty-donut {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 0;
-  width: 100px;
-  font-size: 0.875rem;
-  color: var(--text-color-secondary);
+  padding: 2rem 0;
+  color: var(--green-600);
 }
 
-.severity-dot {
+.empty-donut i {
+  font-size: 2rem;
+}
+
+/* Alert legend */
+.alert-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.alert-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+}
+
+.alert-legend-item .legend-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.severity-critical { background: var(--red-500); }
-.severity-high { background: var(--orange-500); }
-.severity-medium { background: var(--yellow-500); }
-.severity-low { background: var(--blue-500); }
-.severity-info { background: var(--gray-400); }
-
-.bar-cell {
-  padding: 0.5rem 0.75rem;
-}
-
-.distribution-bar {
-  height: 8px;
-  background: var(--surface-200);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.bar-segment {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s ease;
-}
-
-.bar-critical { background: var(--red-500); }
-.bar-high { background: var(--orange-500); }
-.bar-medium { background: var(--yellow-500); }
-.bar-low { background: var(--blue-500); }
-.bar-info { background: var(--gray-400); }
-
-.count-cell {
-  padding: 0.5rem 0;
-  text-align: right;
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: var(--text-color);
-  width: 40px;
-}
-
-/* Entity types */
-.entity-type-list {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
-}
-
-.entity-type-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  background: var(--surface-50);
-  border-radius: 6px;
-}
-
-.entity-type-icon {
+.alert-legend-item .legend-label {
   color: var(--text-color-secondary);
 }
 
-.entity-type-label {
-  flex: 1;
-  font-size: 0.875rem;
-}
-
-.entity-type-count {
+.alert-legend-item .legend-count {
   font-weight: 600;
   color: var(--text-color);
 }
 
-/* Top characters */
-.top-characters-list {
+/* ── Entity bars ── */
+.entity-bars {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
-.character-item {
+.entity-bar-row {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.5rem;
 }
 
-.character-rank {
-  width: 1.5rem;
-  height: 1.5rem;
+.entity-bar-label {
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: var(--primary-100);
-  color: var(--primary-700);
-  border-radius: 50%;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.character-name {
-  flex: 1;
-  font-weight: 500;
-}
-
-.character-mentions {
+  gap: 0.5rem;
+  width: 110px;
+  min-width: 110px;
   font-size: 0.8125rem;
   color: var(--text-color-secondary);
 }
 
-/* Density map */
+.entity-bar-label i {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.entity-bar-track {
+  flex: 1;
+  height: 12px;
+  background: var(--surface-100);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.entity-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.4s ease;
+  min-width: 6px;
+}
+
+.entity-bar-count {
+  width: 30px;
+  text-align: right;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-color);
+}
+
+/* ── Density chart (alerts per chapter) ── */
 .density-card :deep(.p-card-title) {
   display: flex;
   align-items: center;
@@ -776,20 +789,9 @@ const originalDocumentName = computed(() => {
   font-weight: 500;
 }
 
-.trend-improving {
-  background: var(--green-100);
-  color: var(--green-700);
-}
-
-.trend-worsening {
-  background: var(--red-100);
-  color: var(--red-700);
-}
-
-.trend-stable {
-  background: var(--gray-100);
-  color: var(--gray-700);
-}
+.trend-improving { background: var(--green-100); color: var(--green-700); }
+.trend-worsening { background: var(--red-100); color: var(--red-700); }
+.trend-stable { background: var(--gray-100); color: var(--gray-700); }
 
 .density-chart {
   display: flex;
@@ -857,7 +859,7 @@ const originalDocumentName = computed(() => {
   border-top: 1px solid var(--surface-100);
 }
 
-.legend-item {
+.density-legend .legend-item {
   display: flex;
   align-items: center;
   gap: 0.25rem;
@@ -865,7 +867,7 @@ const originalDocumentName = computed(() => {
   color: var(--text-color-secondary);
 }
 
-.legend-dot {
+.density-legend .legend-dot {
   width: 10px;
   height: 10px;
   border-radius: 2px;
@@ -877,62 +879,195 @@ const originalDocumentName = computed(() => {
 .legend-low { background: var(--blue-500); }
 .legend-info { background: var(--gray-400); }
 
-/* Actions */
-.actions-grid {
+/* ── Bottom row: 3 columns ── */
+.bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1.25rem;
+}
+
+/* ── Top characters ── */
+.top-characters-list {
   display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.character-item {
+  display: flex;
+  align-items: center;
   gap: 0.75rem;
-  flex-wrap: wrap;
 }
 
-/* Responsive */
+.character-rank {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  background: var(--surface-100);
+  color: var(--text-color-secondary);
+}
+
+.character-rank.rank-1 { background: var(--yellow-100); color: var(--yellow-700); }
+.character-rank.rank-2 { background: var(--gray-200); color: var(--gray-700); }
+.character-rank.rank-3 { background: var(--orange-100); color: var(--orange-700); }
+
+.character-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.character-name {
+  font-weight: 500;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.character-bar-track {
+  height: 6px;
+  background: var(--surface-100);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.character-bar-fill {
+  height: 100%;
+  background: var(--primary-color);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+  min-width: 4px;
+  opacity: 0.6;
+}
+
+.character-mentions {
+  font-size: 0.8125rem;
+  color: var(--text-color-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Info card ── */
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.info-row-icon {
+  color: var(--text-color-secondary);
+  margin-top: 0.125rem;
+  flex-shrink: 0;
+  font-size: 0.875rem;
+}
+
+.info-row-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.info-row-label {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-color-secondary);
+}
+
+.info-row-value {
+  font-size: 0.875rem;
+  color: var(--text-color);
+  word-break: break-word;
+}
+
+/* ── Actions ── */
+.actions-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.action-btn {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1200px) {
+  .stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .bottom-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .actions-card {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 768px) {
-  .stats-grid {
+  .stats-row {
     grid-template-columns: 1fr;
   }
 
-  .info-grid {
+  .charts-row {
     grid-template-columns: 1fr;
   }
 
-  .entity-type-list {
+  .bottom-row {
     grid-template-columns: 1fr;
   }
 }
 
-/* Dark mode */
-.dark .distribution-bar {
+/* ── Dark mode ── */
+:deep(.dark) .stat-words .stat-icon-bg { background: var(--blue-900); }
+:deep(.dark) .stat-chapters .stat-icon-bg { background: var(--teal-900); }
+:deep(.dark) .stat-entities .stat-icon-bg { background: var(--purple-900); }
+:deep(.dark) .stat-alerts .stat-icon-bg { background: var(--orange-900); }
+
+:deep(.dark) .stat-card {
+  border-color: var(--surface-600);
+}
+
+:deep(.dark) .entity-bar-track,
+:deep(.dark) .character-bar-track {
   background: var(--surface-700);
 }
 
-.dark .entity-type-item {
-  background: var(--surface-800);
-}
-
-.dark .character-rank {
-  background: var(--primary-900);
-  color: var(--primary-300);
-}
-
-.dark .density-bar-container {
+:deep(.dark) .character-rank {
   background: var(--surface-700);
 }
 
-.dark .density-legend {
+:deep(.dark) .character-rank.rank-1 { background: var(--yellow-900); color: var(--yellow-300); }
+:deep(.dark) .character-rank.rank-2 { background: var(--gray-700); color: var(--gray-300); }
+:deep(.dark) .character-rank.rank-3 { background: var(--orange-900); color: var(--orange-300); }
+
+:deep(.dark) .density-bar-container {
+  background: var(--surface-700);
+}
+
+:deep(.dark) .density-legend {
   border-top-color: var(--surface-600);
 }
 
-.dark .trend-improving {
-  background: var(--green-900);
-  color: var(--green-300);
-}
-
-.dark .trend-worsening {
-  background: var(--red-900);
-  color: var(--red-300);
-}
-
-.dark .trend-stable {
-  background: var(--gray-800);
-  color: var(--gray-300);
-}
+:deep(.dark) .trend-improving { background: var(--green-900); color: var(--green-300); }
+:deep(.dark) .trend-worsening { background: var(--red-900); color: var(--red-300); }
+:deep(.dark) .trend-stable { background: var(--gray-800); color: var(--gray-300); }
 </style>

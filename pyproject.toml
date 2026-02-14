@@ -1,6 +1,6 @@
 [project]
 name = "narrative-assistant"
-version = "0.9.9"
+version = "0.9.10"
 description = "Asistente de Corrección Narrativa - Herramienta offline de análisis narrativo para correctores profesionales"
 readme = "README.md"
 license = { text = "MIT" }

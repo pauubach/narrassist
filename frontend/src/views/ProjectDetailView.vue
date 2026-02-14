@@ -70,6 +70,7 @@
       <CorrectionConfigModal
         ref="correctionConfigModalRef"
         :project-id="project.id"
+        @saved="loadAlerts(project.id)"
       />
 
       <!-- Analyze/Reanalyze Confirmation Dialog -->

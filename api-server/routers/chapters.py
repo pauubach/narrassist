@@ -1191,6 +1191,106 @@ async def suggest_chapter_focalization(project_id: int, chapter_number: int):
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
+@router.post("/api/projects/{project_id}/focalization/suggest-all", response_model=ApiResponse)
+async def suggest_all_focalizations(project_id: int, auto_apply: bool = False):
+    """
+    Sugiere focalizacion para todos los capitulos sin declaracion.
+
+    Si auto_apply=True, aplica automaticamente sugerencias con confianza >= 0.65.
+    """
+    try:
+        from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.focalization import (  # type: ignore[attr-defined]
+            FocalizationDeclarationService,
+            SQLiteFocalizationRepository,
+        )
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        if not deps.project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = deps.project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+        entity_repo = get_entity_repository()
+        entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+        characters = [e for e in entities if deps.is_character_entity(e)]
+
+        repo = SQLiteFocalizationRepository()
+        service = FocalizationDeclarationService(repository=repo)
+
+        # Obtener declaraciones existentes
+        existing = service.get_all_declarations(project_id)
+        declared_chapters = {d.chapter for d in existing}
+
+        suggestions = []
+        applied = 0
+
+        for chapter in chapters:
+            if chapter.chapter_number in declared_chapters:
+                continue
+            if not chapter.content or len(chapter.content.strip()) < 50:
+                continue
+
+            suggestion = service.suggest_focalization(
+                project_id, chapter.chapter_number, chapter.content, characters
+            )
+
+            focalizer_names = []
+            for fid in suggestion.get("suggested_focalizers", []):
+                entity = next((e for e in characters if e.id == fid), None)
+                if entity:
+                    focalizer_names.append({"id": fid, "name": entity.canonical_name or entity.name})
+
+            sug_data = {
+                "chapter_number": chapter.chapter_number,
+                "chapter_title": chapter.title or f"Capítulo {chapter.chapter_number}",
+                "suggested_type": suggestion["suggested_type"].value if suggestion["suggested_type"] else None,
+                "suggested_focalizers": focalizer_names,
+                "confidence": suggestion["confidence"],
+                "evidence": suggestion["evidence"],
+                "applied": False,
+            }
+
+            # Auto-aplicar si confianza suficiente
+            if auto_apply and suggestion["suggested_type"] and suggestion["confidence"] >= 0.65:
+                try:
+                    service.declare_focalization(
+                        project_id=project_id,
+                        chapter=chapter.chapter_number,
+                        focalization_type=suggestion["suggested_type"],
+                        focalizer_ids=suggestion.get("suggested_focalizers", []),
+                        declared_by="system_suggestion",
+                        notes=f"Auto-sugerido (confianza: {suggestion['confidence']:.0%})",
+                    )
+                    sug_data["applied"] = True
+                    applied += 1
+                except Exception as e:
+                    logger.warning(f"Error applying suggestion for ch {chapter.chapter_number}: {e}")
+
+            suggestions.append(sug_data)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "suggestions": suggestions,
+                "total_chapters": len(chapters),
+                "already_declared": len(declared_chapters),
+                "suggested": len(suggestions),
+                "auto_applied": applied,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error suggesting all focalizations: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
 @router.get("/api/projects/{project_id}/chapters/{chapter_number}/scenes", response_model=ApiResponse)
 async def get_chapter_scenes(project_id: int, chapter_number: int):
     """Obtiene las escenas de un capítulo específico."""

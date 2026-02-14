@@ -2442,7 +2442,9 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
         correction_config = CorrectionConfig.default()
         try:
             project_settings = project.settings or {}
-            cc = project_settings.get("correction_config", {})
+            # New system: correction_customizations (CorrectionConfigModal)
+            # Legacy: correction_config (old presets)
+            cc = project_settings.get("correction_customizations") or project_settings.get("correction_config", {})
             dialog_cfg = cc.get("dialog", {})
             dash_val = dialog_cfg.get("spoken_dialogue_dash", "")
             dash_map = {"em_dash": "em", "en_dash": "en", "hyphen": "hyphen"}
@@ -2452,6 +2454,7 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
             quote_map = {"angular": "angular", "double": "curly", "single": "straight"}
             if quote_val in quote_map:
                 correction_config.typography.quote_style = quote_map[quote_val]  # type: ignore[assignment]
+            logger.info(f"Correction config loaded: dialogue_dash={correction_config.typography.dialogue_dash}, quote_style={correction_config.typography.quote_style}")
         except Exception as cfg_err:
             logger.debug(f"Could not load project correction config: {cfg_err}")
 
@@ -2968,6 +2971,48 @@ def run_completion(ctx: dict, tracker: ProgressTracker):
         f"Results: {word_count} words, {chapters_count} chapters, "
         f"{len(entities)} entities, {alerts_created} alerts"
     )
+
+    # Auto-sugerir focalizacion para capitulos sin declaracion
+    try:
+        from narrative_assistant.focalization import (  # type: ignore[attr-defined]
+            FocalizationDeclarationService,
+            SQLiteFocalizationRepository,
+        )
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+        characters = [e for e in entities if getattr(e, "entity_type", None) in ("person", "PERSON", "PER", "CHARACTER") or (hasattr(e, "entity_type") and hasattr(e.entity_type, "value") and e.entity_type.value in ("person", "PERSON", "PER", "CHARACTER"))]
+
+        repo = SQLiteFocalizationRepository()
+        service = FocalizationDeclarationService(repository=repo)
+        existing = service.get_all_declarations(project_id)
+        declared_chapters = {d.chapter for d in existing}
+
+        auto_count = 0
+        for ch in chapters:
+            if ch.chapter_number in declared_chapters:
+                continue
+            if not ch.content or len(ch.content.strip()) < 50:
+                continue
+            suggestion = service.suggest_focalization(
+                project_id, ch.chapter_number, ch.content, characters
+            )
+            if suggestion["suggested_type"] and suggestion["confidence"] >= 0.65:
+                service.declare_focalization(
+                    project_id=project_id,
+                    chapter=ch.chapter_number,
+                    focalization_type=suggestion["suggested_type"],
+                    focalizer_ids=suggestion.get("suggested_focalizers", []),
+                    declared_by="system_suggestion",
+                    notes=f"Auto-sugerido (confianza: {suggestion['confidence']:.0%})",
+                )
+                auto_count += 1
+
+        if auto_count:
+            logger.info(f"Focalization: auto-suggested {auto_count} chapter declarations")
+    except Exception as foc_err:
+        logger.warning(f"Error auto-suggesting focalization: {foc_err}")
 
 
 # ============================================================================

@@ -204,6 +204,124 @@ async def check_editorial_rules(project_id: int, text: str = Body(..., embed=Tru
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
+def _rescan_typography_alerts(project_id: int, effective_config: dict) -> dict:
+    """
+    Re-escanea alertas de tipografía tras cambio de config.
+
+    Borra alertas existentes de tipografía/puntuación y re-ejecuta SOLO
+    el detector de tipografía (regex puro, ~100ms) con la nueva config.
+    Esto da feedback instantáneo sin necesidad de re-análisis completo.
+
+    Args:
+        project_id: ID del proyecto
+        effective_config: Config efectiva (dict) con dialog, etc.
+
+    Returns:
+        {"removed": N, "created": M} con contadores
+    """
+    result = {"removed": 0, "created": 0}
+
+    try:
+        if not deps.alert_repository or not deps.chapter_repository:
+            logger.debug("Repositories not available for typography rescan")
+            return result
+
+        from narrative_assistant.alerts.engine import AlertEngine
+        from narrative_assistant.corrections.config import CorrectionConfig as LegacyCorrectionConfig
+        from narrative_assistant.corrections.orchestrator import CorrectionOrchestrator
+
+        # 1. Construir config legacy desde la effective_config del nuevo sistema
+        legacy_config = LegacyCorrectionConfig.default()
+        dialog_cfg = effective_config.get("dialog", {})
+
+        dash_val = dialog_cfg.get("spoken_dialogue_dash", "")
+        dash_map = {"em_dash": "em", "en_dash": "en", "hyphen": "hyphen"}
+        if dash_val in dash_map:
+            legacy_config.typography.dialogue_dash = dash_map[dash_val]  # type: ignore[assignment]
+
+        quote_val = dialog_cfg.get("nested_dialogue_quote", "")
+        quote_map = {"angular": "angular", "double": "curly", "single": "straight"}
+        if quote_val in quote_map:
+            legacy_config.typography.quote_style = quote_map[quote_val]  # type: ignore[assignment]
+
+        # 2. Obtener texto completo del proyecto (capítulos)
+        chapters = deps.chapter_repository.get_by_project(project_id)
+        if not chapters:
+            return result
+
+        full_text = "\n\n".join(ch.content for ch in chapters if ch.content)
+        if not full_text.strip():
+            return result
+
+        # 3. Borrar alertas existentes de tipografía/puntuación
+        #    Tipos: punctuation_wrong_dash_*, typography_wrong_quote_*, typography_mixed_*
+        typo_alert_types = (
+            "punctuation_wrong_dash_dialogue",
+            "punctuation_wrong_dash_range",
+            "punctuation_wrong_dash_inciso",
+            "typography_wrong_quote_style",
+            "typography_mixed_quotes",
+        )
+
+        from narrative_assistant.persistence.database import get_database
+        db = get_database()
+        with db.transaction() as conn:
+            placeholders = ",".join("?" for _ in typo_alert_types)
+            cursor = conn.execute(
+                f"DELETE FROM alerts WHERE project_id = ? AND alert_type IN ({placeholders})",
+                (project_id, *typo_alert_types),
+            )
+            result["removed"] = cursor.rowcount
+
+        # 4. Re-ejecutar solo el detector de tipografía
+        orchestrator = CorrectionOrchestrator(config=legacy_config)
+        correction_issues = orchestrator.analyze(
+            text=full_text,
+            chapter_index=None,
+            spacy_doc=None,
+        )
+
+        # Filtrar solo issues de tipografía/puntuación (no repeticiones, etc.)
+        typo_issues = [
+            issue for issue in correction_issues
+            if issue.category in ("typography", "punctuation")
+        ]
+
+        # 5. Crear nuevas alertas
+        alert_engine = AlertEngine()
+        for issue in typo_issues:
+            try:
+                alert_result = alert_engine.create_from_correction_issue(
+                    project_id=project_id,
+                    category=issue.category,
+                    issue_type=issue.issue_type,
+                    text=issue.text,
+                    start_char=issue.start_char,
+                    end_char=issue.end_char,
+                    explanation=issue.explanation,
+                    suggestion=issue.suggestion,
+                    confidence=issue.confidence,
+                    context=issue.context,
+                    chapter=issue.chapter_index,
+                    rule_id=issue.rule_id or "",
+                    extra_data=issue.extra_data,
+                )
+                if alert_result.is_success:
+                    result["created"] += 1
+            except Exception as e:
+                logger.warning(f"Error creating typography alert during rescan: {e}")
+
+        logger.info(
+            f"Typography rescan for project {project_id}: "
+            f"removed {result['removed']}, created {result['created']}"
+        )
+
+    except Exception as e:
+        logger.warning(f"Typography rescan failed (non-critical): {e}", exc_info=True)
+
+    return result
+
+
 @router.put("/api/projects/{project_id}/correction-config", response_model=ApiResponse)
 async def update_project_correction_config(
     project_id: str,
@@ -250,11 +368,17 @@ async def update_project_correction_config(
         subtype_code = getattr(project, 'document_subtype', None)
         effective_config = get_config_for_project(type_code, subtype_code, update.customizations)
 
+        # Re-scan selectivo: actualizar alertas de tipografía sin re-análisis completo
+        rescan_result = _rescan_typography_alerts(int(project_id), effective_config)
+
         return ApiResponse(
             success=True,
             data={
                 "config": effective_config,
                 "message": "Configuración guardada correctamente",
+                "alerts_removed": rescan_result.get("removed", 0),
+                "alerts_created": rescan_result.get("created", 0),
+                "rescan": True,
             }
         )
 
