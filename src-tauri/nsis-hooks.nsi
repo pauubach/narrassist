@@ -117,16 +117,28 @@ Var CleanInstall
     Pop $0
     nsExec::Exec 'taskkill /F /IM "narrative-assistant-server.exe" /T'
     Pop $0
+    nsExec::Exec 'taskkill /F /IM "python.exe" /T'
+    Pop $0
+    nsExec::Exec 'taskkill /F /IM "ollama.exe" /T'
+    Pop $0
     ; Wait for processes to fully terminate
-    Sleep 1500
+    Sleep 2000
 
     ; Bulk-remove heavy resource dirs BEFORE Tauri's file-by-file removal.
-    ; python-embed + backend contain thousands of small files (torch, spacy, etc.)
-    ; and RMDir /r is orders of magnitude faster than individual Delete calls.
-    DetailPrint "Eliminando Python embebido y backend..."
-    RMDir /r "$INSTDIR\binaries\python-embed"
-    RMDir /r "$INSTDIR\binaries\backend"
+    ; python-embed + backend contain ~50k small files (torch, spacy, numpy, etc.)
+    ; Using 'rd /s /q' via cmd.exe — significantly faster than NSIS's built-in
+    ; RMDir /r for large directory trees (kernel-level vs NSIS loop).
+    ; After this, Tauri's manifest-based per-file Delete calls become fast no-ops.
+    DetailPrint ""
+    DetailPrint "Eliminando Python embebido (~1.8 GB, puede tardar 1-2 min)..."
+    nsExec::Exec 'cmd /c rd /s /q "$INSTDIR\binaries\python-embed"'
+    Pop $0
+    DetailPrint "Eliminando backend..."
+    nsExec::Exec 'cmd /c rd /s /q "$INSTDIR\binaries\backend"'
+    Pop $0
     RMDir "$INSTDIR\binaries"
+    DetailPrint "Archivos principales eliminados."
+    DetailPrint ""
 !macroend
 
 ; ============================================================
