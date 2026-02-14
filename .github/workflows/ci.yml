@@ -46,6 +46,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e ".[dev]"
+          pip install -r api-server/requirements.txt
 
       - name: Run unit tests
         run: |
