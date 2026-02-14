@@ -119,6 +119,14 @@ Var CleanInstall
     Pop $0
     ; Wait for processes to fully terminate
     Sleep 1500
+
+    ; Bulk-remove heavy resource dirs BEFORE Tauri's file-by-file removal.
+    ; python-embed + backend contain thousands of small files (torch, spacy, etc.)
+    ; and RMDir /r is orders of magnitude faster than individual Delete calls.
+    DetailPrint "Eliminando Python embebido y backend..."
+    RMDir /r "$INSTDIR\binaries\python-embed"
+    RMDir /r "$INSTDIR\binaries\backend"
+    RMDir "$INSTDIR\binaries"
 !macroend
 
 ; ============================================================
