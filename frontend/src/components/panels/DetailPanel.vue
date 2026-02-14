@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useSelectionStore } from '@/stores/selection'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import DsBadge from '@/components/ds/DsBadge.vue'
@@ -30,6 +31,7 @@ const emit = defineEmits<{
 }>()
 
 const selectionStore = useSelectionStore()
+const workspaceStore = useWorkspaceStore()
 const { getTypeConfig, getImportanceConfig } = useEntityUtils()
 const { getSeverityConfig, getCategoryConfig, formatAlertLocation } = useAlertUtils()
 
@@ -68,9 +70,13 @@ function handleEditEntity() {
 }
 
 function handleNavigateToMention() {
-  if (selectedEntity.value && selectedEntity.value.firstMentionChapter) {
-    emit('navigate-to-mention', selectedEntity.value.id, selectedEntity.value.firstMentionChapter)
-  }
+  if (!selectedEntity.value?.firstMentionChapter) return
+  // Usar el nombre de la entidad como texto a buscar en el capítulo
+  workspaceStore.navigateToTextPosition(
+    0, // Posición no conocida, el texto guiará la búsqueda
+    selectedEntity.value.name,
+    null, // No tenemos chapter ID, solo number — TextTab buscará por posición
+  )
 }
 
 function handleNavigateToAlert() {

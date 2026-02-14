@@ -48,8 +48,8 @@ def test_chat_unavailable_message_windows(monkeypatch, patched_project_manager):
 
     assert response.success is False
     assert response.error is not None
-    assert "start_ollama_cpu.bat" in response.error
-    assert "OLLAMA_NUM_GPU=0 ollama serve" not in response.error
+    assert "Ollama" in response.error
+    assert "Ajustes" in response.error
 
 
 def test_chat_unavailable_message_macos(monkeypatch, patched_project_manager):
@@ -64,8 +64,9 @@ def test_chat_unavailable_message_macos(monkeypatch, patched_project_manager):
 
     assert response.success is False
     assert response.error is not None
-    assert "OLLAMA_NUM_GPU=0 ollama serve" in response.error
-    assert "start_ollama_cpu.bat" not in response.error
+    # Ahora el mensaje es genérico (no platform-specific) para UX amigable
+    assert "Ollama" in response.error
+    assert "Ajustes" in response.error
 
 
 def test_chat_success_sets_using_cpu_flag(monkeypatch, patched_project_manager):

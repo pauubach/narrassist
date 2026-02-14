@@ -274,6 +274,7 @@
             <TimelineView
               :project-id="project.id"
               :entities="entities"
+              :chapters="chapters"
             />
           </AnalysisRequired>
 

@@ -28,6 +28,7 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import Message from 'primevue/message'
 import type { Alert, AlertSource } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
+import { useWorkspaceStore } from '@/stores/workspace'
 
 interface ChapterInfo {
   id: number
@@ -71,7 +72,25 @@ const emit = defineEmits<{
   (e: 'navigate-to-text', source?: AlertSource): void
 }>()
 
+const workspaceStore = useWorkspaceStore()
 const { getSeverityConfig, getCategoryLabel } = useAlertUtils()
+
+function navigateToText(source?: AlertSource) {
+  const alert = props.currentAlert
+  if (!alert) return
+  const chapterNum = source?.chapter ?? alert.chapter
+  const position = source?.startChar ?? alert.spanStart
+  const excerpt = source?.excerpt ?? alert.excerpt
+  if (position === undefined) return
+  const chapter = chapterNum !== undefined
+    ? props.chapters?.find(c => c.chapterNumber === chapterNum)
+    : undefined
+  workspaceStore.navigateToTextPosition(
+    position,
+    excerpt || undefined,
+    chapter?.id ?? null,
+  )
+}
 
 // Computed
 const severityConfig = computed(() =>
@@ -319,7 +338,7 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
                 text
                 size="small"
                 class="source-nav-btn"
-                @click="emit('navigate-to-text', source)"
+                @click="navigateToText(source)"
               />
             </div>
             <!-- Botón único si no hay múltiples sources -->
@@ -329,7 +348,7 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
               label="Ver en documento"
               text
               size="small"
-              @click="emit('navigate-to-text')"
+              @click="navigateToText()"
             />
           </div>
           <div class="context-body">

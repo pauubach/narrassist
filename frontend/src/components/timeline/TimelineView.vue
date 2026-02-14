@@ -496,6 +496,7 @@ import type {
 const props = defineProps<{
   projectId: number
   entities?: Array<{ id: number; name: string }>
+  chapters?: Array<{ id: number; chapterNumber: number }>
 }>()
 
 const emit = defineEmits<{
@@ -911,8 +912,15 @@ const handleEventHover = (event: TimelineEvent | null) => {
 
 const navigateToText = () => {
   if (selectedEvent.value) {
-    workspaceStore.navigateToTextPosition(selectedEvent.value.discoursePosition)
-    emit('navigateToText', selectedEvent.value.discoursePosition)
+    const event = selectedEvent.value
+    // Resolver chapter number → chapter ID
+    const chapter = props.chapters?.find(c => c.chapterNumber === event.chapter)
+    workspaceStore.navigateToTextPosition(
+      event.discoursePosition,
+      event.description || undefined,
+      chapter?.id ?? null,
+    )
+    emit('navigateToText', event.discoursePosition)
     showEventDetail.value = false
   }
 }

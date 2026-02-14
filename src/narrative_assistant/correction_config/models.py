@@ -446,6 +446,37 @@ class ReadabilityConfig:
         }
 
 
+@dataclass
+class RegionalConfig:
+    """
+    Configuración de variantes regionales del español.
+    """
+
+    # ¿Habilitar análisis regional?
+    enabled: bool = True
+
+    # Variante objetivo (es_ES, es_MX, es_AR, etc.)
+    target_region: str = "es_ES"
+
+    # ¿Detectar mezcla de variantes?
+    detect_mixed_variants: bool = True
+
+    # ¿Sugerir alternativas regionales?
+    suggest_regional_alternatives: bool = True
+
+    # Confianza mínima para alertas regionales
+    min_confidence: float = 0.7
+
+    def to_dict(self) -> dict:
+        return {
+            "enabled": self.enabled,
+            "target_region": self.target_region,
+            "detect_mixed_variants": self.detect_mixed_variants,
+            "suggest_regional_alternatives": self.suggest_regional_alternatives,
+            "min_confidence": self.min_confidence,
+        }
+
+
 # =============================================================================
 # Reglas Editoriales
 # =============================================================================
@@ -584,6 +615,7 @@ class CorrectionConfig:
     style: StyleConfig = field(default_factory=StyleConfig)
     structure: StructureConfig = field(default_factory=StructureConfig)
     readability: ReadabilityConfig = field(default_factory=ReadabilityConfig)
+    regional: RegionalConfig = field(default_factory=RegionalConfig)
 
     # Reglas editoriales (también heredan)
     editorial_rules: EditorialRulesConfig = field(default_factory=EditorialRulesConfig)
@@ -604,6 +636,7 @@ class CorrectionConfig:
             "style": self.style.to_dict(),
             "structure": self.structure.to_dict(),
             "readability": self.readability.to_dict(),
+            "regional": self.regional.to_dict(),
             "editorial_rules": self.editorial_rules.to_dict(),
             "inheritance": self._inheritance_info,
         }

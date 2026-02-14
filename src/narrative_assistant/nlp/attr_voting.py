@@ -342,7 +342,7 @@ class AttributeVotingMixin:
         Returns:
             Lista de atributos sin conflictos (un valor por entidad+key)
         """
-        from .attributes import AttributeKey
+        from .attributes import AttributeCategory, AttributeKey
 
         # Atributos que pueden tener múltiples valores legítimos
         MULTI_VALUE_KEYS = {
@@ -370,6 +370,17 @@ class AttributeVotingMixin:
                 resolved.append(attrs[0])
             elif key in MULTI_VALUE_KEYS:
                 # Atributo que puede tener múltiples valores
+                resolved.extend(attrs)
+            elif attrs[0].category == AttributeCategory.PHYSICAL:
+                # Atributo físico con valores distintos → posible inconsistencia
+                # Preservar TODOS los valores para que attribute_consistency los detecte
+                # (aplica a eye_color, hair_color, facial_hair, height, build, skin, etc.)
+                unique_values = {a.value.lower().strip() for a in attrs}
+                if len(unique_values) > 1:
+                    logger.info(
+                        f"Posible inconsistencia física para {entity}.{key.value}: "
+                        f"valores distintos detectados: {[a.value for a in attrs]}"
+                    )
                 resolved.extend(attrs)
             else:
                 # Conflicto: múltiples valores para atributo que debería ser único

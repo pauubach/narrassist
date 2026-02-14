@@ -832,7 +832,7 @@ def _apply_section_overrides(
         source: Fuente del override.
         source_name: Nombre de la fuente para mostrar en UI.
     """
-    sections = ["dialog", "repetition", "sentence", "style", "structure", "readability"]
+    sections = ["dialog", "repetition", "sentence", "style", "structure", "readability", "regional"]
     section_attrs = {
         "dialog": config.dialog,
         "repetition": config.repetition,
@@ -840,6 +840,7 @@ def _apply_section_overrides(
         "style": config.style,
         "structure": config.structure,
         "readability": config.readability,
+        "regional": config.regional,
     }
 
     for section in sections:
@@ -947,6 +948,15 @@ def get_correction_config(
             type_name,  # type: ignore[arg-type]
             config,
         )
+    if "regional" in type_config:
+        _apply_config_to_dataclass(
+            config.regional,
+            type_config["regional"],
+            "regional",
+            InheritanceSource.TYPE,
+            type_name,  # type: ignore[arg-type]
+            config,
+        )
 
     # 1b. Aplicar overrides de usuario para el tipo (si existen)
     user_type_overrides = _load_user_overrides(type_code, None)
@@ -1009,6 +1019,15 @@ def get_correction_config(
                 config.readability,
                 subtype_config["readability"],  # type: ignore[index]
                 "readability",
+                InheritanceSource.SUBTYPE,
+                subtype_name,  # type: ignore[arg-type]
+                config,
+            )
+        if "regional" in subtype_config:
+            _apply_config_to_dataclass(
+                config.regional,
+                subtype_config["regional"],  # type: ignore[index]
+                "regional",
                 InheritanceSource.SUBTYPE,
                 subtype_name,  # type: ignore[arg-type]
                 config,
@@ -1076,6 +1095,15 @@ def get_correction_config(
                 config.readability,
                 custom_overrides["readability"],
                 "readability",
+                InheritanceSource.CUSTOM,
+                "Personalizado",
+                config,
+            )
+        if "regional" in custom_overrides:
+            _apply_config_to_dataclass(
+                config.regional,
+                custom_overrides["regional"],
+                "regional",
                 InheritanceSource.CUSTOM,
                 "Personalizado",
                 config,

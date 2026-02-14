@@ -1301,7 +1301,17 @@ const loadConfig = async () => {
       }
 
       config.value = configData
-      localConfig.value = JSON.parse(JSON.stringify(configData))
+      // Merge API data with defaults to ensure all categories exist
+      // (prevents template crashes if backend omits a section)
+      const merged = JSON.parse(JSON.stringify(defaultLocalConfig))
+      for (const key of Object.keys(configData)) {
+        if (configData[key] !== null && typeof configData[key] === 'object' && !Array.isArray(configData[key]) && key !== 'inheritance') {
+          merged[key] = { ...merged[key], ...configData[key] }
+        } else {
+          merged[key] = configData[key]
+        }
+      }
+      localConfig.value = merged
 
       // Load rules
       const rules = configData.editorial_rules?.rules || []

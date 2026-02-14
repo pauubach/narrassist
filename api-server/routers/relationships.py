@@ -31,6 +31,38 @@ async def get_project_relationships(project_id: int):
     from routers._enrichment_cache import get_cached_enrichment
     cached = get_cached_enrichment(deps.get_database(), project_id, "character_network", allow_stale=True)  # type: ignore[misc]
     if cached:
+        # Transform cached CharacterNetworkReport format (nodes/edges)
+        # to the frontend-expected format (entities/relations)
+        if "nodes" in cached and "entities" not in cached:
+            cached["entities"] = [
+                {
+                    "id": n.get("entity_id"),
+                    "name": n.get("entity_name", ""),
+                    "type": "character",
+                    "importance": 1,
+                    "mentionCount": 0,
+                }
+                for n in cached.get("nodes", [])
+            ]
+            cached["relations"] = [
+                {
+                    "entity1_id": e.get("source"),
+                    "entity2_id": e.get("target"),
+                    "entity1_name": e.get("source_name", ""),
+                    "entity2_name": e.get("target_name", ""),
+                    "co_occurrences": e.get("interactions", 1),
+                    "confidence": min(1.0, e.get("weight", 0.5)),
+                    "chapters": e.get("chapters", []),
+                    "contexts": [],
+                }
+                for e in cached.get("edges", [])
+            ]
+            cached.setdefault("project_id", project_id)
+            cached.setdefault("entity_count", len(cached["entities"]))
+            cached.setdefault("clusters", [])
+            cached.setdefault("mentions", [])
+            cached.setdefault("opinions", [])
+            cached.setdefault("asymmetries", [])
         return ApiResponse(success=True, data=cached)
 
     try:

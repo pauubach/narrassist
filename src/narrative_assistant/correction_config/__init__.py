@@ -14,6 +14,7 @@ from .models import (
     DialogConfig,
     InheritanceSource,
     ParameterValue,
+    RegionalConfig,
     RepetitionConfig,
     SentenceConfig,
     StyleConfig,
@@ -33,6 +34,7 @@ __all__ = [
     "RepetitionConfig",
     "SentenceConfig",
     "StyleConfig",
+    "RegionalConfig",
     "InheritanceSource",
     "ParameterValue",
     # Registry

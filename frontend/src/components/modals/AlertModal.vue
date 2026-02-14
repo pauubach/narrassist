@@ -5,6 +5,7 @@ import Button from 'primevue/button'
 import Badge from 'primevue/badge'
 import type { Alert, Entity, Chapter } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
+import { useWorkspaceStore } from '@/stores/workspace'
 
 /**
  * AlertModal - Modal de detalle completo de una alerta
@@ -42,7 +43,18 @@ const emit = defineEmits<{
   (e: 'dismiss'): void
 }>()
 
+const workspaceStore = useWorkspaceStore()
 const { getSeverityColor, getSeverityLabel, getCategoryConfig } = useAlertUtils()
+
+const goToLocation = () => {
+  if (!props.alert || props.alert.spanStart === undefined) return
+  workspaceStore.navigateToTextPosition(
+    props.alert.spanStart,
+    props.alert.excerpt || undefined,
+    props.relatedChapter?.id ?? null,
+  )
+  emit('update:visible', false)
+}
 
 // Computed
 const severityColor = computed(() => (props.alert ? getSeverityColor(props.alert.severity) : '#888'))
@@ -191,7 +203,7 @@ function formatDate(date: Date): string {
             v-if="hasPosition"
             type="button"
             class="context-card"
-            @click="emit('goToLocation')"
+            @click="goToLocation"
           >
             <i class="pi pi-map-marker"></i>
             <div class="context-info">
@@ -227,7 +239,7 @@ function formatDate(date: Date): string {
           label="Ir al texto"
           icon="pi pi-map-marker"
           text
-          @click="emit('goToLocation')"
+          @click="goToLocation"
         />
         <div v-if="isActive" class="action-buttons">
           <Button
