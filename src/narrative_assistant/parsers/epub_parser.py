@@ -245,7 +245,7 @@ class EpubParser(DocumentParser):
 
     def _extract_metadata(self, book) -> dict:
         """Extrae metadatos del EPUB."""
-        metadata = {
+        metadata: dict[str, str | bool] = {
             "has_images": False,
         }
 

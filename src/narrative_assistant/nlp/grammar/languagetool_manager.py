@@ -255,7 +255,7 @@ class LanguageToolManager:
             }
 
             if platform.system() == "Windows":
-                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
 
             self._process = subprocess.Popen(cmd, **kwargs)  # type: ignore[call-overload]
 

@@ -350,7 +350,7 @@ class OllamaManager:
             response = httpx.get(
                 f"{self._config.host}/api/tags", timeout=self._config.network_timeout
             )
-            return response.status_code == 200
+            return bool(response.status_code == 200)
         except ImportError:
             # Fallback a urllib si httpx no esta disponible
             try:
@@ -418,7 +418,7 @@ class OllamaManager:
     def _subprocess_kwargs(self) -> dict:
         """Kwargs comunes para subprocess en Windows (ocultar ventana de consola)."""
         if self._platform == InstallationPlatform.WINDOWS:
-            return {"creationflags": subprocess.CREATE_NO_WINDOW}
+            return {"creationflags": subprocess.CREATE_NO_WINDOW}  # type: ignore[attr-defined]
         return {}
 
     @property
@@ -582,7 +582,7 @@ class OllamaManager:
                     [str(installer_path), "/S"],
                     capture_output=True,
                     timeout=300.0,  # 5 minutos
-                    creationflags=subprocess.CREATE_NO_WINDOW,
+                    creationflags=subprocess.CREATE_NO_WINDOW,  # type: ignore[attr-defined]
                 )
                 if result.returncode != 0:
                     # Fallback a instalacion interactiva
@@ -851,7 +851,7 @@ class OllamaManager:
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                         env=env,
-                        creationflags=subprocess.CREATE_NO_WINDOW,
+                        creationflags=subprocess.CREATE_NO_WINDOW,  # type: ignore[attr-defined]
                     )
                 else:
                     # Linux/macOS: iniciar en nueva sesion

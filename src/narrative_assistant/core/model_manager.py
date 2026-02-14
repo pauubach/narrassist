@@ -1599,7 +1599,7 @@ def get_model_size_from_huggingface(model_name: str, use_cache: bool = True) -> 
                 logger.debug(f"Tamaño de {model_name} desde HuggingFace: {total_size} bytes ({total_size / (1024*1024):.1f} MB)")
                 _model_sizes_cache[model_name] = total_size
                 _model_sizes_cache_time = time.time()
-                return total_size
+                return int(total_size)
     except Exception as e:
         logger.debug(f"No se pudo obtener tamaño de {model_name}: {e}")
         # Cachear el fallo para evitar bucle de reintentos

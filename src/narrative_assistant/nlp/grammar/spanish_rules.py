@@ -1686,7 +1686,7 @@ def _find_sentence(doc: Doc, char_pos: int) -> str:
     """Encontrar la oración que contiene una posición de carácter."""
     for sent in doc.sents:
         if sent.start_char <= char_pos < sent.end_char:
-            return sent.text
+            return str(sent.text)
     return ""
 
 
