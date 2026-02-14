@@ -22,7 +22,7 @@
 |----------|---------|
 | **Atributos contradictorios** | "María tiene ojos azules" (cap. 2) vs "sus ojos verdes" (cap. 8) |
 | **Errores temporales** | "Ayer martes" cuando el capítulo anterior era lunes |
-| **Anachronismos** | Teléfono móvil en una novela ambientada en 1950 |
+| **Anacronismos** | Teléfono móvil en una novela ambientada en 1950 |
 | **Conocimiento imposible** | Personaje sabe algo que no debería saber |
 | **Cambios de POV** | Narrador en primera persona que de repente sabe pensamientos ajenos |
 | **Comportamiento fuera de personaje** | Personaje tímido que de repente habla en público sin justificación |
@@ -45,15 +45,15 @@
 - **Grafo de relaciones**: Visualización interactiva de conexiones entre personajes (vis-network)
 - **Perfil de voz**: Cómo habla cada personaje (formalidad, muletillas, longitud)
 - **Arco emocional**: Evolución emocional a lo largo del manuscrito
-- **Línea temporal visual**: Timeline horizontal con eventos y relaciones causales (vis-timeline)
+- **Línea temporal visual**: Línea temporal horizontal con eventos y relaciones causales (vis-timeline)
 
 ### Sistema de Revisión Inteligente
 
 - **Comparación entre versiones**: Detecta qué cambió entre revisiones del manuscrito
 - **Resolución automática de alertas**: Identifica alertas que el autor ya corrigió
 - **Track changes (.docx)**: Aprovecha marcas de revisión de Word para vincular correcciones
-- **Historial de versiones**: Métricas de progreso con sparklines de tendencia
-- **Pesos adaptativos**: El sistema aprende de tu feedback (dismiss/resolve) y ajusta la sensibilidad por tipo de alerta, proyecto y entidad
+- **Historial de versiones**: Métricas de progreso con minigráficos de tendencia
+- **Pesos adaptativos**: El sistema aprende de tus valoraciones (descartar/resolver) y ajusta la sensibilidad por tipo de alerta, proyecto y entidad
 
 ---
 
@@ -79,9 +79,9 @@ Cada alerta incluye:
 - Modo foco: filtra alertas por capítulo o rango de capítulos
 
 ### 4. Itera
-- Re-analiza después de corregir y compara versiones
+- Reanaliza después de corregir y compara versiones
 - Las alertas corregidas se resuelven automáticamente
-- El sistema aprende de tus decisiones (dismiss = falso positivo, resolve = útil)
+- El sistema aprende de tus decisiones (descartar = falso positivo, resolver = útil)
 
 ---
 
