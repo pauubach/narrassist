@@ -968,7 +968,7 @@ class License:
                 if "comp_expires_at" in row and row["comp_expires_at"]
                 else None
             ),
-            comp_notes=row.get("comp_notes", ""),
+            comp_notes=row["comp_notes"] if "comp_notes" in row and row["comp_notes"] else "",
             extra_data=json.loads(row["extra_data"]) if row["extra_data"] else {},
         )
 
