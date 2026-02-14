@@ -248,7 +248,7 @@ class TestLicenseStatusEndpoint:
     def test_status_includes_founding_member_true(self):
         """Si la licencia está marcada como founder, el endpoint lo refleja."""
         lic = _make_license()
-        lic.extra_data = {"founding_member": True}
+        lic.is_founding_member = True
         verification = _make_verification(lic, quota_remaining=1200)
 
         verifier = MagicMock()

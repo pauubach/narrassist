@@ -37,18 +37,19 @@ MAX_WORDS_PER_MANUSCRIPT_CORRECTOR = 60_000
 EDITORIAL_BASE_SEATS = 3
 EDITORIAL_EXTRA_SEAT_PRICE_EUR = 49
 
-# Founding member program
-FOUNDING_PRICES_EUR = {
-    "corrector": 19,
-    "profesional": 34,
-    "editorial": 119,
+# Founding member program — descuentos fijos en €/mes
+FOUNDING_DISCOUNT_EUR: dict[str, float] = {
+    "corrector": 5.0,    # €24 - €5 = €19
+    "profesional": 15.0,  # €49 - €15 = €34
+    "editorial": 40.0,    # €159 - €40 = €119
 }
-FOUNDING_SPOTS = {
+FOUNDING_SPOTS: dict[str, int] = {
     "corrector": 10,
     "profesional": 15,
     "editorial": 5,
 }
-FOUNDING_UPGRADE_DISCOUNT_PCT = 20  # % descuento al subir de tier
+# Grace period en dias para recuperar descuento founding tras downgrade
+FOUNDING_DOWNGRADE_GRACE_DAYS = 90
 
 
 # =============================================================================
@@ -91,6 +92,15 @@ class LicenseTier(Enum):
             LicenseTier.EDITORIAL: "Editorial",
         }
         return names[self]
+
+    @property
+    def rank(self) -> int:
+        """Orden numerico para comparar tiers (mayor = tier superior)."""
+        return {
+            LicenseTier.CORRECTOR: 0,
+            LicenseTier.PROFESIONAL: 1,
+            LicenseTier.EDITORIAL: 2,
+        }[self]
 
 
 class LicenseFeature(Enum):
@@ -153,6 +163,17 @@ TIER_FEATURES: dict[LicenseTier, frozenset[LicenseFeature]] = {
     LicenseTier.PROFESIONAL: _PROFESIONAL_FEATURES,
     LicenseTier.EDITORIAL: _ALL_FEATURES,
 }
+
+
+class CompLicenseType(Enum):
+    """Tipos de licencias comp/regalo."""
+
+    BETA = "beta"          # Beta testers (6-12 meses, 100%)
+    PRESS = "press"        # Prensa/influencers (12 meses, 100%)
+    FRIEND = "friend"      # Friends & family (indefinido, 50-100%)
+    CONTEST = "contest"    # Ganadores de concursos (6-12 meses, 100%)
+    PARTNER = "partner"    # Editoriales, universidades (negociado, 30-50%)
+    GOODWILL = "goodwill"  # Compensacion por bugs/caidas (1-6 meses, 100%)
 
 
 class LicenseStatus(Enum):
@@ -630,6 +651,15 @@ class License:
         expires_at: Fecha de expiracion
         last_verified_at: Ultima verificacion online
         grace_period_ends_at: Fin del periodo de gracia offline
+        is_founding_member: True si es founding member
+        founding_tier: Tier original al unirse como founder
+        founding_discount_eur: Descuento fijo en EUR/mes (€5, €15, €40)
+        downgrade_grace_until: Si no es None, puede recuperar descuento founding hasta esta fecha
+        is_comp: True si es licencia regalo/comp
+        comp_type: Tipo de comp (beta, press, friend, contest, partner, goodwill)
+        comp_discount_pct: Porcentaje de descuento comp (0-100)
+        comp_expires_at: Fecha de expiracion de la comp
+        comp_notes: Notas internas del admin
         subscription: Datos de suscripcion
         devices: Lista de dispositivos vinculados
         extra_data: Datos adicionales (JSON)
@@ -646,6 +676,18 @@ class License:
     expires_at: datetime | None = None
     last_verified_at: datetime | None = None
     grace_period_ends_at: datetime | None = None
+    # Founding member
+    is_founding_member: bool = False
+    founding_tier: LicenseTier | None = None
+    founding_discount_eur: float = 0.0
+    downgrade_grace_until: datetime | None = None
+    # Comp/regalo
+    is_comp: bool = False
+    comp_type: CompLicenseType | None = None
+    comp_discount_pct: float = 0.0
+    comp_expires_at: datetime | None = None
+    comp_notes: str = ""
+    # Relaciones
     subscription: Subscription | None = None
     devices: list[Device] = field(default_factory=list)
     extra_data: dict = field(default_factory=dict)
@@ -687,6 +729,48 @@ class License:
     def active_device_count(self) -> int:
         """Numero de dispositivos activos."""
         return len(self.active_devices)
+
+    @property
+    def founding_discount_active(self) -> bool:
+        """True si el descuento founding esta activo (no suspendido por downgrade)."""
+        if not self.is_founding_member or self.founding_discount_eur <= 0:
+            return False
+        if self.founding_tier is None:
+            return False
+        # Descuento activo si tier actual >= tier original del founding
+        if self.tier.rank < self.founding_tier.rank:
+            return False
+        # Suspendido si estamos en grace period de downgrade
+        if self.downgrade_grace_until is not None:
+            return False
+        return True
+
+    @property
+    def comp_active(self) -> bool:
+        """True si la licencia comp esta activa (no expirada)."""
+        if not self.is_comp:
+            return False
+        if self.comp_expires_at is None:
+            return True  # Sin expiracion = indefinida
+        return datetime.utcnow() < self.comp_expires_at
+
+    def calculate_effective_discount(self, base_price: float) -> float:
+        """Calcula el descuento efectivo total en EUR/mes.
+
+        Args:
+            base_price: Precio base del tier actual en EUR/mes.
+
+        Returns:
+            Descuento total en EUR (nunca mayor que base_price).
+        """
+        discount = 0.0
+        # Founding discount (fijo en EUR)
+        if self.founding_discount_active:
+            discount += self.founding_discount_eur
+        # Comp discount (porcentaje sobre precio base)
+        if self.comp_active and self.comp_discount_pct > 0:
+            discount += base_price * (self.comp_discount_pct / 100.0)
+        return min(discount, base_price)  # Floor: no puede ser > precio base
 
     def has_feature(self, feature: LicenseFeature) -> bool:
         """Verifica si una feature esta disponible en el tier actual."""
@@ -738,6 +822,21 @@ class License:
                 if self.grace_period_ends_at
                 else None
             ),
+            "is_founding_member": self.is_founding_member,
+            "founding_tier": self.founding_tier.value if self.founding_tier else None,
+            "founding_discount_eur": self.founding_discount_eur,
+            "downgrade_grace_until": (
+                self.downgrade_grace_until.isoformat()
+                if self.downgrade_grace_until
+                else None
+            ),
+            "is_comp": self.is_comp,
+            "comp_type": self.comp_type.value if self.comp_type else None,
+            "comp_discount_pct": self.comp_discount_pct,
+            "comp_expires_at": (
+                self.comp_expires_at.isoformat() if self.comp_expires_at else None
+            ),
+            "comp_notes": self.comp_notes,
             "subscription": self.subscription.to_dict() if self.subscription else None,
             "devices": [d.to_dict() for d in self.devices],
             "extra_data": self.extra_data,
@@ -778,6 +877,31 @@ class License:
                 if data.get("grace_period_ends_at")
                 else None
             ),
+            is_founding_member=data.get("is_founding_member", False),
+            founding_tier=(
+                LicenseTier(data["founding_tier"])
+                if data.get("founding_tier")
+                else None
+            ),
+            founding_discount_eur=data.get("founding_discount_eur", 0.0),
+            downgrade_grace_until=(
+                datetime.fromisoformat(data["downgrade_grace_until"])
+                if data.get("downgrade_grace_until")
+                else None
+            ),
+            is_comp=data.get("is_comp", False),
+            comp_type=(
+                CompLicenseType(data["comp_type"])
+                if data.get("comp_type")
+                else None
+            ),
+            comp_discount_pct=data.get("comp_discount_pct", 0.0),
+            comp_expires_at=(
+                datetime.fromisoformat(data["comp_expires_at"])
+                if data.get("comp_expires_at")
+                else None
+            ),
+            comp_notes=data.get("comp_notes", ""),
             extra_data=data.get("extra_data", {}),
         )
 
@@ -820,6 +944,31 @@ class License:
                 if row["grace_period_ends_at"]
                 else None
             ),
+            is_founding_member=bool(row["is_founding_member"]) if "is_founding_member" in row.keys() else False,
+            founding_tier=(
+                LicenseTier(row["founding_tier"])
+                if "founding_tier" in row.keys() and row["founding_tier"]
+                else None
+            ),
+            founding_discount_eur=float(row["founding_discount_eur"]) if "founding_discount_eur" in row.keys() else 0.0,
+            downgrade_grace_until=(
+                datetime.fromisoformat(row["downgrade_grace_until"])
+                if "downgrade_grace_until" in row.keys() and row["downgrade_grace_until"]
+                else None
+            ),
+            is_comp=bool(row["is_comp"]) if "is_comp" in row.keys() else False,
+            comp_type=(
+                CompLicenseType(row["comp_type"])
+                if "comp_type" in row.keys() and row["comp_type"]
+                else None
+            ),
+            comp_discount_pct=float(row["comp_discount_pct"]) if "comp_discount_pct" in row.keys() else 0.0,
+            comp_expires_at=(
+                datetime.fromisoformat(row["comp_expires_at"])
+                if "comp_expires_at" in row.keys() and row["comp_expires_at"]
+                else None
+            ),
+            comp_notes=row["comp_notes"] if "comp_notes" in row.keys() else "",
             extra_data=json.loads(row["extra_data"]) if row["extra_data"] else {},
         )
 
@@ -843,6 +992,18 @@ CREATE TABLE IF NOT EXISTS licenses (
     expires_at TEXT,
     last_verified_at TEXT,
     grace_period_ends_at TEXT,
+    -- Founding member
+    is_founding_member INTEGER DEFAULT 0,
+    founding_tier TEXT,
+    founding_discount_eur REAL DEFAULT 0.0,
+    downgrade_grace_until TEXT,
+    -- Comp/regalo
+    is_comp INTEGER DEFAULT 0,
+    comp_type TEXT,
+    comp_discount_pct REAL DEFAULT 0.0,
+    comp_expires_at TEXT,
+    comp_notes TEXT DEFAULT '',
+    -- Extra
     extra_data TEXT DEFAULT '{}'
 );
 
@@ -935,6 +1096,36 @@ CREATE TABLE IF NOT EXISTS device_swaps (
 );
 
 CREATE INDEX IF NOT EXISTS idx_device_swaps_license_period ON device_swaps(license_id, billing_period);
+
+-- Auditoria de cambios de descuento (founding/comp)
+CREATE TABLE IF NOT EXISTS discount_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    license_id INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    old_tier TEXT,
+    new_tier TEXT,
+    discount_before REAL DEFAULT 0.0,
+    discount_after REAL DEFAULT 0.0,
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (license_id) REFERENCES licenses(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_discount_events_license ON discount_events(license_id);
+"""
+
+# SQL para migrar BD existentes (añadir columnas nuevas)
+LICENSING_MIGRATION_V2_SQL = """
+-- Migración v2: Founding member fields + Comp license fields
+ALTER TABLE licenses ADD COLUMN is_founding_member INTEGER DEFAULT 0;
+ALTER TABLE licenses ADD COLUMN founding_tier TEXT;
+ALTER TABLE licenses ADD COLUMN founding_discount_eur REAL DEFAULT 0.0;
+ALTER TABLE licenses ADD COLUMN downgrade_grace_until TEXT;
+ALTER TABLE licenses ADD COLUMN is_comp INTEGER DEFAULT 0;
+ALTER TABLE licenses ADD COLUMN comp_type TEXT;
+ALTER TABLE licenses ADD COLUMN comp_discount_pct REAL DEFAULT 0.0;
+ALTER TABLE licenses ADD COLUMN comp_expires_at TEXT;
+ALTER TABLE licenses ADD COLUMN comp_notes TEXT DEFAULT '';
 """
 
 
@@ -942,8 +1133,25 @@ def initialize_licensing_schema(db) -> None:
     """
     Inicializa el schema de licencias en la base de datos.
 
+    Ejecuta CREATE TABLE IF NOT EXISTS para todas las tablas.
+    Si la BD ya existia, intenta añadir las columnas nuevas de v2.
+
     Args:
         db: Instancia de Database
     """
     with db.connection() as conn:
         conn.executescript(LICENSING_SCHEMA_SQL)
+        # Migrar BD existentes: añadir columnas nuevas si no existen
+        try:
+            cursor = conn.execute("PRAGMA table_info(licenses)")
+            existing_cols = {row[1] for row in cursor.fetchall()}
+            if "is_founding_member" not in existing_cols:
+                for line in LICENSING_MIGRATION_V2_SQL.strip().split("\n"):
+                    line = line.strip()
+                    if line and not line.startswith("--"):
+                        try:
+                            conn.execute(line)
+                        except Exception:
+                            pass  # Column already exists
+        except Exception:
+            pass  # PRAGMA failed (shouldn't happen)

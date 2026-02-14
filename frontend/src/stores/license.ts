@@ -35,6 +35,9 @@ export interface LicenseInfo {
   expires_at: string | null
   is_trial: boolean
   is_founding_member?: boolean
+  founding_discount_eur?: number
+  is_comp?: boolean
+  comp_type?: string | null
   offline_days_remaining: number | null
 }
 

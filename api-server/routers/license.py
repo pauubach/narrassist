@@ -98,7 +98,10 @@ async def get_license_status():
                     if license_obj.subscription
                     else False
                 ),
-                "is_founding_member": license_obj.extra_data.get("founding_member", False),
+                "is_founding_member": license_obj.is_founding_member,
+                "founding_discount_eur": license_obj.founding_discount_eur,
+                "is_comp": license_obj.is_comp,
+                "comp_type": license_obj.comp_type.value if license_obj.comp_type else None,
                 "offline_days_remaining": (
                     license_obj.grace_period_remaining.days
                     if license_obj.grace_period_remaining

@@ -91,18 +91,31 @@ const isFoundingMember = computed(() => {
   return licenseStore.licenseInfo?.is_founding_member === true
 })
 
+const foundingDiscount = computed(() => {
+  return licenseStore.licenseInfo?.founding_discount_eur ?? 0
+})
+
+// Precios base por tier
+const BASE_PRICES: Record<string, number> = { corrector: 24, profesional: 49, editorial: 159 }
+
 const plans = computed(() => {
-  if (isFoundingMember.value) {
-    return [
-      { key: 'corrector' as const, name: 'Corrector', price: '19 \u20AC/mes', priceNote: '(fundador)' },
-      { key: 'profesional' as const, name: 'Profesional', price: '34 \u20AC/mes', priceNote: '(fundador)' },
-      { key: 'editorial' as const, name: 'Editorial', price: '119 \u20AC/mes', priceNote: '(fundador)' },
-    ]
-  }
+  const discount = isFoundingMember.value ? foundingDiscount.value : 0
   return [
-    { key: 'corrector' as const, name: 'Corrector', price: '24 \u20AC/mes', priceNote: '' },
-    { key: 'profesional' as const, name: 'Profesional', price: '49 \u20AC/mes', priceNote: '' },
-    { key: 'editorial' as const, name: 'Editorial', price: '159 \u20AC/mes', priceNote: '' },
+    {
+      key: 'corrector' as const, name: 'Corrector',
+      price: `${BASE_PRICES.corrector - discount} \u20AC/mes`,
+      priceNote: discount > 0 ? `(-${discount}\u20AC fundador)` : '',
+    },
+    {
+      key: 'profesional' as const, name: 'Profesional',
+      price: `${BASE_PRICES.profesional - discount} \u20AC/mes`,
+      priceNote: discount > 0 ? `(-${discount}\u20AC fundador)` : '',
+    },
+    {
+      key: 'editorial' as const, name: 'Editorial',
+      price: `${BASE_PRICES.editorial - discount} \u20AC/mes`,
+      priceNote: discount > 0 ? `(-${discount}\u20AC fundador)` : '',
+    },
   ]
 })
 
