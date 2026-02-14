@@ -12,7 +12,7 @@
       aria-label="Contenido principal"
     >
       <Toast position="top-right" aria-live="polite" />
-      <div v-if="isBackendDown" class="backend-down-banner" role="alert">
+      <div v-if="showBackendDownBanner" class="backend-down-banner" role="alert">
         <i class="pi pi-exclamation-triangle"></i>
         <div class="backend-down-banner__text">
           <span class="backend-down-banner__title">Sin conexión con el servidor</span>
@@ -84,6 +84,12 @@ const themeStore = useThemeStore()
 const workspaceStore = useWorkspaceStore()
 const isBackendDown = backendDown
 const numRecoveryAttempts = recoveryAttempts
+const showBackendDownBanner = computed(() => {
+  // Evitar falsa alarma en arranque: mientras el backend inicializa,
+  // no mostrar "Sin conexión" aunque haya fallos transitorios.
+  if (systemStore.backendStarting && !systemStore.backendReady) return false
+  return isBackendDown.value
+})
 
 // ── Global error boundary ───────────────────────────────────
 onErrorCaptured((err, instance, info) => {

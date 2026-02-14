@@ -33,8 +33,11 @@
         <div class="status-grid">
           <div class="status-item">
             <span class="status-label">Backend Python:</span>
-            <span class="status-value" :class="{ 'status-ok': backendStatus, 'status-error': !backendStatus }">
-              {{ backendStatus ? 'Conectado' : 'Desconectado' }}
+            <span
+              class="status-value"
+              :class="{ 'status-ok': backendStatus || systemStore.backendStarting, 'status-error': showBackendDisconnected }"
+            >
+              {{ systemStore.backendStarting ? 'Iniciando...' : (backendStatus ? 'Conectado' : 'Desconectado') }}
             </span>
           </div>
           <div class="status-item">
@@ -48,7 +51,7 @@
         </div>
 
         <!-- Error message and retry when backend disconnected -->
-        <div v-if="!backendStatus" class="backend-error-container">
+        <div v-if="showBackendDisconnected" class="backend-error-container">
           <p class="backend-error-message">
             <i class="pi pi-exclamation-triangle"></i>
             {{ backendError || 'No se puede conectar con el servidor. Reintentando...' }}
@@ -76,13 +79,16 @@
 import { onMounted, computed, ref, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { useSystemStore } from '@/stores/system'
 import Button from 'primevue/button'
 
 const router = useRouter()
 const appStore = useAppStore()
+const systemStore = useSystemStore()
 
 const backendStatus = computed(() => appStore.backendConnected)
 const backendError = computed(() => appStore.backendError)
+const showBackendDisconnected = computed(() => !systemStore.backendStarting && !backendStatus.value)
 const isRetrying = ref(false)
 
 const retryConnection = async () => {

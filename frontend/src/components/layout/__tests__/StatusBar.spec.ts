@@ -214,6 +214,20 @@ describe('StatusBar: stepLabels', () => {
 
 describe('StatusBar: analysisStatus logic', () => {
   // Pure function version of the computed
+  function formatAnalysisErrorText(rawError: string): string {
+    const errorText = rawError.trim()
+    const lower = errorText.toLowerCase()
+    if (
+      lower.startsWith('error en análisis')
+      || lower.startsWith('error en el análisis')
+      || lower.startsWith('error en analisis')
+      || lower.startsWith('error en el analisis')
+    ) {
+      return errorText
+    }
+    return `Error en análisis: ${errorText}`
+  }
+
   function getAnalysisStatus(opts: {
     isAnalyzing: boolean
     status?: string
@@ -230,7 +244,7 @@ describe('StatusBar: analysisStatus logic', () => {
       return { icon: 'pi-clock', text: 'En cola — esperando análisis anterior', class: 'status-queued' }
     }
     if (opts.error || opts.analysisError) {
-      const detail = opts.error ? `Error en análisis: ${opts.error}` : 'Error en análisis'
+      const detail = opts.error ? formatAnalysisErrorText(opts.error) : 'Error en análisis'
       return { icon: 'pi-times-circle', text: detail, class: 'status-error' }
     }
     if (opts.hasAnalysis) {
@@ -259,6 +273,24 @@ describe('StatusBar: analysisStatus logic', () => {
     const result = getAnalysisStatus({ isAnalyzing: false, error: 'OOM error' })
     expect(result?.class).toBe('status-error')
     expect(result?.text).toContain('OOM error')
+  })
+
+  it('should not duplicate prefixed backend errors', () => {
+    const result = getAnalysisStatus({
+      isAnalyzing: false,
+      error: "Error en el análisis: No module named 'x'",
+    })
+    expect(result?.class).toBe('status-error')
+    expect(result?.text).toBe("Error en el análisis: No module named 'x'")
+  })
+
+  it('should not duplicate unaccented prefixed backend errors', () => {
+    const result = getAnalysisStatus({
+      isAnalyzing: false,
+      error: "Error en analisis: No module named 'x'",
+    })
+    expect(result?.class).toBe('status-error')
+    expect(result?.text).toBe("Error en analisis: No module named 'x'")
   })
 
   it('should show generic error from prop', () => {

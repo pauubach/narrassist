@@ -699,7 +699,7 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
     persist_chapters_to_db(chapters_data, project_id, db_session)
 
     # Cargar capítulos con IDs de BD
-    from narrative_assistant.persistence.chapter_repository import ChapterRepository
+    from narrative_assistant.persistence.chapter import ChapterRepository
 
     chapter_repo = ChapterRepository(db_session)
     chapters_with_ids = chapter_repo.get_by_project(project_id)

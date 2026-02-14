@@ -192,6 +192,21 @@ const currentStepLabel = computed(() => {
   return stepLabels[currentStep.value] || currentStep.value || 'Procesando...'
 })
 
+function formatAnalysisErrorText(rawError: string): string {
+  const errorText = rawError.trim()
+  const lower = errorText.toLowerCase()
+  // Evita duplicar prefijos cuando el backend ya envía un mensaje contextualizado.
+  if (
+    lower.startsWith('error en análisis')
+    || lower.startsWith('error en el análisis')
+    || lower.startsWith('error en analisis')
+    || lower.startsWith('error en el analisis')
+  ) {
+    return errorText
+  }
+  return `Error en análisis: ${errorText}`
+}
+
 // Estado del análisis cuando no está analizando
 const analysisStatus = computed(() => {
   if (isAnalyzing.value) return null
@@ -208,7 +223,7 @@ const analysisStatus = computed(() => {
   // Si hay error (del store o del prop)
   if (analysisStore.error || props.analysisError) {
     const detail = analysisStore.error
-      ? `Error en análisis: ${analysisStore.error}`
+      ? formatAnalysisErrorText(analysisStore.error)
       : 'Error en análisis'
     return { icon: 'pi-times-circle', text: detail, class: 'status-error' }
   }
