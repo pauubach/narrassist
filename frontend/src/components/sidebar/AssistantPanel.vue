@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, nextTick, watch } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 import { useChat } from '@/composables/useChat'
+import { useAnalysisStore } from '@/stores/analysis'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 
@@ -8,6 +9,8 @@ import InputText from 'primevue/inputtext'
  * AssistantPanel - Chat con LLM para el sidebar.
  *
  * Permite hacer preguntas sobre el documento usando Ollama.
+ * Si hay un análisis en curso, el backend prioriza el chat
+ * entre iteraciones LLM (LLMScheduler), así que no se bloquea.
  */
 
 const props = defineProps<{
@@ -16,6 +19,8 @@ const props = defineProps<{
 }>()
 
 const { messages, isLoading, error, sendMessage, clearHistory } = useChat(props.projectId)
+const analysisStore = useAnalysisStore()
+const isProjectAnalyzing = computed(() => analysisStore.isProjectAnalyzing(props.projectId))
 
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
@@ -100,7 +105,7 @@ function handleKeydown(e: KeyboardEvent) {
           <span></span>
           <span></span>
         </span>
-        <span class="loading-text">Pensando...</span>
+        <span class="loading-text">{{ isProjectAnalyzing ? 'Esperando turno del análisis...' : 'Pensando...' }}</span>
       </div>
     </div>
 
@@ -122,8 +127,8 @@ function handleKeydown(e: KeyboardEvent) {
       />
     </div>
 
-    <!-- Global error banner -->
-    <div v-if="error && messages.length > 0" class="error-banner">
+    <!-- Global error banner — only show if no error message bubble is visible -->
+    <div v-if="error && messages.length > 0 && messages[messages.length - 1]?.status !== 'error'" class="error-banner">
       <i class="pi pi-exclamation-triangle"></i>
       <span>{{ error }}</span>
     </div>
@@ -232,10 +237,17 @@ function handleKeydown(e: KeyboardEvent) {
 
 .message-error-content {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--ds-space-2);
   color: var(--ds-color-danger);
   font-size: var(--ds-font-size-xs);
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.message-error-content i {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .message-loading {
@@ -302,12 +314,15 @@ function handleKeydown(e: KeyboardEvent) {
 
 .error-banner {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--ds-space-2);
   padding: var(--ds-space-2) var(--ds-space-3);
   background: var(--ds-color-danger-subtle);
   border-top: 1px solid var(--ds-color-danger);
   color: var(--ds-color-danger);
   font-size: var(--ds-font-size-xs);
+  overflow-wrap: break-word;
+  word-break: break-word;
+  flex-shrink: 0;
 }
 </style>

@@ -1597,6 +1597,13 @@ class CoreferenceVotingResolver(
         resolved_pairs: list[tuple[Mention, Mention, float]] = []
 
         for anaphor in anaphors:
+            # Ceder turno al chat interactivo si hay uno esperando
+            try:
+                from narrative_assistant.llm.client import get_llm_scheduler
+                get_llm_scheduler().yield_to_chat()
+            except Exception:
+                pass
+
             # Si es pronombre de primera persona y hay narrador, saltar
             if anaphor.start_char in first_person_already_resolved:
                 continue

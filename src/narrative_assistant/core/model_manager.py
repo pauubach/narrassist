@@ -994,16 +994,40 @@ class ModelManager:
 
                 target_dir.mkdir(parents=True, exist_ok=True)
 
-                self._snapshot_download_with_retry(
-                    repo_id,
-                    local_dir=str(target_dir),
-                    tqdm_class=tracker_class,
-                    ignore_patterns=["*.onnx", "*.h5", "tf_*", "openvino/*", "onnx/*", "rust_model.ot"],
-                    revision=hf_revision,
-                )
+                # Intentar con revisión pinneada; si falla, reintentar con latest
+                actual_revision = hf_revision
+                try:
+                    self._snapshot_download_with_retry(
+                        repo_id,
+                        local_dir=str(target_dir),
+                        tqdm_class=tracker_class,
+                        ignore_patterns=["*.onnx", "*.h5", "tf_*", "openvino/*", "onnx/*", "rust_model.ot"],
+                        revision=hf_revision,
+                    )
+                except Exception as rev_err:
+                    if hf_revision:
+                        logger.warning(
+                            f"Revisión pinneada {hf_revision[:12]} de '{repo_id}' "
+                            f"no disponible: {rev_err}. Reintentando con última versión..."
+                        )
+                        # Limpiar descarga parcial y reintentar sin revision
+                        import shutil
+                        if target_dir.exists():
+                            shutil.rmtree(target_dir, ignore_errors=True)
+                        target_dir.mkdir(parents=True, exist_ok=True)
+                        actual_revision = None
+                        self._snapshot_download_with_retry(
+                            repo_id,
+                            local_dir=str(target_dir),
+                            tqdm_class=tracker_class,
+                            ignore_patterns=["*.onnx", "*.h5", "tf_*", "openvino/*", "onnx/*", "rust_model.ot"],
+                            revision=None,
+                        )
+                    else:
+                        raise
 
                 # Escribir marcador de versión para trazabilidad
-                self._write_version_marker(target_dir, model_info, actual_version=hf_revision)
+                self._write_version_marker(target_dir, model_info, actual_version=actual_revision)
 
                 _update_download_progress(
                     model_info.model_type,
@@ -1102,16 +1126,37 @@ class ModelManager:
 
                     attempt_dir.mkdir(parents=True, exist_ok=True)
 
-                    self._snapshot_download_with_retry(
-                        repo_id,
-                        local_dir=str(attempt_dir),
-                        tqdm_class=tracker_class,
-                        ignore_patterns=["*.onnx", "*.h5", "tf_*", "flax_*", "openvino/*", "onnx/*"],
-                        revision=hf_revision,
-                    )
+                    # Intentar con revisión pinneada; si falla, reintentar con latest
+                    actual_revision = hf_revision
+                    try:
+                        self._snapshot_download_with_retry(
+                            repo_id,
+                            local_dir=str(attempt_dir),
+                            tqdm_class=tracker_class,
+                            ignore_patterns=["*.onnx", "*.h5", "tf_*", "flax_*", "openvino/*", "onnx/*"],
+                            revision=hf_revision,
+                        )
+                    except Exception as rev_err:
+                        if hf_revision:
+                            logger.warning(
+                                f"Revisión pinneada {hf_revision[:12]} de '{repo_id}' "
+                                f"no disponible: {rev_err}. Reintentando con última versión..."
+                            )
+                            self._cleanup_model_dir(attempt_dir)
+                            attempt_dir.mkdir(parents=True, exist_ok=True)
+                            actual_revision = None
+                            self._snapshot_download_with_retry(
+                                repo_id,
+                                local_dir=str(attempt_dir),
+                                tqdm_class=tracker_class,
+                                ignore_patterns=["*.onnx", "*.h5", "tf_*", "flax_*", "openvino/*", "onnx/*"],
+                                revision=None,
+                            )
+                        else:
+                            raise
 
                     # Escribir marcador de versión para trazabilidad
-                    self._write_version_marker(attempt_dir, attempt_info, actual_version=hf_revision)
+                    self._write_version_marker(attempt_dir, attempt_info, actual_version=actual_revision)
 
                     _update_download_progress(
                         attempt_info.model_type,
@@ -1150,13 +1195,21 @@ class ModelManager:
                 error_str = str(e)
                 is_auth_error = "401" in error_str or "403" in error_str or "gated" in error_str.lower()
 
-                if is_auth_error and attempt_info.name != models_to_try[-1].name:
-                    logger.warning(
-                        f"Modelo '{attempt_info.name}' requiere autenticación (HTTP 401/403). "
-                        f"Intentando siguiente alternativa..."
-                    )
-                    # Limpiar directorio parcial del intento fallido + padres vacíos
-                    self._cleanup_model_dir(attempt_dir)
+                # Limpiar directorio parcial del intento fallido + padres vacíos
+                self._cleanup_model_dir(attempt_dir)
+
+                # Si hay más modelos en la lista, intentar el siguiente
+                if attempt_info.name != models_to_try[-1].name:
+                    if is_auth_error:
+                        logger.warning(
+                            f"Modelo '{attempt_info.name}' requiere autenticación (HTTP 401/403). "
+                            f"Intentando siguiente alternativa..."
+                        )
+                    else:
+                        logger.warning(
+                            f"Modelo '{attempt_info.name}' falló: {e}. "
+                            f"Intentando siguiente alternativa..."
+                        )
                     continue
                 else:
                     _update_download_progress(
@@ -1164,8 +1217,6 @@ class ModelManager:
                         phase="error",
                         error_message=str(e),
                     )
-                    # Limpiar directorio parcial + padres vacíos
-                    self._cleanup_model_dir(attempt_dir)
                     return Result.failure(
                         ModelDownloadError(
                             model_name=attempt_info.name,

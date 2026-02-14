@@ -498,23 +498,20 @@ async def chat_with_assistant(project_id: int, request: ChatRequest):
                 logger.warning("LLM not available - Ollama might not be running")
                 return ApiResponse(
                     success=False,
-                    error=(
-                        "Ollama no está disponible. Ejecuta 'ollama serve' o usa "
-                        + ("scripts\\start_ollama_cpu.bat" if sys.platform == "win32" else "OLLAMA_NUM_GPU=0 ollama serve")
-                    )
+                    error="El asistente necesita Ollama para funcionar. Inícialo desde Ajustes > LLM."
                 )
 
             llm_client = get_llm_client()
             if not llm_client:
                 return ApiResponse(
                     success=False,
-                    error="No se pudo conectar con Ollama. Verifica que esté corriendo."
+                    error="No se pudo conectar con Ollama. Reinícialo desde Ajustes > LLM."
                 )
 
             if not llm_client.is_available:
                 return ApiResponse(
                     success=False,
-                    error="Ollama está corriendo pero el modelo no está disponible. Ejecuta: ollama pull llama3.2"
+                    error="Ollama está activo pero falta el modelo. Descárgalo desde Ajustes > LLM."
                 )
         except ImportError as e:
             logger.error(f"LLM module import error: {e}")
@@ -595,14 +592,16 @@ en el contexto proporcionado, indícalo claramente.
 {context_text}
 {history_text}"""
 
-        # Llamar al LLM
+        # Llamar al LLM (con prioridad sobre análisis batch)
         try:
-            response = llm_client.complete(
-                prompt=request.message,
-                system=system_prompt,
-                max_tokens=1000,
-                temperature=0.7
-            )
+            from narrative_assistant.llm.client import get_llm_scheduler
+            with get_llm_scheduler().chat_priority():
+                response = llm_client.complete(
+                    prompt=request.message,
+                    system=system_prompt,
+                    max_tokens=1000,
+                    temperature=0.7
+                )
 
             if response and response.strip():
                 using_cpu = getattr(llm_client, '_ollama_num_gpu', None) == 0

@@ -23,12 +23,15 @@ from .client import (
     # Cliente
     LocalLLMClient,
     LocalLLMConfig,
+    # Scheduler — prioridad chat sobre análisis
+    LLMScheduler,
     download_ollama_model,
     ensure_llm_ready,
     # Alias deprecated
     get_claude_client,
     # Funciones - cliente
     get_llm_client,
+    get_llm_scheduler,
     get_ollama_status,
     install_ollama_if_needed,
     is_llm_available,
@@ -94,6 +97,9 @@ __all__ = [
     # Cliente LLM
     "LocalLLMClient",
     "LocalLLMConfig",
+    # Scheduler
+    "LLMScheduler",
+    "get_llm_scheduler",
     # Funciones - Client
     "get_llm_client",
     "is_llm_available",

@@ -19,6 +19,7 @@ import logging
 import os
 import threading
 from collections.abc import Callable
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Optional
@@ -30,6 +31,85 @@ _client_lock = threading.Lock()
 _client: Optional["LocalLLMClient"] = None
 
 LLMBackend = Literal["ollama", "transformers", "none"]
+
+
+# =============================================================================
+# LLM Scheduler — prioriza chat interactivo sobre análisis batch
+# =============================================================================
+
+class LLMScheduler:
+    """
+    Coordina acceso al LLM entre análisis (batch) y chat (interactivo).
+
+    Durante el análisis, el pipeline hace decenas de llamadas LLM en bucle
+    (correferencias, temporal, perfiles). Si el usuario manda un mensaje al
+    chat, el scheduler hace que el análisis ceda el turno al chat entre
+    iteraciones, para que la respuesta interactiva sea rápida.
+
+    Uso:
+        # En el chat endpoint:
+        with llm_scheduler.chat_priority():
+            response = llm_client.complete(prompt, system)
+
+        # En bucles de análisis (entre iteraciones LLM):
+        for anaphor in anaphors:
+            llm_scheduler.yield_to_chat()
+            result = resolver.resolve(anaphor, candidates, context)
+    """
+
+    def __init__(self) -> None:
+        self._chat_pending = threading.Event()
+        self._chat_done = threading.Event()
+        self._chat_done.set()  # Inicialmente no hay chat pendiente
+
+    def yield_to_chat(self) -> None:
+        """
+        Llamar entre iteraciones LLM del análisis.
+
+        Si hay un chat esperando, bloquea hasta que el chat termine.
+        Si no hay chat pendiente, retorna inmediatamente (coste ~0).
+        """
+        if self._chat_pending.is_set():
+            logger.debug("Análisis cede turno a chat interactivo")
+            self._chat_done.wait(timeout=120)
+
+    @contextmanager
+    def chat_priority(self):
+        """
+        Context manager para llamadas LLM del chat interactivo.
+
+        Señala al análisis que hay un chat esperando. El análisis cede
+        el turno en su próximo yield_to_chat(). Después del chat,
+        el análisis continúa automáticamente.
+        """
+        self._chat_done.clear()
+        self._chat_pending.set()
+        try:
+            yield
+        finally:
+            self._chat_pending.clear()
+            self._chat_done.set()
+
+    @property
+    def is_chat_pending(self) -> bool:
+        """True si hay un chat esperando turno."""
+        return self._chat_pending.is_set()
+
+
+# Singleton global
+_scheduler: LLMScheduler | None = None
+_scheduler_lock = threading.Lock()
+
+
+def get_llm_scheduler() -> LLMScheduler:
+    """Obtiene el singleton del scheduler LLM."""
+    global _scheduler
+    if _scheduler is None:
+        with _scheduler_lock:
+            if _scheduler is None:
+                _scheduler = LLMScheduler()
+    return _scheduler
+
 
 # Callback para solicitar instalación de Ollama
 _installation_prompt_callback: Callable[[], bool] | None = None

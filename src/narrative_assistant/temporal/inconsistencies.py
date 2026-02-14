@@ -1174,6 +1174,13 @@ class VotingTemporalChecker:
             timeline_summary = self._get_timeline_summary(timeline)
 
             for inc in high_priority:
+                # Ceder turno al chat interactivo si hay uno esperando
+                try:
+                    from narrative_assistant.llm.client import get_llm_scheduler
+                    get_llm_scheduler().yield_to_chat()
+                except Exception:
+                    pass
+
                 context = self._get_context_for_inconsistency(inc, text)
                 llm_score, llm_reason = self._base_checker._llm_validator.validate_inconsistency(
                     inc, context, timeline_summary

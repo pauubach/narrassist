@@ -586,6 +586,13 @@ async def download_models(request: DownloadModelsRequest):
                     # Clear stale progress from previous attempts
                     _clear_download_progress(mt)
 
+            # Registrar TODOS los modelos como "queued" ANTES de iniciar descargas.
+            # Sin esto, el frontend ve solo los modelos activos (max_workers=2),
+            # concluye que "todo terminó" cuando los 2 primeros acaban y deja
+            # de hacer polling antes de que el tercero empiece.
+            for _name, mt in models_to_download:
+                _update_download_progress(mt, phase="queued")
+
             # Descargas paralelas: spaCy (GitHub CDN) + HF model en paralelo
             # Máximo 2 workers para no saturar red ni RAM
             def _download_one(name_and_type):
