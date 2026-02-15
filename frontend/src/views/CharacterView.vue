@@ -576,6 +576,10 @@ const onUndoMerge = () => {
 }
 
 const onUndoMergeComplete = async () => {
+  // Notificar al HistoryPanel y resto de la app
+  window.dispatchEvent(new CustomEvent('history:undo-complete', {
+    detail: { projectId: projectId.value },
+  }))
   // Navegar de vuelta al proyecto ya que esta entidad ya no existe
   router.push({
     name: 'project',

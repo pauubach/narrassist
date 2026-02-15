@@ -480,6 +480,8 @@ class HistoryManager:
             # Dispatch por tipo de acción
             if action == "entity_merged":
                 self._undo_entity_merge(target_id, old_value)  # type: ignore[arg-type]
+            elif action == "entity_created":
+                self._undo_entity_create(target_id)
             elif action == "entity_deleted":
                 self._undo_entity_delete(target_id, old_value)  # type: ignore[arg-type]
             elif action == "entity_updated":
@@ -677,6 +679,17 @@ class HistoryManager:
             f"Fusión deshecha: restauradas {len(source_entity_ids)} entidades "
             f"desde entidad {result_entity_id}"
         )
+
+    def _undo_entity_create(self, entity_id: int | None) -> None:
+        """Revierte creación de entidad (soft-delete)."""
+        if not entity_id:
+            raise ValueError("No hay entity_id para deshacer creación")
+        with self.db.connection() as conn:
+            conn.execute(
+                "UPDATE entities SET is_active = 0, updated_at = datetime('now') WHERE id = ?",
+                (entity_id,),
+            )
+        logger.debug(f"Entidad {entity_id} desactivada (undo create)")
 
     def _undo_entity_delete(self, entity_id: int, old_value: dict) -> None:
         """Revierte eliminación de entidad (reactivar soft-delete)."""

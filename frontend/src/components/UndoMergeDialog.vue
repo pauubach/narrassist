@@ -164,6 +164,10 @@ const confirmUndo = async () => {
       emit('undo-complete', data.data.restored_entity_ids || [])
       emit('update:visible', false)
       toast.add({ severity: 'success', summary: 'Fusión deshecha', detail: 'Las entidades originales han sido restauradas', life: 3000 })
+      // Notificar al HistoryPanel y resto de la app
+      window.dispatchEvent(new CustomEvent('history:undo-complete', {
+        detail: { projectId: props.projectId, entryId: mergeHistory.value?.id },
+      }))
     } else {
       console.error('Error undoing merge:', data.error)
       toast.add({ severity: 'error', summary: 'Error', detail: `Error al deshacer fusión: ${data.error}`, life: 5000 })
