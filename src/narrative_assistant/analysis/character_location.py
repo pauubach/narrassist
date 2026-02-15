@@ -151,6 +151,7 @@ class CharacterLocationAnalyzer:
     PRESENCE_PATTERNS = [
         r"(?P<name>\w+)\s+(?:estaba|se\s+encontraba|permanecía)\s+en\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
         r"en\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})[,\s]+(?P<name>\w+)\s+(?:esperaba|miraba|observaba)",
+        r"en\s+(?P<loc>[A-ZÁÉÍÓÚÑ]\w+)[,]\s*(?P<name>[A-ZÁÉÍÓÚÑ]\w+)\s+(?:estaba|se\s+encontraba|permanecía)",
     ]
 
     # Patrones de transición
@@ -379,8 +380,8 @@ class CharacterLocationAnalyzer:
             excerpt = text[start:end].strip()
 
             return LocationEvent(
-                entity_id=char_data["id"],
-                entity_name=char_data["name"],
+                entity_id=char_data.get("id", 0),
+                entity_name=char_data.get("name") or char_data.get("canonical_name", ""),
                 location_id=loc_id,
                 location_name=loc,
                 chapter=chapter,

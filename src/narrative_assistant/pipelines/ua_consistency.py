@@ -409,14 +409,16 @@ class PipelineConsistencyMixin:
                     continue
 
                 chapter_dialogues = dialogues_by_chapter.get(chapter_num, [])
+                ch_start = self._get_val(ch, "start_char") or 0
 
                 # Convertir dicts a tuples (speaker, text, start, end)
+                # Posiciones relativas al capítulo (extract_declared_emotions es chapter-relative)
                 dialogues_tuples = [
                     (
                         d.get("resolved_speaker") or d.get("speaker_hint", ""),
                         d.get("text", ""),
-                        d.get("start_char", 0),
-                        d.get("end_char", 0),
+                        d.get("start_char", 0) - ch_start,
+                        d.get("end_char", 0) - ch_start,
                     )
                     for d in chapter_dialogues
                 ]
@@ -426,12 +428,6 @@ class PipelineConsistencyMixin:
                 for e in context.entities:
                     n = self._get_val(e, "canonical_name") or self._get_val(e, "name") or str(e)
                     entity_names.append(n)
-
-                logger.debug(
-                    f"Emotional coherence cap. {chapter_num}: "
-                    f"{len(dialogues_tuples)} dialogues, "
-                    f"{len(entity_names)} entities"
-                )
 
                 # El checker analiza el capítulo completo
                 # analyze_chapter() retorna list[EmotionalIncoherence] directamente
