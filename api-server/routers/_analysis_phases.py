@@ -2459,7 +2459,8 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
             logger.debug(f"Could not load project correction config: {cfg_err}")
 
         # Activar style_register según tipo de documento clasificado
-        doc_type = ctx.get("document_type", "unknown")
+        doc_type_raw = ctx.get("document_type", "unknown")
+        doc_type = doc_type_raw.value if hasattr(doc_type_raw, "value") else str(doc_type_raw)
         _STYLE_REGISTER_PROFILES = {
             "technical": ("strict", True),
             "academic": ("strict", True),
@@ -2468,6 +2469,9 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
             "memoir": ("moderate", True),
             "self_help": ("moderate", True),
             "biography": ("moderate", True),
+            "celebrity": ("moderate", True),
+            "practical": ("moderate", True),
+            "cookbook": ("moderate", True),
             "fiction": ("free", False),
             "drama": ("free", False),
             "children": ("free", False),

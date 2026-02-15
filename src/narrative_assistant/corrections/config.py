@@ -728,6 +728,18 @@ class CorrectionConfig:
                 "use_llm_validation": self.pov.use_llm_validation,
                 "base_confidence": self.pov.base_confidence,
             },
+            "style_register": {
+                "enabled": self.style_register.enabled,
+                "detect_first_person": self.style_register.detect_first_person,
+                "detect_opinion_verbs": self.style_register.detect_opinion_verbs,
+                "detect_vague_quantifiers": self.style_register.detect_vague_quantifiers,
+                "detect_hedging_gaps": self.style_register.detect_hedging_gaps,
+                "detect_emotional_language": self.style_register.detect_emotional_language,
+                "profile": self.style_register.profile,
+                "skip_dialogue": self.style_register.skip_dialogue,
+                "skip_quotes": self.style_register.skip_quotes,
+                "min_confidence": self.style_register.min_confidence,
+            },
             "max_issues_per_category": self.max_issues_per_category,
             "use_llm_review": self.use_llm_review,
             "llm_review_model": self.llm_review_model,
@@ -775,6 +787,21 @@ class CorrectionConfig:
             base_confidence=pov_data.get("base_confidence", 0.70),
         )
 
+        # Parse style_register config
+        sr_data = data.get("style_register", {})
+        style_register_config = StyleRegisterConfig(
+            enabled=sr_data.get("enabled", False),
+            detect_first_person=sr_data.get("detect_first_person", True),
+            detect_opinion_verbs=sr_data.get("detect_opinion_verbs", True),
+            detect_vague_quantifiers=sr_data.get("detect_vague_quantifiers", True),
+            detect_hedging_gaps=sr_data.get("detect_hedging_gaps", True),
+            detect_emotional_language=sr_data.get("detect_emotional_language", True),
+            profile=sr_data.get("profile", "moderate"),
+            skip_dialogue=sr_data.get("skip_dialogue", True),
+            skip_quotes=sr_data.get("skip_quotes", True),
+            min_confidence=sr_data.get("min_confidence", 0.7),
+        )
+
         return cls(
             profile=DocumentProfile.from_dict(data.get("profile", {})),
             typography=TypographyConfig(**data.get("typography", {})),
@@ -785,6 +812,7 @@ class CorrectionConfig:
             field_dictionary=field_dict_config,
             anacoluto=anacoluto_config,
             pov=pov_config,
+            style_register=style_register_config,
             max_issues_per_category=data.get("max_issues_per_category", 100),
             use_llm_review=data.get("use_llm_review", False),
             llm_review_model=data.get("llm_review_model", "llama3.2"),

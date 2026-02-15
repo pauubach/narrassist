@@ -176,6 +176,30 @@ class TestDialogueExemption:
         # With skip_dialogue=False, should find issues inside dialogue
         assert len(issues) > 0
 
+    def test_skip_quotes_disabled_flags_quoted_text(self):
+        detector = _make_detector("strict", skip_quotes=False)
+        text = "Pedro respondió: «Yo creo que varios estudios lo demuestran»."
+        issues = detector.detect(text)
+        types = _types(issues)
+        # With skip_quotes=False, should find issues inside quotes
+        assert "first_person_pronoun" in types
+
+    def test_skip_quotes_enabled_skips_quoted_text(self):
+        detector = _make_detector("strict", skip_quotes=True)
+        text = "Pedro respondió: «Yo creo que varios estudios lo demuestran»."
+        issues = detector.detect(text)
+        types = _types(issues)
+        assert "first_person_pronoun" not in types
+
+    def test_skip_dialogue_only_not_quotes(self):
+        """skip_dialogue=True, skip_quotes=False: masks dashes but not quotes."""
+        detector = _make_detector("strict", skip_dialogue=True, skip_quotes=False)
+        text = "—Hola —dijo Ana.\nPedro escribió: «Yo creo que es importante»."
+        issues = detector.detect(text)
+        types = _types(issues)
+        # Quotes not masked → "Yo" flagged
+        assert "first_person_pronoun" in types
+
 
 # ============================================================================
 # Disabled detector

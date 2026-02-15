@@ -215,13 +215,16 @@ VAGUE_SUGGESTION = "Especifique la cantidad o cite las fuentes concretas."
 # Regex de diálogo para exención
 # ============================================================================
 
-# Patrones de diálogo: raya española, comillas angulares, comillas rectas
-_DIALOGUE_RE = re.compile(
-    r"(?:"
-    r"—[^—\n]+(?:—[^—\n]*—[^—\n]+)*"  # Raya española: —texto— inciso —texto
-    r"|«[^»]*»"  # Comillas angulares
-    r'|"[^"]*"'  # Comillas rectas dobles
-    r")",
+# Patrón de diálogo: solo raya española
+_DIALOGUE_DASH_RE = re.compile(
+    r"—[^—\n]+(?:—[^—\n]*—[^—\n]+)*",  # Raya española: —texto— inciso —texto
+    re.UNICODE,
+)
+
+# Patrón de citas textuales: comillas angulares y rectas
+_QUOTES_RE = re.compile(
+    r"(?:«[^»]*»"  # Comillas angulares
+    r'|"[^"]*")',  # Comillas rectas dobles
     re.UNICODE,
 )
 
@@ -309,8 +312,8 @@ class StyleRegisterDetector(BaseDetector):
         if not self.config.enabled:
             return []
 
-        # Exención de diálogo: reemplazar con espacios (mantener posiciones)
-        clean_text = self._mask_dialogue(text) if self.config.skip_dialogue else text
+        # Exención de diálogo y citas: reemplazar con espacios (mantener posiciones)
+        clean_text = self._mask_exclusions(text)
 
         issues: list[CorrectionIssue] = []
 
@@ -343,12 +346,19 @@ class StyleRegisterDetector(BaseDetector):
         """Obtiene confianza del perfil para un issue type."""
         return self._profile_conf.get(issue_key, 0.7)
 
-    def _mask_dialogue(self, text: str) -> str:
-        """Reemplaza diálogo con espacios, manteniendo posiciones."""
+    def _mask_exclusions(self, text: str) -> str:
+        """Reemplaza diálogo y/o citas con espacios, manteniendo posiciones."""
+        if not self.config.skip_dialogue and not self.config.skip_quotes:
+            return text
         result = list(text)
-        for m in _DIALOGUE_RE.finditer(text):
-            for i in range(m.start(), m.end()):
-                result[i] = " "
+        if self.config.skip_dialogue:
+            for m in _DIALOGUE_DASH_RE.finditer(text):
+                for i in range(m.start(), m.end()):
+                    result[i] = " "
+        if self.config.skip_quotes:
+            for m in _QUOTES_RE.finditer(text):
+                for i in range(m.start(), m.end()):
+                    result[i] = " "
         return "".join(result)
 
     # ------------------------------------------------------------------
