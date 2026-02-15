@@ -82,6 +82,7 @@ const showResolveAllDialog = ref(false)
 
 // Estado de filtros
 const searchQuery = ref('')
+const searchInputRef = ref<InstanceType<typeof InputText> | null>(null)
 const selectedSeverities = ref<AlertSeverity[]>([])
 
 // Sincronizar con el filtro de severidad del store
@@ -306,6 +307,13 @@ function handleNavigateFromSequential(source?: AlertSource) {
     sequentialMode.exit()
   }
 }
+
+function focusSearch() {
+  const el = (searchInputRef.value as any)?.$el as HTMLElement | undefined
+  el?.focus()
+}
+
+defineExpose({ focusSearch })
 </script>
 
 <template>
@@ -315,6 +323,7 @@ function handleNavigateFromSequential(source?: AlertSource) {
       <div class="toolbar-row">
         <span class="p-input-icon-right search-wrapper">
           <InputText
+            ref="searchInputRef"
             v-model="searchQuery"
             placeholder="Buscar alertas..."
             class="search-input"

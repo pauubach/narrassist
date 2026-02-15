@@ -17,7 +17,7 @@ import UndoMergeDialog from '@/components/UndoMergeDialog.vue'
 import MergeHistoryPanel from '@/components/MergeHistoryPanel.vue'
 import RejectEntityDialog from '@/components/RejectEntityDialog.vue'
 import { CharacterProfileModal } from '@/components/modals'
-import type { Entity, MergeHistoryEntry, EntityAttribute } from '@/types'
+import type { Entity, EntityAttribute } from '@/types'
 import { transformEntityAttribute } from '@/types/transformers'
 import type { ApiEntityAttribute } from '@/types/api'
 import { useEntityUtils } from '@/composables/useEntityUtils'
@@ -73,6 +73,7 @@ const { setItemRef: setEntityRef, getTabindex: getEntityTabindex, onKeydown: onE
 
 // Estado de filtros
 const searchQuery = ref('')
+const searchInputRef = ref<InstanceType<typeof DsInput> | null>(null)
 const selectedType = ref<string | null>(null)
 const selectedImportance = ref<string | null>(null)
 const showOnlyRelevant = ref(false) // Filtrar entidades con baja relevancia
@@ -484,29 +485,6 @@ async function onUndoMergeComplete(_restoredIds: number[]) {
   toast.add({ severity: 'success', summary: 'Fusión deshecha', detail: 'Entidades restauradas correctamente', life: 3000 })
 }
 
-async function onUndoMergeFromHistory(entry: MergeHistoryEntry) {
-  const entity = props.entities.find(e => e.id === entry.resultEntityId)
-  if (entity) {
-    entityToUndoMerge.value = entity
-    showUndoMergeDialog.value = true
-  } else {
-    try {
-      const data = await api.postRaw<any>(`/api/projects/${props.projectId}/entities/undo-merge/${entry.id}`)
-
-      if (data.success) {
-        emit('refresh')
-        mergeHistoryRef.value?.refresh()
-        toast.add({ severity: 'success', summary: 'Fusión deshecha', detail: 'Las entidades originales han sido restauradas', life: 3000 })
-      } else {
-        toast.add({ severity: 'error', summary: 'Error', detail: `Error al deshacer fusión: ${data.error}`, life: 5000 })
-      }
-    } catch (err) {
-      console.error('Error undoing merge:', err)
-      toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo deshacer la fusión', life: 5000 })
-    }
-  }
-}
-
 function viewMentions(entity: Entity) {
   // Seleccionar la entidad correcta para mostrar en el inspector
   emit('entity-select', entity)
@@ -787,6 +765,12 @@ function navigateToAttributeSource(attr: EntityAttribute) {
     workspaceStore.navigateToTextPosition(attr.spanStart, attr.value)
   }
 }
+
+function focusSearch() {
+  searchInputRef.value?.focus()
+}
+
+defineExpose({ focusSearch })
 </script>
 
 <template>
@@ -813,6 +797,7 @@ function navigateToAttributeSource(attr: EntityAttribute) {
         <div class="sidebar-toolbar">
           <div class="toolbar-row">
             <DsInput
+              ref="searchInputRef"
               v-model="searchQuery"
               placeholder="Buscar..."
               icon="pi pi-search"
@@ -1347,7 +1332,6 @@ function navigateToAttributeSource(attr: EntityAttribute) {
       <MergeHistoryPanel
         ref="mergeHistoryRef"
         :project-id="projectId"
-        @undo="onUndoMergeFromHistory"
       />
     </Drawer>
   </div>

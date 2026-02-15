@@ -1,10 +1,21 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import DocumentViewer from '@/components/DocumentViewer.vue'
+import TextFindBar from '@/components/workspace/TextFindBar.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 import type { Alert, Chapter } from '@/types'
 
 const workspaceStore = useWorkspaceStore()
+
+// Find bar state
+const textTabContainer = ref<HTMLElement | null>(null)
+const showFindBar = ref(false)
+
+function openFindBar() {
+  showFindBar.value = true
+}
+
+defineExpose({ openFindBar })
 
 /**
  * TextTab - Pestaña principal de visualización de texto
@@ -223,7 +234,14 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="text-tab">
+  <div ref="textTabContainer" class="text-tab">
+    <!-- Find bar -->
+    <TextFindBar
+      :visible="showFindBar"
+      :container="textTabContainer"
+      @close="showFindBar = false"
+    />
+
     <!-- Gutter con marcadores de alertas -->
     <div
       v-if="showGutter"
@@ -267,6 +285,7 @@ onMounted(async () => {
   display: flex;
   height: 100%;
   position: relative;
+  overflow: hidden;
 }
 
 /* Gutter lateral */

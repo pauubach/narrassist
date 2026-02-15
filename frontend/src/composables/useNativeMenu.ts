@@ -157,6 +157,10 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
         window.dispatchEvent(new CustomEvent('menubar:toggle-theme'))
         break
 
+      case 'find':
+        window.dispatchEvent(new CustomEvent('menubar:find'))
+        break
+
       // Analisis
       case 'run_analysis':
         invoke('run_analysis', handlers.onRunAnalysis)

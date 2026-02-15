@@ -75,6 +75,7 @@ interface GlossarySuggestion {
 const entries = ref<GlossaryEntry[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
+const searchInputRef = ref<InstanceType<typeof DsInput> | null>(null)
 const selectedCategory = ref<string | null>(null)
 const showEditDialog = ref(false)
 const editingEntry = ref<Partial<GlossaryEntry> | null>(null)
@@ -417,6 +418,12 @@ function getConfidenceColor(confidence: number): string {
   if (confidence >= 0.6) return 'var(--ds-color-info)'
   return 'var(--ds-color-warning)'
 }
+
+function focusSearch() {
+  searchInputRef.value?.focus()
+}
+
+defineExpose({ focusSearch })
 </script>
 
 <template>
@@ -474,6 +481,7 @@ function getConfidenceColor(confidence: number): string {
     <!-- Filtros -->
     <div class="glossary-tab__filters">
       <DsInput
+        ref="searchInputRef"
         v-model="searchQuery"
         placeholder="Buscar término..."
         icon="pi pi-search"

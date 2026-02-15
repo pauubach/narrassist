@@ -200,6 +200,7 @@
         <div class="center-panel">
           <!-- Tab Texto -->
           <TextTab
+            ref="textTabRef"
             v-if="workspaceStore.activeTab === 'text'"
             :project-id="project.id"
             :document-title="project.name"
@@ -224,6 +225,7 @@
             @analysis-completed="onAnalysisCompleted"
           >
             <EntitiesTab
+              ref="entitiesTabRef"
               :entities="entities"
               :project-id="project.id"
               :loading="loading"
@@ -259,6 +261,7 @@
               :analysis-completed="project.analysisStatus === 'completed'"
             />
             <AlertsTab
+              ref="alertsTabRef"
               :alerts="alerts"
               :chapters="chapters"
               :loading="loading"
@@ -297,6 +300,7 @@
 
           <!-- Tab Glosario (siempre disponible) -->
           <GlossaryTab
+            ref="glossaryTabRef"
             v-else-if="workspaceStore.activeTab === 'glossary'"
             :project-id="project.id"
           />
@@ -506,6 +510,12 @@ const correctionConfigModalRef = ref<InstanceType<typeof CorrectionConfigModal> 
 const reanalyzing = ref(false)
 const exportingStyleGuide = ref(false)
 
+// Refs to tab components (for Ctrl+F routing)
+const textTabRef = ref<InstanceType<typeof TextTab> | null>(null)
+const entitiesTabRef = ref<InstanceType<typeof EntitiesTab> | null>(null)
+const alertsTabRef = ref<InstanceType<typeof AlertsTab> | null>(null)
+const glossaryTabRef = ref<InstanceType<typeof GlossaryTab> | null>(null)
+
 // Estado para sincronización
 const activeChapterId = ref<number | null>(null)
 const highlightedEntityId = ref<number | null>(null)
@@ -606,6 +616,24 @@ const handleMenuRunAnalysis = () => { showReanalyzeDialog.value = true }
 const handleMenuToggleInspector = () => { workspaceStore.toggleRightPanel() }
 const handleMenuToggleSidebar = () => { workspaceStore.toggleLeftPanel() }
 
+// Ctrl+F — contextual find per active tab
+const handleFind = () => {
+  switch (workspaceStore.activeTab) {
+    case 'text':
+      textTabRef.value?.openFindBar()
+      break
+    case 'entities':
+      entitiesTabRef.value?.focusSearch()
+      break
+    case 'alerts':
+      alertsTabRef.value?.focusSearch()
+      break
+    case 'glossary':
+      glossaryTabRef.value?.focusSearch()
+      break
+  }
+}
+
 // Keyboard shortcut handlers
 const handleNextAlert = () => {
   const currentIdx = selectedAlert.value
@@ -666,6 +694,7 @@ onMounted(async () => {
   window.addEventListener('menubar:run-analysis', handleMenuRunAnalysis)
   window.addEventListener('menubar:toggle-inspector', handleMenuToggleInspector)
   window.addEventListener('menubar:toggle-sidebar', handleMenuToggleSidebar)
+  window.addEventListener('menubar:find', handleFind)
 
   // Keyboard shortcut events
   window.addEventListener('keyboard:next-alert', handleNextAlert)
@@ -733,6 +762,7 @@ onUnmounted(() => {
   window.removeEventListener('menubar:run-analysis', handleMenuRunAnalysis)
   window.removeEventListener('menubar:toggle-inspector', handleMenuToggleInspector)
   window.removeEventListener('menubar:toggle-sidebar', handleMenuToggleSidebar)
+  window.removeEventListener('menubar:find', handleFind)
   window.removeEventListener('keyboard:next-alert', handleNextAlert)
   window.removeEventListener('keyboard:prev-alert', handlePrevAlert)
   window.removeEventListener('keyboard:resolve-alert', handleResolveAlert)

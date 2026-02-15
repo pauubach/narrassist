@@ -80,7 +80,7 @@ export function useKeyboardShortcuts() {
       window.dispatchEvent(new CustomEvent('menubar:toggle-sidebar'))
     }
 
-    // Buscar (Ctrl+F — pendiente de implementar listener)
+    // Buscar (Ctrl+F — contextual: texto → find bar, filtros → focus input)
     else if (modifier && !shiftKey && key === 'f') {
       event.preventDefault()
       window.dispatchEvent(new CustomEvent('menubar:find'))
@@ -186,7 +186,7 @@ export const KEYBOARD_SHORTCUTS = [
       { keys: ['Ctrl/Cmd', 'Shift', 'I'], description: 'Mostrar/ocultar inspector' },
       { keys: ['Ctrl/Cmd', 'Shift', 'H'], description: 'Mostrar/ocultar historial' },
       { keys: ['Ctrl/Cmd', 'Z'], description: 'Deshacer última acción' },
-      { keys: ['Ctrl/Cmd', 'F'], description: 'Buscar' },
+      { keys: ['Ctrl/Cmd', 'F'], description: 'Buscar en pestaña activa' },
       { keys: ['Ctrl/Cmd', 'E'], description: 'Exportar' },
       { keys: ['Ctrl/Cmd', ','], description: 'Configuración' },
       { keys: ['Ctrl/Cmd', 'Shift', 'D'], description: 'Cambiar tema' },
