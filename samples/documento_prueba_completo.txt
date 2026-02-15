@@ -1,0 +1,370 @@
+La sombra del algoritmo
+
+Novela de Pau Bach
+
+
+Capítulo 1. El laboratorio
+
+Elena Rodríguez llegó al laboratorio a las siete de la mañana de aquel lunes 15 de marzo de 2024.  Tenía el cabello castaño recogido en una coleta y llevaba su bata blanca de siempre. El laboratorio estaba vacío, como era habitual a esas horas tan tempranas de la mañana en el laboratorio.
+
+Elena dejó su mochila en la mesa y encendió el ordenador. La pantalla parpadeó unos segundos antes de mostrar el escritorio. Mientras esperaba, Elena sacó su libreta de notas y revisó las anotaciones del día anterior. Las anotaciones estaban escritas con su letra diminuta, casi ilegible.
+
+—Buenos días, Elena —dijo el Dr. Martín García entrando por la puerta principal—.  ¿Has dormido algo esta noche?
+
+- No mucho, la verdad -contestó ella sin levantar la vista-. Estuve revisando los resultados del experimento hasta las tres.
+
+—Eso no está bien. Deberías descansar más —respondió Martín, que era el director de la tesis de Elena y que además era un hombre de cincuenta y ocho años con barba canosa y gafas redondas y que siempre vestía camisas de cuadros y que nunca salía sin su maletín de cuero marrón que le había regalado su esposa en su aniversario de bodas hace veinte años—.  Sin descanso adecuado, el cerebro no puede funcionar de que esté en óptimas condiciones.
+
+Elena pienso de que tenía razón, pero no quería admitirlo. Básicamente, ella era muy orgullosa. Realmente, siempre había sido así. De hecho, desde pequeña había sido realmente orgullosa. Básicamente, su madre siempre le decía que era realmente testaruda.
+
+El problema principal era que los datos no cuadraban. Elena había analizado las muestras tres veces, pero los resultados eran inconsistentes. La primera muestra mostraba una concentración de 45 mg/L. Los segundo muestra mostraba 78 mg/L. Y la tercera, inexplicablemente, daba 12 mg/L.
+
+—Martín, mira esto —dijo Elena señalando la pantalla del ordenador—. Los números no tienen sentido.
+
+El doctor se acercó y la dijo que no se preocupara. Miró los datos con atención y frunció el ceño.
+
+—Efectivamente, hay un problema serio. Puede que la calibración del espectrómetro este mal. Habría que recalibrarlo.
+
+—Ya lo recalibré ayer —respondió Elena—. Dos veces, de hecho.
+
+En ese momento, Lucía Fernández entró en el laboratorio. Lucía era la compañera de laboratorio de Elena, una joven de veintisiete años con el pelo rubio y ojos azules. Lucía siempre llegaba tarde, era su costumbre. Lucía nunca se disculpaba por llegar tarde. Lucía simplemente se sentaba y empezaba a trabajar como si nada.
+
+—Hola a todos —dijo Lucía con su sonrisa característica—. ¿Qué tal va todo?
+
+—Mal —dijo Elena—. Los resultados del análisis espectral son un desastre.
+
+Lucía cogió una silla y se sentó junto a Elena. Después agarró el ratón y empezó a revisar los datos en la computadora. Elena la miró sorprendida; Lucía normalmente trabajaba en su propio ordenador.
+
+—Creo que el issue está en el preprocessing de los datos —dijo Lucía—. Cuando hice el upload de los raw files, quizás hubo un bug en el pipeline.
+
+—¿Podrías hablar en castellano? —bromeó Martín.
+
+Lucía se rió. Ella había estudiado dos años en MIT y a veces mezclaba idiomas sin darse cuenta.  Básicamente, era algo que hacía de forma inconsciente. Realmente no podía evitarlo.
+
+Carlos Mendoza, el joven técnico de laboratorio, apareció por la puerta trasera. Carlos tenía cuarenta y cinco años y era un hombre callado. Carlos llevaba trabajando en el laboratorio desde 1998. Carlos conocía cada aparato, cada cable, cada tornillo del lugar.
+
+—He oído que hay problemas con el espectrómetro —dijo Carlos con voz grave.
+
+—Sí, Carlos, los resultados son muy dispares —explicó Elena.
+
+—Déjame echarle un vistazo. La semana pasada noté que la lámpara de deuterio estaba perdiendo intensidad. Quizá haya que reemplazarlo.  El mantenimiento del equipos es fundamental.
+
+Elena asintió. Si Carlos decía que había un problema con la lámpara, seguramente tenía razón. Carlos nunca se equivocaba con los equipos.
+
+Mientras Carlos revisaba el espectrómetro, Elena volvió a su escritorio. Abrió el archivo con los resultados en Excel y empezó a crear gráficas. La primera gráfica mostraba la dispersión de los datos. La segunda gráfica mostraba la tendencia temporal. La tercera gráfica mostraba la correlación entre variables.
+
+Yo siempre he pensado que las gráficas son la mejor forma de entender los datos. Cuando ves un patrón visual, todo cobra sentido. Elena lo sabía bien; ella era una investigadora brillante.
+
+Eran las doce del mediodía cuando Elena decidió tomarse un descanso. Había estado trabajando cinco horas seguidas sin parar. Se levantó de la silla, se estiró y caminó hacia la cafetería del edificio.
+
+La cafetería estaba llena a esas horas. La decisión sobre el uso de los datos del análisis de las muestras de la primera fase del proyecto fue tomada por el comité de ética de la universidad. Elena pidió un café con leche y un bocadillo de jamón. Se sentó en una mesa junto a la ventana y sacó su teléfono móvil. Tenía tres mensajes de su madre, dos emails del departamento y una notificación de la app del banco.
+
+En la mesa de al lado, María Josefa, la secretaria del departamento, hablaba por teléfono con alguien. Maria Josefa siempre estaba al tanto de todos los cotilleos de la facultad.
+
+Elena recordó que el 23 de abril de 2024 tenía que presentar los resultados preliminares en el congreso de Bioquímica. Faltaban solo cinco semanas. Y todavía no tenía resultados fiables.
+
+Su padre le había dicho esa misma mañana por teléfono que no se preocupara, que todo saldría bien. «Papá siempre sabe qué decir», pensó Elena con una sonrisa.
+
+«Esto es un desastre», pensó Elena. "Voy a tener que empezar de cero".
+
+
+Capítulo 2. La tesis
+
+Elena llevaba tres años trabajando en su tesis doctoral. Su investigación se centraba en el uso de Inteligencia Artificial para el análisis de muestras biológicas. Concretamente, utilizaba técnicas de PLN para extraer información de artículos científicos y correlacionarla con datos experimentales.
+
+El marco teórico de su tesis se basaba en varios estudios previos [1]. La técnica de machine learning que ella había desarrollado superaba en un 23% la precisión de los métodos tradicionales (García et al., 2023). Además, los resultados de López (2022) confirmaban la viabilidad del enfoque.
+
+La IA se había convertido en una herramienta fundamental en el laboratorio moderno. Sin embargo, la I.A. también presentaba desafíos éticos importantes que no podían ignorarse. Elena era consciente de que la Inteligencia Artificial no era una solución mágica, pero creía firmemente en su potencial.
+
+La tesis de Elena se dividía en cinco partes principales. La primera parte era la introducción. La segunda parte era el marco teórico. La tercera parte era la metodología. La cuarta parte eran los resultados. Y la quinta parte eran las conclusiones. Esta estructura era bastante estándar para una tesis doctoral en ciencias experimentales.
+
+El director de tesis, Dr. García, le había recomendado utilizar el framework de análisis desarrollado por la OMS para evaluar la calidad de los datos. También le sugirió consultar las guías del CSIC y de la UNESCO sobre buenas prácticas en investigación.
+
+En la sicología experimental, la reproducibilidad de los resultados es fundamental [3]. Elena lo sabía bien, pues había estudiado psicología como asignatura optativa durante la carrera. La psicología le había enseñado la importancia de los sesgos cognitivos en la interpretación de datos.
+
+De niña, Elena solía pasar las tardes en el despacho de su padre en la universidad. Allí, rodeada de libros y pizarras llenas de fórmulas, descubrió su pasión por la ciencia. Años después recordaría aquel despacho como el lugar donde todo empezó.
+
+Elena decidió resetear todos los parámetros del modelo y empezar desde cero. Primero, hizo un backup completo de los datos en el servidor. Después, modificó el script de Python para incluir validación cruzada. El approach que eligió fue un k-fold con k=10, que era el estándar en el campo.
+
+Elena optó por reiniciar la totalidad de las variables del algoritmo y comenzar el proceso nuevamente desde el principio.
+
+El problema fundamental era, como Elena descubrió después de analizar cuidadosamente todos los datos que había recopilado durante los últimos tres meses de experimentación intensiva en el laboratorio con la ayuda de Carlos y Lucía y que además había presentado parcialmente en el seminario del departamento el mes anterior donde el profesor Gutiérrez le había hecho una pregunta muy pertinente sobre la normalización de los datos que ella no había sabido responder adecuadamente en ese momento pero que después investigó a fondo y descubrió que era un punto crucial, que la calibración inicial estaba mal.
+
+Los resultados que Elena obtuvo eran muy prometedores. Los resultados mostraban una mejora significativa en la precisión del modelo. Los resultados indicaban que el nuevo enfoque superaba ampliamente los métodos anteriores. Los resultados confirmaban la hipótesis inicial de la investigación.
+
+Elena, que había pasado la noche anterior sin dormir, y que además estaba preocupada por la presentación del congreso, y que no había tenido tiempo de desayunar esa mañana. Abrió el portátil y comenzó a redactar.
+
+Tú debes entender que la ciencia requiere paciencia. Usted no puede esperar resultados inmediatos. Elena siempre les decía a sus estudiantes que tuviesen paciencia.
+
+A las seis de la tarde, Elena se despidió de sus compañeros y salió del laboratorio. El sol de setiembre ya se escondía tras los edificios de la universidad. Caminó hasta la parada de autobús, pensando en los datos. En septiembre siempre hacía buen tiempo en Barcelona.
+
+Elena tenía los ojos verdes y una sonrisa contagiosa. Esa tarde, mientras esperaba el autobús, su pelo rubio brillaba con los últimos rayos de sol.
+
+En el autobús, Elena abrió su laptop y revisó el email que le había mandado Martín. El mensaje decía....
+
+«Querida Elena:
+
+He revisado tus últimos resultados y creo que vamos por buen camino. La presentación del congreso de abril será un éxito. Recuerda que el deadline para enviar el abstract es el 1 de febrero de 2024.
+
+Saludos,
+Dr. García»
+
+Elena frunció el ceño. ¿Febrero de 2024? Pero si ya estaban en marzo... El deadline ya había pasado. ¿Cómo era posible que Martín se hubiese confundido con la fecha?
+
+
+Capítulo 3. El congreso
+
+El 23 de abril de 2024, Elena se encontraba en el auditorio principal del Centro de Convenciones de Madrid. El congreso Internacional de Bioquímica y Biología Molecular reunía a más de quinientos investigadores de toda España y Latinoamérica.
+
+Elena estaba furiosa con Martín. Realmente estaba muy nerviosa. De hecho, nunca había estado tan nerviosa en toda su vida. Básicamente, sentía que le iba a dar un ataque de pánico.
+
+—Todo va a salir maravillosamente bien, estoy encantada de estar aquí —dijo Elena con una gran sonrisa—. ¡Qué ilusión presentar nuestro trabajo!
+
+—Tranquila, Elena —le dijo Lucía, que la había acompañado al congreso—. Lo vas a hacer genial.
+
+—¿Y si me preguntan algo que no sé? —respondió Elena, retorciendo las manos.
+
+—Nadie sabe todo. Solo responde con honestidad.
+
+Elena pensó en la oferta postdoctoral de Weber. Dos años en Múnich serían una experiencia transformadora. Tendría que pensarlo bien.
+
+En la primera fila del auditorio, Elena vio al Dr. García sentado junto a un hombre que no conocía. Martín le hizo un gesto de ánimo con la mano.
+
+—Buenas tardes —comenzó Elena, ajustando el micrófono—. Mi nombre es Elena Rodríguez y voy a presentar los resultados de mi investigación sobre la aplicación de algoritmos de IA al análisis de muestras biológicas.
+
+La presentación duró veinte minutos. Elena explicó la metodología, mostró los resultados y presentó las conclusiones. La audiencia escuchó con atención.
+
+—Los resultados demuestran que nuestro modelo de deep learning alcanza una precisión del 94.7% en la clasificación de muestras —dijo Elena, señalando un gráfico en la pantalla—.  Esto representa una mejora del 23% respecto al estado del arte.
+
+Cuando terminó, hubo un aplauso moderado. Luego vinieron las preguntas.
+
+—Doctora Rodríguez —dijo un hombre calvo desde la tercera fila—, ¿ha considerado el efecto del overfitting en sus resultados?
+
+Elena respiró hondo.
+
+—Sí, por supuesto. Utilizamos validación cruzada con k=10 y regularización L2 para prevenir el sobreajuste. Además, evaluamos el modelo con un dataset completamente independiente.
+
+—¿Y qué hay del sesgo de selección en las muestras? —preguntó una mujer desde el fondo de la sala.
+
+—Buena pregunta. Las muestras fueron seleccionadas aleatoriamente de cinco hospitales diferentes, con un protocolo estandarizado que fue revisado y que fue aprobado por el comité ético de cada institución.
+
+Las preguntas continuaron durante diez minutos más. Elena las respondió todas con seguridad. Se sentía orgullosa de su trabajo.
+
+Mientras tanto, en Barcelona, Lucía estaba en el laboratorio revisando las muestras que Elena le había encargado.
+
+Después de la presentación, Martín se acercó a ella con una sonrisa enorme.
+
+—Brillante, Elena. Absolutamente brillante —dijo el viejo profesor, dándola un abrazo—. Estoy muy orgulloso de ti.
+
+—Gracias, Martín. No podría haberlo hecho sin tu ayuda.
+
+—Hay alguien que quiero que conozcas —dijo Martín, señalando al hombre que estaba sentado junto a él—. Este es el profesor Hans Weber, de la Universidad de Múnich. Está interesado en tu investigación.
+
+—Es un placer, profesora Rodríguez —dijo Weber con acento alemán—. Su trabajo es fascinante. Nos encantaría que hiciera una estancia postdoctoral en nuestro laboratorio.
+
+Elena no podía creerlo. Una estancia en Múnich sería una oportunidad increíble.
+
+—Me encantaría —dijo Elena—. ¿Cuándo podríamos hablar de los detalles?
+
+—¿Qué le parece mañana durante el almuerzo? Conozco un restaurante excelente aquí en Madrid.
+
+Elena aceptó. Esa noche, en el hotel, no pudo dormir de la emoción. Llamó a su madre para contarle la noticia.
+
+—¡Mamá, no te lo vas a creer! Un profesor alemán me ha ofrecido una estancia postdoctoral en Múnich.
+
+—¡Qué maravilla, hija! Pero... ¿Múnich? Eso está muy lejos.
+
+—Lo sé, mamá. Pero es una oportunidad única.
+
+—Tu padre estaría muy orgulloso de ti. Siempre decía que llegarías lejos.
+
+Elena sintió un nudo en la garganta. Su padre había fallecido hace dos años, el 7 de junio de 2022, después de una larga enfermedad. Él era profesor de Física en la Universidad de Salamanca y había sido su mayor inspiración para dedicarse a la ciencia.
+
+A la mañana siguiente, Elena se reunió con Weber en un restaurante del centro. El profesor era un hombre alto, delgado, de unos sesenta años, con pelo canoso y modales impecables.
+
+La profesora Rodríguez, cuya trayectoria investigadora había sido objeto de elogiosas valoraciones por parte del tribunal evaluador de la comisión de posgrado, procedió a tomar asiento en la mesa que le había sido asignada por el maître del establecimiento.
+
+—Bueno, tía, ¿qué, nos pedimos unas cañas o qué? Yo estoy
+
+—Profesora Rodríguez, permítame ir directo al grano —dijo Weber—. En Múnich estamos desarrollando un proyecto muy ambicioso que combina inteligencia artificial con bioquímica. Su experiencia con PLN y análisis de datos sería perfecta para nuestro equipo.
+
+—Suena increíble —dijo Elena—. ¿Cuánto duraría la estancia?
+
+—Inicialmente, dos años. Con posibilidad de extensión si los resultados son buenos. Y, por supuesto, con un salario competitivo.
+
+Elena se quedó pensativa. Dos años era mucho tiempo. Tendría que dejar Barcelona, su laboratorio, sus amigos... Pero también sabía que las oportunidades así no se presentaban todos los días.
+
+—¿Puedo pensarlo unos días? —preguntó Elena.
+
+—Por supuesto. Tómese el tiempo que necesite. Pero le pido que me dé una respuesta antes del 15 de mayo.
+
+Elena asintió. Tenía tres semanas para tomar la decisión más importante de su carrera.
+
+Al volver a Barcelona, Elena fue directamente al laboratorio. Quería hablar con Martín y con Lucía. Quería hablar con Carlos también. Necesitaba consejo. Necesitaba pensar.
+
+—¿Y bien? ¿Qué vas a hacer? —le preguntó Lucía cuando Elena le contó todo.
+
+—No lo sé. Es una oportunidad increíble, pero...
+
+—Pero nada, Elena. Tienes que ir. Si yo tuviera esa oportunidad, no lo dudaría ni un segundo.
+
+—Es la mejor noticia del año.
+
+—Sin duda alguna.
+
+Carlos, que había escuchado la conversación en silencio, finalmente habló:
+
+—¡¡¡Esto es FANTÁSTICO, Elena!!! ¡¡No me lo puedo creer!! ¡¡Madre mía, qué emoción!! ¡Tienes que ir, tienes que ir, tienes que ir! ¡Yo organizaré una fiesta de despedida ENORME! ¡Invitaremos a todo el departamento, no, a toda la facultad! ¡¡¡MÚNICH!!! —gritó Carlos, saltando de alegría y abrazando a todos los presentes.
+
+Elena miró a Carlos con sorpresa. El técnico no solía dar consejos, y jamás lo había visto mostrar semejante efusividad.
+
+En septiembre de 2024, Elena Rodríguez tomó un vuelo a Múnich. Llevaba dos maletas, su portátil y una foto de su padre en el bolsillo. Comenzaba una nueva etapa.
+
+
+Capítulo 4. El informe
+
+Elena tenía que escribir un informe. El informe era sobre los resultados. Los resultados eran importantes. Los resultados habían sido obtenidos en el laboratorio. El laboratorio estaba en la universidad. La universidad estaba en Barcelona. Barcelona era una ciudad muy bonita. Era una ciudad muy grande. Era una ciudad muy cosmopolita. Había muchas cosas que hacer en Barcelona. Había muchos museos. Había muchas playas. Había muchos restaurantes.
+
+En realidad, el informe no era tan complicado. O sea, solo tenía que describir los datos. Totalmente, era cuestión de sentarse y escribir. Completamente normal. Absolutamente rutinario. O sea, no era nada del otro mundo. Básicamente, en realidad, solo tenía que copiar los números. En realidad, o sea, era muy sencillo. Totalmente sencillo. ¿Sabes? No era difícil. ¿No? Era bastante fácil. ¿Vale? Solo había que tener un poco de paciencia. Quizás un poco de concentración. Tal vez algo de café. Un poco de música. Quizás un poco de silencio. Tal vez cerrar la puerta.
+
+Elena optó por reiniciar la totalidad de las variables del algoritmo y comenzar el proceso nuevamente desde el principio.
+
+El informe debía estar listo para el viernes. El plazo era inamovible. La directora lo había dejado claro. La directora era muy estricta. La directora no admitía excusas. La directora siempre cumplía los plazos. La directora esperaba lo mismo de todos.
+
+
+Capítulo 5. La despedida
+
+Era el último día de Elena en el laboratorio de Barcelona. Había invitado a una cena de despedida en el restaurante La Tagliatella, cerca de la universidad. Era junio de 2024.
+
+—He reservado mesa para diez personas —dijo Elena.
+
+—Genial —dijo Lucía.
+
+—Perfecto —dijo Martín.
+
+—Bien —dijo Carlos.
+
+—Ok —dijo Elena.
+
+—Estupendo —dijo Lucía.
+
+—Vamos, entonces —dijo Martín.
+
+—Sí, vamos —dijo Carlos.
+
+Entonces fueron al restaurante. Luego se sentaron. Después pidieron bebidas. Entonces el camarero trajo la carta. Luego miraron el menú. Después pidieron la comida. Entonces empezaron a hablar. Luego llegaron los entrantes. Después llegaron los platos principales.
+
+Al restaurante también llegó Pedro Jiménez, del departamento de Física. Pedro era alto. También llegó Ana Ortiz, de Química. Ana era rubia. También llegó Roberto Sanz, de Matemáticas. Roberto llevaba gafas. Y también llegó Isabel Navarro, de Biología. Isabel sonrió.
+
+Pedro se sentó junto a Elena. Ana se sentó junto a Lucía. Roberto se sentó junto a Martín. Isabel se sentó junto a Carlos.
+
+—Bueno, Elena, nos vas a echar mucho de menos —dijo Pedro.
+
+—Sí, claro —dijo Elena.
+
+—¿Y cuándo te vas exactamente? —dijo Ana.
+
+—En septiembre —dijo Elena.
+
+—¡Qué emoción! —dijo Roberto.
+
+—Sí, ¿verdad? —dijo Isabel.
+
+—Yo también estuve en Alemania una vez —dijo Pedro—. Fui a Berlín en 2019. Fue bastante interesante. Muy bonito. Bastante frío. Muy caro. Bastante lejos. Muy diferente.
+
+—Muy interesante —dijo Elena con tono seco y distante, sin mirar a Lucía, que estaba sentada enfrente.
+
+Lucía, que siempre había sido la mejor amiga de Elena, intentó hablar con ella, pero Elena la ignoró durante toda la cena. No le dirigió la palabra. No la miró. Cuando Lucía contó una anécdota divertida, Elena no sonrió. Cuando Lucía brindó por ella, Elena no levantó la copa. Era como si Lucía no existiera.
+
+Mientras tanto, Roberto pensaba que la cena era aburrida. Quería estar en su casa viendo la televisión. Se arrepentía de haber venido. Echaba de menos a su gato. Pensaba que la comida era mediocre. Se preguntaba si podría irse antes del postre.
+
+—Elena, cuéntanos sobre el proyecto de Múnich —dijo Pedro.
+
+Elena empezó a hablar. Elena explicó que el proyecto era sobre inteligencia artificial. Elena dijo que trabajaría con el profesor Weber. Elena comentó que el laboratorio era muy moderno. Elena añadió que tendría acceso a supercomputadores. Elena mencionó que el equipo era internacional. Elena indicó que habría investigadores de diez países. Elena señaló que el presupuesto era de dos millones de euros. Elena subrayó que era una oportunidad única. Elena repitió que estaba muy ilusionada.
+
+—¡Qué interesante! —dijo Pedro—. Yo una vez hice un experimento con un láser. El láser era muy potente. El láser era rojo. El láser costó mucho dinero. El láser vino de Japón. El láser era impresionante.
+
+En realidad, Pedro era bastante aburrido. Realmente, siempre contaba las mismas historias. De hecho, todos lo sabían. Básicamente, nadie le escuchaba. O sea, asentían por educación. ¿Sabes? Era una situación un poco incómoda.
+
+De repente, la camarera, una joven llamada Marta con el pelo recogido y un delantal azul, se acercó a la mesa.
+
+—¿Desean postre? —preguntó Marta con una sonrisa profesional.
+
+—Sí, yo quiero tiramisú —dijo Elena.
+
+—Yo también —dijo Pedro.
+
+—Para mí un flan —dijo Ana.
+
+—Nada para mí —dijo Roberto.
+
+—Un café —dijo Isabel.
+
+La cena continuó sin mayores incidentes. Pedro siguió hablando de láseres. Ana habló un poco sobre sus clases. Roberto miró su teléfono debajo de la mesa. Isabel asintió educadamente a todo lo que le decían.
+
+Al final de la cena, Elena se levantó para dar un pequeño discurso.
+
+—Quiero agradecer a todos por estos años maravillosos en Barcelona. Ha sido un privilegio trabajar con vosotros. Os voy a echar mucho de menos.
+
+Todos aplaudieron. Carlos incluso derramó una lágrima, cosa que sorprendió a todos dado que era un hombre que no solía mostrar emociones.
+
+Elena abrazó a cada uno de sus compañeros. Cuando llegó a Lucía, la abrazó con fuerza y le susurró al oído:
+
+—Eres la mejor amiga que he tenido nunca. Gracias por todo.
+
+Lucía sonrió. Elena sonrió. Todos sonrieron.
+
+Al salir del restaurante, Elena miró al cielo. No había estrellas. Solo nubes grises. Era medianoche y hacía frío. Elena caminó sola hasta su piso, pensando en el futuro.
+
+
+Capítulo 6. Múnich
+
+Elena llegó a Múnich el 3 de septiembre de 2024. El aeropuerto Franz Josef Strauss era enorme. Todo estaba en alemán. Elena no hablaba alemán.
+
+El profesor Weber la esperaba en la puerta de llegadas. Weber llevaba un traje gris y un paraguas negro, aunque no llovía.
+
+—Bienvenida a Múnich, doctora Rodríguez —dijo Weber.
+
+—Gracias, profesor. Es un placer estar aquí.
+
+Weber la llevó en su coche al instituto. El trayecto duró cuarenta y cinco minutos. No hablaron mucho. Elena miró por la ventana. Los edificios eran grises. Los árboles empezaban a cambiar de color. El cielo estaba nublado.
+
+Al llegar al instituto, Elena conoció a su nuevo equipo. Había investigadores de Alemania, Francia, Italia, Japón y Brasil. Todos hablaban inglés. Elena se presentó y todos le dieron la bienvenida.
+
+El primer día fue totalmente administrativo. Elena tuvo que rellenar formularios. Muchos formularios. Formularios para la tarjeta de acceso. Formularios para el seguro médico. Formularios para la cuenta bancaria. Formularios para el comedor. Formularios para la biblioteca. Formularios para el parking. Formularios para el email institucional.
+
+Elena se había marchado de Barcelona el primero de agosto de 2024. Antes de irse, había pasado dos semanas cerrando todos los experimentos pendientes.
+
+Tres años después, Elena recordaría este primer día en Múnich como el comienzo del peor error de su vida. El proyecto fracasaría estrepitosamente, Weber sería investigado por fraude académico, y Elena se vería obligada a regresar a Barcelona con las manos vacías y la carrera arruinada.
+
+Pero ese primer día, Elena no sabía nada de eso. Solo sentía emoción y nervios.
+
+Esa noche, en su pequeño apartamento de Schwabing, Elena cenó sola un plato de pasta recalentada. Llamó a su madre.
+
+—Mamá, ya estoy aquí. Todo bien.
+
+—Me alegro, hija. ¿Has comido?
+
+—Sí, mamá.
+
+—¿Y hace frío?
+
+—Un poco.
+
+—Abrígate.
+
+—Sí, mamá.
+
+La conversación fue breve. Elena colgó y se quedó mirando el techo. Pensó en Barcelona. Pensó en el laboratorio. Pensó en Lucía y en Martín y en Carlos. Pensó en su padre. En ese mismo momento, en Barcelona, Carlos estaba limpiando el espectrómetro y pensaba que el laboratorio no sería lo mismo sin Elena.
+
+Elena abrió su portátil y empezó a leer los documentos del proyecto de Weber. Eran más de quinientas páginas. Había secciones sobre deep learning, sobre redes neuronales, sobre procesamiento de señales biológicas. Todo era muy técnico. Todo era muy denso. Todo era muy alemán.
+
+Los días pasaron. Elena se adaptó a la rutina. Se levantaba a las siete. Desayunaba un café y un bretzel. Iba al instituto en bicicleta. Trabajaba hasta las seis. Volvía a casa. Cenaba. Leía. Dormía. Se levantaba a las siete. Desayunaba un café y un bretzel. Iba al instituto en bicicleta. Trabajaba hasta las seis. Volvía a casa. Cenaba. Leía. Dormía.
+
+Todo era bastante monótono. En realidad, Elena empezaba a aburrirse.
+
+
+## Bibliografía
+
+[1] Martínez, R. (2021). Técnicas avanzadas de procesamiento de datos biológicos. Revista Española de Bioquímica, 45(2), 112-128.
+[3] Pérez, J., & Sánchez, M. (2020). Reproducibilidad en ciencias experimentales: un meta-análisis. Journal of Scientific Methods, 33(4), 201-215.
