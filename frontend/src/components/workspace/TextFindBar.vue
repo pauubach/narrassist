@@ -324,4 +324,15 @@ mark.text-find-match.text-find-current {
   outline: 2px solid var(--primary-color);
   border-radius: 2px;
 }
+
+/* Dark mode — stronger highlights for contrast on dark backgrounds */
+.dark mark.text-find-match {
+  background-color: rgba(255, 213, 0, 0.35);
+  color: #1a1a1a;
+}
+
+.dark mark.text-find-match.text-find-current {
+  background-color: rgba(255, 170, 0, 0.7);
+  color: #1a1a1a;
+}
 </style>
