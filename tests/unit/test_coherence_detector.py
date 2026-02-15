@@ -10,11 +10,10 @@ import pytest
 
 from narrative_assistant.corrections.config import CoherenceConfig
 from narrative_assistant.corrections.detectors.coherence import (
-    CoherenceDetector,
     _JACCARD_REDUNDANCY_THRESHOLD,
+    CoherenceDetector,
 )
 from narrative_assistant.corrections.types import CoherenceIssueType, CorrectionCategory
-
 
 # ============================================================================
 # Fixtures
@@ -92,8 +91,12 @@ class TestCoherenceDetectorBasic:
 # ============================================================================
 
 
+@patch(
+    "narrative_assistant.nlp.embeddings.get_embeddings_model",
+    side_effect=ImportError("No embeddings in test"),
+)
 class TestJaccardHeuristic:
-    def test_redundant_paragraphs_detected(self, detector):
+    def test_redundant_paragraphs_detected(self, _mock_emb, detector):
         """Párrafos con vocabulario muy similar → redundante."""
         para = _long_para(
             "La metodología experimental utiliza técnicas avanzadas de procesamiento "
@@ -112,7 +115,7 @@ class TestJaccardHeuristic:
         ]
         assert len(redundant) >= 1
 
-    def test_different_paragraphs_no_issue(self, detector):
+    def test_different_paragraphs_no_issue(self, _mock_emb, detector):
         """Párrafos con vocabulario diferente → no flaggeados."""
         para1 = _long_para(
             "La astronomía estudia los cuerpos celestes, planetas, estrellas y galaxias "
@@ -130,7 +133,7 @@ class TestJaccardHeuristic:
         ]
         assert len(redundant) == 0
 
-    def test_method_used_is_jaccard(self, detector):
+    def test_method_used_is_jaccard(self, _mock_emb, detector):
         """Sin LLM ni embeddings, method_used debe ser 'jaccard'."""
         para = _long_para(
             "La metodología experimental utiliza técnicas avanzadas de procesamiento "
@@ -145,7 +148,7 @@ class TestJaccardHeuristic:
         for issue in issues:
             assert issue.extra_data.get("method_used") == "jaccard"
 
-    def test_jaccard_similarity_in_extra_data(self, detector):
+    def test_jaccard_similarity_in_extra_data(self, _mock_emb, detector):
         """La similitud Jaccard se incluye en extra_data."""
         para = _long_para(
             "La metodología experimental utiliza técnicas avanzadas de procesamiento "
@@ -156,7 +159,7 @@ class TestJaccardHeuristic:
         assert len(issues) >= 1
         assert "jaccard_similarity" in issues[0].extra_data
 
-    def test_confidence_range(self, detector):
+    def test_confidence_range(self, _mock_emb, detector):
         """La confianza del Jaccard está en rango razonable."""
         para = _long_para(
             "La metodología experimental utiliza técnicas avanzadas de procesamiento "

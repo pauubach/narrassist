@@ -6,9 +6,9 @@ incluyendo las que estaban ausentes antes de S18-00a.
 """
 
 from narrative_assistant.corrections.config import (
+    AgreementConfig,
     AnacolutoConfig,
     AnglicismsConfig,
-    AgreementConfig,
     ClarityConfig,
     CorrectionConfig,
     CrutchWordsConfig,
