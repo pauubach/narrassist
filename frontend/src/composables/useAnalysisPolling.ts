@@ -11,16 +11,9 @@ import { useProjectsStore } from '@/stores/projects'
 import { useNotifications } from '@/composables/useNotifications'
 import type { Entity, Alert, Chapter } from '@/types'
 
-interface ProgressData {
-  progress: number
-  phase: string
-  error?: string
-  metrics?: { chapters_found?: number; entities_found?: number }
-}
-
 interface AnalysisPollingOptions {
   /** Reactive project computed */
-  project: ComputedRef<{ id: number; analysisStatus?: string | null; wordCount?: number; name?: string } | null>
+  project: ComputedRef<{ id: number; wordCount?: number; name?: string } | null>
   /** Data refs to populate incrementally during analysis */
   entities: Ref<Entity[]>
   alerts: Ref<Alert[]>
@@ -38,7 +31,6 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
   const projectsStore = useProjectsStore()
   const { notifyAnalysisComplete, notifyAnalysisError } = useNotifications()
 
-  const analysisProgressData = ref<ProgressData | null>(null)
   const cancellingAnalysis = ref(false)
 
   let pollingInterval: ReturnType<typeof setInterval> | null = null
@@ -48,27 +40,16 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
 
   // ── Computed ─────────────────────────────────────────────
 
+  // Fuente única de verdad: el store (setAnalyzing / checkAnalysisStatus)
   const isAnalyzing = computed(() => {
     if (!project.value) return false
-    const status = project.value.analysisStatus
-    const activeStatuses = ['in_progress', 'analyzing']
-    return status ? activeStatuses.includes(status) : false
+    return analysisStore.isProjectAnalyzing(project.value.id)
   })
 
   const hasBeenAnalyzed = computed(() => {
     if (!project.value) return false
     const p = project.value as any
     return (p.chapterCount || 0) > 0 || (p.entityCount || 0) > 0
-  })
-
-  const analysisProgress = computed(() => {
-    if (analysisProgressData.value) return analysisProgressData.value.progress
-    if (!project.value) return 0
-    return (project.value as any).analysisProgress || 0
-  })
-
-  const analysisPhase = computed(() => {
-    return analysisProgressData.value?.phase || 'Analizando...'
   })
 
   // ── Polling ──────────────────────────────────────────────
@@ -84,15 +65,7 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
 
       if (!progressData) {
         stopPolling()
-        analysisProgressData.value = null
         return
-      }
-
-      analysisProgressData.value = {
-        progress: progressData.progress || 0,
-        phase: progressData.current_phase || 'Analizando...',
-        error: progressData.error,
-        metrics: progressData.metrics,
       }
 
       // Incremental loading: chapters
@@ -119,7 +92,6 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
       // Idle — no active analysis
       if (progressData.status === 'idle') {
         stopPolling()
-        analysisProgressData.value = null
         return
       }
 
@@ -144,7 +116,6 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
         await loadEntities(project.value!.id)
         await loadAlerts(project.value!.id)
         await loadChapters(project.value!.id)
-        analysisProgressData.value = null
 
         // Retry if data seems stale
         if (project.value && project.value.wordCount === 0 && (progressData.metrics?.chapters_found || 0) > 0) {
@@ -184,7 +155,6 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
       const success = await analysisStore.cancelAnalysis(project.value.id)
       if (success) {
         stopPolling()
-        analysisProgressData.value = null
         await projectsStore.fetchProject(project.value.id)
       }
     } finally {
@@ -199,19 +169,10 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
     else stopPolling()
   }, { immediate: true })
 
-  watch(() => project.value?.analysisStatus, (newStatus) => {
-    if (newStatus === 'in_progress' || newStatus === 'analyzing' || newStatus === 'queued' || newStatus === 'queued_for_heavy') {
-      if (!pollingInterval) startPolling()
-    }
-  })
-
   return {
-    analysisProgressData,
     cancellingAnalysis,
     isAnalyzing,
     hasBeenAnalyzed,
-    analysisProgress,
-    analysisPhase,
     startPolling,
     stopPolling,
     cancelAnalysis,

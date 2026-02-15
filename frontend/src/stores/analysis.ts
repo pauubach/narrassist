@@ -335,13 +335,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
     }
   }
 
-  function clearError(projectId?: number) {
-    const id = projectId ?? _activeProjectId.value
-    if (id != null) {
-      delete _errors.value[id]
-    }
-  }
-
   /**
    * Marca el inicio de un análisis (para cuando se llama desde fuera del store)
    */
@@ -560,7 +553,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
     cancelAnalysis,
     getProgress,
     clearAnalysis,
-    clearError,
     setAnalyzing,
     checkAnalysisStatus,
     // Per-project queries

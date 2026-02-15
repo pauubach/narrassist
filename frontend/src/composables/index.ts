@@ -18,9 +18,6 @@ export {
 } from './useHighlight'
 export type { HighlightSpan, HighlightOptions, FlashState } from './useHighlight'
 
-export { useAnalysisStream } from './useAnalysisStream'
-export type { AnalysisProgress, AnalysisPhase, UseAnalysisStreamOptions } from './useAnalysisStream'
-
 export { useNavigation } from './useNavigation'
 export type { NavigationTarget, TooltipData, HighlightState } from './useNavigation'
 

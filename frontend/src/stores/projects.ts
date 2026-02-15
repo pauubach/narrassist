@@ -94,10 +94,6 @@ export const useProjectsStore = defineStore('projects', () => {
     }
   }
 
-  function clearError() {
-    error.value = null
-  }
-
   function clearCurrentProject() {
     currentProject.value = null
   }
@@ -114,7 +110,6 @@ export const useProjectsStore = defineStore('projects', () => {
     fetchProject,
     createProject,
     updateProjectProgress,
-    clearError,
     clearCurrentProject
   }
 })

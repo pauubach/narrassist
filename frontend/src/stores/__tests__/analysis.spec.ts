@@ -251,21 +251,6 @@ describe('analysisStore', () => {
     })
   })
 
-  describe('clearError', () => {
-    it('should clear only the error for active project', () => {
-      const store = useAnalysisStore()
-      store.setActiveProjectId(1)
-
-      // Set error via internal map
-      store._errors[1] = 'Some error'
-      store.setAnalyzing(1, true)
-
-      store.clearError(1)
-
-      expect(store.error).toBeNull()
-      expect(store.isAnalyzing).toBe(true)
-    })
-  })
 })
 
 

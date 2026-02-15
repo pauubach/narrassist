@@ -365,19 +365,7 @@ describe('projectsStore', () => {
     })
   })
 
-  // ── clearError / clearCurrentProject ─────────────────────
-
-  describe('clearError', () => {
-    it('should clear the error', async () => {
-      mockApi.get.mockRejectedValueOnce(new Error('test error'))
-      const store = useProjectsStore()
-      await store.fetchProjects()
-      expect(store.error).toBe('test error')
-
-      store.clearError()
-      expect(store.error).toBeNull()
-    })
-  })
+  // ── clearCurrentProject ─────────────────────────────────
 
   describe('clearCurrentProject', () => {
     it('should set currentProject to null', async () => {
