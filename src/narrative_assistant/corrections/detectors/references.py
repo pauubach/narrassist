@@ -59,6 +59,34 @@ class ReferencesDetector(BaseDetector):
     def category(self) -> CorrectionCategory:
         return CorrectionCategory.REFERENCES
 
+    @staticmethod
+    def _expand_numeric_citation(cite_body: str) -> set[str]:
+        """Expande [1-3, 5] -> {"1", "2", "3", "5"}."""
+        numbers: set[str] = set()
+
+        for part in re.split(r"\s*,\s*", cite_body.strip()):
+            if not part:
+                continue
+
+            range_match = re.fullmatch(r"(\d+)\s*[-–]\s*(\d+)", part)
+            if range_match:
+                start = int(range_match.group(1))
+                end = int(range_match.group(2))
+                lo, hi = sorted((start, end))
+
+                # Guardar extremos si el rango es patológico.
+                if hi - lo > 1000:
+                    numbers.add(str(start))
+                    numbers.add(str(end))
+                else:
+                    for value in range(lo, hi + 1):
+                        numbers.add(str(value))
+                continue
+
+            numbers.update(re.findall(r"\d+", part))
+
+        return numbers
+
     def detect(
         self,
         text: str,
@@ -173,7 +201,7 @@ class ReferencesDetector(BaseDetector):
                     continue
 
                 # Extraer números individuales de la cita
-                cite_nums = re.findall(r"\d+", cite_match.group(1))
+                cite_nums = self._expand_numeric_citation(cite_match.group(1))
                 for num in cite_nums:
                     # Buscar si el número aparece en la sección bibliográfica
                     bib_pattern = re.compile(
@@ -213,7 +241,7 @@ class ReferencesDetector(BaseDetector):
             cited_nums: set[str] = set()
             for cm in numeric_cites:
                 if cm.start() < bib_start:
-                    cited_nums.update(re.findall(r"\d+", cm.group(1)))
+                    cited_nums.update(self._expand_numeric_citation(cm.group(1)))
 
             for entry_num in bib_entries:
                 if entry_num not in cited_nums:

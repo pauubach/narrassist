@@ -11,6 +11,7 @@ import pytest
 from narrative_assistant.corrections.config import CoherenceConfig
 from narrative_assistant.corrections.detectors.coherence import (
     _JACCARD_REDUNDANCY_THRESHOLD,
+    _LLM_CHUNK_SIZE,
     CoherenceDetector,
 )
 from narrative_assistant.corrections.types import CoherenceIssueType, CorrectionCategory
@@ -520,6 +521,61 @@ class TestLLMMocked:
             issues = llm_detector.detect(text)
 
         assert len(issues) == 0
+
+    def test_llm_uses_absolute_indices_across_chunks(self, llm_detector):
+        """Índices LLM absolutos no deben sumarse de nuevo con chunk_start."""
+        paragraphs = [
+            _long_para(
+                f"Parrafo {idx} con contenido unico para validar mapeo de indices absolutos."
+            )
+            for idx in range(_LLM_CHUNK_SIZE + 2)
+        ]
+        text = _make_text(*paragraphs)
+
+        llm_responses = [
+            {"issues": []},  # chunk 0
+            {
+                "issues": [
+                    {
+                        "type": "weak_transition",
+                        "paragraph_indices": [_LLM_CHUNK_SIZE],
+                        "explanation": "Transicion debil detectada.",
+                        "suggestion": "Agregar conector.",
+                        "confidence": 0.81,
+                    }
+                ]
+            },  # chunk 1
+        ]
+
+        mock_client = MagicMock()
+        mock_client.is_available = True
+        mock_client.complete.side_effect = [json.dumps(r) for r in llm_responses]
+
+        with (
+            patch(
+                "narrative_assistant.llm.client.get_llm_client",
+                return_value=mock_client,
+            ),
+            patch(
+                "narrative_assistant.llm.client.get_llm_scheduler",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "narrative_assistant.llm.sanitization.sanitize_for_prompt",
+                side_effect=lambda t, **kw: t,
+            ),
+            patch(
+                "narrative_assistant.llm.sanitization.validate_llm_response",
+                side_effect=llm_responses,
+            ),
+        ):
+            issues = llm_detector.detect(text)
+
+        weak = [i for i in issues if i.issue_type == CoherenceIssueType.WEAK_TRANSITION.value]
+        assert len(weak) == 1
+        expected_start = text.find(paragraphs[_LLM_CHUNK_SIZE])
+        assert weak[0].start_char == expected_start
+        assert weak[0].text.startswith("Parrafo")
 
 
 # ============================================================================

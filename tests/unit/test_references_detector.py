@@ -136,6 +136,17 @@ class TestReferencesDetectorOrphanCitations:
         orphans = [i for i in issues if i.issue_type == ReferencesIssueType.ORPHAN_CITATION.value]
         assert len(orphans) == 0
 
+    def test_orphan_detection_expands_ranges(self, detector):
+        text = (
+            "Resultados previos [1-3] respaldan la hipótesis.\n\n"
+            "## Referencias\n"
+            "[1] García, A. (2024). Título.\n"
+            "[3] López, B. (2023). Otro título.\n"
+        )
+        issues = detector.detect(text)
+        orphans = [i for i in issues if i.issue_type == ReferencesIssueType.ORPHAN_CITATION.value]
+        assert any(i.extra_data.get("citation_number") == "2" for i in orphans)
+
 
 class TestReferencesDetectorUnusedReferences:
     def test_unused_reference_detected(self):
@@ -176,6 +187,21 @@ class TestReferencesDetectorUnusedReferences:
             "## Referencias\n"
             "[1] García.\n"
             "[2] López.\n"
+        )
+        issues = det.detect(text)
+        unused = [i for i in issues if i.issue_type == ReferencesIssueType.UNUSED_REFERENCE.value]
+        assert len(unused) == 0
+
+    def test_range_citation_marks_middle_reference_as_used(self):
+        """[1-3] cuenta 1, 2 y 3 como citadas (sin falsos UNUSED_REFERENCE)."""
+        config = ReferencesConfig(enabled=True, detect_unused_references=True)
+        det = ReferencesDetector(config)
+        text = (
+            "Varios estudios [1-3] confirman el resultado.\n\n"
+            "## Referencias\n"
+            "[1] García.\n"
+            "[2] López.\n"
+            "[3] Pérez.\n"
         )
         issues = det.detect(text)
         unused = [i for i in issues if i.issue_type == ReferencesIssueType.UNUSED_REFERENCE.value]
