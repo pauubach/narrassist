@@ -181,10 +181,17 @@ function onFindKeydown(event: KeyboardEvent) {
   }
 }
 
+function focusInput() {
+  findInputRef.value?.focus()
+  findInputRef.value?.select()
+}
+
 onUnmounted(() => {
   clearHighlights()
   if (searchTimeout) clearTimeout(searchTimeout)
 })
+
+defineExpose({ focusInput })
 </script>
 
 <template>

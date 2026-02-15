@@ -10,9 +10,15 @@ const workspaceStore = useWorkspaceStore()
 // Find bar state
 const textTabContainer = ref<HTMLElement | null>(null)
 const showFindBar = ref(false)
+const findBarRef = ref<InstanceType<typeof TextFindBar> | null>(null)
 
 function openFindBar() {
-  showFindBar.value = true
+  if (showFindBar.value) {
+    // Already open — just re-focus
+    findBarRef.value?.focusInput()
+  } else {
+    showFindBar.value = true
+  }
 }
 
 defineExpose({ openFindBar })
@@ -237,6 +243,7 @@ onMounted(async () => {
   <div ref="textTabContainer" class="text-tab">
     <!-- Find bar -->
     <TextFindBar
+      ref="findBarRef"
       :visible="showFindBar"
       :container="textTabContainer"
       @close="showFindBar = false"
