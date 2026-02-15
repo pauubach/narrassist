@@ -253,7 +253,22 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
         true,
         Some("CmdOrCtrl+Shift+I"),
     )?;
+    let toggle_history = MenuItem::with_id(
+        app,
+        view_menu::TOGGLE_HISTORY,
+        "Mostrar/ocultar historial",
+        true,
+        Some("CmdOrCtrl+Shift+H"),
+    )?;
     let separator6 = PredefinedMenuItem::separator(app)?;
+    let toggle_theme = MenuItem::with_id(
+        app,
+        view_menu::TOGGLE_THEME,
+        "Cambiar tema",
+        true,
+        Some("CmdOrCtrl+Shift+D"),
+    )?;
+    let separator6b = PredefinedMenuItem::separator(app)?;
     let fullscreen = PredefinedMenuItem::fullscreen(app, Some("Pantalla completa"))?;
 
     let view_submenu = Submenu::with_items(
@@ -272,7 +287,10 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
             &separator5,
             &toggle_sidebar,
             &toggle_inspector,
+            &toggle_history,
             &separator6,
+            &toggle_theme,
+            &separator6b,
             &fullscreen,
         ],
     )?;
@@ -427,10 +445,10 @@ mod tests {
     /// (para detectar si se anade un item sin actualizar ALL_MENU_IDS)
     #[test]
     fn menu_ids_count_matches_expected() {
-        // 6 archivo + 10 ver + 1 analisis + 6 ayuda = 23
+        // 6 archivo + 12 ver + 1 analisis + 6 ayuda = 25
         assert_eq!(
             ALL_MENU_IDS.len(),
-            23,
+            25,
             "Se cambio el numero de items de menu. Actualizar ALL_MENU_IDS y este test."
         );
     }
@@ -458,6 +476,8 @@ mod tests {
             "view_summary",
             "toggle_inspector",
             "toggle_sidebar",
+            "toggle_history",
+            "toggle_theme",
             "run_analysis",
             "tutorial",
             "keyboard_shortcuts",
@@ -499,6 +519,8 @@ mod tests {
         assert_eq!(view_menu::SUMMARY, "view_summary");
         assert_eq!(view_menu::TOGGLE_INSPECTOR, "toggle_inspector");
         assert_eq!(view_menu::TOGGLE_SIDEBAR, "toggle_sidebar");
+        assert_eq!(view_menu::TOGGLE_HISTORY, "toggle_history");
+        assert_eq!(view_menu::TOGGLE_THEME, "toggle_theme");
     }
 
     #[test]

@@ -765,6 +765,11 @@ def update_entity(
         if error:
             return error
 
+        # Capturar valores anteriores para historial
+        old_name = entity.canonical_name
+        old_type = entity.entity_type.value if hasattr(entity.entity_type, 'value') else str(entity.entity_type)
+        old_importance = entity.importance.value if hasattr(entity.importance, 'value') else str(entity.importance)
+
         # Mapear campos del request a parámetros del repositorio
         canonical_name = body.name or body.canonical_name
         aliases = body.aliases
@@ -800,6 +805,29 @@ def update_entity(
         updated_entity = entity_repo.get_entity(entity_id)  # type: ignore[attr-defined]
 
         logger.info(f"Updated entity {entity_id} ({updated_entity.canonical_name})")
+
+        # Registrar en historial para undo
+        try:
+            from narrative_assistant.persistence.history import ChangeType, HistoryManager
+            history = HistoryManager(project_id)
+            history.record(
+                action_type=ChangeType.ENTITY_UPDATED,
+                target_type="entity",
+                target_id=entity_id,
+                old_value={
+                    "canonical_name": old_name,
+                    "entity_type": old_type,
+                    "importance": old_importance,
+                },
+                new_value={
+                    "canonical_name": updated_entity.canonical_name,
+                    "entity_type": updated_entity.entity_type.value,
+                    "importance": updated_entity.importance.value,
+                },
+                note=f"'{old_name}' editada",
+            )
+        except Exception:
+            logger.debug("Could not log entity update to history", exc_info=True)
 
         return ApiResponse(
             success=True,
@@ -2413,6 +2441,27 @@ def create_entity_attribute(
             f"Created attribute {attribute_id} for entity {entity_id}: {name}={value}"
         )
 
+        # Registrar en historial para undo
+        try:
+            from narrative_assistant.persistence.history import ChangeType, HistoryManager
+            history = HistoryManager(project_id)
+            history.record(
+                action_type=ChangeType.ATTRIBUTE_ADDED,
+                target_type="attribute",
+                target_id=attribute_id,
+                old_value=None,
+                new_value={
+                    "entity_id": entity_id,
+                    "category": category,
+                    "name": name,
+                    "value": value,
+                    "confidence": confidence,
+                },
+                note=f"{entity.canonical_name}: {name} = {value}",
+            )
+        except Exception:
+            logger.debug("Could not log attribute create to history", exc_info=True)
+
         # Invalidación granular (S8c)
         try:
             from routers._invalidation import emit_invalidation_event
@@ -2477,6 +2526,10 @@ def update_entity_attribute(
         if not entity or entity.project_id != project_id:
             return ApiResponse(success=False, error="Entidad no encontrada")
 
+        # Capturar valor anterior para historial
+        old_attrs = entity_repo.get_attributes_by_entity(entity_id)  # type: ignore[attr-defined]
+        old_attr = next((a for a in old_attrs if a["id"] == attribute_id), None)
+
         # Actualizar atributo
         updated = entity_repo.update_attribute(  # type: ignore[attr-defined]
             attribute_id=attribute_id,
@@ -2489,6 +2542,36 @@ def update_entity_attribute(
             return ApiResponse(success=False, error="No se pudo actualizar el atributo")
 
         logger.info(f"Updated attribute {attribute_id} for entity {entity_id}")
+
+        # Registrar en historial para undo
+        try:
+            from narrative_assistant.persistence.history import ChangeType, HistoryManager
+            change_type = (
+                ChangeType.ATTRIBUTE_VERIFIED
+                if body.is_verified is not None and old_attr and not old_attr.get("is_verified")
+                else ChangeType.ATTRIBUTE_UPDATED
+            )
+            history = HistoryManager(project_id)
+            history.record(
+                action_type=change_type,
+                target_type="attribute",
+                target_id=attribute_id,
+                old_value={
+                    "entity_id": entity_id,
+                    "name": old_attr["name"] if old_attr else None,
+                    "value": old_attr["value"] if old_attr else None,
+                    "is_verified": old_attr.get("is_verified", False) if old_attr else False,
+                },
+                new_value={
+                    "entity_id": entity_id,
+                    "name": body.name,
+                    "value": body.value,
+                    "is_verified": body.is_verified,
+                },
+                note=f"{entity.canonical_name}: {body.name}",
+            )
+        except Exception:
+            logger.debug("Could not log attribute update to history", exc_info=True)
 
         # Invalidación granular (S8c)
         try:
@@ -2539,6 +2622,10 @@ def delete_entity_attribute(project_id: int, entity_id: int, attribute_id: int):
         if not entity or entity.project_id != project_id:
             return ApiResponse(success=False, error="Entidad no encontrada")
 
+        # Capturar valor anterior para historial
+        old_attrs = entity_repo.get_attributes_by_entity(entity_id)  # type: ignore[attr-defined]
+        old_attr = next((a for a in old_attrs if a["id"] == attribute_id), None)
+
         # Eliminar atributo
         deleted = entity_repo.delete_attribute(attribute_id)  # type: ignore[attr-defined]
 
@@ -2546,6 +2633,29 @@ def delete_entity_attribute(project_id: int, entity_id: int, attribute_id: int):
             return ApiResponse(success=False, error="No se pudo eliminar el atributo")
 
         logger.info(f"Deleted attribute {attribute_id} from entity {entity_id}")
+
+        # Registrar en historial para undo
+        if old_attr:
+            try:
+                from narrative_assistant.persistence.history import ChangeType, HistoryManager
+                history = HistoryManager(project_id)
+                history.record(
+                    action_type=ChangeType.ATTRIBUTE_DELETED,
+                    target_type="attribute",
+                    target_id=attribute_id,
+                    old_value={
+                        "entity_id": entity_id,
+                        "category": old_attr["category"],
+                        "name": old_attr["name"],
+                        "value": old_attr["value"],
+                        "confidence": old_attr.get("confidence"),
+                        "is_verified": old_attr.get("is_verified", False),
+                    },
+                    new_value=None,
+                    note=f"{entity.canonical_name}: {old_attr['name']} eliminado",
+                )
+            except Exception:
+                logger.debug("Could not log attribute delete to history", exc_info=True)
 
         # Invalidación granular (S8c)
         try:

@@ -646,7 +646,7 @@ const handleSidebarSetTab = (event: Event) => {
 const handleUndoComplete = async () => {
   const pid = project.value?.id
   if (!pid) return
-  await Promise.all([loadEntities(pid), loadAlerts(pid)])
+  await Promise.all([loadEntities(pid), loadAlerts(pid), loadRelationships(pid)])
 }
 
 // ── Lifecycle ──────────────────────────────────────────────

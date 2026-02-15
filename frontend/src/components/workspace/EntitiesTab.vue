@@ -22,6 +22,7 @@ import { transformEntityAttribute } from '@/types/transformers'
 import type { ApiEntityAttribute } from '@/types/api'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 import { useAlertUtils } from '@/composables/useAlertUtils'
+import { useListKeyboardNav } from '@/composables/useListKeyboardNav'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useSelectionStore } from '@/stores/selection'
 import { useRouter, useRoute } from 'vue-router'
@@ -68,6 +69,7 @@ const workspaceStore = useWorkspaceStore()
 const _selectionStore = useSelectionStore()
 const { getEntityIcon, getEntityLabel, getEntityColor } = useEntityUtils()
 const { formatChapterLabel } = useAlertUtils()
+const { setItemRef: setEntityRef, getTabindex: getEntityTabindex, onKeydown: onEntityListKeydown, focusedIndex: entityFocusedIndex } = useListKeyboardNav()
 
 // Estado de filtros
 const searchQuery = ref('')
@@ -849,7 +851,7 @@ function navigateToAttributeSource(attr: EntityAttribute) {
         </div>
 
         <!-- Lista de entidades compacta -->
-        <div class="entities-list-compact">
+        <div class="entities-list-compact" role="listbox" aria-label="Entidades" @keydown="onEntityListKeydown">
           <DsEmptyState
             v-if="filteredEntities.length === 0 && !loading"
             icon="pi pi-users"
@@ -858,11 +860,17 @@ function navigateToAttributeSource(attr: EntityAttribute) {
           />
 
           <div
-            v-for="entity in filteredEntities"
+            v-for="(entity, index) in filteredEntities"
             :key="entity.id"
+            :ref="el => setEntityRef(el, index)"
             class="entity-item-compact"
+            role="option"
+            :tabindex="getEntityTabindex(index)"
             :class="{ 'selected': selectedEntity?.id === entity.id }"
+            :aria-selected="selectedEntity?.id === entity.id"
             @click="handleEntityClick(entity)"
+            @keydown.enter.stop="handleEntityClick(entity)"
+            @focus="entityFocusedIndex = index"
           >
             <div class="entity-icon-small" :style="{ backgroundColor: getTypeBackgroundColor(entity.type) }">
               <i :class="getEntityIcon(entity.type)" :style="{ color: getTypeTextColor(entity.type) }"></i>

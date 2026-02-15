@@ -297,6 +297,12 @@ export function useGlobalUndo(projectId: () => number | null) {
       return
     }
 
+    // No interceptar Ctrl+Z si el modo corrección secuencial está activo
+    // (tiene su propio stack de undo local)
+    if (document.querySelector('.sequential-mode')) {
+      return
+    }
+
     // Ctrl+Z: deshacer última acción
     if (modifier && !shiftKey && key === 'z') {
       event.preventDefault()

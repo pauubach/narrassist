@@ -656,6 +656,28 @@ def create_relationship(project_id: int, payload: deps.CreateRelationshipRequest
         rel_repo = get_relationship_repository()
         rel_id = rel_repo.create_relationship(relationship)
 
+        # Registrar en historial para undo
+        try:
+            from narrative_assistant.persistence.history import ChangeType, HistoryManager
+            history = HistoryManager(project_id)
+            history.record(
+                action_type=ChangeType.RELATIONSHIP_CREATED,
+                target_type="relationship",
+                target_id=None,
+                old_value=None,
+                new_value={
+                    "id": rel_id,
+                    "source_entity_id": source_entity_id,
+                    "target_entity_id": target_entity_id,
+                    "relation_type": relation_type.value,
+                    "description": description,
+                    "bidirectional": bidirectional,
+                },
+                note=f"{source_entity.canonical_name} → {target_entity.canonical_name} ({relation_type.value})",
+            )
+        except Exception:
+            logger.debug("Could not log relationship create to history", exc_info=True)
+
         return ApiResponse(
             success=True,
             data={
@@ -691,9 +713,39 @@ def delete_relationship(project_id: int, relationship_id: str):
         )
 
         rel_repo = get_relationship_repository()
+
+        # Capturar datos antes de eliminar para historial
+        old_rel = rel_repo.get_relationship(relationship_id)
+
         success = rel_repo.delete_relationship(relationship_id)
 
         if success:
+            # Registrar en historial para undo
+            if old_rel:
+                try:
+                    from narrative_assistant.persistence.history import ChangeType, HistoryManager
+                    history = HistoryManager(project_id)
+                    history.record(
+                        action_type=ChangeType.RELATIONSHIP_DELETED,
+                        target_type="relationship",
+                        target_id=None,
+                        old_value={
+                            "id": relationship_id,
+                            "source_entity_id": old_rel.source_entity_id,
+                            "target_entity_id": old_rel.target_entity_id,
+                            "source_entity_name": old_rel.source_entity_name,
+                            "target_entity_name": old_rel.target_entity_name,
+                            "relation_type": old_rel.relation_type.value if hasattr(old_rel.relation_type, 'value') else str(old_rel.relation_type),
+                            "bidirectional": old_rel.bidirectional,
+                            "confidence": old_rel.confidence,
+                            "evidence_texts": old_rel.evidence_texts,
+                        },
+                        new_value=None,
+                        note=f"{old_rel.source_entity_name} → {old_rel.target_entity_name} eliminada",
+                    )
+                except Exception:
+                    logger.debug("Could not log relationship delete to history", exc_info=True)
+
             return ApiResponse(success=True, data={"deleted": relationship_id})
         else:
             return ApiResponse(success=False, error="Relación no encontrada")

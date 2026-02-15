@@ -149,6 +149,14 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
         invoke('toggle_sidebar', handlers.onToggleSidebar)
         break
 
+      case 'toggle_history':
+        window.dispatchEvent(new CustomEvent('menubar:toggle-history'))
+        break
+
+      case 'toggle_theme':
+        window.dispatchEvent(new CustomEvent('menubar:toggle-theme'))
+        break
+
       // Analisis
       case 'run_analysis':
         invoke('run_analysis', handlers.onRunAnalysis)

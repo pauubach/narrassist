@@ -174,6 +174,23 @@ const chapterAppearances = computed((): ChapterAppearance[] => {
 })
 
 const hasChapterData = computed(() => chapterAppearances.value.length > 1)
+
+/** Keyboard navigation for mentions: ←/→ prev/next, Home/End first/last */
+function onMentionNavKeydown(event: KeyboardEvent) {
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    event.preventDefault()
+    mentionNav.goToPrevious()
+  } else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    event.preventDefault()
+    mentionNav.goToNext()
+  } else if (event.key === 'Home') {
+    event.preventDefault()
+    mentionNav.goToMention(0)
+  } else if (event.key === 'End') {
+    event.preventDefault()
+    mentionNav.goToMention(mentionNav.totalMentions.value - 1)
+  }
+}
 </script>
 
 <template>
@@ -323,13 +340,21 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
     </div>
 
     <!-- Barra de navegación de apariciones (siempre visible si hay menciones) -->
-    <div v-if="mentionNav.isActive.value" class="mention-navigation">
+    <div
+      v-if="mentionNav.isActive.value"
+      class="mention-navigation"
+      tabindex="0"
+      role="group"
+      aria-label="Navegación entre apariciones"
+      @keydown="onMentionNavKeydown"
+    >
       <div class="nav-header">
         <span class="nav-title">APARICIONES</span>
+        <span class="nav-hint">← → para navegar</span>
       </div>
       <div class="nav-controls">
         <Button
-          v-tooltip.bottom="'Anterior'"
+          v-tooltip.bottom="'Anterior (←)'"
           icon="pi pi-chevron-left"
           text
           rounded
@@ -339,7 +364,7 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
         />
         <span class="nav-counter">{{ mentionNav.navigationLabel.value }}</span>
         <Button
-          v-tooltip.bottom="'Siguiente'"
+          v-tooltip.bottom="'Siguiente (→)'"
           icon="pi pi-chevron-right"
           text
           rounded
@@ -590,6 +615,24 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
   color: var(--ds-color-primary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.nav-hint {
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-text-secondary);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.mention-navigation:focus .nav-hint,
+.mention-navigation:focus-within .nav-hint {
+  opacity: 1;
+}
+
+.mention-navigation:focus {
+  outline: 2px solid var(--ds-color-primary);
+  outline-offset: -2px;
+  border-radius: var(--ds-radius-md);
 }
 
 .nav-controls {

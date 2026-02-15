@@ -23,7 +23,10 @@ const TAB_BY_NUMBER: Record<string, string> = {
  * Diseño validado por panel de expertos (UX, editor, accesibilidad):
  * - Ctrl+1..8 para pestañas (patrón estándar, sin conflictos con OS)
  * - Sin secuestrar Ctrl+A/X/H/P/T/R/D (funciones estándar del sistema)
+ * - Ctrl+Shift+I/H/D para paneles (inspector, historial, tema)
  * - F8/Shift+F8 para navegación de alertas
+ * - Namespace unificado: todos los eventos usan prefijo 'menubar:' para acciones
+ *   de UI, 'keyboard:' solo para acciones sin equivalente en menú (alertas, escape)
  * - Modo corrección secuencial tiene sus propios atajos (A/D/S/F/N/P)
  */
 export function useKeyboardShortcuts() {
@@ -77,7 +80,7 @@ export function useKeyboardShortcuts() {
       window.dispatchEvent(new CustomEvent('menubar:toggle-sidebar'))
     }
 
-    // Buscar
+    // Buscar (Ctrl+F — pendiente de implementar listener)
     else if (modifier && !shiftKey && key === 'f') {
       event.preventDefault()
       window.dispatchEvent(new CustomEvent('menubar:find'))
@@ -188,6 +191,23 @@ export const KEYBOARD_SHORTCUTS = [
       { keys: ['Ctrl/Cmd', ','], description: 'Configuración' },
       { keys: ['Ctrl/Cmd', 'Shift', 'D'], description: 'Cambiar tema' },
       { keys: ['Escape'], description: 'Cerrar modal/cancelar' },
+    ]
+  },
+  {
+    category: 'Navegación en listas',
+    shortcuts: [
+      { keys: ['↑', '↓'], description: 'Mover entre elementos' },
+      { keys: ['Home'], description: 'Ir al primer elemento' },
+      { keys: ['End'], description: 'Ir al último elemento' },
+      { keys: ['Enter'], description: 'Seleccionar elemento' },
+    ]
+  },
+  {
+    category: 'Apariciones de entidad',
+    shortcuts: [
+      { keys: ['←', '→'], description: 'Anterior/siguiente aparición' },
+      { keys: ['Home'], description: 'Primera aparición' },
+      { keys: ['End'], description: 'Última aparición' },
     ]
   },
   {
