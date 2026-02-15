@@ -113,15 +113,16 @@ export type WorkspaceTab = 'text' | 'entities' | 'relationships' | 'alerts' | 't
 
 export const TAB_REQUIRED_PHASES: Partial<Record<WorkspaceTab, keyof ExecutedPhases>> = {
   // text: siempre disponible tras carga del documento
-  entities: 'entities',
+  // entities necesita NER + fusión + atributos para estar completa
+  entities: 'attributes',
   relationships: 'coreference',
   alerts: 'alerts',
-  // timeline necesita entidades (NER) para mostrar eventos, no solo estructura
-  timeline: 'entities',
+  // timeline necesita entidades unificadas (tras fusión)
+  timeline: 'coreference',
   style: 'grammar',
-  // glossary y summary: disponibles tras extracción de entidades
-  glossary: 'entities',
-  summary: 'entities',
+  // glossary y summary: disponibles tras fusión de entidades
+  glossary: 'coreference',
+  summary: 'coreference',
 }
 
 /**
