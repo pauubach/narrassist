@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { Alert, AlertSeverity } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
+import { useListKeyboardNav } from '@/composables/useListKeyboardNav'
 
 /**
  * AlertsPanel - Panel compacto de alertas para el sidebar.
@@ -27,6 +28,7 @@ const emit = defineEmits<{
 }>()
 
 const { getSeverityColor } = useAlertUtils()
+const { setItemRef: setAlertRef, getTabindex: getAlertTabindex, onKeydown: onAlertListKeydown, focusedIndex: alertFocusedIndex } = useListKeyboardNav()
 
 /** Orden de severidad para ordenar alertas */
 const severityOrder: Record<AlertSeverity, number> = {
@@ -82,14 +84,20 @@ function handleViewAll() {
       <span>Sin alertas</span>
     </div>
 
-    <div v-else class="alerts-list">
+    <div v-else class="alerts-list" role="listbox" aria-label="Alertas" @keydown="onAlertListKeydown">
       <button
-        v-for="alert in sortedAlerts"
+        v-for="(alert, index) in sortedAlerts"
         :key="alert.id"
+        :ref="el => setAlertRef(el, index)"
         type="button"
+        role="option"
         class="alert-row"
+        :tabindex="getAlertTabindex(index)"
         :title="alert.title"
+        :aria-selected="alertFocusedIndex === index"
         @click="handleAlertClick(alert)"
+        @keydown.enter.stop="handleAlertClick(alert)"
+        @focus="alertFocusedIndex = index"
       >
         <span
           class="severity-dot"

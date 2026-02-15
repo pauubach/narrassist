@@ -248,9 +248,31 @@ def update_alert_status(project_id: int, alert_id: int, body: deps.AlertStatusRe
         if error:
             return error
 
+        old_status_str = alert.status.value if hasattr(alert.status, 'value') else str(alert.status)
+
         # Actualizar el status
         alert.status = status_map[new_status_str]
         deps.alert_repository.update(alert)  # type: ignore[attr-defined]
+
+        # Registrar en historial para undo (solo cambios de estado del usuario)
+        if new_status_str in ('resolved', 'dismissed'):
+            try:
+                from narrative_assistant.persistence.history import ChangeType, HistoryManager
+                change_type = (
+                    ChangeType.ALERT_RESOLVED if new_status_str == 'resolved'
+                    else ChangeType.ALERT_DISMISSED
+                )
+                history = HistoryManager(project_id)
+                history.record(
+                    action_type=change_type,
+                    target_type="alert",
+                    target_id=alert_id,
+                    old_value={"status": old_status_str},
+                    new_value={"status": new_status_str},
+                    note=getattr(alert, 'title', '') or f"Alerta #{alert_id}",
+                )
+            except Exception as hist_err:
+                logger.warning(f"No se pudo registrar en historial: {hist_err}")
 
         # Persistir dismissal para que sobreviva re-análisis
         if new_status_str == 'dismissed' and deps.dismissal_repository:

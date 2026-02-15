@@ -156,9 +156,12 @@ useNativeMenu({
     const tabMap: Record<string, string> = {
       chapters: 'text',
       entities: 'entities',
-      alerts: 'alerts',
       relationships: 'relationships',
+      alerts: 'alerts',
       timeline: 'timeline',
+      style: 'style',
+      glossary: 'glossary',
+      summary: 'summary',
     }
     const tab = tabMap[view] || view
     workspaceStore.setActiveTab(tab as any)
@@ -265,7 +268,7 @@ onMounted(() => {
 
   // Registrar event listeners (web MenuBar y atajos globales)
   window.addEventListener('keyboard:show-help', onShowHelp)
-  window.addEventListener('keyboard:toggle-theme', onToggleTheme)
+  window.addEventListener('menubar:toggle-theme', onToggleTheme)
   window.addEventListener('menubar:about', onMenuAbout)
   window.addEventListener('menubar:tutorial', onMenuTutorial)
   window.addEventListener('menubar:user-guide', onMenuUserGuide)
@@ -275,7 +278,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keyboard:show-help', onShowHelp)
-  window.removeEventListener('keyboard:toggle-theme', onToggleTheme)
+  window.removeEventListener('menubar:toggle-theme', onToggleTheme)
   window.removeEventListener('menubar:about', onMenuAbout)
   window.removeEventListener('menubar:tutorial', onMenuTutorial)
   window.removeEventListener('menubar:user-guide', onMenuUserGuide)

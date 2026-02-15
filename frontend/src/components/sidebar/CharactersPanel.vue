@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import type { Entity } from '@/types'
 import { useSelectionStore } from '@/stores/selection'
 import { useEntityUtils } from '@/composables/useEntityUtils'
+import { useListKeyboardNav } from '@/composables/useListKeyboardNav'
 
 /**
  * CharactersPanel - Panel de personajes principales para el sidebar.
@@ -27,6 +28,7 @@ const emit = defineEmits<{
 
 const selectionStore = useSelectionStore()
 const { getEntityIcon } = useEntityUtils()
+const { setItemRef: setCharRef, getTabindex: getCharTabindex, onKeydown: onCharListKeydown, focusedIndex: charFocusedIndex } = useListKeyboardNav()
 
 /** Personajes ordenados por menciones */
 const topCharacters = computed(() => {
@@ -67,15 +69,20 @@ function handleDoubleClick(entity: Entity) {
       <span>Sin personajes</span>
     </div>
 
-    <div v-else class="characters-list">
+    <div v-else class="characters-list" role="listbox" aria-label="Personajes" @keydown="onCharListKeydown">
       <button
-        v-for="char in topCharacters"
+        v-for="(char, index) in topCharacters"
         :key="char.id"
+        :ref="el => setCharRef(el, index)"
         type="button"
+        role="option"
         class="character-item"
+        :tabindex="getCharTabindex(index)"
+        :aria-selected="isSelected(char.id)"
         :class="{ 'character-item--active': isSelected(char.id) }"
         @click="handleClick(char)"
         @dblclick="handleDoubleClick(char)"
+        @focus="charFocusedIndex = index"
       >
         <i :class="getEntityIcon(char.type)" class="character-icon"></i>
         <span class="character-name">{{ char.name }}</span>

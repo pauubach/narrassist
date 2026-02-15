@@ -129,6 +129,18 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
         invoke('view_timeline', handlers.onViewChange ? () => handlers.onViewChange!('timeline') : undefined)
         break
 
+      case 'view_style':
+        invoke('view_style', handlers.onViewChange ? () => handlers.onViewChange!('style') : undefined)
+        break
+
+      case 'view_glossary':
+        invoke('view_glossary', handlers.onViewChange ? () => handlers.onViewChange!('glossary') : undefined)
+        break
+
+      case 'view_summary':
+        invoke('view_summary', handlers.onViewChange ? () => handlers.onViewChange!('summary') : undefined)
+        break
+
       case 'toggle_inspector':
         invoke('toggle_inspector', handlers.onToggleInspector)
         break

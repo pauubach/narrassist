@@ -1180,6 +1180,18 @@ class UnifiedAnalysisPipeline(
                     if dialogue.speaker_hint:
                         context.speaker_hints[dialogue.start_char] = dialogue.speaker_hint
 
+                # Asignar capítulo a cada diálogo basándose en posición
+                if context.chapters:
+                    for d in context.dialogues:
+                        d_start = d.get("start_char", 0)
+                        for ch in context.chapters:
+                            ch_start = ch.get("start_char", 0) if isinstance(ch, dict) else getattr(ch, "start_char", 0)
+                            ch_end = ch.get("end_char", 0) if isinstance(ch, dict) else getattr(ch, "end_char", 0)
+                            ch_num = ch.get("number", 0) if isinstance(ch, dict) else getattr(ch, "number", 0)
+                            if ch_start <= d_start <= ch_end:
+                                d["chapter"] = ch_num
+                                break
+
                 context.stats["dialogues"] = len(context.dialogues)
                 context.stats["speaker_hints"] = len(context.speaker_hints)
                 logger.info(

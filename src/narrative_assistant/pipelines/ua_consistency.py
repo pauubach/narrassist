@@ -222,8 +222,8 @@ class PipelineConsistencyMixin:
         """
         Detección heurística de intrusiones omniscientes sin declaraciones DB.
 
-        Busca patrones donde el narrador accede a los pensamientos de personajes
-        que no son el focalizador principal del capítulo.
+        Determina el focalizador global (personaje con más acceso mental en
+        toda la obra) y flag a cualquier otro personaje cuya mente se acceda.
         """
         import re
 
@@ -234,7 +234,8 @@ class PipelineConsistencyMixin:
             r"se\s+preguntó|se\s+preguntaba|temía|temió|deseaba|deseó|"
             r"sospechó|sospechaba|intuía|intuyó|imaginó|imaginaba|"
             r"comprendió|comprendía|entendió|entendía|"
-            r"se\s+dijo|se\s+decía|se\s+convenció|creía|creyó)",
+            r"se\s+dijo|se\s+decía|se\s+convenció|creía|creyó|"
+            r"quería|echaba\s+de\s+menos|se\s+arrepentía)",
             re.UNICODE,
         )
 
@@ -244,21 +245,23 @@ class PipelineConsistencyMixin:
             name = self._get_val(e, "canonical_name") or self._get_val(e, "name") or ""
             if name:
                 entity_names.add(name)
-                # Primer nombre
                 first = name.split()[0]
                 if first:
                     entity_names.add(first)
 
         chapters_data = self._prepare_chapter_data(context)
 
-        violations = []
+        # Fase 1: Determinar focalizador global (más accesos mentales en toda la obra)
+        global_mental_counts: dict[str, int] = {}
+        chapter_mental_data: list[dict] = []
+
         for ch in chapters_data:
             content = ch["content"]
             chapter_num = ch["number"]
             if not content:
+                chapter_mental_data.append({"mentions": {}, "positions": {}})
                 continue
 
-            # Detectar focalizador principal: personaje con más accesos mentales
             mental_mentions: dict[str, int] = {}
             mental_positions: dict[str, list[tuple[int, str]]] = {}
             for m in MENTAL_ACCESS.finditer(content):
@@ -268,17 +271,30 @@ class PipelineConsistencyMixin:
                     mental_positions.setdefault(name, []).append(
                         (m.start(), m.group(0))
                     )
+                    global_mental_counts[name] = global_mental_counts.get(name, 0) + 1
 
-            if len(mental_mentions) < 2:
-                continue  # No hay intrusion si solo 1 personaje tiene acceso mental
+            chapter_mental_data.append({
+                "mentions": mental_mentions,
+                "positions": mental_positions,
+            })
 
-            # El focalizador principal es el que tiene más accesos mentales
-            sorted_chars = sorted(mental_mentions.items(), key=lambda x: -x[1])
-            main_focalizer = sorted_chars[0][0]
+        if not global_mental_counts:
+            logger.info("Heuristic focalization: 0 violations (no mental access found)")
+            return []
 
-            # Los demás son intrusiones omniscientes
-            for char_name, count in sorted_chars[1:]:
-                for pos, excerpt in mental_positions[char_name]:
+        # Focalizador global = personaje con más accesos mentales totales
+        sorted_global = sorted(global_mental_counts.items(), key=lambda x: -x[1])
+        main_focalizer = sorted_global[0][0]
+        logger.debug(f"Focalization heuristic: main focalizer = {main_focalizer} ({sorted_global})")
+
+        # Fase 2: Flagear accesos mentales de otros personajes
+        violations = []
+        for ch, ch_data in zip(chapters_data, chapter_mental_data, strict=True):
+            chapter_num = ch["number"]
+            for char_name, positions in ch_data["positions"].items():
+                if char_name == main_focalizer:
+                    continue
+                for pos, excerpt in positions:
                     violations.append(
                         _HeuristicFocalizationViolation(
                             violation_type="forbidden_mind_access",
@@ -286,7 +302,7 @@ class PipelineConsistencyMixin:
                             text_excerpt=excerpt,
                             explanation=(
                                 f"Acceso a pensamientos de {char_name} cuando "
-                                f"el focalizador del capítulo es {main_focalizer}. "
+                                f"el focalizador de la obra es {main_focalizer}. "
                                 f"Posible intrusión omnisciente."
                             ),
                             chapter=chapter_num,
@@ -386,8 +402,8 @@ class PipelineConsistencyMixin:
 
             # Analizar cada capítulo
             for ch in context.chapters:
-                chapter_num = ch.get("number", 0)
-                content = ch.get("content", "")
+                chapter_num = self._get_val(ch, "number") or self._get_val(ch, "chapter_number") or 0
+                content = self._get_val(ch, "content") or self._get_val(ch, "text") or ""
 
                 if not content:
                     continue
@@ -411,14 +427,24 @@ class PipelineConsistencyMixin:
                     n = self._get_val(e, "canonical_name") or self._get_val(e, "name") or str(e)
                     entity_names.append(n)
 
+                logger.debug(
+                    f"Emotional coherence cap. {chapter_num}: "
+                    f"{len(dialogues_tuples)} dialogues, "
+                    f"{len(entity_names)} entities"
+                )
+
                 # El checker analiza el capítulo completo
                 # analyze_chapter() retorna list[EmotionalIncoherence] directamente
-                result = checker.analyze_chapter(
-                    chapter_text=content,
-                    chapter_id=chapter_num,
-                    dialogues=dialogues_tuples,
-                    entity_names=entity_names,
-                )
+                try:
+                    result = checker.analyze_chapter(
+                        chapter_text=content,
+                        chapter_id=chapter_num,
+                        dialogues=dialogues_tuples,
+                        entity_names=entity_names,
+                    )
+                except Exception as chapter_err:
+                    logger.warning(f"Emotional coherence cap. {chapter_num} failed: {chapter_err}")
+                    continue
 
                 # Manejar tanto Result como list directa
                 if hasattr(result, "is_success"):
@@ -562,7 +588,7 @@ class PipelineConsistencyMixin:
             else:
                 etype = "character"
             entities_data.append({
-                "id": eid, "canonical_name": name,
+                "id": eid, "canonical_name": name, "name": name,
                 "aliases": aliases, "entity_type": etype,
             })
         return entities_data

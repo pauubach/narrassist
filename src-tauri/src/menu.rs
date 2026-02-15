@@ -1,5 +1,9 @@
 // Menu nativo para Narrative Assistant
 // Proporciona acceso rapido a las funciones principales de la aplicacion
+//
+// Atajos de pestañas: Ctrl+1..8 (patron estandar VS Code/Chrome)
+// Orden: Texto(1) Entidades(2) Relaciones(3) Revision(4) Cronologia(5)
+//        Escritura(6) Glosario(7) Resumen(8)
 
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem, Submenu},
@@ -24,11 +28,16 @@ pub mod file_menu {
 pub mod view_menu {
     pub const CHAPTERS: &str = "view_chapters";
     pub const ENTITIES: &str = "view_entities";
-    pub const ALERTS: &str = "view_alerts";
     pub const RELATIONSHIPS: &str = "view_relationships";
+    pub const ALERTS: &str = "view_alerts";
     pub const TIMELINE: &str = "view_timeline";
+    pub const STYLE: &str = "view_style";
+    pub const GLOSSARY: &str = "view_glossary";
+    pub const SUMMARY: &str = "view_summary";
     pub const TOGGLE_INSPECTOR: &str = "toggle_inspector";
     pub const TOGGLE_SIDEBAR: &str = "toggle_sidebar";
+    pub const TOGGLE_HISTORY: &str = "toggle_history";
+    pub const TOGGLE_THEME: &str = "toggle_theme";
 }
 
 /// IDs del menu Analisis
@@ -57,11 +66,16 @@ const ALL_MENU_IDS: &[&str] = &[
     file_menu::SETTINGS,
     view_menu::CHAPTERS,
     view_menu::ENTITIES,
-    view_menu::ALERTS,
     view_menu::RELATIONSHIPS,
+    view_menu::ALERTS,
     view_menu::TIMELINE,
+    view_menu::STYLE,
+    view_menu::GLOSSARY,
+    view_menu::SUMMARY,
     view_menu::TOGGLE_INSPECTOR,
     view_menu::TOGGLE_SIDEBAR,
+    view_menu::TOGGLE_HISTORY,
+    view_menu::TOGGLE_THEME,
     analysis_menu::RUN,
     help_menu::TUTORIAL,
     help_menu::KEYBOARD_SHORTCUTS,
@@ -139,7 +153,7 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
         ],
     )?;
 
-    // Menu Edicion
+    // Menu Edicion (predefinidos del sistema — sin conflictos)
     let undo = PredefinedMenuItem::undo(app, Some("Deshacer"))?;
     let redo = PredefinedMenuItem::redo(app, Some("Rehacer"))?;
     let separator4 = PredefinedMenuItem::separator(app)?;
@@ -147,19 +161,31 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
     let copy = PredefinedMenuItem::copy(app, Some("Copiar"))?;
     let paste = PredefinedMenuItem::paste(app, Some("Pegar"))?;
     let select_all = PredefinedMenuItem::select_all(app, Some("Seleccionar todo"))?;
+    let separator4b = PredefinedMenuItem::separator(app)?;
+    let find = MenuItem::with_id(app, "find", "Buscar", true, Some("CmdOrCtrl+F"))?;
 
     let edit_submenu = Submenu::with_items(
         app,
         "Edicion",
         true,
-        &[&undo, &redo, &separator4, &cut, &copy, &paste, &select_all],
+        &[
+            &undo,
+            &redo,
+            &separator4,
+            &cut,
+            &copy,
+            &paste,
+            &select_all,
+            &separator4b,
+            &find,
+        ],
     )?;
 
-    // Menu Ver
+    // Menu Ver — pestañas Ctrl+1..8 en orden visual
     let view_chapters = MenuItem::with_id(
         app,
         view_menu::CHAPTERS,
-        "Capitulos",
+        "Texto",
         true,
         Some("CmdOrCtrl+1"),
     )?;
@@ -170,36 +196,62 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
         true,
         Some("CmdOrCtrl+2"),
     )?;
-    let view_alerts =
-        MenuItem::with_id(app, view_menu::ALERTS, "Alertas", true, Some("CmdOrCtrl+3"))?;
     let view_relationships = MenuItem::with_id(
         app,
         view_menu::RELATIONSHIPS,
         "Relaciones",
+        true,
+        Some("CmdOrCtrl+3"),
+    )?;
+    let view_alerts = MenuItem::with_id(
+        app,
+        view_menu::ALERTS,
+        "Revision",
         true,
         Some("CmdOrCtrl+4"),
     )?;
     let view_timeline = MenuItem::with_id(
         app,
         view_menu::TIMELINE,
-        "Linea temporal",
+        "Cronologia",
         true,
         Some("CmdOrCtrl+5"),
     )?;
-    let separator5 = PredefinedMenuItem::separator(app)?;
-    let toggle_inspector = MenuItem::with_id(
+    let view_style = MenuItem::with_id(
         app,
-        view_menu::TOGGLE_INSPECTOR,
-        "Mostrar/ocultar inspector",
+        view_menu::STYLE,
+        "Escritura",
         true,
-        Some("CmdOrCtrl+Shift+I"),
+        Some("CmdOrCtrl+6"),
     )?;
+    let view_glossary = MenuItem::with_id(
+        app,
+        view_menu::GLOSSARY,
+        "Glosario",
+        true,
+        Some("CmdOrCtrl+7"),
+    )?;
+    let view_summary = MenuItem::with_id(
+        app,
+        view_menu::SUMMARY,
+        "Resumen",
+        true,
+        Some("CmdOrCtrl+8"),
+    )?;
+    let separator5 = PredefinedMenuItem::separator(app)?;
     let toggle_sidebar = MenuItem::with_id(
         app,
         view_menu::TOGGLE_SIDEBAR,
         "Mostrar/ocultar sidebar",
         true,
         Some("CmdOrCtrl+B"),
+    )?;
+    let toggle_inspector = MenuItem::with_id(
+        app,
+        view_menu::TOGGLE_INSPECTOR,
+        "Mostrar/ocultar inspector",
+        true,
+        Some("CmdOrCtrl+Shift+I"),
     )?;
     let separator6 = PredefinedMenuItem::separator(app)?;
     let fullscreen = PredefinedMenuItem::fullscreen(app, Some("Pantalla completa"))?;
@@ -211,24 +263,27 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
         &[
             &view_chapters,
             &view_entities,
-            &view_alerts,
             &view_relationships,
+            &view_alerts,
             &view_timeline,
+            &view_style,
+            &view_glossary,
+            &view_summary,
             &separator5,
-            &toggle_inspector,
             &toggle_sidebar,
+            &toggle_inspector,
             &separator6,
             &fullscreen,
         ],
     )?;
 
-    // Menu Analisis
+    // Menu Analisis (sin atajo global — evita conflicto con Ctrl+R del navegador)
     let run_analysis = MenuItem::with_id(
         app,
         analysis_menu::RUN,
         "Ejecutar analisis",
         true,
-        Some("CmdOrCtrl+R"),
+        None::<&str>,
     )?;
     let analysis_submenu = Submenu::with_items(app, "Analisis", true, &[&run_analysis])?;
 
@@ -372,10 +427,10 @@ mod tests {
     /// (para detectar si se anade un item sin actualizar ALL_MENU_IDS)
     #[test]
     fn menu_ids_count_matches_expected() {
-        // 6 archivo + 7 ver + 1 analisis + 6 ayuda = 20
+        // 6 archivo + 10 ver + 1 analisis + 6 ayuda = 23
         assert_eq!(
             ALL_MENU_IDS.len(),
-            20,
+            23,
             "Se cambio el numero de items de menu. Actualizar ALL_MENU_IDS y este test."
         );
     }
@@ -398,6 +453,9 @@ mod tests {
             "view_alerts",
             "view_relationships",
             "view_timeline",
+            "view_style",
+            "view_glossary",
+            "view_summary",
             "toggle_inspector",
             "toggle_sidebar",
             "run_analysis",
@@ -433,9 +491,12 @@ mod tests {
     fn view_menu_ids_correct() {
         assert_eq!(view_menu::CHAPTERS, "view_chapters");
         assert_eq!(view_menu::ENTITIES, "view_entities");
-        assert_eq!(view_menu::ALERTS, "view_alerts");
         assert_eq!(view_menu::RELATIONSHIPS, "view_relationships");
+        assert_eq!(view_menu::ALERTS, "view_alerts");
         assert_eq!(view_menu::TIMELINE, "view_timeline");
+        assert_eq!(view_menu::STYLE, "view_style");
+        assert_eq!(view_menu::GLOSSARY, "view_glossary");
+        assert_eq!(view_menu::SUMMARY, "view_summary");
         assert_eq!(view_menu::TOGGLE_INSPECTOR, "toggle_inspector");
         assert_eq!(view_menu::TOGGLE_SIDEBAR, "toggle_sidebar");
     }

@@ -825,15 +825,10 @@ def update_entity(
 )
 def delete_entity(project_id: int, entity_id: int, hard_delete: bool = False):
     """
-    Elimina (o desactiva) una entidad.
+    Desactiva (soft-delete) una entidad.
 
-    Args:
-        project_id: ID del proyecto
-        entity_id: ID de la entidad a eliminar
-        hard_delete: Si True, elimina permanentemente. Si False, solo desactiva (default).
-
-    Returns:
-        ApiResponse con resultado de la eliminación
+    Siempre usa soft-delete para compatibilidad con undo/redo.
+    El parámetro hard_delete se mantiene por compatibilidad pero se ignora.
     """
     try:
         # Verificar que la entidad existe y pertenece al proyecto
@@ -842,21 +837,42 @@ def delete_entity(project_id: int, entity_id: int, hard_delete: bool = False):
             return error
 
         entity_name = entity.canonical_name
+        entity_type = getattr(entity, "entity_type", "")
+        if hasattr(entity_type, "value"):
+            entity_type = entity_type.value
 
-        # Eliminar o desactivar la entidad
+        # Siempre soft-delete (undo-compatible)
         entity_repo = deps.entity_repository
-        deleted = entity_repo.delete_entity(entity_id, hard_delete=hard_delete)  # type: ignore[attr-defined]
+        deleted = entity_repo.delete_entity(entity_id, hard_delete=False)  # type: ignore[attr-defined]
 
         if not deleted:
             return ApiResponse(success=False, error="No se pudo eliminar la entidad")
 
-        action = "eliminada permanentemente" if hard_delete else "desactivada"
-        logger.info(f"Entity {entity_id} ({entity_name}) {action}")
+        # Registrar en historial para undo
+        try:
+            from narrative_assistant.persistence.history import ChangeType, HistoryManager
+            history = HistoryManager(project_id)
+            history.record(
+                action_type=ChangeType.ENTITY_DELETED,
+                target_type="entity",
+                target_id=entity_id,
+                old_value={
+                    "canonical_name": entity_name,
+                    "entity_type": entity_type,
+                    "is_active": 1,
+                },
+                new_value={"is_active": 0},
+                note=f"Entidad '{entity_name}' eliminada",
+            )
+        except Exception as hist_err:
+            logger.warning(f"No se pudo registrar en historial: {hist_err}")
+
+        logger.info(f"Entity {entity_id} ({entity_name}) desactivada")
 
         return ApiResponse(
             success=True,
-            data={"id": entity_id, "name": entity_name, "hard_delete": hard_delete},
-            message=f"Entidad '{entity_name}' {action}",
+            data={"id": entity_id, "name": entity_name, "action": "deleted"},
+            message=f"Entidad '{entity_name}' eliminada",
         )
 
     except Exception as e:

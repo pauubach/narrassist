@@ -134,6 +134,9 @@
                   <span v-if="tab === 'alerts' && alertsCount > 0" class="sidebar-badge">
                     {{ alertsCount > 99 ? '99+' : alertsCount }}
                   </span>
+                  <span v-if="tab === 'history' && undoableCount > 0" class="sidebar-badge sidebar-badge--history">
+                    {{ undoableCount > 99 ? '99+' : undoableCount }}
+                  </span>
                 </button>
               </div>
 
@@ -172,6 +175,12 @@
                 <!-- Panel Asistente LLM -->
                 <AssistantPanel
                   v-show="sidebarTab === 'assistant'"
+                  :project-id="project.id"
+                />
+
+                <!-- Panel Historial -->
+                <HistoryPanel
+                  v-show="sidebarTab === 'history'"
                   :project-id="project.id"
                 />
               </div>
@@ -430,7 +439,7 @@ import StatusBar from '@/components/layout/StatusBar.vue'
 import { WorkspaceTabs, TextTab, AlertsTab, EntitiesTab, RelationsTab, StyleTab, GlossaryTab, ResumenTab, PanelResizer } from '@/components/workspace'
 import { AnalysisRequired } from '@/components/analysis'
 import { TimelineView } from '@/components/timeline'
-import { ChaptersPanel, AlertsPanel, CharactersPanel, AssistantPanel } from '@/components/sidebar'
+import { ChaptersPanel, AlertsPanel, CharactersPanel, AssistantPanel, HistoryPanel } from '@/components/sidebar'
 import { ProjectSummary, EntityInspector, AlertInspector, ChapterInspector, TextSelectionInspector } from '@/components/inspector'
 import ComparisonBanner from '@/components/alerts/ComparisonBanner.vue'
 import DocumentTypeChip from '@/components/DocumentTypeChip.vue'
@@ -440,6 +449,8 @@ import type { Entity, Alert, AlertSource } from '@/types'
 import { resetGlobalHighlight } from '@/composables/useHighlight'
 import { api } from '@/services/apiClient'
 import { useNotifications } from '@/composables/useNotifications'
+import { useGlobalUndo } from '@/composables/useGlobalUndo'
+import { useToast } from 'primevue/usetoast'
 
 const route = useRoute()
 const router = useRouter()
@@ -448,6 +459,10 @@ const workspaceStore = useWorkspaceStore()
 const selectionStore = useSelectionStore()
 const analysisStore = useAnalysisStore()
 const { requestPermission: requestNotificationPermission } = useNotifications()
+const toast = useToast()
+
+// Global undo (Ctrl+Z)
+const { undoableCount } = useGlobalUndo(() => project.value?.id ?? null)
 
 // ── Composables ────────────────────────────────────────────
 const project = computed(() => projectsStore.currentProject)
@@ -508,7 +523,8 @@ const getSidebarTabIcon = (tab: SidebarTab): string => {
     chapters: 'pi pi-book',
     alerts: 'pi pi-exclamation-triangle',
     characters: 'pi pi-users',
-    assistant: 'pi pi-comments'
+    assistant: 'pi pi-comments',
+    history: 'pi pi-history'
   }
   return icons[tab]
 }
@@ -518,7 +534,8 @@ const getSidebarTabTitle = (tab: SidebarTab): string => {
     chapters: 'Capítulos',
     alerts: 'Alertas',
     characters: 'Personajes',
-    assistant: 'Asistente'
+    assistant: 'Asistente',
+    history: 'Historial'
   }
   return titles[tab]
 }
@@ -611,7 +628,26 @@ const handleDismissAlert = () => {
   if (selectedAlert.value) onAlertDismiss(selectedAlert.value)
 }
 const handleEscape = () => { selectionStore.clearAll() }
-const handleKeyboardExport = () => { showExportDialog.value = true }
+const handleToggleHistory = () => {
+  if (sidebarTab.value === 'history') {
+    sidebarTab.value = 'chapters'
+  } else {
+    sidebarTab.value = 'history'
+    if (!workspaceStore.leftPanel.expanded) workspaceStore.toggleLeftPanel()
+  }
+}
+const handleSidebarSetTab = (event: Event) => {
+  const tab = (event as CustomEvent).detail?.tab
+  if (tab) {
+    sidebarTab.value = tab
+    if (!workspaceStore.leftPanel.expanded) workspaceStore.toggleLeftPanel()
+  }
+}
+const handleUndoComplete = async () => {
+  const pid = project.value?.id
+  if (!pid) return
+  await Promise.all([loadEntities(pid), loadAlerts(pid)])
+}
 
 // ── Lifecycle ──────────────────────────────────────────────
 
@@ -637,15 +673,16 @@ onMounted(async () => {
   window.addEventListener('keyboard:resolve-alert', handleResolveAlert)
   window.addEventListener('keyboard:dismiss-alert', handleDismissAlert)
   window.addEventListener('keyboard:escape', handleEscape)
-  window.addEventListener('keyboard:export', handleKeyboardExport)
-  window.addEventListener('keyboard:toggle-sidebar', handleMenuToggleSidebar)
+  window.addEventListener('menubar:toggle-history', handleToggleHistory)
+  window.addEventListener('sidebar:set-tab', handleSidebarSetTab)
+  window.addEventListener('history:undo-complete', handleUndoComplete)
 
   try {
     analysisStore.setActiveProjectId(projectId)
     workspaceStore.reset()
 
     const tabParam = route.query.tab as string
-    if (tabParam && ['text', 'entities', 'relations', 'alerts', 'style', 'resumen'].includes(tabParam)) {
+    if (tabParam && ['text', 'entities', 'relationships', 'alerts', 'timeline', 'style', 'glossary', 'summary'].includes(tabParam)) {
       workspaceStore.setActiveTab(tabParam as any)
     }
 
@@ -701,8 +738,9 @@ onUnmounted(() => {
   window.removeEventListener('keyboard:resolve-alert', handleResolveAlert)
   window.removeEventListener('keyboard:dismiss-alert', handleDismissAlert)
   window.removeEventListener('keyboard:escape', handleEscape)
-  window.removeEventListener('keyboard:export', handleKeyboardExport)
-  window.removeEventListener('keyboard:toggle-sidebar', handleMenuToggleSidebar)
+  window.removeEventListener('menubar:toggle-history', handleToggleHistory)
+  window.removeEventListener('sidebar:set-tab', handleSidebarSetTab)
+  window.removeEventListener('history:undo-complete', handleUndoComplete)
   stopAnalysisPolling()
   resetGlobalHighlight()
 })
@@ -852,8 +890,10 @@ const onAlertResolve = async (alert: Alert) => {
     await api.postRaw(`/api/projects/${projectId}/alerts/${alert.id}/resolve`)
     await loadAlerts(projectId)
     selectionStore.clearAll()
+    toast.add({ severity: 'success', summary: 'Resuelta', detail: alert.title || `Alerta #${alert.id} resuelta`, life: 3000 })
   } catch (err) {
     console.error('Error resolving alert:', err)
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo resolver la alerta', life: 3000 })
   }
 }
 
@@ -863,8 +903,10 @@ const onAlertDismiss = async (alert: Alert) => {
     await api.postRaw(`/api/projects/${projectId}/alerts/${alert.id}/dismiss`)
     await loadAlerts(projectId)
     selectionStore.clearAll()
+    toast.add({ severity: 'info', summary: 'Descartada', detail: alert.title || `Alerta #${alert.id} descartada`, life: 3000 })
   } catch (err) {
     console.error('Error dismissing alert:', err)
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo descartar la alerta', life: 3000 })
   }
 }
 

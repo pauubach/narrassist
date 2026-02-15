@@ -101,20 +101,28 @@ const isInProject = computed(() => {
 
 const menus = computed<Menu[]>(() => {
   const viewItems: MenuItem[] = [
-    { label: 'Proyectos', action: 'viewProjects', icon: 'folder', shortcut: 'Ctrl+P' }
+    { label: 'Proyectos', action: 'viewProjects', icon: 'folder' }
   ]
 
-  // Agregar pestañas del proyecto si estamos en un proyecto
+  // Agregar pestañas del proyecto si estamos en un proyecto (Ctrl+1..8)
   if (isInProject.value) {
     viewItems.push(
-      { label: 'Texto', action: 'viewText', icon: 'file-edit', shortcut: 'Ctrl+T' },
-      { label: 'Entidades', action: 'viewEntities', icon: 'users', shortcut: 'Ctrl+E' },
-      { label: 'Relaciones', action: 'viewRelations', icon: 'share-alt', shortcut: 'Ctrl+R' },
-      { label: 'Alertas', action: 'viewAlerts', icon: 'exclamation-triangle', shortcut: 'Ctrl+A' }
+      { label: 'Texto', action: 'viewText', icon: 'file-edit', shortcut: 'Ctrl+1' },
+      { label: 'Entidades', action: 'viewEntities', icon: 'users', shortcut: 'Ctrl+2' },
+      { label: 'Relaciones', action: 'viewRelations', icon: 'share-alt', shortcut: 'Ctrl+3' },
+      { label: 'Revisión', action: 'viewAlerts', icon: 'exclamation-triangle', shortcut: 'Ctrl+4' },
+      { label: 'Cronología', action: 'viewTimeline', icon: 'clock', shortcut: 'Ctrl+5' },
+      { label: 'Escritura', action: 'viewStyle', icon: 'pencil', shortcut: 'Ctrl+6' },
+      { label: 'Glosario', action: 'viewGlossary', icon: 'book', shortcut: 'Ctrl+7' },
+      { label: 'Resumen', action: 'viewSummary', icon: 'chart-bar', shortcut: 'Ctrl+8' },
+      { divider: true, label: '' },
+      { label: 'Sidebar', action: 'toggleSidebar', icon: 'th-large', shortcut: 'Ctrl+B' },
+      { label: 'Inspector', action: 'toggleInspector', icon: 'sliders-h', shortcut: 'Ctrl+Shift+I' },
+      { label: 'Historial', action: 'toggleHistory', icon: 'history', shortcut: 'Ctrl+Shift+H' },
+      { divider: true, label: '' },
+      { label: 'Cambiar tema', action: 'toggleTheme', icon: 'palette', shortcut: 'Ctrl+Shift+D' }
     )
   }
-
-  // El tema se cambia desde Configuración
 
   return [
     {
@@ -135,7 +143,6 @@ const menus = computed<Menu[]>(() => {
       label: 'Edición',
       items: [
         { label: 'Buscar', action: 'find', icon: 'search', shortcut: 'Ctrl+F' },
-        { label: 'Reemplazar', action: 'replace', icon: 'sync', shortcut: 'Ctrl+H' },
       ]
     },
     {
@@ -145,7 +152,7 @@ const menus = computed<Menu[]>(() => {
     {
       label: 'Análisis',
       items: [
-        { label: 'Ejecutar análisis', action: 'runAnalysis', icon: 'play', shortcut: 'Ctrl+R', disabled: !isInProject.value },
+        { label: 'Ejecutar análisis', action: 'runAnalysis', icon: 'play', disabled: !isInProject.value },
       ]
     },
     {
@@ -305,28 +312,56 @@ const handleMenuAction = (item: MenuItem) => {
       router.push('/projects')
       break
     case 'viewText':
-      // Navigate to current project text tab
       if (route.params.id) {
         window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'text' } }))
       }
       break
     case 'viewEntities':
-      // Navigate to current project entities tab
       if (route.params.id) {
         window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'entities' } }))
       }
       break
     case 'viewRelations':
-      // Navigate to current project relations tab
       if (route.params.id) {
-        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'relations' } }))
+        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'relationships' } }))
       }
       break
     case 'viewAlerts':
-      // Navigate to current project alerts tab
       if (route.params.id) {
         window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'alerts' } }))
       }
+      break
+    case 'viewTimeline':
+      if (route.params.id) {
+        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'timeline' } }))
+      }
+      break
+    case 'viewStyle':
+      if (route.params.id) {
+        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'style' } }))
+      }
+      break
+    case 'viewGlossary':
+      if (route.params.id) {
+        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'glossary' } }))
+      }
+      break
+    case 'viewSummary':
+      if (route.params.id) {
+        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'summary' } }))
+      }
+      break
+    case 'toggleSidebar':
+      window.dispatchEvent(new CustomEvent('menubar:toggle-sidebar'))
+      break
+    case 'toggleInspector':
+      window.dispatchEvent(new CustomEvent('menubar:toggle-inspector'))
+      break
+    case 'toggleHistory':
+      window.dispatchEvent(new CustomEvent('menubar:toggle-history'))
+      break
+    case 'toggleTheme':
+      window.dispatchEvent(new CustomEvent('menubar:toggle-theme'))
       break
     case 'shortcuts':
       window.dispatchEvent(new CustomEvent('keyboard:show-help'))

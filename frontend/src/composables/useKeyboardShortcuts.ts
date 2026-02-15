@@ -2,11 +2,37 @@ import { onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 /**
- * Composable para atajos de teclado globales
- * Basado en UI Design Proposal líneas 1401-1461
+ * Mapeo de números de teclado a pestañas del workspace.
+ * Sigue el orden visual de las pestañas (izquierda → derecha).
+ * Patrón estándar: VS Code, Chrome, Sublime, Firefox.
+ */
+const TAB_BY_NUMBER: Record<string, string> = {
+  '1': 'text',          // Texto
+  '2': 'entities',      // Entidades
+  '3': 'relationships', // Relaciones
+  '4': 'alerts',        // Revisión
+  '5': 'timeline',      // Cronología
+  '6': 'style',         // Escritura
+  '7': 'glossary',      // Glosario
+  '8': 'summary',       // Resumen
+}
+
+/**
+ * Composable para atajos de teclado globales.
+ *
+ * Diseño validado por panel de expertos (UX, editor, accesibilidad):
+ * - Ctrl+1..8 para pestañas (patrón estándar, sin conflictos con OS)
+ * - Sin secuestrar Ctrl+A/X/H/P/T/R/D (funciones estándar del sistema)
+ * - F8/Shift+F8 para navegación de alertas
+ * - Modo corrección secuencial tiene sus propios atajos (A/D/S/F/N/P)
  */
 export function useKeyboardShortcuts() {
   const router = useRouter()
+
+  const isInProject = (): boolean => {
+    const currentRoute = router.currentRoute.value
+    return !!(currentRoute.params.id || currentRoute.params.projectId)
+  }
 
   const handleKeydown = (event: KeyboardEvent) => {
     const { key, ctrlKey, metaKey, shiftKey, altKey } = event
@@ -26,68 +52,41 @@ export function useKeyboardShortcuts() {
       return
     }
 
-    // Navegación de alertas
+    // ── Pestañas del workspace: Ctrl+1..8 ──────────────────────
+    if (modifier && !shiftKey && !altKey && key in TAB_BY_NUMBER) {
+      event.preventDefault()
+      if (isInProject()) {
+        const tab = TAB_BY_NUMBER[key]
+        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab } }))
+      }
+      return
+    }
+
+    // ── Navegación de alertas ──────────────────────────────────
     if (key === 'F8' && !shiftKey) {
       event.preventDefault()
-      // Emit evento para el componente de alertas
       window.dispatchEvent(new CustomEvent('keyboard:next-alert'))
     } else if (key === 'F8' && shiftKey) {
       event.preventDefault()
       window.dispatchEvent(new CustomEvent('keyboard:prev-alert'))
     }
 
-    // Paneles y vistas
-    else if (modifier && key === 'b') {
+    // ── Paneles y interfaz ─────────────────────────────────────
+    else if (modifier && !shiftKey && key === 'b') {
       event.preventDefault()
-      window.dispatchEvent(new CustomEvent('keyboard:toggle-sidebar'))
-    } else if (modifier && key === 'e') {
-      event.preventDefault()
-      // Ir al tab de entidades si estamos en un proyecto
-      const currentRoute = router.currentRoute.value
-      if (currentRoute.params.id || currentRoute.params.projectId) {
-        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'entities' } }))
-      }
-    } else if (modifier && key === 'a') {
-      event.preventDefault()
-      // Ir al tab de alertas si estamos en un proyecto
-      const currentRoute = router.currentRoute.value
-      if (currentRoute.params.id || currentRoute.params.projectId) {
-        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'alerts' } }))
-      }
-    } else if (modifier && key === 't') {
-      event.preventDefault()
-      // Ir al tab de texto si estamos en un proyecto
-      const currentRoute = router.currentRoute.value
-      if (currentRoute.params.id || currentRoute.params.projectId) {
-        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'text' } }))
-      }
-    } else if (modifier && key === 'r') {
-      event.preventDefault()
-      // Ir al tab de relaciones si estamos en un proyecto
-      const currentRoute = router.currentRoute.value
-      if (currentRoute.params.id || currentRoute.params.projectId) {
-        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'relations' } }))
-      }
-    } else if (modifier && key === 'd') {
-      event.preventDefault()
-      // Navegar al dashboard del proyecto
-      const currentRoute = router.currentRoute.value
-      if (currentRoute.params.id || currentRoute.params.projectId) {
-        const projectId = currentRoute.params.id || currentRoute.params.projectId
-        router.push({ name: 'project', params: { id: projectId } })
-      }
+      window.dispatchEvent(new CustomEvent('menubar:toggle-sidebar'))
     }
 
-    // Búsqueda
-    else if (modifier && key === 'f') {
+    // Buscar
+    else if (modifier && !shiftKey && key === 'f') {
       event.preventDefault()
-      window.dispatchEvent(new CustomEvent('keyboard:focus-search'))
+      window.dispatchEvent(new CustomEvent('menubar:find'))
     }
 
-    // Exportación
-    else if (modifier && key === 'x') {
+    // Exportar (Ctrl+E — sin conflicto ahora que tabs son numéricos)
+    else if (modifier && !shiftKey && key === 'e') {
       event.preventDefault()
-      window.dispatchEvent(new CustomEvent('keyboard:export'))
+      window.dispatchEvent(new CustomEvent('menubar:export'))
     }
 
     // Configuración
@@ -96,35 +95,38 @@ export function useKeyboardShortcuts() {
       router.push({ name: 'settings' })
     }
 
-    // Ayuda
+    // Toggle inspector (Ctrl+Shift+I)
+    else if (modifier && shiftKey && (key === 'I' || key === 'i')) {
+      event.preventDefault()
+      window.dispatchEvent(new CustomEvent('menubar:toggle-inspector'))
+    }
+
+    // Toggle historial (Ctrl+Shift+H)
+    else if (modifier && shiftKey && (key === 'H' || key === 'h')) {
+      event.preventDefault()
+      window.dispatchEvent(new CustomEvent('menubar:toggle-history'))
+    }
+
+    // Tema (Ctrl+Shift+D)
+    else if (modifier && shiftKey && (key === 'D' || key === 'd')) {
+      event.preventDefault()
+      window.dispatchEvent(new CustomEvent('menubar:toggle-theme'))
+    }
+
+    // ── Ayuda ──────────────────────────────────────────────────
     else if (key === 'F1' || (modifier && key === '/')) {
       event.preventDefault()
       window.dispatchEvent(new CustomEvent('keyboard:show-help'))
     }
 
-    // Tema
-    else if (modifier && shiftKey && key === 'D') {
-      event.preventDefault()
-      window.dispatchEvent(new CustomEvent('keyboard:toggle-theme'))
-    }
-
-    // Acciones en alertas (cuando hay una seleccionada)
+    // ── Acciones en alertas (cuando hay una seleccionada) ──────
     else if (key === 'Enter' && !modifier && !shiftKey && !altKey) {
       window.dispatchEvent(new CustomEvent('keyboard:resolve-alert'))
     } else if (key === 'Delete' && !modifier && !shiftKey && !altKey) {
       window.dispatchEvent(new CustomEvent('keyboard:dismiss-alert'))
     }
 
-    // Navegación general
-    else if (modifier && key === 'h') {
-      event.preventDefault()
-      router.push({ name: 'projects' })
-    } else if (modifier && key === 'p') {
-      event.preventDefault()
-      router.push({ name: 'projects' })
-    }
-
-    // Escape para cerrar modales/sidebars
+    // ── Escape para cerrar modales/sidebars ────────────────────
     else if (key === 'Escape') {
       window.dispatchEvent(new CustomEvent('keyboard:escape'))
     }
@@ -148,20 +150,21 @@ export function useKeyboardShortcuts() {
 }
 
 /**
- * Lista de atajos disponibles para mostrar en ayuda
+ * Lista de atajos disponibles para mostrar en ayuda.
+ * Fuente única de verdad — KeyboardShortcutsDialog la consume directamente.
  */
 export const KEYBOARD_SHORTCUTS = [
   {
-    category: 'Navegación',
+    category: 'Pestañas',
     shortcuts: [
-      { keys: ['Ctrl/Cmd', 'H'], description: 'Ir a inicio' },
-      { keys: ['Ctrl/Cmd', 'P'], description: 'Ir a proyectos' },
-      { keys: ['Ctrl/Cmd', 'D'], description: 'Ir al dashboard del proyecto' },
-      { keys: ['Ctrl/Cmd', 'T'], description: 'Ir a pestaña Texto' },
-      { keys: ['Ctrl/Cmd', 'E'], description: 'Ir a pestaña Entidades' },
-      { keys: ['Ctrl/Cmd', 'R'], description: 'Ir a pestaña Relaciones' },
-      { keys: ['Ctrl/Cmd', 'A'], description: 'Ir a pestaña Alertas' },
-      { keys: ['Ctrl/Cmd', ','], description: 'Abrir configuración' }
+      { keys: ['Ctrl/Cmd', '1'], description: 'Texto' },
+      { keys: ['Ctrl/Cmd', '2'], description: 'Entidades' },
+      { keys: ['Ctrl/Cmd', '3'], description: 'Relaciones' },
+      { keys: ['Ctrl/Cmd', '4'], description: 'Revisión (alertas)' },
+      { keys: ['Ctrl/Cmd', '5'], description: 'Cronología' },
+      { keys: ['Ctrl/Cmd', '6'], description: 'Escritura' },
+      { keys: ['Ctrl/Cmd', '7'], description: 'Glosario' },
+      { keys: ['Ctrl/Cmd', '8'], description: 'Resumen' },
     ]
   },
   {
@@ -170,24 +173,41 @@ export const KEYBOARD_SHORTCUTS = [
       { keys: ['F8'], description: 'Siguiente alerta' },
       { keys: ['Shift', 'F8'], description: 'Alerta anterior' },
       { keys: ['Enter'], description: 'Resolver alerta seleccionada' },
-      { keys: ['Delete'], description: 'Descartar alerta seleccionada' }
+      { keys: ['Delete'], description: 'Descartar alerta seleccionada' },
     ]
   },
   {
     category: 'Interfaz',
     shortcuts: [
       { keys: ['Ctrl/Cmd', 'B'], description: 'Mostrar/ocultar sidebar' },
+      { keys: ['Ctrl/Cmd', 'Shift', 'I'], description: 'Mostrar/ocultar inspector' },
+      { keys: ['Ctrl/Cmd', 'Shift', 'H'], description: 'Mostrar/ocultar historial' },
+      { keys: ['Ctrl/Cmd', 'Z'], description: 'Deshacer última acción' },
       { keys: ['Ctrl/Cmd', 'F'], description: 'Buscar' },
-      { keys: ['Ctrl/Cmd', 'X'], description: 'Exportar' },
+      { keys: ['Ctrl/Cmd', 'E'], description: 'Exportar' },
+      { keys: ['Ctrl/Cmd', ','], description: 'Configuración' },
       { keys: ['Ctrl/Cmd', 'Shift', 'D'], description: 'Cambiar tema' },
-      { keys: ['Escape'], description: 'Cerrar modal/cancelar' }
+      { keys: ['Escape'], description: 'Cerrar modal/cancelar' },
+    ]
+  },
+  {
+    category: 'Corrección secuencial',
+    shortcuts: [
+      { keys: ['→', 'N'], description: 'Siguiente alerta' },
+      { keys: ['←', 'P'], description: 'Alerta anterior' },
+      { keys: ['A', 'Enter'], description: 'Aceptar (resolver)' },
+      { keys: ['D'], description: 'Descartar' },
+      { keys: ['S'], description: 'Saltar' },
+      { keys: ['F'], description: 'Marcar para revisar' },
+      { keys: ['Ctrl/Cmd', 'Z'], description: 'Deshacer' },
+      { keys: ['Escape'], description: 'Salir del modo' },
     ]
   },
   {
     category: 'Ayuda',
     shortcuts: [
       { keys: ['F1'], description: 'Mostrar ayuda' },
-      { keys: ['Ctrl/Cmd', '/'], description: 'Mostrar atajos de teclado' }
+      { keys: ['Ctrl/Cmd', '/'], description: 'Mostrar atajos de teclado' },
     ]
-  }
+  },
 ]

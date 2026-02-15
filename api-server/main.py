@@ -23,6 +23,7 @@ Routes are organized in routers/ subdirectory:
   - exports.py:       Document exports
   - license.py:       License management
   - services.py:      LLM, Ollama, LanguageTool, chat
+  - history.py:       Undo/redo universal, historial de cambios
 """
 
 # CRITICAL: Add user site-packages to sys.path BEFORE any imports
@@ -533,6 +534,10 @@ try:
     from routers import collections, services
     _early_logger.info("services router imported")
 
+    _early_logger.info("Importing history router...")
+    from routers import history
+    _early_logger.info("history router imported")
+
     _early_logger.info("All routers imported successfully")
 
 except Exception as e:
@@ -592,6 +597,9 @@ try:
 
     _early_logger.info("Registering collections router...")
     app.include_router(collections.router)
+
+    _early_logger.info("Registering history router...")
+    app.include_router(history.router)
 
     _early_logger.info("All routers registered successfully")
 

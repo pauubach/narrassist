@@ -84,6 +84,7 @@ def main():
         use_llm=False,
         parallel_extraction=False,  # Secuencial para estabilidad
         max_workers=2,
+        enable_memory_monitoring=False,  # Evitar saltarse fases por RAM
     )
 
     pipeline = UnifiedAnalysisPipeline(config)

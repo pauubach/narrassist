@@ -208,7 +208,7 @@ class TestFalsePositiveRegression:
     def test_test_document_rich_no_false_positives(self):
         """El test_document_rich no debe generar cambios de registro."""
         try:
-            with open("test_books/test_documents/test_document_rich.txt", "r", encoding="utf-8") as f:
+            with open("test_books/test_documents/test_document_rich.txt", encoding="utf-8") as f:
                 content = f.read()
         except FileNotFoundError:
             pytest.skip("test_document_rich.txt not available")

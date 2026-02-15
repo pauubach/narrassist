@@ -203,13 +203,15 @@
     </VirtualScroller>
 
     <!-- Lista normal para pocos items o con paginación -->
-    <div v-else class="alerts-container" :class="{ 'compact': compact }" role="list" aria-label="Alertas filtradas">
+    <div v-else class="alerts-container" :class="{ 'compact': compact }" role="listbox" aria-label="Alertas filtradas" @keydown="onAlertListKeydown">
       <div
-        v-for="alert in paginatedAlerts"
+        v-for="(alert, index) in paginatedAlerts"
         :key="alert.id"
+        :ref="el => setAlertRef(el, index)"
         class="alert-item"
-        role="listitem"
-        tabindex="0"
+        role="option"
+        :tabindex="getAlertTabindex(index)"
+        :aria-selected="alertFocusedIndex === index"
         :aria-label="`${getSeverityLabel(alert.severity)}: ${alert.title}`"
         :class="[
           `alert-${alert.severity}`,
@@ -218,6 +220,7 @@
         ]"
         @click="onAlertClick(alert)"
         @keydown.enter="onAlertClick(alert)"
+        @focus="alertFocusedIndex = index"
       >
         <!-- Severidad indicator -->
         <div class="alert-severity-bar" :class="`severity-${alert.severity}`"></div>
@@ -326,6 +329,7 @@ import VirtualScroller from 'primevue/virtualscroller'
 import type { Alert } from '@/types'
 import { debounce } from '@/composables'
 import { useAlertUtils } from '@/composables/useAlertUtils'
+import { useListKeyboardNav } from '@/composables/useListKeyboardNav'
 
 // Usar composable centralizado para utilidades de alertas
 const {
@@ -334,6 +338,8 @@ const {
   getStatusConfig,
   getSeverityLabel,
 } = useAlertUtils()
+
+const { setItemRef: setAlertRef, getTabindex: getAlertTabindex, onKeydown: onAlertListKeydown, focusedIndex: alertFocusedIndex } = useListKeyboardNav()
 
 // Umbral para activar virtualización
 const VIRTUALIZATION_THRESHOLD = 50

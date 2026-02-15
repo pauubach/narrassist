@@ -11,6 +11,7 @@ import ChapterRangeSelector from '@/components/alerts/ChapterRangeSelector.vue'
 import SequentialCorrectionMode from './SequentialCorrectionMode.vue'
 import type { Alert, AlertSeverity, AlertStatus, AlertSource } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
+import { useListKeyboardNav } from '@/composables/useListKeyboardNav'
 import { useSequentialMode } from '@/composables/useSequentialMode'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useToast } from 'primevue/usetoast'
@@ -60,6 +61,7 @@ const emit = defineEmits<{
 const toast = useToast()
 
 const { getSeverityLabel, getCategoryConfig } = useAlertUtils()
+const { setItemRef: setAlertRef, getTabindex: getAlertTabindex, onKeydown: onAlertListKeydown, focusedIndex: alertFocusedIndex } = useListKeyboardNav()
 const workspaceStore = useWorkspaceStore()
 
 // Sequential mode
@@ -451,7 +453,7 @@ function handleNavigateFromSequential(source?: AlertSource) {
     </div>
 
     <!-- Lista de alertas -->
-    <div class="alerts-list" role="list" aria-label="Lista de alertas">
+    <div class="alerts-list" role="listbox" aria-label="Lista de alertas" @keydown="onAlertListKeydown">
       <DsEmptyState
         v-if="filteredAlerts.length === 0 && !loading"
         :icon="analysisExecuted ? 'pi pi-check-circle' : 'pi pi-clock'"
@@ -464,15 +466,18 @@ function handleNavigateFromSequential(source?: AlertSource) {
       />
 
       <div
-        v-for="alert in filteredAlerts"
+        v-for="(alert, index) in filteredAlerts"
         :key="alert.id"
+        :ref="el => setAlertRef(el, index)"
         class="alert-item"
-        role="listitem"
-        tabindex="0"
+        role="option"
+        :tabindex="getAlertTabindex(index)"
         :class="`alert-${alert.severity}`"
+        :aria-selected="alertFocusedIndex === index"
         :aria-label="`${getSeverityLabel(alert.severity)}: ${alert.title}`"
         @click="handleAlertClick(alert)"
         @keydown.enter="handleAlertClick(alert)"
+        @focus="alertFocusedIndex = index"
       >
         <div class="alert-header">
           <DsBadge :severity="alert.severity" size="sm">

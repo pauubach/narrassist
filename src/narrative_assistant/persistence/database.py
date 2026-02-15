@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 24
+SCHEMA_VERSION = 25
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -1326,6 +1326,11 @@ class Database:
             ("alerts", "previous_snapshot_alert_id", "INTEGER"),
             ("alerts", "match_confidence", "REAL"),
             ("alerts", "resolution_reason", "TEXT"),
+            # v25: Undo/redo universal — batch grouping + dependency tracking
+            ("review_history", "batch_id", "TEXT"),
+            ("review_history", "depends_on_ids", "TEXT DEFAULT '[]'"),
+            ("review_history", "schema_version", "INTEGER DEFAULT 25"),
+            ("review_history", "undone_at", "TEXT"),
         ]
         for table, column, col_def in migrations:
             try:
@@ -1411,6 +1416,8 @@ class Database:
             )""",
             "CREATE INDEX IF NOT EXISTS idx_proj_det_weights_project ON project_detector_weights(project_id)",
             "CREATE INDEX IF NOT EXISTS idx_proj_det_weights_entity ON project_detector_weights(project_id, alert_type, entity_canonical_name)",
+            # v25: Índice para undo/redo por batch
+            "CREATE INDEX IF NOT EXISTS idx_history_batch ON review_history(project_id, batch_id)",
         ]
         for sql in table_migrations:
             try:

@@ -42,3 +42,6 @@ export type { DocumentTypeUIConfig } from './useDocumentTypeConfig'
 export { useAttributeLabels, getAttributeLabel } from './useAttributeLabels'
 
 export { ensureBackendReady } from './useBackendReady'
+
+export { useGlobalUndo } from './useGlobalUndo'
+export type { UndoResult, HistoryEntry } from './useGlobalUndo'
