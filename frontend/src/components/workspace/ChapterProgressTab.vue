@@ -568,7 +568,7 @@ async function loadReport() {
     }
   } catch (err) {
     console.error('Error loading chapter progress:', err)
-    error.value = 'Error inesperado'
+    error.value = 'No se pudo cargar el análisis de progreso.'
   } finally {
     loading.value = false
   }

@@ -291,7 +291,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
       voiceProfiles.value[projectId] = (data.profiles || []).map(transformVoiceProfile)
       return true
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Error desconocido'
+      error.value = err instanceof Error ? err.message : 'No se pudo completar la operación'
       console.error('Failed to fetch voice profiles:', err)
       return false
     } finally {
@@ -324,7 +324,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
       }
       return true
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Error desconocido'
+      error.value = err instanceof Error ? err.message : 'No se pudo completar la operación'
       console.error('Failed to fetch register analysis:', err)
       return false
     } finally {
@@ -354,7 +354,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
       }
       return true
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Error desconocido'
+      error.value = err instanceof Error ? err.message : 'No se pudo completar la operación'
       console.error('Failed to fetch dialogue attributions:', err)
       return false
     } finally {
@@ -388,7 +388,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
       }
       return true
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Error desconocido'
+      error.value = err instanceof Error ? err.message : 'No se pudo completar la operación'
       console.error('Failed to fetch character knowledge:', err)
       return false
     } finally {

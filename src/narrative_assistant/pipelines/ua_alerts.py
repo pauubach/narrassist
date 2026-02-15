@@ -595,6 +595,40 @@ class PipelineAlertsMixin:
                 except Exception as e:
                     logger.debug(f"Chekhov alert failed: {e}")
 
+            # Alertas de personajes planos (shallow characters)
+            for sc in context.shallow_characters:
+                try:
+                    name = sc.get("entity_name", "Personaje") if isinstance(sc, dict) else getattr(sc, "entity_name", "Personaje")
+                    desc = sc.get("description", "") if isinstance(sc, dict) else getattr(sc, "description", "")
+
+                    result = engine.create_alert(
+                        project_id=context.project_id,
+                        alert_type="shallow_character",
+                        category=AlertCategory.BEHAVIORAL
+                        if hasattr(AlertCategory, "BEHAVIORAL")
+                        else AlertCategory.STYLE,
+                        severity=AlertSeverity.INFO,
+                        title=f"Personaje plano: {name}",
+                        description=desc
+                        or f"'{name}' tiene muchas menciones pero poco desarrollo narrativo",
+                        explanation=(
+                            "Este personaje aparece frecuentemente pero tiene pocas "
+                            "dimensiones narrativas (atributos, diálogos, acciones). "
+                            "Considerar profundizar su desarrollo o reducir su presencia."
+                        ),
+                        confidence=0.6,
+                        extra_data={
+                            "mentions": sc.get("mentions", 0) if isinstance(sc, dict) else 0,
+                            "chapters_present": sc.get("chapters_present", 0) if isinstance(sc, dict) else 0,
+                            "attributes": sc.get("attributes", 0) if isinstance(sc, dict) else 0,
+                            "dialogues": sc.get("dialogues", 0) if isinstance(sc, dict) else 0,
+                        },
+                    )
+                    if result.is_success:
+                        context.alerts.append(result.value)
+                except Exception as e:
+                    logger.debug(f"Shallow character alert failed: {e}")
+
             # Alertas de oraciones de baja energía (voz pasiva, verbos débiles)
             for sent in context.sentence_energy_issues:
                 try:

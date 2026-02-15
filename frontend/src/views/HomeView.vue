@@ -54,7 +54,7 @@
         <div v-if="showBackendDisconnected" class="backend-error-container">
           <p class="backend-error-message">
             <i class="pi pi-exclamation-triangle"></i>
-            {{ backendError || 'La aplicación no responde. Reintentando...' }}
+            {{ backendError || 'El motor de análisis no responde. Reintentando...' }}
           </p>
           <Button
             label="Reintentar"

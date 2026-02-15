@@ -41,7 +41,7 @@ export function useAsyncAction(
 
   async function run<T>(
     action: () => Promise<T>,
-    fallbackMessage = 'Error desconocido',
+    fallbackMessage = 'No se pudo completar la operación',
     options?: RunOptions,
   ): Promise<T | undefined> {
     loading.value = true

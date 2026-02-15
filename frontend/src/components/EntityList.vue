@@ -681,7 +681,7 @@ const undoMerge = async (mergeId: number) => {
       await loadMergeHistory()
       emit('refresh')
     } else {
-      throw new Error(data.error || 'Error desconocido')
+      throw new Error(data.error || 'No se pudo completar la operación')
     }
   } catch (error) {
     console.error('Error undoing merge:', error)

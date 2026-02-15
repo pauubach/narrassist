@@ -281,7 +281,7 @@
             <div class="nlp-category">
               <div class="category-header">
                 <h4><i class="pi pi-microchip-ai"></i> Analizador Semántico</h4>
-                <span class="category-desc">Análisis avanzado del significado y contexto</span>
+                <span class="category-desc">Motor de análisis avanzado del significado y contexto</span>
               </div>
 
               <!-- Estado del analizador compacto cuando está listo -->
@@ -1373,7 +1373,7 @@ const confirmChangeDataLocation = async () => {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: 'No se pudo completar la operación',
+      detail: 'No se pudo cambiar la ubicación de datos. Vuelve a intentarlo.',
       life: 3000
     })
   } finally {

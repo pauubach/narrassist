@@ -265,7 +265,7 @@ const loadAttributions = async () => {
       error.value = store.error || 'Error al cargar atribuciones'
     }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Error desconocido'
+    error.value = err instanceof Error ? err.message : 'No se pudo completar la operación'
   } finally {
     loading.value = false
   }

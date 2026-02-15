@@ -172,7 +172,7 @@ export function useMentionNavigation(projectId: () => number) {
       const data = await response.json()
 
       if (!data.success) {
-        throw new Error(data.error || 'Error desconocido')
+        throw new Error(data.error || 'No se pudo completar la operación')
       }
 
       state.value.entityId = entityId
@@ -193,7 +193,7 @@ export function useMentionNavigation(projectId: () => number) {
 
       return true
     } catch (err) {
-      state.value.error = err instanceof Error ? err.message : 'Error desconocido'
+      state.value.error = err instanceof Error ? err.message : 'No se pudo completar la operación'
       console.error('Error loading mentions:', err)
       return false
     } finally {

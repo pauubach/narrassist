@@ -603,7 +603,7 @@ const loadAnalysis = async () => {
       error.value = store.error || 'Error al cargar el análisis de registro'
     }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Error desconocido'
+    error.value = err instanceof Error ? err.message : 'No se pudo completar la operación'
   } finally {
     loading.value = false
   }

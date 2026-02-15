@@ -370,7 +370,7 @@ async function analyze() {
     }
   } catch (e) {
     console.error('Sensory report error:', e)
-    errorMsg.value = e instanceof Error ? e.message : 'Error inesperado'
+    errorMsg.value = e instanceof Error ? e.message : 'No se pudo generar el informe sensorial.'
   } finally {
     loading.value = false
   }

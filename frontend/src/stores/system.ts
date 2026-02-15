@@ -212,7 +212,7 @@ export const useSystemStore = defineStore('system', () => {
 
     // Timeout
     backendStarting.value = false
-    backendStartupError.value = 'La aplicación no se inició a tiempo. Intenta reiniciar.'
+    backendStartupError.value = 'El motor de análisis no se inició a tiempo. Reinicia la aplicación.'
     return false
   }
 
@@ -225,7 +225,7 @@ export const useSystemStore = defineStore('system', () => {
       modelsStatus.value = data
       return data
     } catch (error) {
-      modelsError.value = error instanceof Error ? error.message : 'Network error'
+      modelsError.value = error instanceof Error ? error.message : 'Error de comunicación interna'
     } finally {
       modelsLoading.value = false
     }
@@ -241,7 +241,7 @@ export const useSystemStore = defineStore('system', () => {
       pollModelsStatus()
       return true
     } catch (error) {
-      modelsError.value = error instanceof Error ? error.message : 'Network error'
+      modelsError.value = error instanceof Error ? error.message : 'Error de comunicación interna'
     } finally {
       modelsDownloading.value = false
     }
@@ -374,7 +374,7 @@ export const useSystemStore = defineStore('system', () => {
       pollModelsStatus()
       return true
     } catch (error) {
-      modelsError.value = error instanceof Error ? error.message : 'Network error'
+      modelsError.value = error instanceof Error ? error.message : 'Error de comunicación interna'
     }
     return false
   }
@@ -465,7 +465,7 @@ export const useSystemStore = defineStore('system', () => {
                 phase: 'error',
                 phase_label: 'Error',
                 percentage: 0,
-                detail: 'Error interno. Reinicia la aplicación.',
+                detail: 'Se perdió la comunicación con el motor de análisis. Reinicia la aplicación.',
                 error: 'connection_lost',
               }
               stopLTPolling()

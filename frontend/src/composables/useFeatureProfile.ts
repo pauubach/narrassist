@@ -155,7 +155,7 @@ export function useFeatureProfile(
         profile.value = null
       }
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Network error'
+      error.value = err instanceof Error ? err.message : 'Error de comunicación interna'
       profile.value = null
     } finally {
       loading.value = false

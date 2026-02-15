@@ -25,7 +25,7 @@ describe('AnalysisErrorState', () => {
     it('should render warning icon', () => {
       const wrapper = mount(AnalysisErrorState, {
         props: {
-          message: 'Error inesperado',
+          message: 'No se pudo re-analizar el documento. Vuelve a intentarlo.',
         },
       })
 

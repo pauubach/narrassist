@@ -249,10 +249,10 @@ const analyzeEmotions = async () => {
     if (data.success) {
       profile.value = data.data
     } else {
-      error.value = data.error || 'Error desconocido'
+      error.value = data.error || 'No se pudo completar la operación'
     }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Error inesperado'
+    error.value = e instanceof Error ? e.message : 'No se pudo cargar el análisis emocional.'
   } finally {
     loading.value = false
   }

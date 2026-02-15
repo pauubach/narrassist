@@ -68,7 +68,7 @@ async function analyze() {
     }
   } catch (error) {
     console.error('Error checking narrative health:', error)
-    errorMsg.value = error instanceof Error ? error.message : 'Error inesperado'
+    errorMsg.value = error instanceof Error ? error.message : 'No se pudo evaluar la salud narrativa.'
   } finally {
     loading.value = false
   }

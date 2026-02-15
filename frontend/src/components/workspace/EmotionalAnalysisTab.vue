@@ -321,7 +321,7 @@ async function analyze() {
     }
   } catch (error) {
     console.error('Error analyzing emotional coherence:', error)
-    analysisError.value = error instanceof Error ? error.message : 'Error desconocido'
+    analysisError.value = error instanceof Error ? error.message : 'No se pudo completar la operación'
     toast.add({
       severity: 'error',
       summary: 'Error',

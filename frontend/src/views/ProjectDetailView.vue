@@ -1003,7 +1003,7 @@ const quickExportStyleGuide = async () => {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } else {
-      throw new Error(data.error || 'Error desconocido')
+      throw new Error(data.error || 'No se pudo completar la operación')
     }
   } catch (err) {
     console.error('Error exporting style guide:', err)
@@ -1082,7 +1082,7 @@ const startReanalysis = async () => {
       await loadAlerts(project.value.id)
     }
   } catch (_err) {
-    error.value = 'Error inesperado'
+    error.value = 'No se pudo re-analizar el documento. Vuelve a intentarlo.'
     // En caso de error, recargar los datos originales
     if (project.value) {
       analysisStore.setAnalyzing(project.value.id, false)

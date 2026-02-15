@@ -13,10 +13,25 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .unified_analysis import AnalysisContext
 
+from dataclasses import dataclass
+
 from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _HeuristicFocalizationViolation:
+    """Violación de focalización detectada por heurística (sin DB)."""
+
+    violation_type: str
+    declared_focalizer: str
+    text_excerpt: str
+    explanation: str
+    chapter: int
+    position: int
+    confidence: float = 0.7
 
 
 class PipelineConsistencyMixin:
@@ -44,7 +59,7 @@ class PipelineConsistencyMixin:
             if self.config.run_temporal_consistency and context.temporal_markers:
                 self._run_temporal_consistency(context)
 
-            if self.config.run_focalization and context.focalization_segments:
+            if self.config.run_focalization and context.chapters:
                 self._run_focalization_consistency(context)
 
             if self.config.run_voice_deviations and context.voice_profiles:
@@ -67,6 +82,9 @@ class PipelineConsistencyMixin:
 
             if self.config.run_sentiment and context.chapters:
                 self._run_sentiment_analysis(context)
+
+            if self.config.run_character_profiling and context.entities and context.chapters:
+                self._run_shallow_character_detection(context)
 
             context.phase_times["consistency"] = (datetime.now() - phase_start).total_seconds()
             return Result.success(None)
@@ -158,39 +176,39 @@ class PipelineConsistencyMixin:
             logger.warning(f"Temporal consistency check failed: {e}")
 
     def _run_focalization_consistency(self, context: AnalysisContext) -> None:
-        """Verificar violaciones de focalización si hay declaraciones."""
+        """Verificar violaciones de focalización (DB o heurística)."""
         try:
-            from ..focalization.declaration import FocalizationDeclarationService
+            from ..focalization.declaration import get_focalization_service
             from ..focalization.violations import FocalizationViolationDetector
 
-            service = FocalizationDeclarationService()
+            service = get_focalization_service(use_sqlite=True)
             declarations = service.get_all_declarations(context.project_id)
 
-            if not declarations:
-                logger.debug("No focalization declarations, skipping check")
-                return
-
-            # Crear detector con entidades
-            detector = FocalizationViolationDetector(service, context.entities)
-
             all_violations = []
-            for ch in context.chapters:
-                content = ch.get("content", "")
-                chapter_num = ch.get("number", 0)
 
-                if content:
-                    violations = detector.detect_violations(
-                        project_id=context.project_id,
-                        text=content,
-                        chapter=chapter_num,
-                    )
-                    all_violations.extend(violations)
+            if declarations:
+                # DB declarations exist → use formal detector
+                detector = FocalizationViolationDetector(service, context.entities)
+
+                for ch in context.chapters:
+                    content = self._get_val(ch, "content") or self._get_val(ch, "text") or ""
+                    chapter_num = self._get_val(ch, "number") or self._get_val(ch, "chapter_number") or 0
+
+                    if content:
+                        violations = detector.detect_violations(
+                            project_id=context.project_id,
+                            text=content,
+                            chapter=chapter_num,
+                        )
+                        all_violations.extend(violations)
+            else:
+                # No declarations → heuristic omniscient intrusion detection
+                all_violations = self._heuristic_focalization_check(context)
 
             if all_violations:
                 context.stats["focalization_violations"] = len(all_violations)
                 logger.info(f"Found {len(all_violations)} focalization violations")
 
-                # Almacenar para generación de alertas
                 if not hasattr(context, "focalization_violations"):
                     context.focalization_violations = []
                 context.focalization_violations.extend(all_violations)
@@ -199,6 +217,86 @@ class PipelineConsistencyMixin:
             logger.debug("Focalization module not available")
         except Exception as e:
             logger.warning(f"Focalization consistency check failed: {e}")
+
+    def _heuristic_focalization_check(self, context: AnalysisContext) -> list:
+        """
+        Detección heurística de intrusiones omniscientes sin declaraciones DB.
+
+        Busca patrones donde el narrador accede a los pensamientos de personajes
+        que no son el focalizador principal del capítulo.
+        """
+        import re
+
+        # Patrones de acceso mental (pensamientos, sentimientos internos)
+        MENTAL_ACCESS = re.compile(
+            r"\b(?P<name>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+"
+            r"(?:pensó|pensaba|sintió|sentía|sabía|supo|recordó|recordaba|"
+            r"se\s+preguntó|se\s+preguntaba|temía|temió|deseaba|deseó|"
+            r"sospechó|sospechaba|intuía|intuyó|imaginó|imaginaba|"
+            r"comprendió|comprendía|entendió|entendía|"
+            r"se\s+dijo|se\s+decía|se\s+convenció|creía|creyó)",
+            re.UNICODE,
+        )
+
+        # Recoger nombres de entidades
+        entity_names: set[str] = set()
+        for e in context.entities:
+            name = self._get_val(e, "canonical_name") or self._get_val(e, "name") or ""
+            if name:
+                entity_names.add(name)
+                # Primer nombre
+                first = name.split()[0]
+                if first:
+                    entity_names.add(first)
+
+        chapters_data = self._prepare_chapter_data(context)
+
+        violations = []
+        for ch in chapters_data:
+            content = ch["content"]
+            chapter_num = ch["number"]
+            if not content:
+                continue
+
+            # Detectar focalizador principal: personaje con más accesos mentales
+            mental_mentions: dict[str, int] = {}
+            mental_positions: dict[str, list[tuple[int, str]]] = {}
+            for m in MENTAL_ACCESS.finditer(content):
+                name = m.group("name")
+                if name in entity_names:
+                    mental_mentions[name] = mental_mentions.get(name, 0) + 1
+                    mental_positions.setdefault(name, []).append(
+                        (m.start(), m.group(0))
+                    )
+
+            if len(mental_mentions) < 2:
+                continue  # No hay intrusion si solo 1 personaje tiene acceso mental
+
+            # El focalizador principal es el que tiene más accesos mentales
+            sorted_chars = sorted(mental_mentions.items(), key=lambda x: -x[1])
+            main_focalizer = sorted_chars[0][0]
+
+            # Los demás son intrusiones omniscientes
+            for char_name, count in sorted_chars[1:]:
+                for pos, excerpt in mental_positions[char_name]:
+                    violations.append(
+                        _HeuristicFocalizationViolation(
+                            violation_type="forbidden_mind_access",
+                            declared_focalizer=main_focalizer,
+                            text_excerpt=excerpt,
+                            explanation=(
+                                f"Acceso a pensamientos de {char_name} cuando "
+                                f"el focalizador del capítulo es {main_focalizer}. "
+                                f"Posible intrusión omnisciente."
+                            ),
+                            chapter=chapter_num,
+                            position=ch["start_char"] + pos,
+                            confidence=0.7,
+                        )
+                    )
+
+        logger.info(f"Heuristic focalization: {len(violations)} violations")
+        return violations
 
     def _run_voice_deviation_detection(self, context: AnalysisContext) -> None:
         """
@@ -296,13 +394,30 @@ class PipelineConsistencyMixin:
 
                 chapter_dialogues = dialogues_by_chapter.get(chapter_num, [])
 
+                # Convertir dicts a tuples (speaker, text, start, end)
+                dialogues_tuples = [
+                    (
+                        d.get("resolved_speaker") or d.get("speaker_hint", ""),
+                        d.get("text", ""),
+                        d.get("start_char", 0),
+                        d.get("end_char", 0),
+                    )
+                    for d in chapter_dialogues
+                ]
+
+                # Normalizar entity names (pueden ser objetos o dicts)
+                entity_names = []
+                for e in context.entities:
+                    n = self._get_val(e, "canonical_name") or self._get_val(e, "name") or str(e)
+                    entity_names.append(n)
+
                 # El checker analiza el capítulo completo
                 # analyze_chapter() retorna list[EmotionalIncoherence] directamente
                 result = checker.analyze_chapter(
                     chapter_text=content,
                     chapter_id=chapter_num,
-                    dialogues=chapter_dialogues,
-                    entity_names=[e.canonical_name for e in context.entities],
+                    dialogues=dialogues_tuples,
+                    entity_names=entity_names,
                 )
 
                 # Manejar tanto Result como list directa
@@ -703,3 +818,100 @@ class PipelineConsistencyMixin:
 
         except Exception as e:
             logger.warning(f"Chekhov check failed: {e}")
+
+    def _run_shallow_character_detection(self, context: AnalysisContext) -> None:
+        """
+        Detectar personajes planos: muchas menciones pero pocas dimensiones narrativas.
+
+        Un personaje "plano" tiene presencia cuantitativa (aparece mucho)
+        pero poca profundidad (pocos atributos, diálogos, interacciones).
+        """
+        try:
+            total_chapters = len(context.chapters)
+            if total_chapters < 2:
+                return
+
+            # Contadores por personaje
+            mention_counts: dict[str, int] = {}
+            attr_counts: dict[str, int] = {}
+            dialogue_counts: dict[str, int] = {}
+            chapter_counts: dict[str, int] = {}
+
+            # Recoger personajes
+            characters: list[str] = []
+            for e in context.entities:
+                etype_raw = self._get_val(e, "entity_type")
+                etype = (
+                    etype_raw.value if hasattr(etype_raw, "value")
+                    else str(etype_raw) if etype_raw else ""
+                )
+                if etype not in ("character", "person", "PER"):
+                    continue
+                ename = self._get_val(e, "canonical_name") or str(e)
+                characters.append(ename)
+                mention_counts[ename] = 0
+                attr_counts[ename] = 0
+                dialogue_counts[ename] = 0
+                chapter_counts[ename] = 0
+
+            if not characters:
+                return
+
+            # Contar menciones y capítulos de presencia
+            for ch in context.chapters:
+                content = self._get_val(ch, "content") or self._get_val(ch, "text") or ""
+                content_lower = content.lower()
+                for name in characters:
+                    count = content_lower.count(name.lower())
+                    if count > 0:
+                        mention_counts[name] += count
+                        chapter_counts[name] += 1
+
+            # Contar atributos
+            for attr in context.attributes:
+                attr_name = (
+                    attr.get("entity_name", "")
+                    if isinstance(attr, dict)
+                    else getattr(attr, "entity_name", "")
+                )
+                if attr_name in attr_counts:
+                    attr_counts[attr_name] += 1
+
+            # Contar diálogos atribuidos
+            for d in context.dialogues:
+                speaker = d.get("resolved_speaker") or d.get("speaker_hint", "")
+                if speaker in dialogue_counts:
+                    dialogue_counts[speaker] += 1
+
+            # Detectar personajes planos: aparecen en ≥2 capítulos con ≥3 menciones
+            # pero ≤1 atributos y ≤1 diálogos
+            shallow = []
+            for name in characters:
+                mentions = mention_counts.get(name, 0)
+                chapters_in = chapter_counts.get(name, 0)
+                attrs = attr_counts.get(name, 0)
+                dialogues = dialogue_counts.get(name, 0)
+
+                if chapters_in >= 2 and mentions >= 3 and attrs <= 1 and dialogues <= 1:
+                    shallow.append({
+                        "entity_name": name,
+                        "mentions": mentions,
+                        "chapters_present": chapters_in,
+                        "attributes": attrs,
+                        "dialogues": dialogues,
+                        "description": (
+                            f"'{name}' aparece en {chapters_in} capítulos "
+                            f"({mentions} menciones) pero tiene solo {attrs} atributo(s) "
+                            f"y {dialogues} diálogo(s). Personaje poco desarrollado."
+                        ),
+                    })
+
+            if shallow:
+                if not hasattr(context, "shallow_characters"):
+                    context.shallow_characters = []
+                context.shallow_characters = shallow
+                context.stats["shallow_characters"] = len(shallow)
+                logger.info(f"Shallow characters: {len(shallow)} detected")
+
+        except Exception as e:
+            logger.warning(f"Shallow character detection failed: {e}")

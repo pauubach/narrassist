@@ -386,7 +386,7 @@ const loadCharacter = async () => {
       error.value = 'Personaje no encontrado'
     }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Error desconocido'
+    error.value = err instanceof Error ? err.message : 'No se pudo completar la operación'
   } finally {
     loading.value = false
   }

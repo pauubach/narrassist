@@ -175,7 +175,7 @@ describe('projectsStore', () => {
       const store = useProjectsStore()
       await store.fetchProjects()
 
-      expect(store.error).toBe('Error desconocido')
+      expect(store.error).toBe('No se pudo completar la operación')
     })
 
     it('should clear previous error on new fetch', async () => {
