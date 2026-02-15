@@ -709,6 +709,58 @@ class CorrectionConfig:
                 "suggest_accessible_alternatives": self.field_dictionary.suggest_accessible_alternatives,
                 "min_confidence": self.field_dictionary.min_confidence,
             },
+            "clarity": {
+                "enabled": self.clarity.enabled,
+                "max_sentence_words": self.clarity.max_sentence_words,
+                "max_sentence_chars": self.clarity.max_sentence_chars,
+                "warning_sentence_words": self.clarity.warning_sentence_words,
+                "max_subordinates": self.clarity.max_subordinates,
+                "min_pauses_per_100_words": self.clarity.min_pauses_per_100_words,
+                "base_confidence": self.clarity.base_confidence,
+            },
+            "grammar": {
+                "enabled": self.grammar.enabled,
+                "check_dequeismo": self.grammar.check_dequeismo,
+                "check_queismo": self.grammar.check_queismo,
+                "check_laismo": self.grammar.check_laismo,
+                "check_loismo": self.grammar.check_loismo,
+                "check_gender_agreement": self.grammar.check_gender_agreement,
+                "check_number_agreement": self.grammar.check_number_agreement,
+                "check_adjective_agreement": self.grammar.check_adjective_agreement,
+                "check_redundancy": self.grammar.check_redundancy,
+                "check_other": self.grammar.check_other,
+                "min_confidence": self.grammar.min_confidence,
+            },
+            "crutch_words": {
+                "enabled": self.crutch_words.enabled,
+                "z_score_threshold": self.crutch_words.z_score_threshold,
+                "min_occurrences": self.crutch_words.min_occurrences,
+                "check_adverbs": self.crutch_words.check_adverbs,
+                "check_connectors": self.crutch_words.check_connectors,
+                "check_speech_verbs": self.crutch_words.check_speech_verbs,
+                "check_intensifiers": self.crutch_words.check_intensifiers,
+                "check_filler_phrases": self.crutch_words.check_filler_phrases,
+                "base_confidence": self.crutch_words.base_confidence,
+            },
+            "glossary": {
+                "enabled": self.glossary.enabled,
+                "alert_on_variants": self.glossary.alert_on_variants,
+                "alert_undefined_invented": self.glossary.alert_undefined_invented,
+                "alert_undefined_technical": self.glossary.alert_undefined_technical,
+                "update_usage_stats": self.glossary.update_usage_stats,
+                "fuzzy_threshold": self.glossary.fuzzy_threshold,
+                "base_confidence": self.glossary.base_confidence,
+            },
+            "orthographic_variants": {
+                "enabled": self.orthographic_variants.enabled,
+                "check_consonant_groups": self.orthographic_variants.check_consonant_groups,
+                "check_h_variants": self.orthographic_variants.check_h_variants,
+                "check_bv_confusion": self.orthographic_variants.check_bv_confusion,
+                "check_lly_confusion": self.orthographic_variants.check_lly_confusion,
+                "check_accent_variants": self.orthographic_variants.check_accent_variants,
+                "check_loanword_adaptation": self.orthographic_variants.check_loanword_adaptation,
+                "base_confidence": self.orthographic_variants.base_confidence,
+            },
             "anacoluto": {
                 "enabled": self.anacoluto.enabled,
                 "check_nominativus_pendens": self.anacoluto.check_nominativus_pendens,
@@ -802,6 +854,73 @@ class CorrectionConfig:
             min_confidence=sr_data.get("min_confidence", 0.7),
         )
 
+        # Parse clarity config
+        clarity_data = data.get("clarity", {})
+        clarity_config = ClarityConfig(
+            enabled=clarity_data.get("enabled", True),
+            max_sentence_words=clarity_data.get("max_sentence_words", 50),
+            max_sentence_chars=clarity_data.get("max_sentence_chars", 300),
+            warning_sentence_words=clarity_data.get("warning_sentence_words", 35),
+            max_subordinates=clarity_data.get("max_subordinates", 3),
+            min_pauses_per_100_words=clarity_data.get("min_pauses_per_100_words", 3),
+            base_confidence=clarity_data.get("base_confidence", 0.85),
+        )
+
+        # Parse grammar config
+        grammar_data = data.get("grammar", {})
+        grammar_config = GrammarConfig(
+            enabled=grammar_data.get("enabled", True),
+            check_dequeismo=grammar_data.get("check_dequeismo", True),
+            check_queismo=grammar_data.get("check_queismo", True),
+            check_laismo=grammar_data.get("check_laismo", True),
+            check_loismo=grammar_data.get("check_loismo", True),
+            check_gender_agreement=grammar_data.get("check_gender_agreement", True),
+            check_number_agreement=grammar_data.get("check_number_agreement", True),
+            check_adjective_agreement=grammar_data.get("check_adjective_agreement", True),
+            check_redundancy=grammar_data.get("check_redundancy", True),
+            check_other=grammar_data.get("check_other", True),
+            min_confidence=grammar_data.get("min_confidence", 0.5),
+        )
+
+        # Parse crutch_words config
+        cw_data = data.get("crutch_words", {})
+        crutch_words_config = CrutchWordsConfig(
+            enabled=cw_data.get("enabled", True),
+            z_score_threshold=cw_data.get("z_score_threshold", 2.0),
+            min_occurrences=cw_data.get("min_occurrences", 5),
+            check_adverbs=cw_data.get("check_adverbs", True),
+            check_connectors=cw_data.get("check_connectors", True),
+            check_speech_verbs=cw_data.get("check_speech_verbs", True),
+            check_intensifiers=cw_data.get("check_intensifiers", True),
+            check_filler_phrases=cw_data.get("check_filler_phrases", True),
+            base_confidence=cw_data.get("base_confidence", 0.75),
+        )
+
+        # Parse glossary config
+        glossary_data = data.get("glossary", {})
+        glossary_config = GlossaryConfig(
+            enabled=glossary_data.get("enabled", True),
+            alert_on_variants=glossary_data.get("alert_on_variants", True),
+            alert_undefined_invented=glossary_data.get("alert_undefined_invented", True),
+            alert_undefined_technical=glossary_data.get("alert_undefined_technical", True),
+            update_usage_stats=glossary_data.get("update_usage_stats", True),
+            fuzzy_threshold=glossary_data.get("fuzzy_threshold", 0.85),
+            base_confidence=glossary_data.get("base_confidence", 0.80),
+        )
+
+        # Parse orthographic_variants config
+        ov_data = data.get("orthographic_variants", {})
+        orthographic_variants_config = OrthographicVariantsConfig(
+            enabled=ov_data.get("enabled", True),
+            check_consonant_groups=ov_data.get("check_consonant_groups", True),
+            check_h_variants=ov_data.get("check_h_variants", True),
+            check_bv_confusion=ov_data.get("check_bv_confusion", False),
+            check_lly_confusion=ov_data.get("check_lly_confusion", False),
+            check_accent_variants=ov_data.get("check_accent_variants", False),
+            check_loanword_adaptation=ov_data.get("check_loanword_adaptation", False),
+            base_confidence=ov_data.get("base_confidence", 0.85),
+        )
+
         return cls(
             profile=DocumentProfile.from_dict(data.get("profile", {})),
             typography=TypographyConfig(**data.get("typography", {})),
@@ -810,6 +929,11 @@ class CorrectionConfig:
             terminology=TerminologyConfig(**data.get("terminology", {})),
             regional=RegionalConfig(**data.get("regional", {})),
             field_dictionary=field_dict_config,
+            clarity=clarity_config,
+            grammar=grammar_config,
+            crutch_words=crutch_words_config,
+            glossary=glossary_config,
+            orthographic_variants=orthographic_variants_config,
             anacoluto=anacoluto_config,
             pov=pov_config,
             style_register=style_register_config,

@@ -19,6 +19,7 @@ from .detectors import (
     CrutchWordsDetector,
     GlossaryDetector,
     GrammarDetector,
+    OrthographicVariantsDetector,
     POVDetector,
     RegionalDetector,
     RepetitionDetector,
@@ -71,6 +72,9 @@ class CorrectionOrchestrator:
             CorrectionCategory.ANACOLUTO: AnacolutoDetector(self.config.anacoluto),
             CorrectionCategory.POV: POVDetector(self.config.pov),
             CorrectionCategory.STYLE_REGISTER: StyleRegisterDetector(self.config.style_register),
+            CorrectionCategory.ORTHOGRAPHY: OrthographicVariantsDetector(
+                self.config.orthographic_variants
+            ),
         }
 
         # Detectores que usan embeddings (inicializados bajo demanda)
@@ -102,8 +106,9 @@ class CorrectionOrchestrator:
         all_issues: list[CorrectionIssue] = []
         failed_detectors: list[str] = []
 
-        # Separar detectores que requieren spaCy
+        # Separar detectores en 3 buckets: regex (parallel), LLM (sequential), spaCy (sequential)
         parallel_detectors = []
+        llm_detectors = []
         sequential_detectors = []
 
         for category, detector in self._detectors.items():
@@ -114,7 +119,9 @@ class CorrectionOrchestrator:
                 logger.debug(f"Saltando {category.value}: requiere spaCy")
                 continue
 
-            if detector.requires_spacy:
+            if detector.requires_llm:
+                llm_detectors.append((category, detector))
+            elif detector.requires_spacy:
                 sequential_detectors.append((category, detector))
             else:
                 parallel_detectors.append((category, detector))
@@ -144,6 +151,18 @@ class CorrectionOrchestrator:
                     except Exception as e:
                         logger.error(f"Error en detector {category.value}: {e}")
                         failed_detectors.append(category.value)
+
+        # Ejecutar detectores LLM (secuenciales, skip si LLM no disponible)
+        for category, detector in llm_detectors:
+            if progress_callback:
+                progress_callback(f"Analizando {self._category_name(category)} con LLM...")
+
+            try:
+                issues = self._run_detector(detector, text, chapter_index, None)
+                all_issues.extend(self._limit_issues(issues, category))
+            except Exception as e:
+                logger.error(f"Error en detector LLM {category.value}: {e}")
+                failed_detectors.append(category.value)
 
         # Ejecutar detectores secuenciales (requieren spaCy)
         for category, detector in sequential_detectors:
@@ -345,6 +364,8 @@ class CorrectionOrchestrator:
             return self.config.anacoluto.enabled
         elif category == CorrectionCategory.POV:
             return self.config.pov.enabled
+        elif category == CorrectionCategory.ORTHOGRAPHY:
+            return self.config.orthographic_variants.enabled
         elif category == CorrectionCategory.STYLE_REGISTER:
             return self.config.style_register.enabled
         return False
@@ -377,6 +398,7 @@ class CorrectionOrchestrator:
             CorrectionCategory.GLOSSARY: "glosario",
             CorrectionCategory.ANACOLUTO: "anacolutos",
             CorrectionCategory.POV: "punto de vista",
+            CorrectionCategory.ORTHOGRAPHY: "variantes ortográficas",
             CorrectionCategory.STYLE_REGISTER: "estilo de registro",
         }.get(category, category.value)
 

@@ -108,6 +108,11 @@ class BaseDetector(ABC):
         """Si el detector necesita análisis de spaCy."""
         return False
 
+    @property
+    def requires_llm(self) -> bool:
+        """Si el detector necesita un LLM (Ollama)."""
+        return False
+
     def _extract_context(self, text: str, start: int, end: int, window: int = 40) -> str:
         """
         Extrae contexto alrededor de una posición.

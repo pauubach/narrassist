@@ -2108,6 +2108,78 @@ Infraestructura existente (55% — backend core completo):
 
 ---
 
+#### Sprint S18: Detectores para Texto Científico/Académico [10-12h] — PLANIFICADO
+
+> **Lingüista Computacional**: "Referencias, siglas y estructura son aspectos formales
+> detectables con regex de alta precisión. El análisis de coherencia entre párrafos es
+> el que más se beneficia de un LLM."
+> **Corrector Editorial**: "Un artículo sin bibliografía o con siglas sin definir es
+> directamente rechazable. Estos detectores ahorran trabajo mecánico al revisor."
+> **Arquitecto**: "3 fases independientes: plumbing (deuda técnica) → detectores
+> determinísticos (regex) → detector LLM (coherencia). Cada fase es deployable."
+
+**Estructura en 3 fases** (decisión de revisión con 6 agentes + debate):
+
+##### Fase S18-00: Plumbing — Deuda técnica del orchestrator [1.5-2h] → v0.9.12
+
+Requisito previo: corregir bugs descubiertos en la revisión antes de añadir 4 detectores.
+
+| Tarea | Estado | Archivo | Detalle |
+|-------|--------|---------|---------|
+| S18-00a | ✅ | `corrections/config.py` | Fix `to_dict()`/`from_dict()`: añadido clarity, grammar, crutch_words, glossary, orthographic_variants. Round-trip completo |
+| S18-00b | ✅ | `corrections/base.py` | Añadido `requires_llm: bool = False` como property en `BaseDetector` |
+| S18-00c | ✅ | `corrections/orchestrator.py` | 3er bucket de ejecución: regex (parallel) → LLM (sequential) → spaCy (sequential) |
+| S18-00d | ✅ | `corrections/orchestrator.py` | Wire `OrthographicVariantsDetector` + `_is_enabled` + `_category_name` |
+| S18-00e | ✅ | `tests/unit/test_correction_config_roundtrip.py` | 9 tests: round-trip de TODAS las configs + factory methods + empty dict defaults |
+
+**DoD S18-00**: `to_dict(from_dict(config.to_dict())) == config` para todas las configs. Orchestrator tiene 3 buckets. Tests verdes.
+
+##### Fase S18-A: Detectores Determinísticos (regex) [4-5h] → v0.10.0
+
+| Tarea | Estado | Archivo | Detalle |
+|-------|--------|---------|---------|
+| S18-A1 | ⬚ | `corrections/types.py` | 3 nuevos enums: `ReferencesIssueType` (6), `AcronymIssueType` (4), `StructureIssueType` (4) + `PARAGRAPH_TOO_SHORT`/`PARAGRAPH_TOO_LONG` en `ClarityIssueType` + 3 categorías en `CorrectionCategory` |
+| S18-A2 | ⬚ | `corrections/config.py` | `ReferencesConfig`, `AcronymConfig`, `StructureConfig` + campos en `CorrectionConfig` + to_dict/from_dict |
+| S18-A3 | ⬚ | `corrections/detectors/references.py` | `ReferencesDetector`: citas numéricas [1], author-year (García, 2024), bibliografía, formato mixto, citas huérfanas. `requires_spacy = False` |
+| S18-A4 | ⬚ | `corrections/detectors/acronyms.py` | `AcronymDetector`: definición antes de uso, formas inconsistentes, redefiniciones, siglas universales exentas (EEUU, ONU, UE, OMS). `requires_spacy = False` |
+| S18-A5 | ⬚ | `corrections/detectors/structure.py` | `ScientificStructureDetector` (no `StructureDetector` — naming conflict con `parsers/structure_detector.py`): secciones obligatorias por perfil (scientific/essay/technical), orden esperado, headers markdown + heurísticos |
+| S18-A6 | ⬚ | `corrections/detectors/clarity.py` | Extender `ClarityDetector` con `_check_paragraph_length()`: reutilizar `_split_sentences()` existente (L89-114) y split por `\n\s*\n` (L243). Párrafos <2 frases o >10 frases |
+| S18-A7 | ⬚ | `orchestrator.py` + `engine.py` + `_analysis_phases.py` + `__init__.py` | Registro de 3 detectores + clarity extension, mapeo AlertCategory.STYLE, activación por document_type |
+| S18-A8 | ⬚ | `tests/unit/` (×4 archivos) | ~48 tests: referencias (15), siglas (15), estructura (10), clarity extension (8) |
+
+**DoD S18-A**: Artículo científico sin bibliografía → alerta. Sigla sin definir → detectada. Estructura incompleta → flaggeada. Párrafo de 1 frase → alerta. 48 tests verdes.
+
+##### Fase S18-B: CoherenceDetector con LLM [4-5h] → v0.10.1
+
+| Tarea | Estado | Archivo | Detalle |
+|-------|--------|---------|---------|
+| S18-B1 | ⬚ | `corrections/types.py` | `CoherenceIssueType` (6 valores): `IRRELEVANT_PARAGRAPH`, `REDUNDANT_PARAGRAPH`, `MERGE_SUGGESTED`, `SPLIT_SUGGESTED`, `TOPIC_DISCONTINUITY` (no `LOGICAL_GAP` — evitar confusión con BK-32), `WEAK_TRANSITION` + categoría `COHERENCE` |
+| S18-B2 | ⬚ | `corrections/config.py` | `CoherenceConfig` (enabled, use_llm, llm_model, fallback_model, max_paragraphs, min_paragraph_words, temperature) |
+| S18-B3 | ⬚ | `llm/prompts.py` | `COHERENCE_SYSTEM` + `COHERENCE_TEMPLATE` para análisis editorial de coherencia |
+| S18-B4 | ⬚ | `corrections/detectors/coherence.py` | `CoherenceDetector` con 3-tier fallback: LLM (Ollama) → embeddings (`get_embeddings_model()`) → Jaccard bag-of-words. `requires_llm = True`. Chunks de 8 párrafos. Timeout 120s/chunk |
+| S18-B5 | ⬚ | `orchestrator.py` + `engine.py` + `_analysis_phases.py` | Wire coherence detector, mapeo AlertCategory.STYLE, activación LLM solo para TEC/ENS |
+| S18-B6 | ⬚ | `tests/unit/test_coherence_detector.py` | ~24 tests: LLM mock (10), embeddings fallback (6), Jaccard heurístico (4), integration (4). Ollama degradation: silent fallback + `method_used` metadata + logged warning |
+
+**DoD S18-B**: Texto con párrafos redundantes → detectados por LLM. Si Ollama no disponible → fallback silencioso a embeddings → Jaccard. `method_used` en `extra_data` indica qué tier se usó. 24 tests verdes.
+
+**Notas de diseño** (consolidadas de la revisión con 6 agentes):
+
+- **Reutilización**: `_split_sentences()` de `clarity.py` (L89-114), `re.split(r"\n\s*\n", text)` para párrafos, `get_llm_client()` + `sanitize_for_prompt()` + `validate_llm_response()` del stack LLM existente
+- **NO importar** `nlp/style/coherence_detector.py` (diferente dominio: narrativo vs editorial). Sí reutilizar `get_embeddings_model()` para tier 2
+- **AlertCategory**: Las 4 nuevas categorías → `AlertCategory.STYLE`. `AlertCategory.STRUCTURE` existente (pacing narrativo) no se toca
+- **BK-32** (coherencia argumentativa) es independiente de S18 coherencia (editorial). Diferente scope: premisas→conclusión vs redundancia/transiciones
+
+**Activación por tipo de documento**:
+- **TEC** (técnico): Todos habilitados, `structure=scientific`, coherencia LLM activa
+- **ENS** (ensayo): Todos habilitados, `structure=essay`, coherencia LLM activa
+- **DIV** (divulgación): Todos habilitados, `structure=essay`, coherencia sin LLM (solo embeddings/Jaccard)
+- **FIC/DRA/INF/GRA**: Deshabilitados
+
+**Dependencias**: S17 (sistema de correcciones). Ollama para S18-B (opcional — fallback disponible).
+**Total tests**: ~80 (8 + 48 + 24)
+
+---
+
 ### Backlog — Estilo Avanzado (post-S17)
 
 | ID | Acción | Detalle |
@@ -2121,6 +2193,19 @@ Infraestructura existente (55% — backend core completo):
 | BK-36 | Dashboard de métricas de estilo en StyleTab | Puntuación formalidad, adherencia al tipo, distribución por sub-detector. |
 | BK-37 | Estado "intencional" en alertas | Nuevo status + suppression_rules para persistir entre re-análisis. |
 | BK-38 | Perfiles estilo en correction_config/registry.py | Integrar con sistema nuevo de config (type→subtype→custom). |
+
+### Backlog — Texto Científico/Académico (post-S18)
+
+| ID | Acción | Detalle |
+|----|--------|---------|
+| BK-39 | Autocitas excesivas | Detectar >30% de citas al mismo autor. Requiere parsing de nombres en bibliografía. |
+| BK-40 | Formato bibliográfico avanzado | Validar APA 7 / IEEE / Vancouver completo (no solo consistencia, sino conformidad). |
+| BK-41 | Abstract structure scoring | Evaluar que el abstract tenga: objetivo, método, resultados, conclusión (IMRAD micro). |
+| BK-42 | Coherence heatmap (frontend) | Visualización tipo mapa de calor de coherencia por párrafo. Requiere UI en Vue. |
+| BK-43 | Cross-section reference validation | Verificar "como se muestra en la Sección 3" → que la sección 3 exista y sea relevante. |
+| BK-44 | Acronym glossary auto-generation | Generar tabla de siglas automáticamente desde las definiciones detectadas. Export a DOCX. |
+| BK-45 | Reconciliar dual config system | `corrections/config.py` (runtime dataclasses) vs `correction_config/models.py` (UI inheritance). Unificar o documentar bridge. |
+| BK-46 | Test hardening: Ollama degradation | Tests de degradación ante Ollama caído/lento/timeout. Config round-trip coverage completa. |
 
 ---
 
@@ -2154,13 +2239,15 @@ Infraestructura existente (55% — backend core completo):
 ```
 COMPLETADO                                          PRÓXIMO (Version + Monetización)
 ───────────────────────────────────────────────── ──────────────────────────────────
-S0-S6 (NLP + Frontend) ✅                          BACKLOG ESTILO (BK-30..38):
+S0-S6 (NLP + Frontend) ✅                          BACKLOG ESTILO (BK-30..38)
+                                                    BACKLOG CIENTÍFICO (BK-39..44):
 S7a-S7d (Licensing + UX) ✅                        RhetoricDetector, LLM subjetividad,
 Sprint PP ✅ (17/17)                                coherencia, config modal, dashboard
 Sprint S8 ✅ (S8a + S8b + S8c)                     ──────────────────────────────────
 Sprint S15 ✅ (BK-28 Version tracking)              CONDICIONADO (requiere infra):
 Sprint S16A ✅ (BK-29 Quota UX)                     S16B (Stripe pagos, backend público)
-Sprint S17 ✅ (Style Register Detection)            ──────────────────────────────────
+Sprint S17 ✅ (Style Register Detection)            Sprint S18 (3 fases: 00→A→B)
+                                                    ──────────────────────────────────
                                                     APARCADO:
 Sprint S9 ✅ (BK-09/15/17/10b/10c)                 BK-26 Collab online
 Sprint S10 ✅ (BK-14/11/12)                        Landing web, UserGuide PDF
@@ -2197,7 +2284,8 @@ Dependencias restantes:
 | ~~Sprint S16A~~ | ~~12h (2-3 días)~~ | ✅ COMPLETADO (QuotaWarningBanner, TierComparisonDialog, quota-status endpoint, 317 tests) |
 | Sprint S16B | 20-28h (4-6 días) | BK-29 pagos (requiere backend billing público) |
 | ~~Sprint S17~~ | ~~7-9h (1-2 días)~~ | ✅ COMPLETADO (Style Register: 5 sub-detectores, 4 perfiles, 39 tests) |
-| **TOTAL restante** | **~20-28h (S16B condicionado)** | Solo pagos Stripe (requiere infra) |
+| Sprint S18 | 10-12h (2-3 días) | PLANIFICADO — 3 fases: S18-00 (plumbing 1.5-2h), S18-A (determinísticos 4-5h), S18-B (coherencia LLM 4-5h). ~80 tests |
+| **TOTAL restante** | **~30-40h** | S16B condicionado (Stripe) + S18 planificado (3 fases) |
 
 ---
 
@@ -2229,6 +2317,6 @@ Dependencias restantes:
 
 ---
 
-**Ultima actualizacion**: 2026-02-13
-**Autor**: Claude (Panel de 8 expertos simulados + sesión producto 10-Feb + paneles pricing/sales/editorial 12-Feb)
-**Estado**: S0-S12 completados. Sprint PP completado (17/17). S7b-S7d completados. SP-1..3 completados. BK-08/BK-12 completados (v0.9.4). 24/29 BK completados. Tag: v0.9.4. Próximo: S13 (BK-27 + BK-25 MVP).
+**Ultima actualizacion**: 2026-02-15
+**Autor**: Claude (Panel de 8 expertos simulados + sesiones producto/pricing/editorial Feb + revisión S18 con 8 agentes 15-Feb)
+**Estado**: S0-S17 completados. Sprint PP completado (17/17). S7b-S7d, SP-1..3, S8a-S8c, S9, S10, S11, S12, S13, S14, S15, S16A completados. Tag: v0.9.5. Próximo: S18 (3 fases: S18-00 plumbing → S18-A determinísticos → S18-B coherencia LLM). S16B condicionado (Stripe).
