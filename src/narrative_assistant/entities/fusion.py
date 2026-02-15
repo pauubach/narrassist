@@ -318,37 +318,6 @@ class EntityFusionService:
             logger.error(f"Error fusionando entidades: {e}")
             return Result.failure(error)
 
-    def undo_merge(self, merge_id: int) -> Result[list[int]]:
-        """
-        Deshace una fusión, restaurando las entidades originales.
-
-        NOTA: Esta operación es compleja y puede no restaurar
-        el estado exacto si hubo cambios posteriores.
-
-        Args:
-            merge_id: ID del registro de fusión
-
-        Returns:
-            Result con lista de IDs de entidades restauradas
-        """
-        # Por ahora, solo marcamos como deshecha
-        # La implementación completa requeriría restaurar desde snapshots
-        try:
-            success = self.repo.mark_merge_undone(merge_id)
-            if success:
-                logger.info(f"Fusión {merge_id} marcada como deshecha")
-                return Result.success([])
-            else:
-                error = FusionError(
-                    original_error=f"Fusión {merge_id} no encontrada",
-                )
-                return Result.failure(error)
-        except Exception as e:
-            error = FusionError(
-                original_error=str(e),
-            )
-            return Result.failure(error)
-
     def suggest_merges(
         self,
         project_id: int,

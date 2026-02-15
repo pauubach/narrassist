@@ -68,18 +68,8 @@
           </span>
         </div>
 
-        <!-- Action buttons -->
-        <div v-if="!entry.undoneAt" class="entry-actions">
-          <Button
-            label="Deshacer"
-            icon="pi pi-replay"
-            size="small"
-            text
-            severity="warning"
-            @click="$emit('undo', entry)"
-          />
-        </div>
-        <div v-else class="entry-undone-info">
+        <!-- Undone badge -->
+        <div v-if="entry.undoneAt" class="entry-undone-info">
           <span>
             <i class="pi pi-check-circle"></i>
             Deshecha el {{ formatDate(entry.undoneAt) }}
@@ -102,9 +92,7 @@ const props = defineProps<{
   projectId: number
 }>()
 
-defineEmits<{
-  'undo': [entry: MergeHistoryEntry]
-}>()
+// Read-only panel — undo is handled via unified HistoryPanel (Ctrl+Z / sidebar)
 
 const loading = ref(false)
 const history = ref<MergeHistoryEntry[]>([])
@@ -296,14 +284,6 @@ defineExpose({ refresh: loadHistory })
 .entry-meta i {
   margin-right: 0.375rem;
   font-size: 0.6875rem;
-}
-
-.entry-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--surface-border);
 }
 
 .entry-undone-info {

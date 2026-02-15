@@ -1355,33 +1355,16 @@ class EntityRepository:
                         else None
                     ),
                     merged_by=new_data.get("merged_by", "user"),
+                    undone_at=(
+                        datetime.fromisoformat(row["undone_at"])
+                        if row.get("undone_at")
+                        else None
+                    ),
                     note=row["note"],
                 )
             )
 
         return history
-
-    def mark_merge_undone(self, merge_id: int) -> bool:
-        """
-        Marca una fusión como deshecha.
-
-        Args:
-            merge_id: ID del registro de fusión
-
-        Returns:
-            True si se actualizó
-        """
-        # Añadir nota indicando que fue deshecha
-        with self.db.connection() as conn:
-            cursor = conn.execute(
-                """
-                UPDATE review_history
-                SET note = COALESCE(note || ' ', '') || '[UNDONE at ' || datetime('now') || ']'
-                WHERE id = ?
-                """,
-                (merge_id,),
-            )
-            return cursor.rowcount > 0
 
     # =========================================================================
     # Búsquedas especializadas

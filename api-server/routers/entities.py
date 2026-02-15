@@ -622,7 +622,8 @@ def get_merge_history(project_id: int):
         history = entity_repo.get_merge_history(project_id)  # type: ignore[attr-defined]
 
         return ApiResponse(
-            success=True, data={"merges": history, "total": len(history)}
+            success=True,
+            data={"merges": [h.to_dict() for h in history], "total": len(history)},
         )
 
     except Exception as e:
@@ -636,7 +637,9 @@ def get_merge_history(project_id: int):
 )
 def undo_entity_merge(project_id: int, merge_id: int):
     """
-    Deshace una fusión de entidades, restaurando las entidades originales.
+    Deshace una fusión de entidades via HistoryManager unificado.
+
+    Restaura entidades originales, redistribuye menciones y atributos.
 
     Args:
         project_id: ID del proyecto
@@ -646,30 +649,43 @@ def undo_entity_merge(project_id: int, merge_id: int):
         ApiResponse con resultado de la operación
     """
     try:
-        from narrative_assistant.entities.fusion import EntityFusionService
+        from narrative_assistant.persistence.history import HistoryManager
 
-        fusion_service = EntityFusionService()
-        result = fusion_service.undo_merge(merge_id)
+        history = HistoryManager(project_id)
+        result = history.undo(merge_id)
 
-        if result.is_failure:
-            return ApiResponse(success=False, error=str(result.error))
+        if not result.success:
+            return ApiResponse(
+                success=False,
+                error=result.message or "No se pudo deshacer la fusión",
+                data={"conflicts": result.conflicts} if result.conflicts else None,
+            )
 
-        restored_ids = result.value
+        # Extraer source_entity_ids del entry para el frontend
+        entry = history.get_entry(merge_id)
+        restored_ids: list[int] = []
+        if entry and entry.old_value:
+            restored_ids = entry.old_value.get("source_entity_ids", [])
 
         # Invalidación granular (S8c)
         try:
             from routers._invalidation import emit_invalidation_event
 
+            all_ids = restored_ids + ([entry.target_id] if entry and entry.target_id else [])
             emit_invalidation_event(
-                deps.get_database(), project_id, "undo_merge", restored_ids  # type: ignore[misc, arg-type]
+                deps.get_database(), project_id, "undo_merge", all_ids
             )
         except Exception:
             pass
 
         return ApiResponse(
             success=True,
-            data={"restored_entity_ids": restored_ids},
-            message="Fusión deshecha exitosamente",
+            data={
+                "restored_entity_ids": restored_ids,
+                "entry_id": merge_id,
+                "message": result.message,
+            },
+            message=result.message or "Fusión deshecha exitosamente",
         )
 
     except Exception as e:

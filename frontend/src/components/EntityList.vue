@@ -333,17 +333,6 @@
               <span class="merge-result">{{ merge.result_name || 'Entidad resultante' }}</span>
             </div>
           </div>
-          <Button
-            v-if="!merge.undone"
-            v-tooltip.left="'Deshacer fusión'"
-            icon="pi pi-undo"
-            text
-            rounded
-            size="small"
-            severity="warning"
-            :loading="undoingMerge === merge.id"
-            @click="undoMerge(merge.id)"
-          />
         </div>
       </div>
 
@@ -432,7 +421,6 @@ const selectedMenuEntity = ref<Entity | null>(null)
 const showMergeHistoryDialog = ref(false)
 const loadingMergeHistory = ref(false)
 const mergeHistory = ref<any[]>([])
-const undoingMerge = ref<number | null>(null)
 
 // Debounce para búsqueda (300ms de espera)
 const updateDebouncedSearch = debounce((query: string) => {
@@ -659,40 +647,6 @@ const loadMergeHistory = async () => {
     console.error('Error loading merge history:', error)
   } finally {
     loadingMergeHistory.value = false
-  }
-}
-
-const undoMerge = async (mergeId: number) => {
-  if (!props.projectId) return
-
-  undoingMerge.value = mergeId
-  try {
-    const data = await api.postRaw<any>(`/api/projects/${props.projectId}/entities/undo-merge/${mergeId}`)
-
-    if (data.success) {
-      toast.add({
-        severity: 'success',
-        summary: 'Fusión deshecha',
-        detail: 'Las entidades han sido restauradas',
-        life: 3000
-      })
-
-      // Recargar historial y emitir evento de refresh
-      await loadMergeHistory()
-      emit('refresh')
-    } else {
-      throw new Error(data.error || 'No se pudo completar la operación. Si persiste, reinicia la aplicación.')
-    }
-  } catch (error) {
-    console.error('Error undoing merge:', error)
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'No se pudo deshacer la fusión',
-      life: 3000
-    })
-  } finally {
-    undoingMerge.value = null
   }
 }
 

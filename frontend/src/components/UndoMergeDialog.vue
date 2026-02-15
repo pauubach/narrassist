@@ -137,7 +137,7 @@ const loadMergeHistory = async () => {
     if (data.success && data.data.merges) {
       // Buscar la fusión más reciente que creó esta entidad
       const relevantMerge = data.data.merges.find(
-        (m: any) => m.target_id === props.entity?.id && !m.undone_at
+        (m: any) => (m.result_entity_id ?? m.target_id) === props.entity?.id && !m.undone_at
       )
 
       if (relevantMerge) {
