@@ -285,7 +285,11 @@ try:
     from narrative_assistant.persistence.database import Database, get_database
     from narrative_assistant.persistence.project import ProjectManager
     _DB_MODULES_LOADED = True
-    deps.NA_VERSION = NA_VERSION
+    # Only override if pyproject.toml read failed (BACKEND_VERSION == "dev").
+    # pyproject.toml is authoritative; importlib.metadata can be stale
+    # after version bumps without `pip install -e .`.
+    if BACKEND_VERSION == "dev":
+        deps.NA_VERSION = NA_VERSION
     _write_debug("Phase 1 OK: persistence modules loaded")
     _early_logger.info("Phase 1 OK: persistence modules loaded")
 except Exception as e:

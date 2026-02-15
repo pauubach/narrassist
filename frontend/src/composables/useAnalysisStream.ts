@@ -10,7 +10,7 @@
 
 import { ref, computed, onUnmounted } from 'vue'
 import { API_BASE, apiUrl } from '@/config/api'
-import { api } from '@/services/apiClient'
+import { api, signalBackendAlive } from '@/services/apiClient'
 import { useNotifications } from './useNotifications'
 
 export interface AnalysisPhase {
@@ -137,10 +137,12 @@ export function useAnalysisStream(options: UseAnalysisStreamOptions = {}) {
     eventSource.onopen = () => {
       isConnected.value = true
       retryCount.value = 0
+      signalBackendAlive()
     }
 
     // Evento de progreso
     eventSource.addEventListener('progress', (event) => {
+      signalBackendAlive()
       try {
         const data = JSON.parse(event.data)
         progress.value = {
@@ -159,6 +161,7 @@ export function useAnalysisStream(options: UseAnalysisStreamOptions = {}) {
 
     // Evento de completado
     eventSource.addEventListener('complete', (event) => {
+      signalBackendAlive()
       try {
         const data = JSON.parse(event.data)
         progress.value = {
@@ -203,9 +206,9 @@ export function useAnalysisStream(options: UseAnalysisStreamOptions = {}) {
       handleConnectionError()
     })
 
-    // Keepalive (solo para debug)
+    // Keepalive — también prueba de que el backend sigue vivo
     eventSource.addEventListener('keepalive', () => {
-      // Conexión activa
+      signalBackendAlive()
     })
 
     // Error de conexión

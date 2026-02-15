@@ -2,10 +2,11 @@
  * useChat - Composable for LLM chat functionality
  *
  * Provides chat with LLM using the project document as context.
+ * Supports cancellation (AbortController), message queue, and retry on connection errors.
  */
 
 import { ref, watch, onMounted } from 'vue'
-import { api } from '@/services/apiClient'
+import { api, backendDown } from '@/services/apiClient'
 import type { ChatMessage, ChatResponse } from '@/types'
 
 
@@ -14,6 +15,9 @@ export function useChat(projectId: number) {
   const messages = ref<ChatMessage[]>([])
   const isLoading = ref(false)
   const error = ref<string | null>(null)
+  const pendingQueue = ref<string[]>([])
+
+  let abortController: AbortController | null = null
 
   // Load history from localStorage on mount
   onMounted(() => {
@@ -63,6 +67,12 @@ export function useChat(projectId: number) {
   }
 
   async function sendMessage(content: string): Promise<void> {
+    // If already loading, queue the message
+    if (isLoading.value) {
+      pendingQueue.value.push(content)
+      return
+    }
+
     error.value = null
 
     // Add user message
@@ -81,17 +91,19 @@ export function useChat(projectId: number) {
       .slice(-10)
       .map((m) => ({ role: m.role, content: m.content }))
 
+    abortController = new AbortController()
     isLoading.value = true
 
     try {
-      // 120s timeout for LLM response - CPU inference can be slow
+      // 180s timeout for LLM response - CPU inference can be very slow
+      // retries: 2 → retry up to 2 times on connection error (backoff: 500ms, 1s)
       const data = await api.postRaw<any>(
         `/api/projects/${projectId}/chat`,
         {
           message: content,
           history: history.slice(0, -1) // Exclude current message
         },
-        { timeout: 120000 }
+        { timeout: 180000, signal: abortController.signal, retries: 2 }
       )
 
       if (data.success && data.data) {
@@ -107,7 +119,6 @@ export function useChat(projectId: number) {
         messages.value.push(assistantMessage)
       } else {
         error.value = data.error || 'Error al obtener respuesta'
-        // Add error message
         messages.value.push({
           id: generateId(),
           role: 'assistant',
@@ -118,12 +129,17 @@ export function useChat(projectId: number) {
         })
       }
     } catch (e) {
+      // Manual cancellation → don't show error bubble, but finally still runs.
+      // - skipCurrent: queue intact → finally processes next
+      // - stopAll: queue already emptied → finally does nothing
+      if (e instanceof Error && e.name === 'AbortError') {
+        return
+      }
+
       let errorMsg = 'Error de conexión'
 
       if (e instanceof Error) {
-        if (e.name === 'AbortError') {
-          errorMsg = 'La respuesta tardó demasiado. Verifica que Ollama esté corriendo.'
-        } else if (e.message.includes('fetch')) {
+        if (e.message.includes('fetch') || e.message.includes('network')) {
           errorMsg = 'No se pudo conectar con el servidor. Verifica la conexión.'
         } else {
           errorMsg = e.message
@@ -140,12 +156,46 @@ export function useChat(projectId: number) {
         error: errorMsg
       })
     } finally {
+      abortController = null
       isLoading.value = false
+
+      // Process queue — but only if backend is responding
+      if (pendingQueue.value.length > 0 && !backendDown.value) {
+        const next = pendingQueue.value.shift()!
+        await sendMessage(next)
+      }
     }
+  }
+
+  function cancelMessage(): void {
+    if (abortController) {
+      abortController.abort()
+      abortController = null
+    }
+  }
+
+  function skipCurrent(): void {
+    // Cancel current request but keep queue intact → finally processes next
+    cancelMessage()
+  }
+
+  function stopAll(): void {
+    // Cancel current + empty queue → full stop
+    pendingQueue.value = []
+    cancelMessage()
+  }
+
+  function removeQueued(index: number): void {
+    pendingQueue.value.splice(index, 1)
+  }
+
+  function editQueued(index: number): string {
+    return pendingQueue.value.splice(index, 1)[0]
   }
 
   function clearHistory(): void {
     messages.value = []
+    pendingQueue.value = []
     localStorage.removeItem(`chat_history_${projectId}`)
     error.value = null
   }
@@ -154,7 +204,13 @@ export function useChat(projectId: number) {
     messages,
     isLoading,
     error,
+    pendingQueue,
     sendMessage,
+    cancelMessage,
+    skipCurrent,
+    stopAll,
+    removeQueued,
+    editQueued,
     clearHistory
   }
 }

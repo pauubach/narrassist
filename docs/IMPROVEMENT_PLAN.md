@@ -2154,11 +2154,12 @@ Infraestructura existente (55% — backend core completo):
 ```
 COMPLETADO                                          PRÓXIMO (Version + Monetización)
 ───────────────────────────────────────────────── ──────────────────────────────────
-S0-S6 (NLP + Frontend) ✅                          S16 (BK-29 Step-up pricing)
-S7a-S7d (Licensing + UX) ✅                        ──────────────────────────────────
-Sprint PP ✅ (17/17)                                BACKLOG ESTILO (BK-30..38):
-Sprint S8 ✅ (S8a + S8b + S8c)                     RhetoricDetector, LLM subjetividad,
-Sprint S15 ✅ (BK-28 Version tracking)              coherencia, config modal, dashboard
+S0-S6 (NLP + Frontend) ✅                          BACKLOG ESTILO (BK-30..38):
+S7a-S7d (Licensing + UX) ✅                        RhetoricDetector, LLM subjetividad,
+Sprint PP ✅ (17/17)                                coherencia, config modal, dashboard
+Sprint S8 ✅ (S8a + S8b + S8c)                     ──────────────────────────────────
+Sprint S15 ✅ (BK-28 Version tracking)              CONDICIONADO (requiere infra):
+Sprint S16A ✅ (BK-29 Quota UX)                     S16B (Stripe pagos, backend público)
 Sprint S17 ✅ (Style Register Detection)            ──────────────────────────────────
                                                     APARCADO:
 Sprint S9 ✅ (BK-09/15/17/10b/10c)                 BK-26 Collab online
@@ -2170,11 +2171,9 @@ Sprint S13 ✅ (BK-27 + BK-25 MVP)                  Level A (regex) ✅
 Sprint S14 ✅ (BK-25 Revision Intelligence)         Level B (LLM per-chapter) ✅
   + Level A/B/C temporal detection ✅                Level C (cross-chapter linking) ✅
   + 3-layer flashback scoring ✅                     Level D (Narrative-Experts) — futuro
-  v0.8.0 → v0.9.4
+  v0.8.0 → v0.9.10
 
-Dependencias:
-  S15 (independiente)
-  S16A (independiente, desktop-only)
+Dependencias restantes:
   S16B (requiere backend billing público + Stripe)
 ```
 
@@ -2195,10 +2194,10 @@ Dependencias:
 | ~~Sprint S13~~ | ~~7-9h (1-2 días)~~ | ✅ COMPLETADO (BK-27 + BK-25 MVP) |
 | ~~Sprint S14~~ | ~~28-36h (5-7 días)~~ | ✅ COMPLETADO (BK-25 Revision Intelligence fases 1-3) |
 | ~~Sprint S15~~ | ~~20-25h (4-5 días)~~ | ✅ COMPLETADO (BK-28 version metrics, sparkline) |
-| Sprint S16A | 12h (2-3 días) | BK-29 UX (quota warnings, tier comparison) |
+| ~~Sprint S16A~~ | ~~12h (2-3 días)~~ | ✅ COMPLETADO (QuotaWarningBanner, TierComparisonDialog, quota-status endpoint, 317 tests) |
 | Sprint S16B | 20-28h (4-6 días) | BK-29 pagos (requiere backend billing público) |
 | ~~Sprint S17~~ | ~~7-9h (1-2 días)~~ | ✅ COMPLETADO (Style Register: 5 sub-detectores, 4 perfiles, 39 tests) |
-| **TOTAL restante** | **~32-40h (~1-2 semanas)** | S16A (+S16B condicionado) |
+| **TOTAL restante** | **~20-28h (S16B condicionado)** | Solo pagos Stripe (requiere infra) |
 
 ---
 

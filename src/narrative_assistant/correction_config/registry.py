@@ -877,7 +877,10 @@ def get_correction_config(
         >>> config.readability.target_age_min
         8
     """
-    type_code = type_code.upper()
+    # Normalizar valores largos ("fiction") a códigos cortos ("FIC")
+    from narrative_assistant.feature_profile.models import normalize_document_type
+
+    type_code = normalize_document_type(type_code)
     subtype_code = subtype_code.upper() if subtype_code else None
 
     # Obtener info del tipo

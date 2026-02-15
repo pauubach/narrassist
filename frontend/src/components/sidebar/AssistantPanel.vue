@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, watch } from 'vue'
+import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { useChat } from '@/composables/useChat'
 import { useAnalysisStore } from '@/stores/analysis'
 import Button from 'primevue/button'
@@ -11,6 +11,14 @@ import InputText from 'primevue/inputtext'
  * Permite hacer preguntas sobre el documento usando Ollama.
  * Si hay un análisis en curso, el backend prioriza el chat
  * entre iteraciones LLM (LLMScheduler), así que no se bloquea.
+ *
+ * Features:
+ * - Arrow up/down: navigate previous user messages (terminal-style)
+ * - Escape: cancel current request + empty queue
+ * - Message queue: send while waiting, shown as editable list
+ * - Stop button: cancel + clear queue
+ * - Auto-scroll on page reload
+ * - Retry on connection errors (2 retries with backoff)
  */
 
 const props = defineProps<{
@@ -18,12 +26,33 @@ const props = defineProps<{
   projectId: number
 }>()
 
-const { messages, isLoading, error, sendMessage, clearHistory } = useChat(props.projectId)
+const {
+  messages, isLoading, error, pendingQueue,
+  sendMessage, skipCurrent, stopAll, removeQueued, editQueued, clearHistory
+} = useChat(props.projectId)
+
 const analysisStore = useAnalysisStore()
 const isProjectAnalyzing = computed(() => analysisStore.isProjectAnalyzing(props.projectId))
 
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
+
+// Input history (terminal-style navigation)
+const inputHistory = ref<string[]>([])
+const historyIndex = ref(-1)
+const savedInput = ref('')
+
+// Rebuild input history from saved messages + auto-scroll on mount
+onMounted(() => {
+  nextTick(() => {
+    inputHistory.value = messages.value
+      .filter(m => m.role === 'user' && m.status === 'complete')
+      .map(m => m.content)
+    if (messagesContainer.value) {
+      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+    }
+  })
+})
 
 // Auto-scroll on new messages
 watch(
@@ -38,19 +67,59 @@ watch(
   { deep: true }
 )
 
-async function handleSend() {
-  if (!inputText.value.trim() || isLoading.value) return
-
+function handleSend() {
+  if (!inputText.value.trim()) return
   const message = inputText.value.trim()
   inputText.value = ''
-  await sendMessage(message)
+  inputHistory.value.push(message)
+  historyIndex.value = -1
+  sendMessage(message)
 }
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     handleSend()
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    navigateHistory('up')
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    navigateHistory('down')
+  } else if (e.key === 'Escape') {
+    if (isLoading.value || pendingQueue.value.length > 0) {
+      stopAll()
+    }
   }
+}
+
+function navigateHistory(direction: 'up' | 'down') {
+  if (inputHistory.value.length === 0) return
+
+  if (historyIndex.value === -1) {
+    if (direction === 'down') return
+    savedInput.value = inputText.value
+    historyIndex.value = inputHistory.value.length
+  }
+
+  const newIndex = direction === 'up'
+    ? historyIndex.value - 1
+    : historyIndex.value + 1
+
+  if (newIndex < 0) return
+
+  if (newIndex >= inputHistory.value.length) {
+    historyIndex.value = -1
+    inputText.value = savedInput.value
+    return
+  }
+
+  historyIndex.value = newIndex
+  inputText.value = inputHistory.value[newIndex]
+}
+
+function handleEditQueued(index: number) {
+  inputText.value = editQueued(index)
 }
 </script>
 
@@ -105,7 +174,56 @@ function handleKeydown(e: KeyboardEvent) {
           <span></span>
           <span></span>
         </span>
-        <span class="loading-text">{{ isProjectAnalyzing ? 'Esperando turno del análisis...' : 'Pensando...' }}</span>
+        <span class="loading-text">{{ isProjectAnalyzing ? 'Esperando turno...' : 'Pensando...' }}</span>
+        <Button
+          v-if="pendingQueue.length > 0"
+          v-tooltip.top="'Saltar esta y seguir con la cola'"
+          icon="pi pi-forward"
+          text
+          rounded
+          size="small"
+          class="skip-btn"
+          @click="skipCurrent"
+        />
+        <Button
+          v-else
+          v-tooltip.top="'Cancelar (Esc)'"
+          icon="pi pi-times"
+          text
+          rounded
+          size="small"
+          class="skip-btn"
+          @click="stopAll"
+        />
+      </div>
+    </div>
+
+    <!-- Queue panel -->
+    <div v-if="pendingQueue.length > 0" class="queue-panel">
+      <div class="queue-header">
+        <span class="queue-title">En cola ({{ pendingQueue.length }})</span>
+      </div>
+      <div v-for="(q, idx) in pendingQueue" :key="idx" class="queue-item">
+        <span class="queue-text">{{ q }}</span>
+        <div class="queue-actions">
+          <Button
+            v-tooltip.top="'Editar'"
+            icon="pi pi-pencil"
+            text
+            rounded
+            size="small"
+            @click="handleEditQueued(idx)"
+          />
+          <Button
+            v-tooltip.top="'Eliminar'"
+            icon="pi pi-trash"
+            text
+            rounded
+            size="small"
+            severity="danger"
+            @click="removeQueued(idx)"
+          />
+        </div>
       </div>
     </div>
 
@@ -114,14 +232,25 @@ function handleKeydown(e: KeyboardEvent) {
       <InputText
         v-model="inputText"
         placeholder="Escribe tu pregunta..."
-        :disabled="isLoading"
         class="chat-input"
         @keydown="handleKeydown"
       />
+      <!-- Stop button: visible during loading or when queue has items -->
       <Button
+        v-if="isLoading || pendingQueue.length > 0"
+        v-tooltip.top="'Detener (Esc)'"
+        icon="pi pi-stop"
+        severity="danger"
+        text
+        rounded
+        class="stop-btn"
+        @click="stopAll"
+      />
+      <!-- Send button: visible when idle and no queue -->
+      <Button
+        v-else
         icon="pi pi-send"
-        :disabled="!inputText.trim() || isLoading"
-        :loading="isLoading"
+        :disabled="!inputText.trim()"
         class="send-btn"
         @click="handleSend"
       />
@@ -295,6 +424,64 @@ function handleKeydown(e: KeyboardEvent) {
   color: var(--ds-color-text-secondary);
 }
 
+.skip-btn {
+  margin-left: auto;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--ds-color-text-muted) !important;
+}
+
+/* Queue panel */
+.queue-panel {
+  border-top: 1px solid var(--ds-surface-border);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  background: var(--ds-surface-ground);
+  max-height: 120px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.queue-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--ds-space-1);
+}
+
+.queue-title {
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-text-muted);
+  font-weight: var(--ds-font-weight-semibold);
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--ds-space-1) 0;
+  gap: var(--ds-space-2);
+  border-bottom: 1px solid var(--ds-surface-border);
+}
+
+.queue-item:last-child {
+  border-bottom: none;
+}
+
+.queue-text {
+  flex: 1;
+  font-size: var(--ds-font-size-sm);
+  color: var(--ds-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* Input area */
 .input-area {
   display: flex;
   gap: var(--ds-space-2);
@@ -309,6 +496,10 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 .send-btn {
+  flex-shrink: 0;
+}
+
+.stop-btn {
   flex-shrink: 0;
 }
 

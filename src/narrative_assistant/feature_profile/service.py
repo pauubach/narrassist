@@ -11,6 +11,7 @@ from .models import (
     DocumentType,
     FeatureProfile,
     create_feature_profile,
+    normalize_document_type,
 )
 
 logger = logging.getLogger(__name__)
@@ -116,11 +117,13 @@ class FeatureProfileService:
         if not row:
             return None
 
-        doc_type_str = row["document_type"] or "FIC"
+        doc_type_raw = row["document_type"] or "FIC"
         doc_subtype = row["document_subtype"]
 
+        # Normalizar valores legacy largos ("fiction") a códigos cortos ("FIC")
+        doc_type_code = normalize_document_type(doc_type_raw)
         try:
-            doc_type = DocumentType(doc_type_str)
+            doc_type = DocumentType(doc_type_code)
         except ValueError:
             doc_type = DocumentType.FICTION
 
@@ -142,7 +145,7 @@ class FeatureProfileService:
         if not row:
             return None
 
-        doc_type_str = row["document_type"] or "FIC"
+        doc_type_str = normalize_document_type(row["document_type"] or "FIC")
         type_info = self.get_document_type_info(doc_type_str)
 
         # Encontrar nombre del subtipo

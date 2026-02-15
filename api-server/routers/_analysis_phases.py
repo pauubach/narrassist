@@ -593,25 +593,33 @@ def run_classification(ctx: dict, tracker: ProgressTracker):
     tracker.start_phase("classification", 1, "Clasificando tipo de documento...")
 
     try:
+        from narrative_assistant.feature_profile.models import normalize_document_type
         from narrative_assistant.parsers.document_classifier import DocumentClassifier
 
         classifier = DocumentClassifier()
         classification = classifier.classify(full_text)
 
-        document_type = classification.document_type if classification else "unknown"
-        ctx["classification"] = classification
-        ctx["document_type"] = document_type
+        if classification:
+            doc_type = classification.document_type
+            # Enum → str largo → código corto (FIC, MEM, etc.) para BD
+            long_str = doc_type.value if hasattr(doc_type, "value") else str(doc_type)
+            document_type_str = normalize_document_type(long_str)
+        else:
+            document_type_str = "FIC"  # Default coherente con Project.document_type
 
-        logger.info(f"Document classified as: {document_type}")
+        ctx["classification"] = classification
+        ctx["document_type"] = document_type_str
+
+        logger.info(f"Document classified as: {document_type_str}")
         if classification:
             logger.info(f"  Confidence: {classification.confidence:.2f}")
-            logger.info(f"  Genre: {classification.genre}")  # type: ignore[attr-defined]
+            logger.info(f"  Type: {document_type_str}")
 
         # Guardar en proyecto
         try:
             project = ctx["project"]
             if hasattr(project, "document_type"):
-                project.document_type = document_type
+                project.document_type = document_type_str
             from narrative_assistant.persistence.project import ProjectManager
 
             proj_manager = ProjectManager(ctx["db_session"])
@@ -622,7 +630,7 @@ def run_classification(ctx: dict, tracker: ProgressTracker):
     except Exception as e:
         logger.warning(f"Document classification failed (continuing): {e}")
         ctx["classification"] = None
-        ctx["document_type"] = "unknown"
+        ctx["document_type"] = "FIC"  # Default coherente con Project.document_type
 
     tracker.end_phase("classification", 1)
 
@@ -2459,25 +2467,23 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
             logger.debug(f"Could not load project correction config: {cfg_err}")
 
         # Activar style_register según tipo de documento clasificado
-        doc_type_raw = ctx.get("document_type", "unknown")
-        doc_type = doc_type_raw.value if hasattr(doc_type_raw, "value") else str(doc_type_raw)
+        # ctx["document_type"] es código corto (FIC, MEM, etc.)
         _STYLE_REGISTER_PROFILES = {
-            "technical": ("strict", True),
-            "academic": ("strict", True),
-            "divulgation": ("strict", True),
-            "essay": ("formal", True),
-            "memoir": ("moderate", True),
-            "self_help": ("moderate", True),
-            "biography": ("moderate", True),
-            "celebrity": ("moderate", True),
-            "practical": ("moderate", True),
-            "cookbook": ("moderate", True),
-            "fiction": ("free", False),
-            "drama": ("free", False),
-            "children": ("free", False),
-            "graphic": ("free", False),
+            "TEC": ("strict", True),
+            "ENS": ("formal", True),
+            "DIV": ("strict", True),
+            "MEM": ("moderate", True),
+            "AUT": ("moderate", True),
+            "BIO": ("moderate", True),
+            "CEL": ("moderate", True),
+            "PRA": ("moderate", True),
+            "FIC": ("free", False),
+            "DRA": ("free", False),
+            "INF": ("free", False),
+            "GRA": ("free", False),
         }
-        profile, enabled = _STYLE_REGISTER_PROFILES.get(doc_type, ("moderate", False))
+        doc_type_code = ctx.get("document_type", "FIC")
+        profile, enabled = _STYLE_REGISTER_PROFILES.get(doc_type_code, ("moderate", False))
         from narrative_assistant.corrections.config import StyleRegisterConfig
         correction_config.style_register = StyleRegisterConfig(enabled=enabled, profile=profile)
 

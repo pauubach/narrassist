@@ -33,6 +33,14 @@ const _recoveryAttempts = ref(0)
 /** Número de intentos de recuperación fallidos (para escalar el mensaje en UI) */
 export const recoveryAttempts = readonly(_recoveryAttempts)
 
+/**
+ * Señaliza que el backend respondió correctamente (resetea el contador de fallos).
+ * Útil para conexiones que no pasan por monitoredFetch (ej: SSE EventSource).
+ */
+export function signalBackendAlive() {
+  onRequestSuccess()
+}
+
 const CONNECTION_FAIL_THRESHOLD = 3
 let consecutiveFailures = 0
 let recoveryTimer: ReturnType<typeof setInterval> | null = null
@@ -317,7 +325,7 @@ async function postRaw<T>(
   body?: Record<string, unknown>,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { timeout = 30000, headers = {}, signal } = options
+  const { timeout = 30000, headers = {}, signal, retries = 0 } = options
   const abortSignal = createTimeoutSignal(timeout, signal)
 
   const fetchOptions: RequestInit = {
@@ -327,7 +335,9 @@ async function postRaw<T>(
     signal: abortSignal,
   }
 
-  const response = await monitoredFetch(apiUrl(path), fetchOptions)
+  const response = retries > 0
+    ? await monitoredFetchWithRetry(apiUrl(path), fetchOptions, retries)
+    : await monitoredFetch(apiUrl(path), fetchOptions)
   return parseRawResponse<T>(response)
 }
 

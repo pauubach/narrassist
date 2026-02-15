@@ -207,8 +207,12 @@ async def get_project(project_id: int):
                     "SELECT document_type FROM projects WHERE id = ?", (project_id,)
                 ).fetchone()
                 if dt_row and dt_row[0]:
-                    from narrative_assistant.feature_profile.models import _TYPE_CODE_TO_LONG
-                    document_type = _TYPE_CODE_TO_LONG.get(dt_row[0], document_type)
+                    from narrative_assistant.feature_profile.models import (
+                        _TYPE_CODE_TO_LONG,
+                        normalize_document_type,
+                    )
+                    code = normalize_document_type(dt_row[0])
+                    document_type = _TYPE_CODE_TO_LONG.get(code, document_type)
         except Exception:
             pass  # Fallback al valor de settings
 

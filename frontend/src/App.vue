@@ -66,6 +66,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useNativeMenu } from './composables/useNativeMenu'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { useAnalysisStore } from '@/stores/analysis'
 import KeyboardShortcutsDialog from '@/components/KeyboardShortcutsDialog.vue'
 import AboutDialog from '@/components/AboutDialog.vue'
 import TutorialDialog from '@/components/TutorialDialog.vue'
@@ -82,12 +83,16 @@ const appStore = useAppStore()
 const systemStore = useSystemStore()
 const themeStore = useThemeStore()
 const workspaceStore = useWorkspaceStore()
+const analysisStore = useAnalysisStore()
 const isBackendDown = backendDown
 const numRecoveryAttempts = recoveryAttempts
 const showBackendDownBanner = computed(() => {
   // Evitar falsa alarma en arranque: mientras el backend inicializa,
   // no mostrar "Sin conexión" aunque haya fallos transitorios.
   if (systemStore.backendStarting && !systemStore.backendReady) return false
+  // Si hay un análisis en curso, el backend está vivo (SSE activo).
+  // Los fallos de conexión son transitorios por carga, no caída real.
+  if (analysisStore.isAnalyzing) return false
   return isBackendDown.value
 })
 
