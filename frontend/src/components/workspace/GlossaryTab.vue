@@ -19,7 +19,7 @@ import DsInput from '@/components/ds/DsInput.vue'
 import Textarea from 'primevue/textarea'
 import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
-import Chips from 'primevue/chips'
+import InputChips from 'primevue/inputchips'
 import Checkbox from 'primevue/checkbox'
 import Tag from 'primevue/tag'
 // import Message from 'primevue/message'  // Reserved
@@ -731,7 +731,7 @@ function getConfidenceColor(confidence: number): string {
         <!-- Variantes -->
         <div class="glossary-dialog__field">
           <label for="variants">Variantes / Aliases</label>
-          <Chips
+          <InputChips
             id="variants"
             v-model="editingEntry.variants"
             placeholder="Añadir variante y Enter"

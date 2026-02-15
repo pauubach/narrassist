@@ -303,6 +303,7 @@ const miniChartOptions = {
     y: {
       grid: { color: 'rgba(0,0,0,0.05)' },
       ticks: { font: { size: 10 } },
+      beginAtZero: true,
     },
   },
 }

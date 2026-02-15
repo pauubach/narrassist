@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import type { Alert, AlertSource } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
@@ -14,12 +14,20 @@ import { useAlertUtils } from '@/composables/useAlertUtils'
  * - Sugerencia de corrección
  * - Acciones (resolver, descartar, ir al texto)
  * - Múltiples botones de navegación para alertas de inconsistencia
+ * - Navegación de ocurrencias para alertas de repetición (prev/next)
  */
 
 interface ChapterInfo {
   id: number
   chapterNumber: number
   title: string
+}
+
+/** Ocurrencia de una palabra repetida */
+interface AlertOccurrence {
+  start_char: number
+  end_char: number
+  context?: string
 }
 
 const props = defineProps<{
@@ -32,6 +40,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   /** Ir al texto donde está la alerta, opcionalmente a una fuente específica */
   (e: 'navigate', source?: AlertSource): void
+  /** Navegar a una ocurrencia específica por posición */
+  (e: 'navigateToPosition', startChar: number, endChar: number, text?: string): void
   /** Marcar como resuelta */
   (e: 'resolve'): void
   /** Descartar alerta */
@@ -100,6 +110,53 @@ function getSourceLocation(source: AlertSource): string {
     parts.push(getChapterTitle(source.chapter))
   }
   return parts.join(', ') || ''
+}
+
+// =========================================================================
+// Occurrence navigation (for word echo / repetition alerts)
+// =========================================================================
+
+const occurrenceIndex = ref(0)
+
+/** Ocurrencias de la alerta (repeticiones, ecos, etc.) */
+const occurrences = computed<AlertOccurrence[]>(() => {
+  const raw = props.alert.extraData?.occurrences
+  if (!Array.isArray(raw)) return []
+  return raw.filter((o: any) => typeof o.start_char === 'number' && typeof o.end_char === 'number')
+})
+
+const hasOccurrences = computed(() => occurrences.value.length > 1)
+const canGoPrev = computed(() => occurrenceIndex.value > 0)
+const canGoNext = computed(() => occurrenceIndex.value < occurrences.value.length - 1)
+const occurrenceLabel = computed(() =>
+  `${occurrenceIndex.value + 1} / ${occurrences.value.length}`
+)
+
+/** Palabra de la alerta (para el highlight) */
+const alertWord = computed(() => {
+  return (props.alert.extraData?.word as string) ?? props.alert.excerpt ?? ''
+})
+
+// Reset index when alert changes
+watch(() => props.alert.id, () => {
+  occurrenceIndex.value = 0
+})
+
+function navigateToOccurrence(index: number) {
+  const occ = occurrences.value[index]
+  if (!occ) return
+  occurrenceIndex.value = index
+  emit('navigateToPosition', occ.start_char, occ.end_char, alertWord.value)
+}
+
+function goToPrevOccurrence() {
+  if (!canGoPrev.value) return
+  navigateToOccurrence(occurrenceIndex.value - 1)
+}
+
+function goToNextOccurrence() {
+  if (!canGoNext.value) return
+  navigateToOccurrence(occurrenceIndex.value + 1)
 }
 </script>
 
@@ -208,7 +265,35 @@ function getSourceLocation(source: AlertSource): string {
           />
         </div>
       </div>
-      <!-- Botón único para alertas sin múltiples fuentes -->
+      <!-- Navegación de ocurrencias (repeticiones, ecos) -->
+      <div v-else-if="hasOccurrences" class="occurrence-nav">
+        <div class="occurrence-nav-row">
+          <Button
+            icon="pi pi-chevron-left"
+            text
+            rounded
+            size="small"
+            :disabled="!canGoPrev"
+            @click="goToPrevOccurrence"
+          />
+          <span class="occurrence-label">{{ occurrenceLabel }}</span>
+          <Button
+            icon="pi pi-chevron-right"
+            text
+            rounded
+            size="small"
+            :disabled="!canGoNext"
+            @click="goToNextOccurrence"
+          />
+        </div>
+        <Button
+          label="Ir al texto"
+          icon="pi pi-arrow-right"
+          size="small"
+          @click="navigateToOccurrence(occurrenceIndex)"
+        />
+      </div>
+      <!-- Botón único para alertas sin múltiples fuentes ni ocurrencias -->
       <Button
         v-else
         label="Ir al texto"
@@ -507,5 +592,27 @@ function getSourceLocation(source: AlertSource): string {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Occurrence navigation (word echo / repetition alerts) */
+.occurrence-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+  align-items: center;
+}
+
+.occurrence-nav-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+}
+
+.occurrence-label {
+  font-size: var(--ds-font-size-sm);
+  font-weight: var(--ds-font-weight-medium);
+  color: var(--ds-color-text-secondary);
+  min-width: 3rem;
+  text-align: center;
 }
 </style>

@@ -6,7 +6,10 @@
  * Resueltas / Nuevas / Sin cambio, con badge de confianza de matching.
  */
 import { computed, onMounted, ref, watch } from 'vue'
-import TabView from 'primevue/tabview'
+import Tabs from 'primevue/tabs'
+import TabList from 'primevue/tablist'
+import Tab from 'primevue/tab'
+import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
@@ -122,21 +125,32 @@ watch(() => props.projectId, loadDetail)
     </div>
 
     <template v-else>
-      <TabView>
+      <Tabs value="resolved">
+        <TabList>
+          <Tab value="resolved">
+            <i class="pi pi-check-circle" />
+            Resueltas
+            <Tag :value="String(resolvedCount)" severity="success" rounded class="tab-badge" />
+          </Tab>
+          <Tab value="new">
+            <i class="pi pi-exclamation-circle" />
+            Nuevas
+            <Tag :value="String(newCount)" severity="danger" rounded class="tab-badge" />
+          </Tab>
+          <Tab value="unchanged">
+            <i class="pi pi-minus-circle" />
+            Sin cambio
+            <Tag :value="String(unchangedCount)" severity="secondary" rounded class="tab-badge" />
+          </Tab>
+        </TabList>
+        <TabPanels>
         <TabPanel value="resolved">
-          <template #header>
-            <span>
-              <i class="pi pi-check-circle" />
-              Resueltas
-              <Tag :value="String(resolvedCount)" severity="success" rounded class="tab-badge" />
-            </span>
-          </template>
           <div v-if="resolvedCount === 0" class="tab-empty">
             No hay alertas resueltas en esta revisión.
           </div>
           <div v-else class="alert-diff-list">
             <div
-              v-for="(alert, idx) in detail!.alertsResolved"
+              v-for="(alert, idx) in detail?.alertsResolved"
               :key="idx"
               class="alert-diff-item resolved"
               @click="selectedAlert = alert"
@@ -170,19 +184,12 @@ watch(() => props.projectId, loadDetail)
         </TabPanel>
 
         <TabPanel value="new">
-          <template #header>
-            <span>
-              <i class="pi pi-exclamation-circle" />
-              Nuevas
-              <Tag :value="String(newCount)" severity="danger" rounded class="tab-badge" />
-            </span>
-          </template>
           <div v-if="newCount === 0" class="tab-empty">
             No hay alertas nuevas en esta revisión.
           </div>
           <div v-else class="alert-diff-list">
             <div
-              v-for="(alert, idx) in detail!.alertsNew"
+              v-for="(alert, idx) in detail?.alertsNew"
               :key="idx"
               class="alert-diff-item new-alert"
             >
@@ -199,18 +206,12 @@ watch(() => props.projectId, loadDetail)
         </TabPanel>
 
         <TabPanel value="unchanged">
-          <template #header>
-            <span>
-              <i class="pi pi-minus-circle" />
-              Sin cambio
-              <Tag :value="String(unchangedCount)" severity="secondary" rounded class="tab-badge" />
-            </span>
-          </template>
           <div class="tab-empty">
             {{ unchangedCount }} alertas permanecen sin cambios respecto al análisis anterior.
           </div>
         </TabPanel>
-      </TabView>
+        </TabPanels>
+      </Tabs>
 
       <AlertDiffViewer
         v-if="selectedAlert"

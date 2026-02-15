@@ -158,7 +158,7 @@ class RepetitionDetector(BaseDetector):
         "bastante",
     }
 
-    # Palabras que pueden repetirse intencionalmente
+    # Palabras que pueden repetirse intencionalmente (énfasis, ritmo narrativo)
     INTENTIONAL_REPETITION_WORDS = {
         "sí",
         "no",
@@ -168,6 +168,29 @@ class RepetitionDetector(BaseDetector):
         "jamás",
         "siempre",
     }
+
+    # Verbos dicendi y conectores narrativos: umbral más alto (3x distancia normal)
+    # Se repiten legítimamente, pero la monotonía excesiva sí es un problema
+    NARRATIVE_LENIENT = {
+        "dijo",
+        "preguntó",
+        "respondió",
+        "contestó",
+        "exclamó",
+        "pensó",
+        "sintió",
+        "miró",
+        "vio",
+        "oyó",
+        "entonces",
+        "luego",
+        "después",
+    }
+
+    # Factor de tolerancia para palabras narrativas: ventana = distance / factor
+    # Con factor=3 y distance=50, solo se flaggean si están a ≤16 tokens
+    # (más indulgente que contenido normal, pero atrapa monotonía)
+    NARRATIVE_DISTANCE_DIVISOR = 3
 
     def __init__(self, config: RepetitionConfig | None = None):
         self.config = config or RepetitionConfig()
@@ -232,7 +255,7 @@ class RepetitionDetector(BaseDetector):
         else:
             tokens = self._get_tokens_simple(text)
 
-        # Filtrar tokens de contenido
+        # Filtrar tokens de contenido (excluir funcionales y cortos)
         content_tokens = [
             t
             for t in tokens
@@ -241,11 +264,18 @@ class RepetitionDetector(BaseDetector):
             and t["pos"] in ("NOUN", "VERB", "ADJ", "ADV", None)  # None = sin spaCy
         ]
 
+        # Distancia más corta para narrativas: solo flaggear si son muy cercanas
+        narrative_distance = max(distance // self.NARRATIVE_DISTANCE_DIVISOR, 5)
+
         # Buscar repeticiones
         reported_pairs = set()  # Evitar reportar el mismo par dos veces
 
         for i, token in enumerate(content_tokens):
             lemma = token["lemma"].lower()
+
+            # Determinar distancia máxima según tipo de palabra
+            is_narrative = lemma in self.NARRATIVE_LENIENT
+            max_distance = narrative_distance if is_narrative else distance
 
             # Buscar repeticiones en ventana posterior
             for j in range(i + 1, len(content_tokens)):
@@ -253,7 +283,7 @@ class RepetitionDetector(BaseDetector):
 
                 # Fuera de la ventana de distancia
                 word_distance = j - i
-                if word_distance > distance:
+                if word_distance > max_distance:
                     break
 
                 # ¿Es la misma palabra/lema?
@@ -268,6 +298,14 @@ class RepetitionDetector(BaseDetector):
                         continue
                     reported_pairs.add(pair_key)
 
+                    # Sugerencia específica para verbos dicendi
+                    suggestion = None
+                    if is_narrative:
+                        suggestion = (
+                            f"Se usa '{token['text']}' repetidamente. "
+                            f"Considerar variar con sinónimos o reformular."
+                        )
+
                     # Reportar — posición solo del primer token (no del span entre ambos)
                     issues.append(
                         CorrectionIssue(
@@ -280,8 +318,8 @@ class RepetitionDetector(BaseDetector):
                                 f"'{token['text']}' aparece repetida a {word_distance} "
                                 f"palabras de distancia"
                             ),
-                            suggestion=None,  # El corrector decide la variación
-                            confidence=self._calculate_confidence(word_distance, distance),
+                            suggestion=suggestion,
+                            confidence=self._calculate_confidence(word_distance, max_distance),
                             context=self._extract_context(text, token["start"], token["end"]),
                             chapter_index=chapter_index,
                             rule_id="REP_LEXICAL",
@@ -402,7 +440,9 @@ class RepetitionDetector(BaseDetector):
             return True
 
         # En diálogo (podría ser intencional para énfasis)
-        if self.config.ignore_dialogue:
+        # PERO: no excluir verbos dicendi — la monotonía en atribución
+        # de diálogo ("dijo", "dijo", "dijo") sí es un problema estilístico
+        if self.config.ignore_dialogue and word not in self.NARRATIVE_LENIENT:
             context = text[max(0, token1["start"] - 5) : token1["start"]]
             if "—" in context or "–" in context or "-" in context:
                 return True

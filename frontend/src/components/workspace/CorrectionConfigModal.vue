@@ -1715,16 +1715,16 @@ watch(
 }
 
 /* Nested tabs */
-.nested-tabs :deep(.p-tabview-nav) {
+.nested-tabs :deep(.p-tablist) {
   background: transparent;
 }
 
-.nested-tabs :deep(.p-tabview-panels) {
+.nested-tabs :deep(.p-tabpanels) {
   padding: 1rem 0;
 }
 
 /* Tab panel content */
-:deep(.p-tabview-panels) {
+:deep(.p-tabpanels) {
   padding: 1rem 0;
 }
 

@@ -157,9 +157,19 @@ const syntheticBaseDate = (() => {
   return d
 })()
 
+// Coerce vis-timeline date parameter to a native Date (may be moment, number, or Date)
+const toNativeDate = (d: unknown): Date => {
+  if (d instanceof Date) return d
+  if (typeof d === 'number') return new Date(d)
+  if (d && typeof (d as any).toDate === 'function') return (d as any).toDate()
+  if (d && typeof (d as any).getTime === 'function') return new Date((d as any).getTime())
+  return new Date(d as any)
+}
+
 // Convert a Date back to a label for synthetic timelines (adaptive: hours or days)
-const dateToDayLabel = (d: Date): string => {
-  const diffMs = d.getTime() - syntheticBaseDate.getTime()
+const dateToDayLabel = (d: unknown): string => {
+  const nativeDate = toNativeDate(d)
+  const diffMs = nativeDate.getTime() - syntheticBaseDate.getTime()
   const diffDays = diffMs / (1000 * 60 * 60 * 24)
 
   // Sub-day span → show hours
@@ -388,9 +398,10 @@ const initTimeline = () => {
   const span = syntheticSpanDays.value
   const syntheticFormatOption = isSynthetic.value ? {
     format: {
-      minorLabels: (date: Date, _scale: string, _step: number) => dateToDayLabel(date),
-      majorLabels: (date: Date, _scale: string, _step: number) => {
-        const diffMs = date.getTime() - syntheticBaseDate.getTime()
+      minorLabels: (date: unknown, _scale: string, _step: number) => dateToDayLabel(date),
+      majorLabels: (date: unknown, _scale: string, _step: number) => {
+        const nativeDate = toNativeDate(date)
+        const diffMs = nativeDate.getTime() - syntheticBaseDate.getTime()
         const diffDays = diffMs / (1000 * 60 * 60 * 24)
         // Sub-day story → group by day
         if (span < 1) {

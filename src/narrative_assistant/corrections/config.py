@@ -178,8 +178,8 @@ class RepetitionConfig:
     # Distancia mínima entre repeticiones (en palabras)
     min_distance: int = 50
 
-    # Longitud mínima de palabra para considerar (ignora artículos, etc.)
-    min_word_length: int = 4
+    # Longitud mínima de palabra para considerar (3 = incluye "sol", "mar", "voz")
+    min_word_length: int = 3
 
     # Ignorar repeticiones en diálogos (intencionales)
     ignore_dialogue: bool = True

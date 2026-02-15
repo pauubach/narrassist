@@ -56,13 +56,14 @@
     <!-- Knowledge Content -->
     <div v-else-if="knowledge" class="knowledge-content">
       <!-- Tab View for knowledge direction -->
-      <TabView>
+      <Tabs value="0">
+        <TabList>
+          <Tab value="0"><i class="pi pi-eye"></i> Lo que sabe ({{ knowledge.knowsAboutOthers.length }})</Tab>
+          <Tab value="1"><i class="pi pi-users"></i> Lo que otros saben ({{ knowledge.othersKnowAbout.length }})</Tab>
+        </TabList>
+        <TabPanels>
         <!-- What this character knows -->
         <TabPanel value="0">
-          <template #header>
-            <i class="pi pi-eye"></i>
-            <span>Lo que sabe ({{ knowledge.knowsAboutOthers.length }})</span>
-          </template>
 
           <div v-if="knowledge.knowsAboutOthers.length > 0" class="facts-list">
             <div
@@ -111,10 +112,6 @@
 
         <!-- What others know about this character -->
         <TabPanel value="1">
-          <template #header>
-            <i class="pi pi-users"></i>
-            <span>Lo que otros saben ({{ knowledge.othersKnowAbout.length }})</span>
-          </template>
 
           <div v-if="knowledge.othersKnowAbout.length > 0" class="facts-list">
             <div
@@ -161,7 +158,8 @@
           </div>
           <p v-else class="empty-text">No se detectó que otros personajes sepan cosas sobre este</p>
         </TabPanel>
-      </TabView>
+        </TabPanels>
+      </Tabs>
 
       <!-- Stats Summary -->
       <div v-if="knowledge.stats" class="stats-summary">
@@ -201,7 +199,10 @@ import { ref, computed, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Select from 'primevue/select'
-import TabView from 'primevue/tabview'
+import Tabs from 'primevue/tabs'
+import TabList from 'primevue/tablist'
+import Tab from 'primevue/tab'
+import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import ProgressSpinner from 'primevue/progressspinner'
 import ConfidenceBadge from '@/components/shared/ConfidenceBadge.vue'
@@ -563,15 +564,15 @@ watch(
 }
 
 /* Tab styling */
-:deep(.p-tabview-nav) {
+:deep(.p-tablist) {
   background: transparent;
 }
 
-:deep(.p-tabview-panel) {
+:deep(.p-tabpanel) {
   padding: 0.5rem 0;
 }
 
-:deep(.p-tabview-nav-link) {
+:deep(.p-tab) {
   display: flex;
   align-items: center;
   gap: 0.5rem;

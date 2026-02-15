@@ -7,7 +7,7 @@ import DsInput from '@/components/ds/DsInput.vue'
 import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
 import SelectButton from 'primevue/selectbutton'
-import Chips from 'primevue/chips'
+import InputChips from 'primevue/inputchips'
 import Tag from 'primevue/tag'
 import Drawer from 'primevue/drawer'
 import DsBadge from '@/components/ds/DsBadge.vue'
@@ -1277,7 +1277,7 @@ function navigateToAttributeSource(attr: EntityAttribute) {
 
         <div class="field">
           <label>Nombres alternativos</label>
-          <Chips
+          <InputChips
             v-model="editingEntity.aliases"
             placeholder="Añadir alias y presionar Enter"
             class="w-full"

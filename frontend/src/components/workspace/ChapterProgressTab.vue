@@ -100,13 +100,20 @@
       </div>
 
       <!-- Tabs for different views -->
-      <TabView class="progress-tabs">
+      <Tabs value="0" class="progress-tabs">
+        <TabList>
+          <Tab value="0"><i class="pi pi-list"></i> Por capítulo</Tab>
+          <Tab value="1"><i class="pi pi-chart-line"></i> Arcos de personajes</Tab>
+          <Tab value="2"><i class="pi pi-bookmark"></i> Chekhov's Guns
+            <Badge v-if="report.chekhov_elements?.length" :value="report.chekhov_elements.length" severity="warn" />
+          </Tab>
+          <Tab v-if="report.abandoned_threads?.length" value="3"><i class="pi pi-exclamation-circle"></i> Tramas abandonadas
+            <Badge :value="report.abandoned_threads.length" severity="danger" />
+          </Tab>
+        </TabList>
+        <TabPanels>
         <!-- Chapter Summaries Tab -->
         <TabPanel value="0">
-          <template #header>
-            <i class="pi pi-list"></i>
-            <span>Por capítulo</span>
-          </template>
 
           <Accordion :multiple="true" class="chapters-accordion">
             <AccordionPanel
@@ -239,10 +246,6 @@
 
         <!-- Character Arcs Tab -->
         <TabPanel value="1">
-          <template #header>
-            <i class="pi pi-chart-line"></i>
-            <span>Arcos de personajes</span>
-          </template>
 
           <div v-if="report.character_arcs?.length" class="arcs-content">
             <div
@@ -308,11 +311,6 @@
 
         <!-- Chekhov's Guns Tab -->
         <TabPanel value="2">
-          <template #header>
-            <i class="pi pi-bookmark"></i>
-            <span>Chekhov's Guns</span>
-            <Badge v-if="report.chekhov_elements?.length" :value="report.chekhov_elements.length" severity="warn" />
-          </template>
 
           <div v-if="report.chekhov_elements?.length" class="chekhov-content">
             <Message severity="info" :closable="false" class="chekhov-info">
@@ -356,11 +354,6 @@
 
         <!-- Abandoned Threads Tab -->
         <TabPanel v-if="report.abandoned_threads?.length" value="3">
-          <template #header>
-            <i class="pi pi-exclamation-circle"></i>
-            <span>Tramas abandonadas</span>
-            <Badge :value="report.abandoned_threads.length" severity="danger" />
-          </template>
 
           <div class="abandoned-content">
             <div
@@ -387,7 +380,8 @@
             </div>
           </div>
         </TabPanel>
-      </TabView>
+        </TabPanels>
+      </Tabs>
 
       <!-- Structural Notes -->
       <Card v-if="report.structural_notes" class="structural-notes-card">
@@ -411,7 +405,10 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Badge from 'primevue/badge'
 import Message from 'primevue/message'
-import TabView from 'primevue/tabview'
+import Tabs from 'primevue/tabs'
+import TabList from 'primevue/tablist'
+import Tab from 'primevue/tab'
+import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import Accordion from 'primevue/accordion'
 import AccordionPanel from 'primevue/accordionpanel'

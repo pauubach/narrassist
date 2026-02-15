@@ -84,7 +84,7 @@
 
         <div class="field">
           <label>Nombres alternativos</label>
-          <Chips
+          <InputChips
             v-model="editingCharacter.aliases"
             placeholder="Añadir alias y presionar Enter"
             class="w-full"
@@ -252,7 +252,7 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
-import Chips from 'primevue/chips'
+import InputChips from 'primevue/inputchips'
 import Textarea from 'primevue/textarea'
 import CharacterSheet from '@/components/CharacterSheet.vue'
 import UndoMergeDialog from '@/components/UndoMergeDialog.vue'

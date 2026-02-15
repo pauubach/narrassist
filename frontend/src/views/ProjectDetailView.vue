@@ -354,6 +354,7 @@
                   :alert="selectedAlert"
                   :chapters="chapters"
                   @navigate="onAlertNavigate(selectedAlert, $event)"
+                  @navigate-to-position="(s, e, t) => onAlertNavigateToPosition(selectedAlert, s, e, t)"
                   @resolve="onAlertResolve(selectedAlert)"
                   @dismiss="onAlertDismiss(selectedAlert)"
                   @close="selectionStore.clearAll()"
@@ -826,6 +827,23 @@ const onAlertNavigate = (alert: Alert, source?: AlertSource) => {
       setTimeout(() => { scrollToChapterId.value = null }, 500)
     }
   }
+}
+
+/**
+ * Navega a una ocurrencia específica de una alerta (repeticiones, ecos).
+ */
+const onAlertNavigateToPosition = (alert: Alert | null, startChar: number, endChar: number, text?: string) => {
+  if (!alert) return
+
+  const getChapterId = (chapterNumber: number | undefined | null): number | null => {
+    if (chapterNumber === undefined || chapterNumber === null) return null
+    const chapter = chapters.value.find(c => c.chapterNumber === chapterNumber)
+    return chapter?.id ?? null
+  }
+
+  const chapterId = getChapterId(alert.chapter)
+  workspaceStore.clearAlertHighlights()
+  workspaceStore.navigateToTextPosition(startChar, text, chapterId)
 }
 
 const onAlertResolve = async (alert: Alert) => {
