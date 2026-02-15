@@ -243,6 +243,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
     _analyzing.value[projectId] = true
     delete _errors.value[projectId]
+    // Limpiar fases ejecutadas para que los ticks se reseteen
+    executedPhases.value[projectId] = {}
 
     try {
       const formData = new FormData()
@@ -353,6 +355,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
         phases: []
       }
       delete _errors.value[projectId]
+      // Limpiar fases ejecutadas para que los ticks se reseteen
+      executedPhases.value[projectId] = {}
     } else {
       delete _analyses.value[projectId]
     }
