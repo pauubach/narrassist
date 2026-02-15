@@ -137,6 +137,9 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
         await new Promise(resolve => setTimeout(resolve, 500))
 
         await projectsStore.fetchProject(project.value!.id)
+        // Marcar como no-analizando DESPUÉS de fetchProject para que
+        // project.analysisStatus y analysisStore.isAnalyzing cambien juntos
+        analysisStore.setAnalyzing(project.value!.id, false)
         await analysisStore.loadExecutedPhases(project.value!.id)
         await loadEntities(project.value!.id)
         await loadAlerts(project.value!.id)

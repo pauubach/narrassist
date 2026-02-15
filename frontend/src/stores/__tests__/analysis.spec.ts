@@ -127,7 +127,7 @@ describe('analysisStore', () => {
       expect(store.currentAnalysis).toEqual(mockProgressData)
     })
 
-    it('should set isAnalyzing to false when completed', async () => {
+    it('should NOT set isAnalyzing to false on completed (polling handler does it)', async () => {
       const store = useAnalysisStore()
       store.setActiveProjectId(1)
       store.setAnalyzing(1, true)
@@ -144,7 +144,9 @@ describe('analysisStore', () => {
 
       await store.getProgress(1)
 
-      expect(store.isAnalyzing).toBe(false)
+      // getProgress ya no setea _analyzing=false para 'completed';
+      // lo hace useAnalysisPolling después de fetchProject()
+      expect(store.isAnalyzing).toBe(true)
     })
 
     it('should set error when analysis fails', async () => {

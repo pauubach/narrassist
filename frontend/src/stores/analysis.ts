@@ -308,9 +308,10 @@ export const useAnalysisStore = defineStore('analysis', () => {
       }
 
       // Actualizar estado
-      if (progressData.status === 'completed' || progressData.progress >= 100) {
-        _analyzing.value[projectId] = false
-      } else if (progressData.status === 'error' || progressData.status === 'failed') {
+      // NOTA: Para 'completed', NO seteamos _analyzing = false aquí.
+      // Lo hace el polling handler en useAnalysisPolling DESPUÉS de fetchProject(),
+      // para evitar desincronización entre StatusBar y el botón Cancelar.
+      if (progressData.status === 'error' || progressData.status === 'failed') {
         _analyzing.value[projectId] = false
         _errors.value[projectId] = progressData.error || 'Análisis fallido'
       } else if (progressData.status === 'queued' || progressData.status === 'queued_for_heavy') {
