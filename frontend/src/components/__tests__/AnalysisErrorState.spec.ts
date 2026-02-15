@@ -25,7 +25,7 @@ describe('AnalysisErrorState', () => {
     it('should render warning icon', () => {
       const wrapper = mount(AnalysisErrorState, {
         props: {
-          message: 'No se pudo re-analizar el documento. Recarga la página si persiste.',
+          message: 'No se pudo re-analizar el documento. Si persiste, reinicia la aplicación.',
         },
       })
 

@@ -462,7 +462,7 @@ const createProject = async () => {
     toast.add({
       severity: 'error',
       summary: 'Error al crear proyecto',
-      detail: error instanceof Error ? error.message : 'No se pudo completar la operación. Recarga la página si persiste.',
+      detail: error instanceof Error ? error.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.',
       life: 5000
     })
     closeCreateDialog()

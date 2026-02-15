@@ -267,7 +267,7 @@ const loadKnowledge = async () => {
       error.value = store.error || 'Error al cargar el conocimiento del personaje'
     }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'No se pudo completar la operación. Recarga la página si persiste.'
+    error.value = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
   } finally {
     loading.value = false
   }

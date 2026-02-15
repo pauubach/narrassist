@@ -172,7 +172,7 @@ export function useMentionNavigation(projectId: () => number) {
       const data = await response.json()
 
       if (!data.success) {
-        throw new Error(data.error || 'No se pudo completar la operación. Recarga la página si persiste.')
+        throw new Error(data.error || 'No se pudo completar la operación. Si persiste, reinicia la aplicación.')
       }
 
       state.value.entityId = entityId
@@ -193,7 +193,7 @@ export function useMentionNavigation(projectId: () => number) {
 
       return true
     } catch (err) {
-      state.value.error = err instanceof Error ? err.message : 'No se pudo completar la operación. Recarga la página si persiste.'
+      state.value.error = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
       console.error('Error loading mentions:', err)
       return false
     } finally {

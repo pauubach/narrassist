@@ -41,7 +41,7 @@ export function useAsyncAction(
 
   async function run<T>(
     action: () => Promise<T>,
-    fallbackMessage = 'No se pudo completar la operación. Recarga la página si persiste.',
+    fallbackMessage = 'No se pudo completar la operación. Si persiste, reinicia la aplicación.',
     options?: RunOptions,
   ): Promise<T | undefined> {
     loading.value = true

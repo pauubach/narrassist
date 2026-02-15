@@ -267,7 +267,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
       }
       return true
     } catch (err) {
-      _errors.value[projectId] = err instanceof Error ? err.message : 'No se pudo completar la operación. Recarga la página si persiste.'
+      _errors.value[projectId] = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
       _analyzing.value[projectId] = false
       console.error('Failed to start analysis:', err)
       return false
@@ -469,7 +469,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
       await loadExecutedPhases(projectId)
       return true
     } catch (err) {
-      _errors.value[projectId] = err instanceof Error ? err.message : 'No se pudo completar la operación. Recarga la página si persiste.'
+      _errors.value[projectId] = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
       console.error('Error in partial analysis:', err)
       return false
     } finally {

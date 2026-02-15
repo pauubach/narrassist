@@ -670,7 +670,7 @@ const loadTimeline = async () => {
     }
   } catch (err) {
     console.error('Error fetching timeline:', err)
-    error.value = err instanceof Error ? err.message : 'No se pudo cargar la línea temporal. Recarga la página si persiste.'
+    error.value = err instanceof Error ? err.message : 'No se pudo cargar la línea temporal. Si persiste, reinicia la aplicación.'
     timeline.value = null
   } finally {
     loading.value = false

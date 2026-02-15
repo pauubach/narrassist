@@ -175,7 +175,7 @@ describe('projectsStore', () => {
       const store = useProjectsStore()
       await store.fetchProjects()
 
-      expect(store.error).toBe('No se pudo completar la operación. Recarga la página si persiste.')
+      expect(store.error).toBe('No se pudo completar la operación. Si persiste, reinicia la aplicación.')
     })
 
     it('should clear previous error on new fetch', async () => {

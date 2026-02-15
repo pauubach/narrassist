@@ -568,7 +568,7 @@ async function loadReport() {
     }
   } catch (err) {
     console.error('Error loading chapter progress:', err)
-    error.value = 'No se pudo cargar el análisis de progreso. Recarga la página si persiste.'
+    error.value = 'No se pudo cargar el análisis de progreso. Si persiste, reinicia la aplicación.'
   } finally {
     loading.value = false
   }
