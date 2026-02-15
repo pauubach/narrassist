@@ -148,7 +148,7 @@ class TestCorrectionConfigRoundTrip:
             "terminology", "regional", "field_dictionary",
             "clarity", "grammar", "crutch_words", "glossary",
             "orthographic_variants", "anacoluto", "pov", "style_register",
-            "references", "acronyms", "structure",
+            "references", "acronyms", "structure", "coherence",
             "max_issues_per_category", "use_llm_review", "llm_review_model",
         }
         assert set(d.keys()) == expected_keys

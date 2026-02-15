@@ -14,6 +14,7 @@ from .field_terminology import FieldTerminologyDetector
 from .glossary import GlossaryDetector
 from .grammar import GrammarDetector
 from .acronyms import AcronymDetector
+from .coherence import CoherenceDetector
 from .orthographic_variants import OrthographicVariantsDetector
 from .pov import POVDetector
 from .references import ReferencesDetector
@@ -43,4 +44,5 @@ __all__ = [
     "AcronymDetector",
     "ScientificStructureDetector",
     "StyleRegisterDetector",
+    "CoherenceDetector",
 ]

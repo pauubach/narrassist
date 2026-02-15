@@ -167,6 +167,17 @@ class StructureIssueType(Enum):
     MISSING_ABSTRACT = "missing_abstract"  # Sin resumen/abstract
 
 
+class CoherenceIssueType(Enum):
+    """Tipos de problemas de coherencia editorial entre párrafos."""
+
+    IRRELEVANT_PARAGRAPH = "irrelevant_paragraph"  # Párrafo que no aporta al argumento
+    REDUNDANT_PARAGRAPH = "redundant_paragraph"  # Párrafo que repite ideas anteriores
+    MERGE_SUGGESTED = "merge_suggested"  # Párrafos consecutivos que deberían unificarse
+    SPLIT_SUGGESTED = "split_suggested"  # Párrafo con temas mezclados → separar
+    TOPIC_DISCONTINUITY = "topic_discontinuity"  # Salto temático entre párrafos
+    WEAK_TRANSITION = "weak_transition"  # Transición pobre entre párrafos
+
+
 class CorrectionCategory(Enum):
     """Categorías principales de correcciones."""
 
@@ -188,3 +199,4 @@ class CorrectionCategory(Enum):
     REFERENCES = "references"  # Referencias y citas bibliográficas
     ACRONYMS = "acronyms"  # Siglas y abreviaturas
     STRUCTURE = "structure"  # Estructura de documento científico/académico
+    COHERENCE = "coherence"  # Coherencia editorial entre párrafos

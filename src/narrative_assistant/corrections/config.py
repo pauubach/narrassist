@@ -529,6 +529,31 @@ class StructureConfig:
 
 
 @dataclass
+class CoherenceConfig:
+    """Configuración del detector de coherencia editorial entre párrafos."""
+
+    enabled: bool = False  # OFF por defecto, se activa según tipo
+
+    # Usar LLM (Ollama) para análisis semántico
+    use_llm: bool = True
+
+    # Modelo LLM preferido
+    llm_model: str = "qwen2.5"
+
+    # Modelo fallback si el preferido no está disponible
+    fallback_model: str = "llama3.2"
+
+    # Máximo de párrafos a analizar (rendimiento)
+    max_paragraphs: int = 50
+
+    # Palabras mínimas para considerar un párrafo sustantivo
+    min_paragraph_words: int = 15
+
+    # Temperatura LLM (baja para detección consistente)
+    temperature: float = 0.2
+
+
+@dataclass
 class CorrectionConfig:
     """
     Configuración global de correcciones.
@@ -560,6 +585,7 @@ class CorrectionConfig:
     references: ReferencesConfig = field(default_factory=ReferencesConfig)
     acronyms: AcronymConfig = field(default_factory=AcronymConfig)
     structure: StructureConfig = field(default_factory=StructureConfig)
+    coherence: CoherenceConfig = field(default_factory=CoherenceConfig)
 
     # Configuración global
     # Máximo de issues por categoría (para no abrumar)
@@ -868,6 +894,15 @@ class CorrectionConfig:
                 "enabled": self.structure.enabled,
                 "profile": self.structure.profile,
             },
+            "coherence": {
+                "enabled": self.coherence.enabled,
+                "use_llm": self.coherence.use_llm,
+                "llm_model": self.coherence.llm_model,
+                "fallback_model": self.coherence.fallback_model,
+                "max_paragraphs": self.coherence.max_paragraphs,
+                "min_paragraph_words": self.coherence.min_paragraph_words,
+                "temperature": self.coherence.temperature,
+            },
             "max_issues_per_category": self.max_issues_per_category,
             "use_llm_review": self.use_llm_review,
             "llm_review_model": self.llm_review_model,
@@ -1027,6 +1062,18 @@ class CorrectionConfig:
             profile=struct_data.get("profile", "scientific"),
         )
 
+        # Parse coherence config
+        coh_data = data.get("coherence", {})
+        coherence_config = CoherenceConfig(
+            enabled=coh_data.get("enabled", False),
+            use_llm=coh_data.get("use_llm", True),
+            llm_model=coh_data.get("llm_model", "qwen2.5"),
+            fallback_model=coh_data.get("fallback_model", "llama3.2"),
+            max_paragraphs=coh_data.get("max_paragraphs", 50),
+            min_paragraph_words=coh_data.get("min_paragraph_words", 15),
+            temperature=coh_data.get("temperature", 0.2),
+        )
+
         return cls(
             profile=DocumentProfile.from_dict(data.get("profile", {})),
             typography=TypographyConfig(**data.get("typography", {})),
@@ -1046,6 +1093,7 @@ class CorrectionConfig:
             references=references_config,
             acronyms=acronyms_config,
             structure=structure_config,
+            coherence=coherence_config,
             max_issues_per_category=data.get("max_issues_per_category", 100),
             use_llm_review=data.get("use_llm_review", False),
             llm_review_model=data.get("llm_review_model", "llama3.2"),

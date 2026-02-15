@@ -700,6 +700,7 @@ class AlertEngine:
             "references": AlertCategory.STYLE,
             "acronyms": AlertCategory.STYLE,
             "structure": AlertCategory.STYLE,
+            "coherence": AlertCategory.STYLE,
         }
         alert_category = category_map.get(category, AlertCategory.STYLE)
 
@@ -716,6 +717,7 @@ class AlertEngine:
             "references": "Referencias",
             "acronyms": "Siglas",
             "structure": "Estructura",
+            "coherence": "Coherencia",
         }
         title_prefix = category_titles.get(category, "Corrección")
 

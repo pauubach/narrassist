@@ -467,6 +467,48 @@ TEMPORAL_EXTRACTION_EXAMPLES = [
 
 
 # ============================================================================
+# ============================================================================
+# COHERENCIA EDITORIAL (S18-B)
+# ============================================================================
+
+COHERENCE_SYSTEM = (
+    "Eres un corrector editorial experto en textos científicos y académicos en español. "
+    "Tu trabajo es evaluar la coherencia y fluidez entre párrafos consecutivos. "
+    "Respondes SIEMPRE en formato JSON válido. Sé conservador: solo reporta "
+    "problemas claros con confianza >= 0.70."
+)
+
+COHERENCE_TEMPLATE = """Analiza la coherencia de los siguientes párrafos consecutivos de un texto {document_type}.
+
+Párrafos (numerados desde {start_index}):
+---
+{paragraphs}
+---
+
+Para cada par de párrafos consecutivos, evalúa:
+1. ¿Algún párrafo repite ideas ya expresadas en otro? (redundant)
+2. ¿Hay saltos temáticos bruscos entre párrafos? (topic_discontinuity)
+3. ¿Algún párrafo mezcla temas que deberían ir separados? (split_suggested)
+4. ¿Hay párrafos consecutivos sobre lo mismo que deberían unificarse? (merge_suggested)
+5. ¿Las transiciones entre párrafos son adecuadas? (weak_transition)
+
+Responde en JSON:
+{{
+  "issues": [
+    {{
+      "type": "redundant|topic_discontinuity|split_suggested|merge_suggested|weak_transition",
+      "paragraph_indices": [0, 1],
+      "explanation": "por qué es un problema",
+      "suggestion": "cómo mejorarlo",
+      "confidence": 0.70
+    }}
+  ]
+}}
+
+Si no hay problemas, devuelve {{"issues": []}}.
+Solo reporta problemas claros. No flagees diferencias temáticas intencionales entre secciones."""
+
+
 # UTILIDADES (actualización)
 # ============================================================================
 
@@ -480,4 +522,5 @@ RECOMMENDED_TEMPERATURES = {
     "timeline_self_reflection": 0.1,
     "flashback_validation": 0.1,
     "temporal_extraction": 0.2,
+    "coherence_editorial": 0.2,
 }

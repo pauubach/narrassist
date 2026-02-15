@@ -17,6 +17,7 @@ from .detectors import (
     AnacolutoDetector,
     AnglicismsDetector,
     ClarityDetector,
+    CoherenceDetector,
     CrutchWordsDetector,
     GlossaryDetector,
     GrammarDetector,
@@ -81,6 +82,7 @@ class CorrectionOrchestrator:
             CorrectionCategory.REFERENCES: ReferencesDetector(self.config.references),
             CorrectionCategory.ACRONYMS: AcronymDetector(self.config.acronyms),
             CorrectionCategory.STRUCTURE: ScientificStructureDetector(self.config.structure),
+            CorrectionCategory.COHERENCE: CoherenceDetector(self.config.coherence),
         }
 
         # Detectores que usan embeddings (inicializados bajo demanda)
@@ -380,6 +382,8 @@ class CorrectionOrchestrator:
             return self.config.acronyms.enabled
         elif category == CorrectionCategory.STRUCTURE:
             return self.config.structure.enabled
+        elif category == CorrectionCategory.COHERENCE:
+            return self.config.coherence.enabled
         return False
 
     def _limit_issues(
@@ -415,6 +419,7 @@ class CorrectionOrchestrator:
             CorrectionCategory.REFERENCES: "referencias bibliográficas",
             CorrectionCategory.ACRONYMS: "siglas y abreviaturas",
             CorrectionCategory.STRUCTURE: "estructura del documento",
+            CorrectionCategory.COHERENCE: "coherencia editorial",
         }.get(category, category.value)
 
     def get_summary(self, issues: list[CorrectionIssue]) -> dict:

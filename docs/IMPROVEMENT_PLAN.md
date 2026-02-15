@@ -2153,14 +2153,14 @@ Requisito previo: corregir bugs descubiertos en la revisión antes de añadir 4 
 
 | Tarea | Estado | Archivo | Detalle |
 |-------|--------|---------|---------|
-| S18-B1 | ⬚ | `corrections/types.py` | `CoherenceIssueType` (6 valores): `IRRELEVANT_PARAGRAPH`, `REDUNDANT_PARAGRAPH`, `MERGE_SUGGESTED`, `SPLIT_SUGGESTED`, `TOPIC_DISCONTINUITY` (no `LOGICAL_GAP` — evitar confusión con BK-32), `WEAK_TRANSITION` + categoría `COHERENCE` |
-| S18-B2 | ⬚ | `corrections/config.py` | `CoherenceConfig` (enabled, use_llm, llm_model, fallback_model, max_paragraphs, min_paragraph_words, temperature) |
-| S18-B3 | ⬚ | `llm/prompts.py` | `COHERENCE_SYSTEM` + `COHERENCE_TEMPLATE` para análisis editorial de coherencia |
-| S18-B4 | ⬚ | `corrections/detectors/coherence.py` | `CoherenceDetector` con 3-tier fallback: LLM (Ollama) → embeddings (`get_embeddings_model()`) → Jaccard bag-of-words. `requires_llm = True`. Chunks de 8 párrafos. Timeout 120s/chunk |
-| S18-B5 | ⬚ | `orchestrator.py` + `engine.py` + `_analysis_phases.py` | Wire coherence detector, mapeo AlertCategory.STYLE, activación LLM solo para TEC/ENS |
-| S18-B6 | ⬚ | `tests/unit/test_coherence_detector.py` | ~24 tests: LLM mock (10), embeddings fallback (6), Jaccard heurístico (4), integration (4). Ollama degradation: silent fallback + `method_used` metadata + logged warning |
+| S18-B1 | ✅ | `corrections/types.py` | `CoherenceIssueType` (6 valores): `IRRELEVANT_PARAGRAPH`, `REDUNDANT_PARAGRAPH`, `MERGE_SUGGESTED`, `SPLIT_SUGGESTED`, `TOPIC_DISCONTINUITY`, `WEAK_TRANSITION` + categoría `COHERENCE` |
+| S18-B2 | ✅ | `corrections/config.py` | `CoherenceConfig` (enabled, use_llm, llm_model, fallback_model, max_paragraphs, min_paragraph_words, temperature) + to_dict/from_dict |
+| S18-B3 | ✅ | `llm/prompts.py` | `COHERENCE_SYSTEM` + `COHERENCE_TEMPLATE` con párrafos numerados, tipos JSON, `coherence_editorial` en temperaturas |
+| S18-B4 | ✅ | `corrections/detectors/coherence.py` | `CoherenceDetector` con 3-tier fallback: LLM (Ollama) → embeddings → Jaccard bag-of-words. `requires_llm = True`. Chunks de 8 párrafos. Stopwords Spanish. Lazy imports |
+| S18-B5 | ✅ | `orchestrator.py` + `engine.py` + `_analysis_phases.py` + `__init__.py` | Wire coherence, AlertCategory.STYLE, activación TEC/ENS (LLM), DIV (sin LLM) |
+| S18-B6 | ✅ | `tests/unit/test_coherence_detector.py` | 29 tests: básicos (6), Jaccard (5), embeddings mock (4), LLM mock (6), helpers (6), config roundtrip (1), degradation paths (1). Todos verdes |
 
-**DoD S18-B**: Texto con párrafos redundantes → detectados por LLM. Si Ollama no disponible → fallback silencioso a embeddings → Jaccard. `method_used` en `extra_data` indica qué tier se usó. 24 tests verdes.
+**DoD S18-B**: ✅ Párrafos redundantes → detectados. LLM no disponible → fallback silencioso a embeddings → Jaccard. `method_used` en `extra_data` indica tier usado. 29 tests verdes. 87 tests S18 totales sin regresiones.
 
 **Notas de diseño** (consolidadas de la revisión con 6 agentes):
 
@@ -2246,7 +2246,8 @@ Sprint PP ✅ (17/17)                                coherencia, config modal, d
 Sprint S8 ✅ (S8a + S8b + S8c)                     ──────────────────────────────────
 Sprint S15 ✅ (BK-28 Version tracking)              CONDICIONADO (requiere infra):
 Sprint S16A ✅ (BK-29 Quota UX)                     S16B (Stripe pagos, backend público)
-Sprint S17 ✅ (Style Register Detection)            Sprint S18 (3 fases: 00→A→B)
+Sprint S17 ✅ (Style Register Detection)
+Sprint S18 ✅ (Scientific Detectors: 3 fases)
                                                     ──────────────────────────────────
                                                     APARCADO:
 Sprint S9 ✅ (BK-09/15/17/10b/10c)                 BK-26 Collab online
@@ -2284,7 +2285,7 @@ Dependencias restantes:
 | ~~Sprint S16A~~ | ~~12h (2-3 días)~~ | ✅ COMPLETADO (QuotaWarningBanner, TierComparisonDialog, quota-status endpoint, 317 tests) |
 | Sprint S16B | 20-28h (4-6 días) | BK-29 pagos (requiere backend billing público) |
 | ~~Sprint S17~~ | ~~7-9h (1-2 días)~~ | ✅ COMPLETADO (Style Register: 5 sub-detectores, 4 perfiles, 39 tests) |
-| Sprint S18 | 10-12h (2-3 días) | PLANIFICADO — 3 fases: S18-00 (plumbing 1.5-2h), S18-A (determinísticos 4-5h), S18-B (coherencia LLM 4-5h). ~80 tests |
+| ~~Sprint S18~~ | ~~10-12h (2-3 días)~~ | ✅ COMPLETADO — 3 fases: S18-00 (plumbing), S18-A (3 detectores determinísticos), S18-B (coherencia LLM 3-tier). 87 tests |
 | **TOTAL restante** | **~30-40h** | S16B condicionado (Stripe) + S18 planificado (3 fases) |
 
 ---
@@ -2319,4 +2320,4 @@ Dependencias restantes:
 
 **Ultima actualizacion**: 2026-02-15
 **Autor**: Claude (Panel de 8 expertos simulados + sesiones producto/pricing/editorial Feb + revisión S18 con 8 agentes 15-Feb)
-**Estado**: S0-S17 completados. Sprint PP completado (17/17). S7b-S7d, SP-1..3, S8a-S8c, S9, S10, S11, S12, S13, S14, S15, S16A completados. Tag: v0.9.5. Próximo: S18 (3 fases: S18-00 plumbing → S18-A determinísticos → S18-B coherencia LLM). S16B condicionado (Stripe).
+**Estado**: S0-S18 completados. Sprint PP completado (17/17). S7b-S7d, SP-1..3, S8a-S8c, S9, S10, S11, S12, S13, S14, S15, S16A, S17, S18 completados. Tag: v0.9.5. S16B condicionado (Stripe).
