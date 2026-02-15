@@ -190,13 +190,23 @@ describe('useKeyboardShortcuts — enrutamiento de atajos', () => {
       )
     })
 
-    it('Meta+número funciona igual (macOS)', () => {
+    it.each([
+      ['1', 'text'],
+      ['2', 'entities'],
+      ['3', 'relationships'],
+      ['4', 'alerts'],
+      ['5', 'timeline'],
+      ['6', 'style'],
+      ['7', 'glossary'],
+      ['8', 'summary'],
+    ])('Cmd+%s → pestaña "%s" (macOS)', (key, expectedTab) => {
       const opts = createOptions()
-      handleKeydown(createKeyEvent({ key: '1', metaKey: true }), opts)
+      handleKeydown(createKeyEvent({ key, metaKey: true }), opts)
 
+      expect(opts.preventDefault).toHaveBeenCalled()
       expect(opts.dispatchEvent).toHaveBeenCalledWith(
         'menubar:view-tab',
-        { tab: 'text' }
+        { tab: expectedTab }
       )
     })
 
@@ -248,7 +258,7 @@ describe('useKeyboardShortcuts — enrutamiento de atajos', () => {
       expect(opts.dispatchEvent).toHaveBeenCalledWith('menubar:find')
     })
 
-    it('Meta+F dispara menubar:find (macOS)', () => {
+    it('Cmd+F dispara menubar:find (macOS)', () => {
       const opts = createOptions()
       handleKeydown(createKeyEvent({ key: 'f', metaKey: true }), opts)
 
@@ -279,7 +289,7 @@ describe('useKeyboardShortcuts — enrutamiento de atajos', () => {
     })
   })
 
-  describe('paneles y UI', () => {
+  describe('paneles y UI (Ctrl — Windows/Linux)', () => {
     it('Ctrl+B → menubar:toggle-sidebar', () => {
       const opts = createOptions()
       handleKeydown(createKeyEvent({ key: 'b', ctrlKey: true }), opts)
@@ -321,19 +331,70 @@ describe('useKeyboardShortcuts — enrutamiento de atajos', () => {
 
       expect(opts.dispatchEvent).toHaveBeenCalledWith('menubar:toggle-theme')
     })
-  })
-
-  describe('ayuda', () => {
-    it('F1 → keyboard:show-help', () => {
-      const opts = createOptions()
-      handleKeydown(createKeyEvent({ key: 'F1' }), opts)
-
-      expect(opts.dispatchEvent).toHaveBeenCalledWith('keyboard:show-help')
-    })
 
     it('Ctrl+/ → keyboard:show-help', () => {
       const opts = createOptions()
       handleKeydown(createKeyEvent({ key: '/', ctrlKey: true }), opts)
+
+      expect(opts.dispatchEvent).toHaveBeenCalledWith('keyboard:show-help')
+    })
+  })
+
+  describe('paneles y UI (Cmd — macOS)', () => {
+    it('Cmd+B → menubar:toggle-sidebar', () => {
+      const opts = createOptions()
+      handleKeydown(createKeyEvent({ key: 'b', metaKey: true }), opts)
+
+      expect(opts.dispatchEvent).toHaveBeenCalledWith('menubar:toggle-sidebar')
+    })
+
+    it('Cmd+E → menubar:export', () => {
+      const opts = createOptions()
+      handleKeydown(createKeyEvent({ key: 'e', metaKey: true }), opts)
+
+      expect(opts.dispatchEvent).toHaveBeenCalledWith('menubar:export')
+    })
+
+    it('Cmd+, → router push settings', () => {
+      const opts = createOptions()
+      handleKeydown(createKeyEvent({ key: ',', metaKey: true }), opts)
+
+      expect(opts.routerPush).toHaveBeenCalledWith({ name: 'settings' })
+    })
+
+    it('Cmd+Shift+I → menubar:toggle-inspector', () => {
+      const opts = createOptions()
+      handleKeydown(createKeyEvent({ key: 'I', metaKey: true, shiftKey: true }), opts)
+
+      expect(opts.dispatchEvent).toHaveBeenCalledWith('menubar:toggle-inspector')
+    })
+
+    it('Cmd+Shift+H → menubar:toggle-history', () => {
+      const opts = createOptions()
+      handleKeydown(createKeyEvent({ key: 'H', metaKey: true, shiftKey: true }), opts)
+
+      expect(opts.dispatchEvent).toHaveBeenCalledWith('menubar:toggle-history')
+    })
+
+    it('Cmd+Shift+D → menubar:toggle-theme', () => {
+      const opts = createOptions()
+      handleKeydown(createKeyEvent({ key: 'D', metaKey: true, shiftKey: true }), opts)
+
+      expect(opts.dispatchEvent).toHaveBeenCalledWith('menubar:toggle-theme')
+    })
+
+    it('Cmd+/ → keyboard:show-help', () => {
+      const opts = createOptions()
+      handleKeydown(createKeyEvent({ key: '/', metaKey: true }), opts)
+
+      expect(opts.dispatchEvent).toHaveBeenCalledWith('keyboard:show-help')
+    })
+  })
+
+  describe('ayuda', () => {
+    it('F1 → keyboard:show-help (sin modificador, ambas plataformas)', () => {
+      const opts = createOptions()
+      handleKeydown(createKeyEvent({ key: 'F1' }), opts)
 
       expect(opts.dispatchEvent).toHaveBeenCalledWith('keyboard:show-help')
     })
