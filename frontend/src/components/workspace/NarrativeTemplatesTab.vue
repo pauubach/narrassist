@@ -84,7 +84,7 @@ async function analyze() {
     }
   } catch (error) {
     console.error('Error analyzing narrative templates:', error)
-    errorMsg.value = error instanceof Error ? error.message : 'No se pudo analizar las plantillas narrativas.'
+    errorMsg.value = error instanceof Error ? error.message : 'No se pudo analizar las plantillas narrativas. Recarga la página si persiste.'
   } finally {
     loading.value = false
   }

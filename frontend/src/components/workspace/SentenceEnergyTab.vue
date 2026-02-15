@@ -107,7 +107,7 @@ async function analyze() {
     }
   } catch (error) {
     console.error('Error analyzing sentence energy:', error)
-    errorMsg.value = error instanceof Error ? error.message : 'No se pudo analizar la energía de las frases.'
+    errorMsg.value = error instanceof Error ? error.message : 'No se pudo analizar la energía de las frases. Recarga la página si persiste.'
   } finally {
     loading.value = false
   }

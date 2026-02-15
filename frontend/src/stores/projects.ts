@@ -29,7 +29,7 @@ export const useProjectsStore = defineStore('projects', () => {
       const data = await api.get<ApiProject[]>('/api/projects')
       projects.value = transformProjects(data)
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'No se pudo completar la operación'
+      error.value = err instanceof Error ? err.message : 'No se pudo completar la operación. Recarga la página si persiste.'
       console.error('Failed to fetch projects:', err)
     } finally {
       loading.value = false
@@ -51,7 +51,7 @@ export const useProjectsStore = defineStore('projects', () => {
         projects.value[index] = transformed
       }
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'No se pudo completar la operación'
+      error.value = err instanceof Error ? err.message : 'No se pudo completar la operación. Recarga la página si persiste.'
       console.error('Failed to fetch project:', err)
     } finally {
       loading.value = false
@@ -74,7 +74,7 @@ export const useProjectsStore = defineStore('projects', () => {
       currentProject.value = transformed
       return transformed
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'No se pudo completar la operación'
+      error.value = err instanceof Error ? err.message : 'No se pudo completar la operación. Recarga la página si persiste.'
       console.error('Failed to create project:', err)
       throw err
     } finally {

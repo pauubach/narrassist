@@ -1373,7 +1373,7 @@ const confirmChangeDataLocation = async () => {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: 'No se pudo cambiar la ubicación de datos. Vuelve a intentarlo.',
+      detail: 'No se pudo cambiar la ubicación de datos. Comprueba que la carpeta existe y tiene permisos de escritura.',
       life: 3000
     })
   } finally {

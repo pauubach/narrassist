@@ -370,7 +370,7 @@ async function analyze() {
     }
   } catch (e) {
     console.error('Sensory report error:', e)
-    errorMsg.value = e instanceof Error ? e.message : 'No se pudo generar el informe sensorial.'
+    errorMsg.value = e instanceof Error ? e.message : 'No se pudo generar el informe sensorial. Recarga la página si persiste.'
   } finally {
     loading.value = false
   }

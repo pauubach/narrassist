@@ -720,7 +720,7 @@ const loadDocumentPreview = async () => {
     if (data.success) {
       documentPreview.value = data.data
     } else {
-      throw new Error(data.error || 'No se pudo completar la operación')
+      throw new Error(data.error || 'No se pudo completar la operación. Recarga la página si persiste.')
     }
   } catch (error) {
     console.error('Error loading document preview:', error)
@@ -814,7 +814,7 @@ const exportReport = async () => {
         life: 3000
       })
     } else {
-      throw new Error(data.error || 'No se pudo completar la operación')
+      throw new Error(data.error || 'No se pudo completar la operación. Recarga la página si persiste.')
     }
   } catch (error) {
     console.error('Error exporting report:', error)
@@ -859,7 +859,7 @@ const exportCharacterSheets = async () => {
         life: 3000
       })
     } else {
-      throw new Error(data.error || 'No se pudo completar la operación')
+      throw new Error(data.error || 'No se pudo completar la operación. Recarga la página si persiste.')
     }
   } catch (error) {
     console.error('Error exporting character sheets:', error)
@@ -883,7 +883,7 @@ const loadStylePreview = async () => {
       stylePreview.value = data.data.preview
       showStylePreview.value = true
     } else {
-      throw new Error(data.error || 'No se pudo completar la operación')
+      throw new Error(data.error || 'No se pudo completar la operación. Recarga la página si persiste.')
     }
   } catch (error) {
     console.error('Error loading style preview:', error)
@@ -963,7 +963,7 @@ const exportStyleGuide = async () => {
         const filename = `guia_estilo_${props.projectName}_${Date.now()}.md`
         downloadFile(data.data.content, filename, 'text/markdown')
       } else {
-        throw new Error(data.error || 'No se pudo completar la operación')
+        throw new Error(data.error || 'No se pudo completar la operación. Recarga la página si persiste.')
       }
     }
   } catch (error) {
@@ -1008,7 +1008,7 @@ const exportAlerts = async () => {
         life: 3000
       })
     } else {
-      throw new Error(data.error || 'No se pudo completar la operación')
+      throw new Error(data.error || 'No se pudo completar la operación. Recarga la página si persiste.')
     }
   } catch (error) {
     console.error('Error exporting alerts:', error)

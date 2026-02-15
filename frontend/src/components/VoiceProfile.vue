@@ -233,7 +233,7 @@ const loadProfile = async () => {
       error.value = store.error || 'Error al cargar el perfil de voz'
     }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'No se pudo completar la operación'
+    error.value = err instanceof Error ? err.message : 'No se pudo completar la operación. Recarga la página si persiste.'
   } finally {
     loading.value = false
   }

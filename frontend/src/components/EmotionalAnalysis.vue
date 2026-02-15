@@ -249,10 +249,10 @@ const analyzeEmotions = async () => {
     if (data.success) {
       profile.value = data.data
     } else {
-      error.value = data.error || 'No se pudo completar la operación'
+      error.value = data.error || 'No se pudo completar la operación. Recarga la página si persiste.'
     }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'No se pudo cargar el análisis emocional.'
+    error.value = e instanceof Error ? e.message : 'No se pudo cargar el análisis emocional. Recarga la página si persiste.'
   } finally {
     loading.value = false
   }

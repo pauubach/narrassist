@@ -378,7 +378,7 @@ async function analyze() {
     }
   } catch (error) {
     console.error('Error analyzing pacing:', error)
-    analysisError.value = error instanceof Error ? error.message : 'No se pudo completar la operación'
+    analysisError.value = error instanceof Error ? error.message : 'No se pudo completar la operación. Recarga la página si persiste.'
     toast.add({
       severity: 'error',
       summary: 'Error',

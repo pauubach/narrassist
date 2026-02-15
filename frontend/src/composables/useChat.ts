@@ -137,13 +137,13 @@ export function useChat(projectId: number) {
         return
       }
 
-      let errorMsg = 'El asistente no respondió'
+      let errorMsg = 'El asistente no respondió. Si hay un análisis en curso, espera a que termine.'
 
       if (e instanceof Error) {
         if (e.message.includes('fetch') || e.message.includes('network')) {
           errorMsg = 'La IA no está disponible. Revisa Ajustes → Análisis.'
-        } else if (e.message.includes('no respondió')) {
-          errorMsg = 'La IA tardó demasiado. Reintenta en unos segundos.'
+        } else if (e.message.includes('no respond')) {
+          errorMsg = 'La IA tardó demasiado. Si hay un análisis en curso, espera a que termine.'
         } else {
           errorMsg = e.message
         }

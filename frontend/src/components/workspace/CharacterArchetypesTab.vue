@@ -75,7 +75,7 @@ async function analyze() {
     }
   } catch (error) {
     console.error('Error analyzing character archetypes:', error)
-    errorMsg.value = error instanceof Error ? error.message : 'No se pudo analizar los arquetipos.'
+    errorMsg.value = error instanceof Error ? error.message : 'No se pudo analizar los arquetipos. Recarga la página si persiste.'
   } finally {
     loading.value = false
   }
