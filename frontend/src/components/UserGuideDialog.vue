@@ -326,7 +326,7 @@
 
           <h3>Análisis</h3>
           <ul>
-            <li><strong>Analizador semántico (Ollama)</strong> - Motor de IA local para análisis avanzado de personajes y relaciones</li>
+            <li><strong>Analizador semántico</strong> - Motor de IA local para análisis avanzado de personajes y relaciones</li>
             <li><strong>LanguageTool</strong> - Corrector gramatical avanzado con +2000 reglas para español</li>
             <li><strong>Sensibilidad</strong> - Ajusta qué tan estricta es la detección de problemas</li>
           </ul>
@@ -366,7 +366,7 @@
             </p>
             <ul>
               <li><strong>Modelos NLP</strong> - Para detectar entidades y analizar texto</li>
-              <li><strong>LLM local (Ollama)</strong> - Para análisis semántico avanzado</li>
+              <li><strong>IA local</strong> - Para análisis semántico avanzado</li>
             </ul>
             <p class="ai-privacy-note">
               <i class="pi pi-download"></i> Se pueden <strong>descargar</strong> modelos y actualizaciones.
@@ -461,7 +461,7 @@
           <div class="faq-item">
             <h4>¿Qué significa "Analizador semántico no disponible"?</h4>
             <p>
-              El análisis avanzado requiere un componente adicional (Ollama).
+              El análisis avanzado requiere un componente adicional (se instala automáticamente).
               Ve a Ajustes → Métodos de Análisis y haz clic en
               "Configurar analizador" para instalarlo.
             </p>

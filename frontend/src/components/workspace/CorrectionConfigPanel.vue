@@ -606,7 +606,7 @@ onBeforeUnmount(() => {
               <ToggleSwitch v-model="config.use_llm_review" @change="scheduleAutoSave" />
               <div class="detector-info">
                 <label>Revisión con IA</label>
-                <span>Filtrar falsos positivos (requiere Ollama)</span>
+                <span>Filtrar falsos positivos (requiere analizador semántico)</span>
               </div>
             </div>
           </div>

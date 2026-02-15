@@ -198,12 +198,16 @@ class CharacterLocationAnalyzer:
         try:
             report = CharacterLocationReport(project_id=project_id)
 
-            # Filtrar personajes (PER) y ubicaciones (LOC)
+            # Filtrar personajes (PER/character) y ubicaciones (LOC/location)
+            char_types = {"PER", "character", "PERSON", "person"}
+            loc_types = {"LOC", "location", "LOCATION", "building"}
             characters = {
-                e["name"].lower(): e for e in entities if e.get("entity_type") == "PER"
+                (e.get("name") or e.get("canonical_name", "")).lower(): e
+                for e in entities if e.get("entity_type") in char_types
             }
             locations = {
-                e["name"].lower(): e for e in entities if e.get("entity_type") == "LOC"
+                (e.get("name") or e.get("canonical_name", "")).lower(): e
+                for e in entities if e.get("entity_type") in loc_types
             }
 
             # Tracking de última ubicación conocida por personaje

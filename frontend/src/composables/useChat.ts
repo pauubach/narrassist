@@ -126,7 +126,7 @@ export function useChat(projectId: number) {
           content: '',
           timestamp: new Date(),
           status: 'error',
-          error: data.error || 'Ollama no generó respuesta'
+          error: data.error || 'La IA no generó respuesta'
         })
       }
     } catch (e) {
@@ -137,13 +137,13 @@ export function useChat(projectId: number) {
         return
       }
 
-      let errorMsg = 'El asistente local no respondió'
+      let errorMsg = 'El asistente no respondió'
 
       if (e instanceof Error) {
         if (e.message.includes('fetch') || e.message.includes('network')) {
-          errorMsg = 'No se pudo conectar con Ollama. ¿Está iniciado?'
+          errorMsg = 'La IA no está disponible. Revisa Ajustes → Análisis.'
         } else if (e.message.includes('no respondió')) {
-          errorMsg = 'Ollama tardó demasiado en responder. Reintenta en unos segundos.'
+          errorMsg = 'La IA tardó demasiado. Reintenta en unos segundos.'
         } else {
           errorMsg = e.message
         }

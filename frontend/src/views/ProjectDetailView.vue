@@ -1082,7 +1082,7 @@ const startReanalysis = async () => {
       await loadAlerts(project.value.id)
     }
   } catch (_err) {
-    error.value = 'Error del servicio local'
+    error.value = 'Error inesperado'
     // En caso de error, recargar los datos originales
     if (project.value) {
       analysisStore.setAnalyzing(project.value.id, false)

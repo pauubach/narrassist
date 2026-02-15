@@ -208,7 +208,7 @@ async function parseRawResponse<T>(response: Response): Promise<T> {
  */
 function createTimeoutSignal(timeoutMs: number, existingSignal?: AbortSignal): AbortSignal {
   const controller = new AbortController()
-  const reason = `El servicio local no respondió en ${Math.round(timeoutMs / 1000)}s`
+  const reason = `Sin respuesta tras ${Math.round(timeoutMs / 1000)}s`
 
   const timer = setTimeout(() => controller.abort(reason), timeoutMs)
 

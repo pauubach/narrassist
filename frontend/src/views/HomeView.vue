@@ -32,12 +32,12 @@
         <h2><i class="pi pi-check-circle"></i> Estado del Sistema</h2>
         <div class="status-grid">
           <div class="status-item">
-            <span class="status-label">Backend Python:</span>
+            <span class="status-label">Motor interno:</span>
             <span
               class="status-value"
               :class="{ 'status-ok': backendStatus || systemStore.backendStarting, 'status-error': showBackendDisconnected }"
             >
-              {{ systemStore.backendStarting ? 'Iniciando...' : (backendStatus ? 'Conectado' : 'Desconectado') }}
+              {{ systemStore.backendStarting ? 'Iniciando...' : (backendStatus ? 'Activo' : 'Inactivo') }}
             </span>
           </div>
           <div class="status-item">
@@ -54,7 +54,7 @@
         <div v-if="showBackendDisconnected" class="backend-error-container">
           <p class="backend-error-message">
             <i class="pi pi-exclamation-triangle"></i>
-            {{ backendError || 'El motor de análisis local no responde. Reintentando...' }}
+            {{ backendError || 'La aplicación no responde. Reintentando...' }}
           </p>
           <Button
             label="Reintentar"

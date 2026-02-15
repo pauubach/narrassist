@@ -104,7 +104,7 @@ class OutOfCharacterReport:
 FORMALITY_DEVIATION_THRESHOLD = 0.35  # Diferencia mínima en formalidad
 SENTIMENT_DEVIATION_THRESHOLD = 0.5  # Diferencia mínima en sentimiento
 AGENCY_DEVIATION_THRESHOLD = 0.4  # Diferencia mínima en agentividad
-MIN_PROFILE_MENTIONS = 5  # Menciones mínimas para confiar en el perfil
+MIN_PROFILE_MENTIONS = 3  # Menciones mínimas para confiar en el perfil
 
 # Marcadores de transición narrativa que justifican un cambio
 TRANSITION_MARKERS = {

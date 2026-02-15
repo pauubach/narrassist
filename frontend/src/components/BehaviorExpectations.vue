@@ -6,7 +6,7 @@
         <i class="pi pi-sparkles"></i>
         <h3>Expectativas de Comportamiento</h3>
         <Tag v-if="llmAvailable" severity="success" size="small">
-          {{ llmBackend === 'ollama' ? 'Ollama' : 'Local' }}
+          IA
         </Tag>
         <Tag v-else severity="warning" size="small">No disponible</Tag>
       </div>

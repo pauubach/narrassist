@@ -170,7 +170,7 @@ const confirmUndo = async () => {
     }
   } catch (error) {
     console.error('Error undoing merge:', error)
-    toast.add({ severity: 'error', summary: 'Error del servicio', detail: 'No se pudo deshacer la fusión', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo deshacer la fusión', life: 5000 })
   } finally {
     undoing.value = false
   }

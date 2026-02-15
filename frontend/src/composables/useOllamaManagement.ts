@@ -71,7 +71,7 @@ export function useOllamaManagement() {
 
   const ollamaStatusMessage = computed(() => {
     const messages: Record<OllamaState, string> = {
-      not_installed: 'Necesitas instalar el motor de an\u00E1lisis sem\u00E1ntico',
+      not_installed: 'Necesitas instalar la IA de an\u00E1lisis',
       not_running: 'El analizador est\u00E1 instalado pero no se ha iniciado',
       no_models: 'El analizador est\u00E1 listo, pero necesitas descargar un modelo',
       ready: `${systemCapabilities.value?.ollama.models.length || 0} modelo(s) disponible(s)`,
@@ -133,14 +133,14 @@ export function useOllamaManagement() {
         }
       } else {
         if (result.data?.action_required === 'install') {
-          toast.add({ severity: 'warn', summary: 'Analizador no instalado', detail: 'Necesitas instalar el motor de an\u00E1lisis primero', life: 5000 })
+          toast.add({ severity: 'warn', summary: 'Analizador no instalado', detail: 'Necesitas instalar la IA de an\u00E1lisis primero', life: 5000 })
         } else {
           toast.add({ severity: 'error', summary: 'Error al iniciar', detail: result.error || 'No se pudo iniciar el analizador', life: 5000 })
         }
       }
     } catch (error) {
       console.error('Error starting Ollama:', error)
-      toast.add({ severity: 'error', summary: 'Error de Ollama', detail: 'No se pudo iniciar Ollama', life: 3000 })
+      toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo iniciar la IA de análisis', life: 3000 })
     } finally {
       ollamaStarting.value = false
     }
@@ -207,7 +207,7 @@ export function useOllamaManagement() {
         }
       }, 1000)
     } catch {
-      toast.add({ severity: 'error', summary: 'Error de Ollama', detail: 'No se pudo descargar el modelo', life: 3000 })
+      toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo descargar el modelo de IA', life: 3000 })
       modelDownloading.value = false
     }
   }

@@ -326,24 +326,28 @@ class PipelineDeepExtractionMixin:
                         character_aliases[alias.lower()] = entity.canonical_name
 
             # Detector de interacciones
-            detector = InteractionDetector(
-                known_characters=character_names,  # type: ignore[call-arg]
-                character_aliases=character_aliases,  # type: ignore[call-arg]
-            )
+            detector = InteractionDetector()
 
             all_interactions = []
 
             # Detectar en cada capítulo
             for ch in context.chapters:
-                chapter_num = ch.get("number", 1)
-                content = ch.get("content", "")
+                chapter_num = (
+                    ch.get("number", 1) if isinstance(ch, dict)
+                    else getattr(ch, "number", getattr(ch, "chapter_number", 1))
+                )
+                content = (
+                    ch.get("content", "") if isinstance(ch, dict)
+                    else getattr(ch, "content", "")
+                )
 
                 if not content:
                     continue
 
-                interactions = detector.detect(  # type: ignore[attr-defined]
+                interactions = detector.detect_all(
                     text=content,
-                    chapter_id=chapter_num,
+                    entities=character_names,
+                    chapter=chapter_num,
                 )
 
                 all_interactions.extend(interactions)

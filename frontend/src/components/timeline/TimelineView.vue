@@ -670,7 +670,7 @@ const loadTimeline = async () => {
     }
   } catch (err) {
     console.error('Error fetching timeline:', err)
-    error.value = err instanceof Error ? err.message : 'Error del servicio local'
+    error.value = err instanceof Error ? err.message : 'Error inesperado'
     timeline.value = null
   } finally {
     loading.value = false

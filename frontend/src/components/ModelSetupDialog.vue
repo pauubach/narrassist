@@ -118,7 +118,7 @@ const currentModel = computed(() => {
   const modelType = realProgress.value.modelType
   const displayName = modelType ? (modelDisplayNames[modelType] || modelType) : ''
 
-  if (phase === 'connecting') return 'Conectando con el motor de análisis...'
+  if (phase === 'connecting') return 'Iniciando la IA...'
   if (phase === 'installing') return `Instalando ${displayName}...`
   if (phase === 'downloading') return `Descargando ${displayName}...`
   return 'Procesando...'
@@ -382,7 +382,7 @@ async function recheckPython() {
         <div class="checking-state">
           <i class="pi pi-spin pi-spinner checking-spinner"></i>
           <h3 class="starting-title">Iniciándose...</h3>
-          <p class="starting-subtitle">Preparando el motor de análisis</p>
+          <p class="starting-subtitle">Preparando la IA</p>
         </div>
       </template>
 
@@ -390,8 +390,8 @@ async function recheckPython() {
       <template v-else-if="downloadPhase === 'backend-error'">
         <div class="error-state" role="alert" aria-live="assertive">
           <i class="pi pi-exclamation-triangle error-icon"></i>
-          <h3>No se pudo conectar</h3>
-          <p class="error-message">{{ systemStore.backendStartupError || 'El motor de análisis no respondió a tiempo.' }}</p>
+          <h3>No se pudo iniciar</h3>
+          <p class="error-message">{{ systemStore.backendStartupError || 'La aplicación no se inició a tiempo.' }}</p>
           <p class="error-hint">
             Intenta cerrar y volver a abrir la aplicación. Si el problema persiste, verifica que no haya otra instancia ejecutándose.
           </p>

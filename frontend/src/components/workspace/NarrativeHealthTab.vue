@@ -68,7 +68,7 @@ async function analyze() {
     }
   } catch (error) {
     console.error('Error checking narrative health:', error)
-    errorMsg.value = error instanceof Error ? error.message : 'Error del servicio local'
+    errorMsg.value = error instanceof Error ? error.message : 'Error inesperado'
   } finally {
     loading.value = false
   }

@@ -281,7 +281,7 @@
             <div class="nlp-category">
               <div class="category-header">
                 <h4><i class="pi pi-microchip-ai"></i> Analizador Semántico</h4>
-                <span class="category-desc">Motor de análisis avanzado del significado y contexto</span>
+                <span class="category-desc">Análisis avanzado del significado y contexto</span>
               </div>
 
               <!-- Estado del analizador compacto cuando está listo -->
@@ -858,7 +858,7 @@
               <div class="setting-info">
                 <label class="setting-label">Revisión inteligente</label>
                 <p class="setting-description">
-                  Usar el motor de análisis local para filtrar falsos positivos en las alertas de corrección.
+                  Usar la IA para filtrar falsos positivos en las alertas de corrección.
                   Requiere el analizador semántico activo.
                 </p>
               </div>
@@ -1372,8 +1372,8 @@ const confirmChangeDataLocation = async () => {
     console.error('Error changing data location:', error)
     toast.add({
       severity: 'error',
-      summary: 'Error del servicio',
-      detail: 'No se pudo conectar con el motor de análisis local',
+      summary: 'Error',
+      detail: 'No se pudo completar la operación',
       life: 3000
     })
   } finally {

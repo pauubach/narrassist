@@ -532,7 +532,7 @@ const modeDescription = computed(() => {
     case 'basic':
       return 'Análisis de patrones sin LLM. Rápido pero limitado.'
     case 'standard':
-      return 'Análisis con Ollama (llama3.2). Equilibrio entre velocidad y calidad.'
+      return 'Análisis con IA. Equilibrio entre velocidad y calidad.'
     case 'deep':
       return 'Análisis multi-modelo con votación. Más preciso pero más lento.'
     default:
@@ -568,7 +568,7 @@ async function loadReport() {
     }
   } catch (err) {
     console.error('Error loading chapter progress:', err)
-    error.value = 'Error del servicio local'
+    error.value = 'Error inesperado'
   } finally {
     loading.value = false
   }
