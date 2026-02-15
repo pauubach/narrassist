@@ -37,6 +37,9 @@ ACRONYM_DEF_BEFORE = re.compile(r"([A-ZÁÉÍÓÚÑ]{2,8})\s*\(([^)]{10,80})\)")
 # Uso de sigla en texto (2-8 letras mayúsculas)
 ACRONYM_USE = re.compile(r"\b([A-ZÁÉÍÓÚÑ]{2,8})\b")
 
+# Forma con puntos: N.L.P., E.E.U.U., O.N.U.
+ACRONYM_DOTTED = re.compile(r"\b((?:[A-ZÁÉÍÓÚÑ]\.){2,8})")
+
 # Palabras que parecen siglas pero no lo son
 FALSE_ACRONYMS = frozenset({
     "EL", "LA", "LO", "LAS", "LOS", "UN", "UNA", "DE", "EN", "AL", "DEL",
@@ -207,6 +210,45 @@ class AcronymDetector(BaseDetector):
                         chapter_index=chapter_index,
                         rule_id="ACR_UNDEFINED",
                         extra_data={"acronym": acronym, "use_count": len(positions)},
+                    )
+                )
+
+        # Paso 4: Detectar formas inconsistentes (NLP vs N.L.P.)
+        dotted_forms: dict[str, list[tuple[int, int]]] = {}
+        for m in ACRONYM_DOTTED.finditer(text):
+            dotted = m.group(1)
+            # Convertir "N.L.P." → "NLP"
+            plain = dotted.replace(".", "")
+            if plain and len(plain) >= self.config.min_acronym_length:
+                dotted_forms.setdefault(plain, []).append((m.start(), m.end()))
+
+        for plain_form, dotted_positions in dotted_forms.items():
+            if plain_form in uses:
+                # Ambas formas existen → inconsistente
+                first_dotted_start, first_dotted_end = dotted_positions[0]
+                issues.append(
+                    CorrectionIssue(
+                        category=self.category.value,
+                        issue_type=AcronymIssueType.INCONSISTENT_FORM.value,
+                        start_char=first_dotted_start,
+                        end_char=first_dotted_end,
+                        text=text[first_dotted_start:first_dotted_end],
+                        explanation=(
+                            f"La sigla '{plain_form}' aparece en dos formas: "
+                            f"'{plain_form}' y '{text[first_dotted_start:first_dotted_end]}'. "
+                            f"Use una forma consistente."
+                        ),
+                        suggestion=f"Unifique la forma de '{plain_form}' en todo el texto.",
+                        confidence=0.82,
+                        context=self._extract_context(
+                            text, first_dotted_start, first_dotted_end
+                        ),
+                        chapter_index=chapter_index,
+                        rule_id="ACR_INCONSISTENT_FORM",
+                        extra_data={
+                            "acronym": plain_form,
+                            "forms": [plain_form, text[first_dotted_start:first_dotted_end]],
+                        },
                     )
                 )
 

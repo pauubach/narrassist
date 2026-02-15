@@ -128,3 +128,36 @@ class TestAcronymDetectorFiltering:
     def test_category_is_acronyms(self, detector):
         from narrative_assistant.corrections.types import CorrectionCategory
         assert detector.category == CorrectionCategory.ACRONYMS
+
+
+class TestAcronymDetectorInconsistentForm:
+    def test_inconsistent_form_detected(self, detector):
+        """NLP y N.L.P. en el mismo texto → inconsistent_form."""
+        text = (
+            "Procesamiento de Lenguaje Natural (NLP) es un campo activo. "
+            "También se escribe N.L.P. en algunos textos."
+        )
+        issues = detector.detect(text)
+        inconsistent = [
+            i for i in issues if i.issue_type == AcronymIssueType.INCONSISTENT_FORM.value
+        ]
+        assert len(inconsistent) == 1
+        assert inconsistent[0].confidence == 0.82
+
+    def test_only_dotted_no_inconsistency(self, detector):
+        """Solo forma con puntos, sin forma plain → no es inconsistente."""
+        text = "La O.N.U. organizó la conferencia internacional."
+        issues = detector.detect(text)
+        inconsistent = [
+            i for i in issues if i.issue_type == AcronymIssueType.INCONSISTENT_FORM.value
+        ]
+        assert len(inconsistent) == 0
+
+    def test_only_plain_no_inconsistency(self, detector):
+        """Solo forma sin puntos → no es inconsistente."""
+        text = "Procesamiento de Lenguaje Natural (NLP) es útil. NLP avanza rápido."
+        issues = detector.detect(text)
+        inconsistent = [
+            i for i in issues if i.issue_type == AcronymIssueType.INCONSISTENT_FORM.value
+        ]
+        assert len(inconsistent) == 0

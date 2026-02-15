@@ -163,6 +163,7 @@ class ReferencesDetector(BaseDetector):
 
         # 4. Citas huérfanas (numéricas sin entrada en bibliografía)
         if has_bibliography and has_numeric and self.config.detect_orphan_citations:
+            assert bib_match is not None  # guarded by has_bibliography
             bib_start = bib_match.start()
             bib_text = text[bib_start:]
 
@@ -197,6 +198,54 @@ class ReferencesDetector(BaseDetector):
                                 chapter_index=chapter_index,
                                 rule_id="REF_ORPHAN_CITATION",
                                 extra_data={"citation_number": num},
+                            )
+                        )
+
+        # 5. Referencias no citadas (entradas en bibliografía sin cita en texto)
+        if has_bibliography and has_numeric and self.config.detect_unused_references:
+            assert bib_match is not None  # guarded by has_bibliography
+            bib_start = bib_match.start()
+            bib_text = text[bib_start:]
+
+            # Extraer números de entradas bibliográficas: [1], [2], etc.
+            bib_entries = re.findall(r"(?:^|\n)\s*\[(\d+)\]", bib_text)
+            # Extraer todos los números citados en el cuerpo
+            cited_nums: set[str] = set()
+            for cm in numeric_cites:
+                if cm.start() < bib_start:
+                    cited_nums.update(re.findall(r"\d+", cm.group(1)))
+
+            for entry_num in bib_entries:
+                if entry_num not in cited_nums:
+                    entry_pattern = re.compile(
+                        rf"(?:^|\n)\s*\[{re.escape(entry_num)}\]",
+                        re.MULTILINE,
+                    )
+                    entry_match = entry_pattern.search(bib_text)
+                    if entry_match:
+                        abs_pos = bib_start + entry_match.start()
+                        issues.append(
+                            CorrectionIssue(
+                                category=self.category.value,
+                                issue_type=ReferencesIssueType.UNUSED_REFERENCE.value,
+                                start_char=abs_pos,
+                                end_char=abs_pos + len(entry_match.group()),
+                                text=f"[{entry_num}]",
+                                explanation=(
+                                    f"La referencia [{entry_num}] de la bibliografía "
+                                    f"no se cita en el cuerpo del texto."
+                                ),
+                                suggestion=(
+                                    f"Cite la referencia [{entry_num}] en el texto "
+                                    f"o elimínela de la bibliografía."
+                                ),
+                                confidence=0.80,
+                                context=self._extract_context(
+                                    text, abs_pos, abs_pos + 80
+                                ),
+                                chapter_index=chapter_index,
+                                rule_id="REF_UNUSED_REFERENCE",
+                                extra_data={"reference_number": entry_num},
                             )
                         )
 

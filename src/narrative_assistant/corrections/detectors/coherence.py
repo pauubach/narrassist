@@ -45,7 +45,7 @@ _STOPWORDS = frozenset({
     "esta", "entre", "cuando", "muy", "sin", "sobre", "ser", "también",
     "me", "hasta", "hay", "donde", "quien", "desde", "nos", "durante",
     "uno", "ni", "ante", "ellos", "e", "esto", "mí", "antes", "ese",
-    "todo", "esta", "son", "dos", "puede", "cada", "así", "mismo",
+    "todo", "son", "dos", "puede", "cada", "así", "mismo",
 })
 
 
@@ -213,9 +213,10 @@ class CoherenceDetector(BaseDetector):
 
                 # Determinar posición en el texto original
                 if para_indices and isinstance(para_indices, list):
-                    # Índice relativo al chunk → índice en substantive
+                    # El LLM recibe índices absolutos en el prompt ([chunk_start+i])
+                    # así que devuelve índices absolutos → usar directamente
                     first_idx = para_indices[0]
-                    abs_idx = chunk_start + first_idx
+                    abs_idx = first_idx
                     if 0 <= abs_idx < len(paragraphs):
                         _, para_text, para_pos = paragraphs[abs_idx]
                         start_char = para_pos

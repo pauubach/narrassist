@@ -135,3 +135,48 @@ class TestReferencesDetectorOrphanCitations:
         issues = det.detect(text)
         orphans = [i for i in issues if i.issue_type == ReferencesIssueType.ORPHAN_CITATION.value]
         assert len(orphans) == 0
+
+
+class TestReferencesDetectorUnusedReferences:
+    def test_unused_reference_detected(self):
+        """Entrada en bibliografía sin cita en texto → flaggeada."""
+        config = ReferencesConfig(enabled=True, detect_unused_references=True)
+        det = ReferencesDetector(config)
+        text = (
+            "Según [1], esto es importante.\n\n"
+            "## Referencias\n"
+            "[1] García. Estudio.\n"
+            "[2] López. Análisis.\n"  # No citado
+        )
+        issues = det.detect(text)
+        unused = [i for i in issues if i.issue_type == ReferencesIssueType.UNUSED_REFERENCE.value]
+        assert len(unused) == 1
+        assert unused[0].text == "[2]"
+
+    def test_all_references_cited_no_issue(self):
+        """Todas las entradas citadas → sin issue."""
+        config = ReferencesConfig(enabled=True, detect_unused_references=True)
+        det = ReferencesDetector(config)
+        text = (
+            "Según [1] y [2].\n\n"
+            "## Referencias\n"
+            "[1] García. Estudio.\n"
+            "[2] López. Análisis.\n"
+        )
+        issues = det.detect(text)
+        unused = [i for i in issues if i.issue_type == ReferencesIssueType.UNUSED_REFERENCE.value]
+        assert len(unused) == 0
+
+    def test_config_disable_unused_detection(self):
+        """Con detect_unused_references=False, no se chequea."""
+        config = ReferencesConfig(enabled=True, detect_unused_references=False)
+        det = ReferencesDetector(config)
+        text = (
+            "Según [1].\n\n"
+            "## Referencias\n"
+            "[1] García.\n"
+            "[2] López.\n"
+        )
+        issues = det.detect(text)
+        unused = [i for i in issues if i.issue_type == ReferencesIssueType.UNUSED_REFERENCE.value]
+        assert len(unused) == 0
