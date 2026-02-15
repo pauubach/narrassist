@@ -142,7 +142,7 @@ export const useLicenseStore = defineStore('license', () => {
     try {
       licenseInfo.value = await api.get<LicenseInfo>('/api/license/status')
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'No se pudo conectar con el servidor'
+      error.value = e instanceof Error ? e.message : 'No se pudo verificar la licencia'
       console.error('Error fetching license status:', e)
     } finally {
       loading.value = false

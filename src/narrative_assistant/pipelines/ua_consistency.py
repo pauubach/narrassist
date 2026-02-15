@@ -53,6 +53,18 @@ class PipelineConsistencyMixin:
             if self.config.run_emotional and context.chapters:
                 self._run_emotional_coherence(context)
 
+            if self.config.run_vital_status and context.entities and context.chapters:
+                self._run_vital_status_check(context)
+
+            if self.config.run_character_location and context.entities and context.chapters:
+                self._run_character_location_check(context)
+
+            if self.config.run_ooc_detection and context.entities and context.chapters:
+                self._run_ooc_detection(context)
+
+            if self.config.run_chekhov and context.entities and context.chapters:
+                self._run_chekhov_check(context)
+
             if self.config.run_sentiment and context.chapters:
                 self._run_sentiment_analysis(context)
 
@@ -402,3 +414,292 @@ class PipelineConsistencyMixin:
             logger.debug(f"Sentiment analyzer not available: {e}")
         except Exception as e:
             logger.warning(f"Sentiment analysis failed: {e}")
+
+    @staticmethod
+    def _get_val(obj, key: str, default=None):
+        """Extrae valor de un dict o de un objeto con atributo."""
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
+    def _prepare_chapter_data(self, context: AnalysisContext) -> list[dict]:
+        """Normaliza capítulos (dict u objeto) a lista de dicts."""
+        chapters_data = []
+        for ch in context.chapters:
+            num = self._get_val(ch, "number") or self._get_val(ch, "chapter_number") or 0
+            content = self._get_val(ch, "content") or self._get_val(ch, "text") or ""
+            start = self._get_val(ch, "start_char") or 0
+            chapters_data.append({"number": num, "content": content, "start_char": start})
+        return chapters_data
+
+    def _prepare_entity_data(self, context: AnalysisContext) -> list[dict]:
+        """Normaliza entidades (dict u objeto) a lista de dicts."""
+        entities_data = []
+        for e in context.entities:
+            eid = self._get_val(e, "id") or 0
+            name = self._get_val(e, "canonical_name") or str(e)
+            aliases = self._get_val(e, "aliases") or []
+            etype_raw = self._get_val(e, "entity_type")
+            if etype_raw and hasattr(etype_raw, "value"):
+                etype = etype_raw.value
+            elif etype_raw:
+                etype = str(etype_raw)
+            else:
+                etype = "character"
+            entities_data.append({
+                "id": eid, "canonical_name": name,
+                "aliases": aliases, "entity_type": etype,
+            })
+        return entities_data
+
+    def _run_vital_status_check(self, context: AnalysisContext) -> None:
+        """
+        Detectar personajes fallecidos que reaparecen.
+
+        Busca menciones de muerte/fallecimiento y luego verifica que el personaje
+        no reaparezca activamente (hablando, actuando) después.
+        """
+        try:
+            from ..analysis.vital_status import analyze_vital_status
+
+            chapters_data = self._prepare_chapter_data(context)
+            entities_data = self._prepare_entity_data(context)
+
+            result = analyze_vital_status(
+                project_id=context.project_id,
+                chapters=chapters_data,
+                entities=entities_data,
+            )
+
+            if result.is_success and result.value is not None:
+                context.vital_status_report = result.value
+                post_mortem = getattr(result.value, "post_mortem_appearances", [])
+                context.stats["vital_status_deaths"] = len(
+                    getattr(result.value, "death_events", [])
+                )
+                context.stats["vital_status_post_mortem"] = len(post_mortem)
+                logger.info(
+                    f"Vital status: {len(getattr(result.value, 'death_events', []))} deaths, "
+                    f"{len(post_mortem)} post-mortem appearances"
+                )
+
+        except ImportError as e:
+            logger.debug(f"Vital status module not available: {e}")
+        except Exception as e:
+            logger.warning(f"Vital status check failed: {e}")
+
+    def _run_character_location_check(self, context: AnalysisContext) -> None:
+        """
+        Detectar ubicaciones imposibles de personajes.
+
+        Busca menciones de personajes en diferentes ubicaciones en el mismo
+        período temporal sin transición narrativa.
+        """
+        try:
+            from ..analysis.character_location import analyze_character_locations
+
+            chapters_data = self._prepare_chapter_data(context)
+            entities_data = self._prepare_entity_data(context)
+
+            result = analyze_character_locations(
+                project_id=context.project_id,
+                chapters=chapters_data,
+                entities=entities_data,
+            )
+
+            if result.is_success and result.value is not None:
+                inconsistencies = getattr(result.value, "inconsistencies", [])
+                context.location_inconsistencies = inconsistencies
+                context.stats["location_inconsistencies"] = len(inconsistencies)
+                logger.info(f"Character locations: {len(inconsistencies)} inconsistencies")
+
+        except ImportError as e:
+            logger.debug(f"Character location module not available: {e}")
+        except Exception as e:
+            logger.warning(f"Character location check failed: {e}")
+
+    def _run_ooc_detection(self, context: AnalysisContext) -> None:
+        """
+        Detectar comportamiento fuera de personaje (OOC).
+
+        Compara el comportamiento establecido (perfil) contra acciones
+        y diálogos en cada capítulo.
+        """
+        try:
+            from ..analysis.out_of_character import OutOfCharacterDetector
+
+            detector = OutOfCharacterDetector()
+
+            # Preparar diálogos por capítulo
+            chapter_dialogues: dict[int, list] = {}
+            for d in context.dialogues:
+                ch_num = d.get("chapter", 0)
+                if ch_num not in chapter_dialogues:
+                    chapter_dialogues[ch_num] = []
+                chapter_dialogues[ch_num].append(d)
+
+            # Preparar textos por capítulo
+            chapter_texts: dict[int, str] = {}
+            for ch in context.chapters:
+                ch_num = self._get_val(ch, "number") or self._get_val(ch, "chapter_number") or 0
+                ch_content = self._get_val(ch, "content") or self._get_val(ch, "text") or ""
+                chapter_texts[ch_num] = ch_content
+
+            # Obtener perfiles si existen
+            profiles = []
+            if context.voice_profiles:
+                # voice_profiles es dict {entity_id: profile}
+                profiles = list(context.voice_profiles.values())
+
+            if not profiles:
+                # Sin perfiles, construir perfiles básicos desde menciones/atributos
+                from ..analysis.character_profiling import CharacterProfiler
+
+                profiler = CharacterProfiler()
+
+                # Preparar menciones desde entidades
+                mentions = []
+                for e in context.entities:
+                    eid = self._get_val(e, "id") or 0
+                    ename = self._get_val(e, "canonical_name") or str(e)
+                    for ch in context.chapters:
+                        ch_num = self._get_val(ch, "number") or self._get_val(ch, "chapter_number") or 0
+                        ch_content = self._get_val(ch, "content") or self._get_val(ch, "text") or ""
+                        if ename.lower() in ch_content.lower():
+                            mentions.append(
+                                {
+                                    "entity_id": eid,
+                                    "entity_name": ename,
+                                    "chapter": ch_num,
+                                }
+                            )
+
+                attrs_data = [
+                    a if isinstance(a, dict) else a.to_dict()
+                    if hasattr(a, "to_dict") else {"key": str(a)}
+                    for a in context.attributes
+                ]
+
+                dialogues_data = context.dialogues
+
+                profiles = profiler.build_profiles(
+                    mentions=mentions,
+                    attributes=attrs_data,
+                    dialogues=dialogues_data,
+                    chapter_texts=chapter_texts,
+                )
+
+            if profiles:
+                report = detector.detect(
+                    profiles=profiles,
+                    chapter_dialogues=chapter_dialogues,
+                    chapter_texts=chapter_texts,
+                )
+
+                ooc_events = getattr(report, "events", [])
+                context.ooc_events = [
+                    e.to_dict() if hasattr(e, "to_dict") else e for e in ooc_events
+                ]
+                context.stats["ooc_events"] = len(ooc_events)
+                logger.info(f"OOC detection: {len(ooc_events)} events")
+
+        except ImportError as e:
+            logger.debug(f"OOC detection module not available: {e}")
+        except Exception as e:
+            logger.warning(f"OOC detection failed: {e}")
+
+    def _run_chekhov_check(self, context: AnalysisContext) -> None:
+        """
+        Detectar personajes/elementos introducidos con detalle que luego desaparecen.
+
+        Basado en el principio de Chekhov: si introduces algo con detalle,
+        debe tener relevancia posterior en la narrativa.
+
+        Implementación ligera que no requiere DB: analiza en memoria
+        qué personajes secundarios aparecen pocas veces y luego desaparecen.
+        """
+        try:
+            total_chapters = len(context.chapters)
+            if total_chapters < 2:
+                return
+
+            # Construir mapa de presencia: {entity_name: set(chapter_numbers)}
+            presence: dict[str, set[int]] = {}
+            intro_chapter: dict[str, int] = {}
+
+            for e in context.entities:
+                ename = self._get_val(e, "canonical_name") or str(e)
+                etype_raw = self._get_val(e, "entity_type")
+                etype = (
+                    etype_raw.value if hasattr(etype_raw, "value")
+                    else str(etype_raw) if etype_raw else ""
+                )
+
+                # Solo personajes
+                if etype not in ("character", "person", "PER"):
+                    continue
+
+                chapters_present: set[int] = set()
+                for ch in context.chapters:
+                    ch_num = self._get_val(ch, "number") or self._get_val(ch, "chapter_number") or 0
+                    ch_content = self._get_val(ch, "content") or self._get_val(ch, "text") or ""
+                    if ename.lower() in ch_content.lower():
+                        chapters_present.add(ch_num)
+
+                if chapters_present:
+                    presence[ename] = chapters_present
+                    intro_chapter[ename] = min(chapters_present)
+
+            # Detectar personajes que desaparecen: aparecen en 1-2 capítulos,
+            # se introducen con detalle (tienen atributos), y no llegan al final
+            abandoned = []
+            last_chapter_num = max(
+                (
+                    self._get_val(ch, "number") or self._get_val(ch, "chapter_number") or i
+                    for i, ch in enumerate(context.chapters)
+                ),
+                default=total_chapters,
+            )
+
+            # Verificar qué personajes tienen atributos (= introducidos con detalle)
+            entities_with_attrs: set[str] = set()
+            for attr in context.attributes:
+                attr_name = (
+                    attr.get("entity_name", "")
+                    if isinstance(attr, dict)
+                    else getattr(attr, "entity_name", "")
+                )
+                if attr_name:
+                    entities_with_attrs.add(attr_name.lower())
+
+            for ename, chapters_set in presence.items():
+                last_mention = max(chapters_set)
+                # Personaje que desaparece: no aparece en los últimos 40% de capítulos
+                disappears_before = last_chapter_num - int(total_chapters * 0.4)
+
+                if (
+                    len(chapters_set) <= 2
+                    and last_mention <= disappears_before
+                    and ename.lower() in entities_with_attrs
+                ):
+                    abandoned.append(
+                        {
+                            "entity_name": ename,
+                            "introduction_chapter": intro_chapter.get(ename, 0),
+                            "last_mention_chapter": last_mention,
+                            "chapters_present": sorted(chapters_set),
+                            "total_chapters": total_chapters,
+                            "description": (
+                                f"'{ename}' se introduce con detalle en cap. "
+                                f"{intro_chapter.get(ename, '?')} pero desaparece "
+                                f"después de cap. {last_mention}"
+                            ),
+                        }
+                    )
+
+            context.chekhov_threads = abandoned
+            context.stats["chekhov_threads"] = len(abandoned)
+            logger.info(f"Chekhov tracker: {len(abandoned)} abandoned threads")
+
+        except Exception as e:
+            logger.warning(f"Chekhov check failed: {e}")

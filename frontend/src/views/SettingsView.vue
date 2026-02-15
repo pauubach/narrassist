@@ -1372,8 +1372,8 @@ const confirmChangeDataLocation = async () => {
     console.error('Error changing data location:', error)
     toast.add({
       severity: 'error',
-      summary: 'Error de conexión',
-      detail: 'No se pudo conectar con el servidor',
+      summary: 'Error del servicio',
+      detail: 'No se pudo conectar con el motor de análisis local',
       life: 3000
     })
   } finally {

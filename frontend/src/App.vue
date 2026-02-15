@@ -15,12 +15,12 @@
       <div v-if="showBackendDownBanner" class="backend-down-banner" role="alert">
         <i class="pi pi-exclamation-triangle"></i>
         <div class="backend-down-banner__text">
-          <span class="backend-down-banner__title">Sin conexión con el servidor</span>
+          <span class="backend-down-banner__title">El motor de análisis no responde</span>
           <span v-if="numRecoveryAttempts < 6" class="backend-down-banner__hint">
             Reintentando automáticamente...
           </span>
           <span v-else class="backend-down-banner__hint">
-            No se pudo restablecer la conexión. Cierra la aplicación y vuelve a abrirla.
+            No se pudo restablecer la comunicación con el motor local. Cierra la aplicación y vuelve a abrirla.
           </span>
         </div>
       </div>

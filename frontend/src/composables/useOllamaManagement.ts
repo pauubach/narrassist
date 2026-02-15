@@ -140,7 +140,7 @@ export function useOllamaManagement() {
       }
     } catch (error) {
       console.error('Error starting Ollama:', error)
-      toast.add({ severity: 'error', summary: 'Error de conexi\u00F3n', detail: 'No se pudo conectar con el servidor', life: 3000 })
+      toast.add({ severity: 'error', summary: 'Error de Ollama', detail: 'No se pudo iniciar Ollama', life: 3000 })
     } finally {
       ollamaStarting.value = false
     }
@@ -207,7 +207,7 @@ export function useOllamaManagement() {
         }
       }, 1000)
     } catch {
-      toast.add({ severity: 'error', summary: 'Error de conexi\u00F3n', detail: 'No se pudo conectar con el servidor', life: 3000 })
+      toast.add({ severity: 'error', summary: 'Error de Ollama', detail: 'No se pudo descargar el modelo', life: 3000 })
       modelDownloading.value = false
     }
   }

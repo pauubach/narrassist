@@ -125,22 +125,29 @@ async function monitoredFetch(input: RequestInfo | URL, init?: RequestInit): Pro
 
 /**
  * monitoredFetch with retry + exponential backoff for transient connection errors.
- * Only used for idempotent (GET) requests.
+ * Creates a fresh timeout signal per attempt to avoid stale AbortSignals.
  */
 async function monitoredFetchWithRetry(
   input: RequestInfo | URL,
   init: RequestInit | undefined,
   retries: number,
+  timeoutMs?: number,
+  userSignal?: AbortSignal,
 ): Promise<Response> {
   const maxRetries = Math.min(retries, 3)
   let lastError: unknown
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await monitoredFetch(input, init)
+      // Create a fresh timeout signal per attempt (prevents stale signal after timeout)
+      const attemptInit = timeoutMs
+        ? { ...init, signal: createTimeoutSignal(timeoutMs, userSignal) }
+        : init
+      return await monitoredFetch(input, attemptInit)
     } catch (err) {
       lastError = err
       if (isConnectionError(err) && attempt < maxRetries) {
-        await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)))
+        // Exponential backoff: 2s, 4s, 8s (longer for slow local inference)
+        await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)))
         continue
       }
       throw err
@@ -173,7 +180,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
 
   if (!data.success) {
     throw new ApiError(
-      data.error || 'Error desconocido del servidor',
+      data.error || 'Error interno',
       response.status,
       data.error,
     )
@@ -201,7 +208,7 @@ async function parseRawResponse<T>(response: Response): Promise<T> {
  */
 function createTimeoutSignal(timeoutMs: number, existingSignal?: AbortSignal): AbortSignal {
   const controller = new AbortController()
-  const reason = `El servidor no respondió en ${Math.round(timeoutMs / 1000)}s`
+  const reason = `El servicio local no respondió en ${Math.round(timeoutMs / 1000)}s`
 
   const timer = setTimeout(() => controller.abort(reason), timeoutMs)
 
@@ -227,12 +234,10 @@ function createTimeoutSignal(timeoutMs: number, existingSignal?: AbortSignal): A
  */
 async function get<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { timeout = 30000, headers = {}, signal, retries = 0 } = options
-  const abortSignal = createTimeoutSignal(timeout, signal)
-  const fetchInit = { method: 'GET', headers, signal: abortSignal }
 
   const response = retries > 0
-    ? await monitoredFetchWithRetry(apiUrl(path), fetchInit, retries)
-    : await monitoredFetch(apiUrl(path), fetchInit)
+    ? await monitoredFetchWithRetry(apiUrl(path), { method: 'GET', headers }, retries, timeout, signal)
+    : await monitoredFetch(apiUrl(path), { method: 'GET', headers, signal: createTimeoutSignal(timeout, signal) })
 
   return parseResponse<T>(response)
 }
@@ -242,12 +247,10 @@ async function get<T>(path: string, options: RequestOptions = {}): Promise<T> {
  */
 async function getRaw<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { timeout = 30000, headers = {}, signal, retries = 0 } = options
-  const abortSignal = createTimeoutSignal(timeout, signal)
-  const fetchInit = { method: 'GET', headers, signal: abortSignal }
 
   const response = retries > 0
-    ? await monitoredFetchWithRetry(apiUrl(path), fetchInit, retries)
-    : await monitoredFetch(apiUrl(path), fetchInit)
+    ? await monitoredFetchWithRetry(apiUrl(path), { method: 'GET', headers }, retries, timeout, signal)
+    : await monitoredFetch(apiUrl(path), { method: 'GET', headers, signal: createTimeoutSignal(timeout, signal) })
 
   return parseRawResponse<T>(response)
 }
@@ -326,18 +329,16 @@ async function postRaw<T>(
   options: RequestOptions = {},
 ): Promise<T> {
   const { timeout = 30000, headers = {}, signal, retries = 0 } = options
-  const abortSignal = createTimeoutSignal(timeout, signal)
 
-  const fetchOptions: RequestInit = {
+  const fetchInit: RequestInit = {
     method: 'POST',
     headers: body !== undefined ? { 'Content-Type': 'application/json', ...headers } : headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
-    signal: abortSignal,
   }
 
   const response = retries > 0
-    ? await monitoredFetchWithRetry(apiUrl(path), fetchOptions, retries)
-    : await monitoredFetch(apiUrl(path), fetchOptions)
+    ? await monitoredFetchWithRetry(apiUrl(path), fetchInit, retries, timeout, signal)
+    : await monitoredFetch(apiUrl(path), { ...fetchInit, signal: createTimeoutSignal(timeout, signal) })
   return parseRawResponse<T>(response)
 }
 
@@ -450,7 +451,7 @@ async function del<T>(
 async function getChecked<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const raw = await getRaw<{ success: boolean; data: T; error?: string }>(path, options)
   if (!raw.success) {
-    throw new ApiError(raw.error || 'Error desconocido del servidor', 200, raw.error)
+    throw new ApiError(raw.error || 'Error interno', 200, raw.error)
   }
   return raw.data
 }
@@ -468,7 +469,7 @@ async function postChecked<T>(
 ): Promise<T> {
   const raw = await postRaw<{ success: boolean; data: T; error?: string }>(path, body, options)
   if (!raw.success) {
-    throw new ApiError(raw.error || 'Error desconocido del servidor', 200, raw.error)
+    throw new ApiError(raw.error || 'Error interno', 200, raw.error)
   }
   return raw.data
 }

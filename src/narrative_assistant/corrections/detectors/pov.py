@@ -34,7 +34,9 @@ class POVDetector(BaseDetector):
         r"pensé|sentí|miré|caminé|dije|vi|hice|fui|tuve|pude|quise|supe|"
         r"pienso|siento|miro|camino|hablo|escribo|leo|vivo|trabajo|"
         r"creí|sabía|recordé|noté|comprendí|percibí|imaginé|"
-        r"creo|noto|comprendo|percibo|imagino|recuerdo)\b",
+        r"creo|noto|comprendo|percibo|imagino|recuerdo|"
+        # Auxiliar de presente perfecto (1ª persona singular)
+        r"he|había|habré|habría|haya|hubiera|hubiese)\b",
         re.IGNORECASE,
     )
 
@@ -254,7 +256,7 @@ class POVDetector(BaseDetector):
             current_pov = para["pov"]["dominant"]
 
             # Ignorar párrafos sin marcadores claros
-            if para["pov"]["total_markers"] < 3:
+            if para["pov"]["total_markers"] < 2:
                 continue
 
             if current_pov and prev_pov and current_pov != prev_pov:

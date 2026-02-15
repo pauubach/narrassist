@@ -568,7 +568,7 @@ async function loadReport() {
     }
   } catch (err) {
     console.error('Error loading chapter progress:', err)
-    error.value = 'Error de conexión con el servidor'
+    error.value = 'Error del servicio local'
   } finally {
     loading.value = false
   }

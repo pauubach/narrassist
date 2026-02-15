@@ -370,7 +370,7 @@ async function analyze() {
     }
   } catch (e) {
     console.error('Sensory report error:', e)
-    errorMsg.value = e instanceof Error ? e.message : 'Error de conexión'
+    errorMsg.value = e instanceof Error ? e.message : 'Error del servicio local'
   } finally {
     loading.value = false
   }

@@ -205,7 +205,17 @@ class VitalStatusAnalyzer:
         r"(?P<name>\w+)\s+(?:miró|observó|vio|escuchó|oyó)",
         r"(?P<name>\w+)\s+(?:tomó|agarró|cogió|soltó|dejó|puso)",
         r"(?P<name>\w+)\s+(?:sonrió|rió|lloró|suspiró|frunció)",
+        # Pluscuamperfecto / perífrasis con pronombres intercalados
+        r"(?P<name>\w+)\s+(?:le\s+)?(?:había|ha)\s+(?:dicho|llamado|preguntado|gritado|contado|explicado|pedido|hablado)",
     ]
+
+    # Términos relacionales que pueden sustituir a un nombre propio
+    RELATIONAL_TERMS = {
+        "padre", "madre", "hermano", "hermana", "abuelo", "abuela",
+        "tío", "tía", "primo", "prima", "esposo", "esposa", "marido",
+        "mujer", "hijo", "hija", "suegro", "suegra", "cuñado", "cuñada",
+        "novio", "novia", "padrino", "madrina",
+    }
 
     def __init__(self, project_id: int, temporal_map=None):
         self.project_id = project_id
@@ -215,6 +225,7 @@ class VitalStatusAnalyzer:
         self._death_events: dict[int, DeathEvent] = {}  # entity_id -> DeathEvent
         self._entity_names: dict[int, str] = {}
         self._name_to_id: dict[str, int] = {}
+        self._synthetic_id_counter = -1  # IDs negativos para entidades sintéticas
 
     def register_entity(self, entity_id: int, name: str, aliases: list[str] = None):  # type: ignore[assignment]
         """Registra una entidad para el análisis."""
@@ -292,7 +303,20 @@ class VitalStatusAnalyzer:
                     entity_id = self.get_entity_id(name)
 
                     if not entity_id:
-                        continue
+                        # Si es un término relacional (padre, madre, etc.),
+                        # crear entidad sintética para rastrear
+                        if name in self.RELATIONAL_TERMS:
+                            entity_id = self._name_to_id.get(name)
+                            if not entity_id:
+                                entity_id = self._synthetic_id_counter
+                                self._synthetic_id_counter -= 1
+                                self.register_entity(entity_id, name)
+                                logger.info(
+                                    f"Synthetic entity created for relational term '{name}' "
+                                    f"(id={entity_id})"
+                                )
+                        else:
+                            continue
 
                     # No duplicar si ya encontramos muerte para esta entidad en este capítulo
                     if entity_id in found_in_chapter:
@@ -591,6 +615,56 @@ def analyze_vital_status(
 
             all_death_events.extend(death_events)
             all_appearances.extend(appearances)
+
+        # Segunda pasada: para muertes en pluscuamperfecto (habían ocurrido antes),
+        # buscar apariciones activas en capítulos ANTERIORES al de detección.
+        pluperfect_deaths = [
+            e for e in all_death_events if e.death_type == "pluperfect"
+        ]
+        if pluperfect_deaths:
+            sorted_chapters = sorted(chapters, key=lambda c: c.get("number", 0))
+            for death_event in pluperfect_deaths:
+                for chapter in sorted_chapters:
+                    ch_num = chapter.get("number", 0)
+                    # Solo buscar en capítulos ANTERIORES al de la detección de muerte
+                    if ch_num >= death_event.chapter:
+                        continue
+                    text = chapter.get("content", "") or chapter.get("text", "")
+                    start_offset = chapter.get("start_char", 0)
+                    if not text:
+                        continue
+                    # Buscar apariciones activas del personaje fallecido
+                    entity_name = death_event.entity_name.lower()
+                    for pattern in analyzer.ACTIVE_ACTION_PATTERNS:
+                        for match in re.finditer(pattern, text, re.IGNORECASE):
+                            matched_name = match.group("name").lower()
+                            matched_id = analyzer.get_entity_id(matched_name)
+                            if matched_id != death_event.entity_id:
+                                continue
+                            context_start = max(0, match.start() - 250)
+                            context_end = min(len(text), match.end() + 250)
+                            context = text[context_start:context_end]
+                            is_valid = analyzer._is_valid_reference(
+                                context, entity_name
+                            )
+                            appearance = PostMortemAppearance(
+                                entity_id=death_event.entity_id,
+                                entity_name=death_event.entity_name,
+                                death_chapter=death_event.chapter,
+                                appearance_chapter=ch_num,
+                                appearance_start_char=start_offset + match.start(),
+                                appearance_end_char=start_offset + match.end(),
+                                appearance_excerpt=context,
+                                appearance_type="action",
+                                is_valid=is_valid,
+                                confidence=0.75,
+                            )
+                            all_appearances.append(appearance)
+                            if not is_valid:
+                                logger.warning(
+                                    f"Pluperfect post-mortem: {death_event.entity_name} "
+                                    f"appears in ch.{ch_num} but died before ch.{death_event.chapter}"
+                                )
 
         # Generar reporte
         report = analyzer.generate_report()

@@ -95,15 +95,16 @@ export function useChat(projectId: number) {
     isLoading.value = true
 
     try {
-      // 180s timeout for LLM response - CPU inference can be very slow
-      // retries: 2 → retry up to 2 times on connection error (backoff: 500ms, 1s)
+      // 300s timeout - CPU inference on low-end hardware can be very slow,
+      // especially when analysis is running and chat has to wait for LLM scheduler.
+      // retries: 3 → retry up to 3 times on connection error (backoff: 2s, 4s, 8s)
       const data = await api.postRaw<any>(
         `/api/projects/${projectId}/chat`,
         {
           message: content,
           history: history.slice(0, -1) // Exclude current message
         },
-        { timeout: 180000, signal: abortController.signal, retries: 2 }
+        { timeout: 300000, signal: abortController.signal, retries: 3 }
       )
 
       if (data.success && data.data) {
@@ -125,7 +126,7 @@ export function useChat(projectId: number) {
           content: '',
           timestamp: new Date(),
           status: 'error',
-          error: data.error || 'Error desconocido'
+          error: data.error || 'Ollama no generó respuesta'
         })
       }
     } catch (e) {
@@ -136,11 +137,13 @@ export function useChat(projectId: number) {
         return
       }
 
-      let errorMsg = 'Error de conexión'
+      let errorMsg = 'El asistente local no respondió'
 
       if (e instanceof Error) {
         if (e.message.includes('fetch') || e.message.includes('network')) {
-          errorMsg = 'No se pudo conectar con el servidor. Verifica la conexión.'
+          errorMsg = 'No se pudo conectar con Ollama. ¿Está iniciado?'
+        } else if (e.message.includes('no respondió')) {
+          errorMsg = 'Ollama tardó demasiado en responder. Reintenta en unos segundos.'
         } else {
           errorMsg = e.message
         }

@@ -75,7 +75,7 @@ async function analyze() {
     }
   } catch (error) {
     console.error('Error analyzing character archetypes:', error)
-    errorMsg.value = error instanceof Error ? error.message : 'Error de conexión'
+    errorMsg.value = error instanceof Error ? error.message : 'Error del servicio local'
   } finally {
     loading.value = false
   }

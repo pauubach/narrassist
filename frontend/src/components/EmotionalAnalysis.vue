@@ -252,7 +252,7 @@ const analyzeEmotions = async () => {
       error.value = data.error || 'Error desconocido'
     }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Error de conexión'
+    error.value = e instanceof Error ? e.message : 'Error del servicio local'
   } finally {
     loading.value = false
   }

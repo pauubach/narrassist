@@ -25,7 +25,7 @@ describe('AnalysisErrorState', () => {
     it('should render warning icon', () => {
       const wrapper = mount(AnalysisErrorState, {
         props: {
-          message: 'Error de conexión',
+          message: 'Error del servicio local',
         },
       })
 

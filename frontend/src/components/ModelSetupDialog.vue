@@ -118,7 +118,7 @@ const currentModel = computed(() => {
   const modelType = realProgress.value.modelType
   const displayName = modelType ? (modelDisplayNames[modelType] || modelType) : ''
 
-  if (phase === 'connecting') return 'Conectando con el servidor...'
+  if (phase === 'connecting') return 'Conectando con el motor de análisis...'
   if (phase === 'installing') return `Instalando ${displayName}...`
   if (phase === 'downloading') return `Descargando ${displayName}...`
   return 'Procesando...'
@@ -391,7 +391,7 @@ async function recheckPython() {
         <div class="error-state" role="alert" aria-live="assertive">
           <i class="pi pi-exclamation-triangle error-icon"></i>
           <h3>No se pudo conectar</h3>
-          <p class="error-message">{{ systemStore.backendStartupError || 'El servidor no respondió a tiempo.' }}</p>
+          <p class="error-message">{{ systemStore.backendStartupError || 'El motor de análisis no respondió a tiempo.' }}</p>
           <p class="error-hint">
             Intenta cerrar y volver a abrir la aplicación. Si el problema persiste, verifica que no haya otra instancia ejecutándose.
           </p>

@@ -90,22 +90,22 @@ FORMAL_INDICATORS: set[str] = {
 }
 
 # Indicadores de registro coloquial
-# NOTA: Usamos palabras completas, no substrings, para evitar falsos positivos
+# NOTA: Solo palabras que son INEQUIVOCAMENTE coloquiales en español.
+# Palabras ambiguas (estándar + coloquial según contexto) se excluyen
+# para evitar falsos positivos. El umbral mínimo de indicadores
+# (MIN_COLLOQUIAL_INDICATORS) compensa: si hay suficientes marcadores
+# genuinos, el registro se detecta correctamente.
 COLLOQUIAL_INDICATORS: set[str] = {
-    # Expresiones coloquiales clasicas
+    # Expresiones coloquiales clasicas (inequivocas)
     "mola",
     "flipar",
     "currar",
     "mogollon",
-    "rollo",
     "molar",
     "flipante",
-    "pasada",
     "guay",
     "chulo",
     "majo",
-    "lio",
-    "movida",
     "chungo",
     "petar",
     "tope",
@@ -120,11 +120,8 @@ COLLOQUIAL_INDICATORS: set[str] = {
     "flipando",
     "petando",
     "molando",
-    "brutal",
-    # Lenguaje juvenil moderno / Gen Z
+    # Lenguaje juvenil moderno / Gen Z (anglicismos sin colision con español)
     "bro",
-    "crack",
-    "random",
     "cringe",
     "mood",
     "vibe",
@@ -137,38 +134,78 @@ COLLOQUIAL_INDICATORS: set[str] = {
     "trolear",
     "lol",
     "wtf",
-    "pov",
     "slay",
     "based",
     "goat",
-    "lit",
     "fam",
     "squad",
-    "flow",
-    "chill",
     "lowkey",
     "highkey",
-    "flex",
     "savage",
     "salty",
-    "sus",
-    # Expresiones juveniles en espanol
+    # Expresiones juveniles en espanol (inequivocas)
     "flipo",
-    "locura",
-    "posta",
-    "heavy",
-    "fuerte",
-    "rayada",
-    "rallado",
-    "colgado",
     "pirao",
     "empanao",
-    "quedada",
-    "plan",
-    "rato",
-    "pego",
-    "morro",
 }
+# Palabras ELIMINADAS por colision con español estándar:
+# - "sus" (pronombre posesivo: "sus ojos")
+# - "plan" (sustantivo: "el plan era...")
+# - "rato" (temporal: "un rato después")
+# - "fuerte" (adjetivo: "hombre fuerte")
+# - "brutal" (adjetivo: "ataque brutal")
+# - "locura" (sustantivo: "la locura del rey")
+# - "pasada" (adjetivo: "la semana pasada")
+# - "rollo" (sustantivo: "rollo de papel")
+# - "lio" (sustantivo: "un lío de papeles")
+# - "movida" (sustantivo: "la movida madrileña")
+# - "morro" (anatomía: "el morro del avión")
+# - "pego" (verbo pegar 1ª persona)
+# - "quedada" (participio femenino de quedar)
+# - "heavy" (préstamo: "heavy metal")
+# - "crack" (sustantivo: "el crack del 29")
+# - "random" (préstamo demasiado extendido)
+# - "pov" (acrónimo: "point of view")
+# - "lit" / "flex" / "flow" / "chill" (anglicismos ambiguos)
+# - "rayada" / "rallado" / "colgado" (participios estándar)
+# - "posta" (locución: "a posta")
+
+# Umbral minimo de indicadores para clasificar como no-neutral.
+# Una sola palabra ambigua no debe cambiar el registro de un parrafo.
+MIN_COLLOQUIAL_INDICATORS = 2
+MIN_FORMAL_INDICATORS = 2
+MIN_TECHNICAL_INDICATORS = 2
+MIN_POETIC_INDICATORS = 1  # Dispositivos poeticos son mas raros, 1 basta
+
+# ---------------------------------------------------------------------------
+# Palabras ambiguas con deteccion contextual
+# ---------------------------------------------------------------------------
+# Estas palabras son coloquiales SOLO en ciertos contextos gramaticales.
+# Se detectan mediante patrones regex que capturan el uso coloquial.
+# Si el patron no coincide, la palabra se ignora (uso estandar).
+
+CONTEXTUAL_COLLOQUIAL_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    # "fuerte" como exclamacion/intensificador (no como adjetivo descriptivo)
+    ("fuerte", re.compile(r"(?:^|[.!¡]\s*)(?:¡?\s*(?:qu[eé]|es|muy|tan|más)\s+fuerte)", re.IGNORECASE)),
+    # "brutal" como exclamacion/intensificador
+    ("brutal", re.compile(r"(?:^|[.!¡]\s*)(?:¡?\s*(?:qu[eé]|es)\s+brutal|brutal[,!])", re.IGNORECASE)),
+    # "locura" como exclamacion
+    ("locura", re.compile(r"(?:¡?\s*(?:qu[eé]|menuda|vaya|es una)\s+locura)", re.IGNORECASE)),
+    # "pasada" como exclamacion
+    ("pasada", re.compile(r"(?:¡?\s*(?:qu[eé]|menuda|vaya|es una)\s+pasada)", re.IGNORECASE)),
+    # "rollo" como aburrimiento/tema
+    ("rollo", re.compile(r"(?:(?:qu[eé]|menudo|vaya|es un|buen)\s+rollo|rollo\s+(?:patatero|total))", re.IGNORECASE)),
+    # "lio" como problema/desorden coloquial
+    ("lio", re.compile(r"(?:(?:qu[eé]|menudo|vaya|es un)\s+l[ií]o|l[ií]o\s+(?:gordo|pardo|mental))", re.IGNORECASE)),
+    # "movida" como asunto/problema coloquial
+    ("movida", re.compile(r"(?:(?:qu[eé]|menuda|vaya)\s+movida|la\s+movida\s+(?:de|del))", re.IGNORECASE)),
+    # "morro" como descaro
+    ("morro", re.compile(r"(?:(?:qu[eé]|menudo|vaya|tiene|con)\s+morro)", re.IGNORECASE)),
+    # "heavy" como intensificador coloquial
+    ("heavy", re.compile(r"(?:(?:qu[eé]|es|muy|bastante)\s+heavy)", re.IGNORECASE)),
+    # "crack" como elogio coloquial (no sustantivo)
+    ("crack", re.compile(r"(?:(?:eres|es)\s+un\s+crack|crack\s+(?:total|absoluto))", re.IGNORECASE)),
+]
 
 # Patrones tecnicos por dominio
 TECHNICAL_PATTERNS: list[str] = [
@@ -188,10 +225,11 @@ TECHNICAL_PATTERNS: list[str] = [
 
 # Patrones poeticos
 POETIC_PATTERNS: list[str] = [
-    # Similes elaborados
-    r"como\s+\w+\s+de\s+\w+\s+\w+",
+    # Similes elaborados (requieren adjetivo o sustantivo sensorial, no comparaciones triviales)
+    # Excluye: "como los de mi madre", "como la de tu amigo"
+    r"como\s+(?:un|una)\s+\w+\s+(?:de|en|que)\s+\w+",
     # Verbos poeticos
-    r"\b(susurraba|murmuraba|danzaba|flotaba|brillaba|centelleaba)\b",
+    r"\b(susurraba|murmuraba|danzaba|flotaba|centelleaba)\b",
     # Personificacion de elementos naturales
     r"(el|la)\s+(luna|sol|viento|noche|mar|cielo)\s+(lloraba|cantaba|danzaba|susurraba|gritaba)",
     # Metaforas de color con verbos
@@ -265,11 +303,20 @@ class RegisterChange:
 class RegisterAnalyzer:
     """Analizador de registro narrativo."""
 
-    def __init__(self):
-        """Inicializa el analizador."""
+    def __init__(self, use_llm_fallback: bool = False):
+        """
+        Inicializa el analizador.
+
+        Args:
+            use_llm_fallback: Si True, usa LLM para resolver palabras
+                ambiguas que no coinciden con patrones contextuales.
+                Requiere Ollama disponible. Default False.
+        """
         # Limpiar indicadores (remover entradas vacias)
         self.formal_set = {w for w in FORMAL_INDICATORS if w.strip()}
         self.colloquial_set = {w for w in COLLOQUIAL_INDICATORS if w.strip()}
+        self._use_llm_fallback = use_llm_fallback
+        self._llm_cache: dict[str, bool] = {}  # cache "palabra:contexto" -> es_coloquial
 
         # Compilar patrones tecnicos y poeticos
         self.technical_patterns = []
@@ -285,6 +332,63 @@ class RegisterAnalyzer:
                 self.poetic_patterns.append(re.compile(pattern, re.IGNORECASE))
             except re.error:
                 logger.warning(f"Invalid poetic pattern: {pattern}")
+
+        # Palabras ambiguas: solo las que tienen patron contextual
+        self._ambiguous_words = {word for word, _ in CONTEXTUAL_COLLOQUIAL_PATTERNS}
+
+    @staticmethod
+    def _extract_sentence(text: str, word: str) -> str | None:
+        """Extrae la oración que contiene la palabra del texto."""
+        # Dividir en oraciones por punto, !, ? y salto de línea
+        sentences = re.split(r"[.!?¡¿\n]+", text)
+        word_lower = word.lower()
+        for sent in sentences:
+            if word_lower in sent.lower():
+                stripped = sent.strip()
+                if stripped:
+                    return stripped
+        return None
+
+    def _check_ambiguous_word_llm(self, word: str, sentence: str) -> bool | None:
+        """
+        Usa LLM como fallback para determinar si una palabra ambigua
+        se usa en sentido coloquial.
+
+        Args:
+            word: Palabra ambigua (e.g. "fuerte", "brutal")
+            sentence: Oracion completa donde aparece
+
+        Returns:
+            True si uso coloquial, False si estandar, None si LLM no disponible
+        """
+        cache_key = f"{word}:{sentence[:80]}"
+        if cache_key in self._llm_cache:
+            return self._llm_cache[cache_key]
+
+        try:
+            from ..llm.client import get_llm_client
+
+            client = get_llm_client()
+            if not client or not client.is_available():
+                return None
+
+            prompt = (
+                f'En la siguiente oración, ¿la palabra "{word}" se usa en sentido '
+                f"coloquial/informal o en sentido estándar/literal?\n\n"
+                f'Oración: "{sentence}"\n\n'
+                f"Responde SOLO con una palabra: COLOQUIAL o ESTANDAR"
+            )
+
+            response = client.complete(prompt, max_tokens=10, temperature=0.0)
+            if response and response.strip():
+                is_colloquial = "coloquial" in response.strip().lower()
+                self._llm_cache[cache_key] = is_colloquial
+                logger.debug(f"LLM register fallback: '{word}' in '{sentence[:40]}...' -> {response.strip()}")
+                return is_colloquial
+        except Exception as e:
+            logger.debug(f"LLM register fallback unavailable: {e}")
+
+        return None
 
     def analyze_segment(
         self, text: str, chapter: int, position: int, is_dialogue: bool = False
@@ -327,8 +431,25 @@ class RegisterAnalyzer:
                 if indicator in words:
                     formal_found.append(indicator)
 
-        # Encontrar indicadores coloquiales (palabras completas)
+        # Encontrar indicadores coloquiales (palabras completas inequivocas)
         colloquial_found = [w for w in self.colloquial_set if w in words]
+
+        # Encontrar indicadores coloquiales contextuales (palabras ambiguas)
+        matched_ambiguous: set[str] = set()
+        for word, pattern in CONTEXTUAL_COLLOQUIAL_PATTERNS:
+            if word in words and pattern.search(text_lower):
+                colloquial_found.append(word)
+                matched_ambiguous.add(word)
+
+        # Fallback LLM para palabras ambiguas no resueltas por regex
+        if self._use_llm_fallback:
+            unresolved = (self._ambiguous_words & words) - matched_ambiguous
+            for word in unresolved:
+                sentence = self._extract_sentence(text, word)
+                if sentence:
+                    result = self._check_ambiguous_word_llm(word, sentence)
+                    if result is True:
+                        colloquial_found.append(word)
 
         # Encontrar terminos tecnicos
         technical_found = []
@@ -388,6 +509,10 @@ class RegisterAnalyzer:
         """
         Calcula scores normalizados por tipo de registro.
 
+        Aplica umbrales minimos: un registro no-neutral solo se activa
+        si alcanza el minimo de indicadores (MIN_*_INDICATORS).
+        Esto previene que una sola palabra ambigua cambie el registro.
+
         Args:
             total_words: Total de palabras unicas
             formal_count: Indicadores formales encontrados
@@ -401,18 +526,29 @@ class RegisterAnalyzer:
         if total_words == 0:
             return dict.fromkeys(RegisterType, 0.2)
 
-        # Normalizar por longitud del texto
+        # Aplicar umbrales minimos: por debajo del umbral, score = 0
+        effective_formal = formal_count if formal_count >= MIN_FORMAL_INDICATORS else 0
+        effective_colloquial = colloquial_count if colloquial_count >= MIN_COLLOQUIAL_INDICATORS else 0
+        effective_technical = technical_count if technical_count >= MIN_TECHNICAL_INDICATORS else 0
+        effective_poetic = poetic_count if poetic_count >= MIN_POETIC_INDICATORS else 0
+
+        # Normalizar por longitud del texto (por cada 100 palabras)
         norm = max(total_words / 100, 1)
 
-        # Calcular scores individuales
-        formal_score = min(formal_count / norm, 1.0) * 1.5  # Boost formal
-        colloquial_score = min(colloquial_count / norm, 1.0) * 1.5  # Boost colloquial
-        technical_score = min(technical_count / norm, 1.0) * 1.2
-        poetic_score = min(poetic_count / norm, 1.0) * 1.2
+        # Calcular scores sin boost artificial
+        formal_score = min(effective_formal / norm, 1.0)
+        colloquial_score = min(effective_colloquial / norm, 1.0)
+        technical_score = min(effective_technical / norm, 1.0)
+        poetic_score = min(effective_poetic / norm, 1.0)
 
-        # Score neutral es inverso a los otros
-        other_total = formal_score + colloquial_score + technical_score + poetic_score
-        neutral_score = max(0.1, 1 - other_total * 0.5)
+        # Score neutral: dominante si no hay marcadores suficientes
+        other_max = max(formal_score, colloquial_score, technical_score, poetic_score)
+        if other_max < 0.01:
+            # Sin marcadores significativos → texto neutral
+            neutral_score = 1.0
+        else:
+            # Neutral decrece proporcionalmente al marcador mas fuerte
+            neutral_score = max(0.1, 1.0 - other_max * 2.0)
 
         scores = {
             RegisterType.FORMAL_LITERARY: formal_score,

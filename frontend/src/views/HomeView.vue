@@ -54,10 +54,10 @@
         <div v-if="showBackendDisconnected" class="backend-error-container">
           <p class="backend-error-message">
             <i class="pi pi-exclamation-triangle"></i>
-            {{ backendError || 'No se puede conectar con el servidor. Reintentando...' }}
+            {{ backendError || 'El motor de análisis local no responde. Reintentando...' }}
           </p>
           <Button
-            label="Reintentar conexión"
+            label="Reintentar"
             icon="pi pi-refresh"
             severity="warning"
             size="small"

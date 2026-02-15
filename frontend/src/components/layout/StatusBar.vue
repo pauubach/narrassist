@@ -44,7 +44,7 @@ const systemStore = useSystemStore()
 
 // Fuente única: systemStore (inicializado via waitForBackend en arranque)
 const appVersion = computed(() =>
-  systemStore.backendVersion !== 'unknown' ? systemStore.backendVersion : 'sin conexión'
+  systemStore.backendVersion !== 'unknown' ? systemStore.backendVersion : 'iniciando...'
 )
 
 // Si aún no tenemos versión, lanzar health check

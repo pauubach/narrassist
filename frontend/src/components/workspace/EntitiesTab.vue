@@ -341,7 +341,7 @@ async function onEntityDelete(entity: Entity) {
     }
   } catch (err) {
     console.error('Error deleting entity:', err)
-    toast.add({ severity: 'error', summary: 'Error de conexión', detail: 'No se pudo ocultar la entidad', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Error del servicio', detail: 'No se pudo ocultar la entidad', life: 5000 })
   }
 }
 
@@ -411,7 +411,7 @@ async function handleRejectEntity(scope: 'project' | 'global', reason: string) {
     })
   } catch (err) {
     console.error('Error rejecting entity:', err)
-    toast.add({ severity: 'error', summary: 'Error de conexión', detail: 'No se pudo rechazar la entidad', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Error del servicio', detail: 'No se pudo rechazar la entidad', life: 5000 })
   } finally {
     entityToReject.value = null
   }
@@ -443,7 +443,7 @@ async function saveEntity() {
     }
   } catch (err) {
     console.error('Error updating entity:', err)
-    toast.add({ severity: 'error', summary: 'Error de conexión', detail: 'No se pudo guardar la entidad', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Error del servicio', detail: 'No se pudo guardar la entidad', life: 5000 })
   }
 }
 
@@ -468,7 +468,7 @@ async function onMergeEntities(primaryEntityId: number, entityIdsToMerge: number
     }
   } catch (err) {
     console.error('Error merging entities:', err)
-    toast.add({ severity: 'error', summary: 'Error de conexión', detail: 'No se pudo fusionar las entidades', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Error del servicio', detail: 'No se pudo fusionar las entidades', life: 5000 })
   }
 }
 
@@ -500,7 +500,7 @@ async function onUndoMergeFromHistory(entry: MergeHistoryEntry) {
       }
     } catch (err) {
       console.error('Error undoing merge:', err)
-      toast.add({ severity: 'error', summary: 'Error de conexión', detail: 'No se pudo deshacer la fusión', life: 5000 })
+      toast.add({ severity: 'error', summary: 'Error del servicio', detail: 'No se pudo deshacer la fusión', life: 5000 })
     }
   }
 }

@@ -118,6 +118,12 @@ class UnifiedConfig:
     run_coherence: bool = True  # Detectar saltos de coherencia narrativa
     run_register_analysis: bool = False  # Detectar cambios de registro (formal/coloquial)
     run_sticky_sentences: bool = True  # Detectar oraciones pesadas (exceso de glue words)
+    run_sentence_energy: bool = True  # Detectar voz pasiva, verbos débiles, baja energía
+    run_sensory_report: bool = True  # Detectar déficit de descripciones sensoriales
+    run_typography: bool = True  # Detectar errores tipográficos (guiones, comillas, espacios)
+    run_pov_check: bool = True  # Detectar cambios de punto de vista narrativo
+    run_references_check: bool = False  # Detectar referencias bibliográficas inconsistentes
+    run_acronyms_check: bool = True  # Detectar siglas sin definir o inconsistentes
 
     # Análisis avanzado
     run_temporal: bool = True  # Extracción de marcadores temporales
@@ -130,6 +136,9 @@ class UnifiedConfig:
     # Consistencia
     run_consistency: bool = True
     run_temporal_consistency: bool = True
+    run_vital_status: bool = True  # Detectar personajes fallecidos que reaparecen
+    run_character_location: bool = True  # Detectar ubicaciones imposibles de personajes
+    run_chekhov: bool = True  # Detectar personajes/elementos introducidos y olvidados
     create_alerts: bool = True
 
     # Features avanzadas (gated por licencia)
@@ -404,6 +413,12 @@ class AnalysisContext:
     coherence_breaks: list = field(default_factory=list)  # Saltos de coherencia
     register_changes: list = field(default_factory=list)  # Cambios de registro narrativo
     sticky_sentences: list = field(default_factory=list)  # Oraciones pesadas (sticky sentences)
+    sentence_energy_issues: list = field(default_factory=list)  # Oraciones de baja energía
+    sensory_report: dict = field(default_factory=dict)  # Reporte de densidad sensorial
+    typography_issues: list = field(default_factory=list)  # Errores tipográficos
+    pov_issues: list = field(default_factory=list)  # Cambios de punto de vista
+    reference_issues: list = field(default_factory=list)  # Problemas de referencias bibliográficas
+    acronym_issues: list = field(default_factory=list)  # Siglas inconsistentes
 
     # Marcadores temporales y focalización
     temporal_markers: list = field(default_factory=list)
@@ -417,6 +432,10 @@ class AnalysisContext:
     emotional_incoherences: list = field(default_factory=list)
     sentiment_arcs: list = field(default_factory=list)  # Arco emocional por capítulo
     pacing_analysis: dict = field(default_factory=dict)  # Análisis de ritmo narrativo
+    vital_status_report: Any | None = None  # Reporte de estado vital de personajes
+    location_inconsistencies: list = field(default_factory=list)  # Ubicaciones imposibles
+    ooc_events: list = field(default_factory=list)  # Eventos fuera de personaje (OOC)
+    chekhov_threads: list = field(default_factory=list)  # Hilos narrativos abandonados (Chekhov)
 
     # Alertas
     alerts: list = field(default_factory=list)

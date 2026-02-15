@@ -433,7 +433,7 @@ const saveCharacter = async () => {
     }
   } catch (err) {
     console.error('Error updating character:', err)
-    toast.add({ severity: 'error', summary: 'Error de conexión', detail: 'No se pudo guardar el personaje', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Error del servicio', detail: 'No se pudo guardar el personaje', life: 5000 })
   }
 }
 
@@ -481,7 +481,7 @@ const saveAttribute = async () => {
     }
   } catch (err) {
     console.error('Error creating attribute:', err)
-    toast.add({ severity: 'error', summary: 'Error de conexión', detail: 'No se pudo crear el atributo', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Error del servicio', detail: 'No se pudo crear el atributo', life: 5000 })
   }
 }
 
@@ -506,7 +506,7 @@ const onDeleteAttribute = async (attributeId: number | undefined) => {
     }
   } catch (err) {
     console.error('Error deleting attribute:', err)
-    toast.add({ severity: 'error', summary: 'Error de conexión', detail: 'No se pudo eliminar el atributo', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Error del servicio', detail: 'No se pudo eliminar el atributo', life: 5000 })
   }
 }
 
@@ -545,7 +545,7 @@ const saveRelationship = async () => {
     }
   } catch (err) {
     console.error('Error creating relationship:', err)
-    toast.add({ severity: 'error', summary: 'Error de conexión', detail: 'No se pudo crear la relación', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Error del servicio', detail: 'No se pudo crear la relación', life: 5000 })
   }
 }
 
@@ -567,7 +567,7 @@ const onDeleteRelationship = async (relationshipId: number | string | undefined)
     }
   } catch (err) {
     console.error('Error deleting relationship:', err)
-    toast.add({ severity: 'error', summary: 'Error de conexión', detail: 'No se pudo eliminar la relación', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Error del servicio', detail: 'No se pudo eliminar la relación', life: 5000 })
   }
 }
 

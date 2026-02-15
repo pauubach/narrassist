@@ -19,6 +19,23 @@ from ..core.result import Result
 logger = logging.getLogger(__name__)
 
 
+def _ch_val(ch, key: str, default=None):
+    """Extrae valor de un dict o de un objeto con atributo."""
+    if isinstance(ch, dict):
+        return ch.get(key, default)
+    return getattr(ch, key, default)
+
+
+def _ch_num(ch, fallback=0):
+    """Obtiene el número de capítulo de un dict o objeto."""
+    return _ch_val(ch, "number") or _ch_val(ch, "chapter_number") or fallback
+
+
+def _ch_content(ch):
+    """Obtiene el contenido de texto de un dict o objeto."""
+    return _ch_val(ch, "content") or _ch_val(ch, "text") or ""
+
+
 class PipelineQualityMixin:
     """
     Mixin: Phase 5: Spelling, grammar, repetitions, coherence, register, pacing.
@@ -71,6 +88,24 @@ class PipelineQualityMixin:
         if self.config.run_sticky_sentences:
             tasks.append(("sticky", self._run_sticky_sentences))
 
+        if self.config.run_sentence_energy:
+            tasks.append(("sentence_energy", self._run_sentence_energy))
+
+        if self.config.run_sensory_report:
+            tasks.append(("sensory", self._run_sensory_report))
+
+        if self.config.run_typography:
+            tasks.append(("typography", self._run_typography_check))
+
+        if self.config.run_pov_check:
+            tasks.append(("pov", self._run_pov_check))
+
+        if self.config.run_references_check:
+            tasks.append(("references", self._run_references_check))
+
+        if self.config.run_acronyms_check:
+            tasks.append(("acronyms", self._run_acronyms_check))
+
         # Ejecutar en paralelo si está configurado
         if self.config.parallel_extraction and len(tasks) > 1:
             self._run_parallel_tasks(tasks, context)
@@ -99,8 +134,10 @@ class PipelineQualityMixin:
             Número de capítulo o None si no se encuentra
         """
         for ch in chapters:
-            if ch.start_char <= position < ch.end_char:
-                return ch.number  # type: ignore[no-any-return]
+            start = _ch_val(ch, "start_char") or 0
+            end = _ch_val(ch, "end_char") or 0
+            if start <= position < end:
+                return _ch_num(ch)  # type: ignore[no-any-return]
         return None
 
     def _assign_chapters_to_issues(
@@ -379,8 +416,8 @@ class PipelineQualityMixin:
 
             all_sticky: list = []
             for ch in context.chapters:
-                ch_num = ch.chapter_number if hasattr(ch, "chapter_number") else 0
-                ch_content = ch.content if hasattr(ch, "content") else str(ch)
+                ch_num = _ch_num(ch)
+                ch_content = _ch_content(ch)
                 result = detector.analyze(ch_content, chapter=ch_num)
                 if result.is_success and result.value is not None:
                     all_sticky.extend(result.value.sticky_sentences)
@@ -393,3 +430,160 @@ class PipelineQualityMixin:
             logger.debug(f"Sticky sentence detector not available: {e}")
         except Exception as e:
             logger.warning(f"Sticky sentence analysis failed: {e}")
+
+    def _run_sentence_energy(self, context: AnalysisContext) -> None:
+        """Detectar oraciones de baja energía (voz pasiva, verbos débiles)."""
+        try:
+            from ..nlp.style.sentence_energy import get_sentence_energy_detector
+
+            detector = get_sentence_energy_detector()
+
+            all_issues: list = []
+            for ch in context.chapters:
+                ch_num = _ch_num(ch)
+                ch_content = _ch_content(ch)
+                result = detector.analyze(ch_content, chapter=ch_num)
+                if result.is_success and result.value is not None:
+                    all_issues.extend(result.value.low_energy_sentences)
+
+            context.sentence_energy_issues = all_issues
+            context.stats["sentence_energy_issues"] = len(all_issues)
+            logger.info(f"Sentence energy: {len(all_issues)} low-energy sentences")
+
+        except ImportError as e:
+            logger.debug(f"Sentence energy detector not available: {e}")
+        except Exception as e:
+            logger.warning(f"Sentence energy analysis failed: {e}")
+
+    def _run_sensory_report(self, context: AnalysisContext) -> None:
+        """Detectar déficit de descripciones sensoriales por capítulo."""
+        try:
+            from ..nlp.style.sensory_report import get_sensory_analyzer
+
+            analyzer = get_sensory_analyzer()
+            result = analyzer.analyze(
+                text=context.full_text,
+                chapters=[
+                    {
+                        "number": _ch_num(ch, fallback=i + 1),
+                        "content": _ch_content(ch),
+                    }
+                    for i, ch in enumerate(context.chapters)
+                ]
+                if context.chapters
+                else None,
+            )
+
+            if result.is_success and result.value is not None:
+                report = result.value
+                context.sensory_report = {
+                    "overall_density": report.overall_density,
+                    "overall_level": report.overall_density_level.value
+                    if hasattr(report.overall_density_level, "value")
+                    else str(report.overall_density_level),
+                    "sparse_chapters": getattr(report, "sparse_chapters", []),
+                    "by_sense": getattr(report, "by_sense", {}),
+                }
+                context.stats["sensory_density"] = report.overall_density
+                context.stats["sensory_sparse_chapters"] = len(
+                    getattr(report, "sparse_chapters", [])
+                )
+                logger.info(
+                    f"Sensory report: density={report.overall_density:.1f}, "
+                    f"sparse chapters={len(getattr(report, 'sparse_chapters', []))}"
+                )
+
+        except ImportError as e:
+            logger.debug(f"Sensory analyzer not available: {e}")
+        except Exception as e:
+            logger.warning(f"Sensory report failed: {e}")
+
+    def _run_typography_check(self, context: AnalysisContext) -> None:
+        """Detectar errores tipográficos (guiones, comillas, espacios dobles)."""
+        try:
+            from ..corrections.detectors.typography import TypographyDetector
+
+            detector = TypographyDetector()
+
+            all_issues: list = []
+            if context.chapters:
+                for ch in context.chapters:
+                    ch_num = _ch_num(ch)
+                    ch_content = _ch_content(ch)
+                    issues = detector.detect(ch_content, chapter_index=ch_num)
+                    all_issues.extend(issues)
+            else:
+                all_issues = detector.detect(context.full_text)
+
+            context.typography_issues = all_issues
+            context.stats["typography_issues"] = len(all_issues)
+            logger.info(f"Typography: {len(all_issues)} issues detected")
+
+        except ImportError as e:
+            logger.debug(f"Typography detector not available: {e}")
+        except Exception as e:
+            logger.warning(f"Typography check failed: {e}")
+
+    def _run_pov_check(self, context: AnalysisContext) -> None:
+        """Detectar cambios de punto de vista narrativo (1a/3a persona, tú/usted)."""
+        try:
+            from ..corrections.detectors.pov import POVDetector
+
+            detector = POVDetector()
+
+            all_issues: list = []
+            if context.chapters:
+                for ch in context.chapters:
+                    ch_num = _ch_num(ch)
+                    ch_content = _ch_content(ch)
+                    issues = detector.detect(ch_content, chapter_index=ch_num)
+                    all_issues.extend(issues)
+            else:
+                all_issues = detector.detect(context.full_text)
+
+            context.pov_issues = all_issues
+            context.stats["pov_issues"] = len(all_issues)
+            logger.info(f"POV: {len(all_issues)} issues detected")
+
+        except ImportError as e:
+            logger.debug(f"POV detector not available: {e}")
+        except Exception as e:
+            logger.warning(f"POV check failed: {e}")
+
+    def _run_references_check(self, context: AnalysisContext) -> None:
+        """Detectar inconsistencias en referencias bibliográficas."""
+        try:
+            from ..corrections.config import ReferencesConfig
+            from ..corrections.detectors.references import ReferencesDetector
+
+            config = ReferencesConfig(enabled=True)
+            detector = ReferencesDetector(config=config)
+            all_issues = detector.detect(context.full_text)
+
+            context.reference_issues = all_issues
+            context.stats["reference_issues"] = len(all_issues)
+            logger.info(f"References: {len(all_issues)} issues detected")
+
+        except ImportError as e:
+            logger.debug(f"References detector not available: {e}")
+        except Exception as e:
+            logger.warning(f"References check failed: {e}")
+
+    def _run_acronyms_check(self, context: AnalysisContext) -> None:
+        """Detectar siglas sin definir o con formato inconsistente."""
+        try:
+            from ..corrections.config import AcronymConfig
+            from ..corrections.detectors.acronyms import AcronymDetector
+
+            config = AcronymConfig(enabled=True)
+            detector = AcronymDetector(config=config)
+            all_issues = detector.detect(context.full_text)
+
+            context.acronym_issues = all_issues
+            context.stats["acronym_issues"] = len(all_issues)
+            logger.info(f"Acronyms: {len(all_issues)} issues detected")
+
+        except ImportError as e:
+            logger.debug(f"Acronym detector not available: {e}")
+        except Exception as e:
+            logger.warning(f"Acronym check failed: {e}")

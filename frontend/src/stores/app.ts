@@ -110,7 +110,7 @@ export const useAppStore = defineStore('app', () => {
     } catch (err) {
       console.error('Failed to start backend server:', err)
       const systemStore = useSystemStore()
-      systemStore.backendStartupError = err instanceof Error ? err.message : 'Error iniciando servidor'
+      systemStore.backendStartupError = err instanceof Error ? err.message : 'Error iniciando motor de análisis'
       return null
     }
   }

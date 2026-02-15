@@ -212,7 +212,7 @@ export const useSystemStore = defineStore('system', () => {
 
     // Timeout
     backendStarting.value = false
-    backendStartupError.value = 'El servidor no respondio a tiempo. Intenta reiniciar la aplicacion.'
+    backendStartupError.value = 'El motor de análisis local no respondió a tiempo. Intenta reiniciar la aplicación.'
     return false
   }
 
@@ -463,9 +463,9 @@ export const useSystemStore = defineStore('system', () => {
             if (pollCount > 5 && !ltInstallProgress.value) {
               ltInstallProgress.value = {
                 phase: 'error',
-                phase_label: 'Error de conexión',
+                phase_label: 'Error del servicio',
                 percentage: 0,
-                detail: 'No se pudo conectar con el servidor. Reinicia la aplicación.',
+                detail: 'No se pudo conectar con el motor de análisis local. Reinicia la aplicación.',
                 error: 'connection_lost',
               }
               stopLTPolling()

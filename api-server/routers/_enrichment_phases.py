@@ -746,7 +746,7 @@ def _compute_register_analysis(chapters, dialogues):
 
     detector = RegisterChangeDetector()
     detector.analyze_document(segments)
-    changes = detector.detect_changes(min_severity=0.3)
+    changes = detector.detect_changes(min_severity="medium")
     summary = detector.get_summary()
 
     return {
