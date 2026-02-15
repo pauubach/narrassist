@@ -22,6 +22,8 @@ class ClarityIssueType:
     TOO_MANY_SUBORDINATES = "too_many_subordinates"
     PARAGRAPH_NO_PAUSES = "paragraph_no_pauses"
     RUN_ON_SENTENCE = "run_on_sentence"
+    PARAGRAPH_TOO_SHORT = "paragraph_too_short"
+    PARAGRAPH_TOO_LONG = "paragraph_too_long"
 
 
 class ClarityDetector(BaseDetector):
@@ -83,6 +85,10 @@ class ClarityDetector(BaseDetector):
 
         # Detectar párrafos sin pausas
         issues.extend(self._check_paragraph_pauses(text, chapter_index))
+
+        # Detectar párrafos demasiado cortos o largos
+        if self.config.detect_paragraph_length:
+            issues.extend(self._check_paragraph_length(text, chapter_index))
 
         return issues
 
@@ -290,5 +296,93 @@ class ClarityDetector(BaseDetector):
                 )
 
             current_pos += len(paragraph) + 2
+
+        return issues
+
+    def _check_paragraph_length(
+        self, text: str, chapter_index: int | None
+    ) -> list[CorrectionIssue]:
+        """Verifica que los párrafos no sean demasiado cortos ni largos."""
+        issues = []
+
+        paragraphs = re.split(r"\n\s*\n", text)
+        current_pos = 0
+
+        for paragraph in paragraphs:
+            paragraph = paragraph.strip()
+            if not paragraph:
+                current_pos += 2
+                continue
+
+            # Ignorar párrafos que parecen headings (líneas cortas solas)
+            if len(paragraph) < 80 and "\n" not in paragraph:
+                word_count = self._count_words(paragraph)
+                if word_count < 10:
+                    current_pos += len(paragraph) + 2
+                    continue
+
+            # Contar frases en el párrafo
+            sentences = self._split_sentences(paragraph)
+            sentence_count = len(sentences)
+
+            if sentence_count == 0:
+                current_pos += len(paragraph) + 2
+                continue
+
+            start = text.find(paragraph, current_pos)
+            if start == -1:
+                current_pos += len(paragraph) + 2
+                continue
+            end = start + len(paragraph)
+
+            # Párrafo demasiado corto
+            if sentence_count < self.config.min_paragraph_sentences:
+                issues.append(
+                    CorrectionIssue(
+                        category=self.category.value,
+                        issue_type=ClarityIssueType.PARAGRAPH_TOO_SHORT,
+                        start_char=start,
+                        end_char=end,
+                        text=paragraph[:150] + "..." if len(paragraph) > 150 else paragraph,
+                        explanation=(
+                            f"Párrafo con solo {sentence_count} oración(es). "
+                            f"Considere fusionarlo con el párrafo anterior o siguiente."
+                        ),
+                        suggestion="Fusione este párrafo con el adyacente o amplíe su contenido.",
+                        confidence=0.75,
+                        context=self._extract_context(text, start, min(end, start + 200)),
+                        chapter_index=chapter_index,
+                        rule_id="CLARITY_PARAGRAPH_SHORT",
+                        extra_data={"sentence_count": sentence_count},
+                    )
+                )
+
+            # Párrafo demasiado largo
+            elif sentence_count > self.config.max_paragraph_sentences:
+                issues.append(
+                    CorrectionIssue(
+                        category=self.category.value,
+                        issue_type=ClarityIssueType.PARAGRAPH_TOO_LONG,
+                        start_char=start,
+                        end_char=end,
+                        text=paragraph[:150] + "..." if len(paragraph) > 150 else paragraph,
+                        explanation=(
+                            f"Párrafo con {sentence_count} oraciones. "
+                            f"Los párrafos de más de {self.config.max_paragraph_sentences} "
+                            f"oraciones pueden dificultar la lectura."
+                        ),
+                        suggestion="Divida este párrafo en bloques temáticos más pequeños.",
+                        confidence=min(
+                            0.92,
+                            0.78 + (sentence_count - self.config.max_paragraph_sentences) * 0.03,
+                        ),
+                        context=self._extract_context(text, start, min(end, start + 200)),
+                        chapter_index=chapter_index,
+                        rule_id="CLARITY_PARAGRAPH_LONG",
+                        extra_data={"sentence_count": sentence_count},
+                    )
+                )
+
+            current_pos = end + 2
 
         return issues

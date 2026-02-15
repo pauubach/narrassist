@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from .base import CorrectionIssue
 from .config import CorrectionConfig
 from .detectors import (
+    AcronymDetector,
     AgreementDetector,
     AnacolutoDetector,
     AnglicismsDetector,
@@ -21,8 +22,10 @@ from .detectors import (
     GrammarDetector,
     OrthographicVariantsDetector,
     POVDetector,
+    ReferencesDetector,
     RegionalDetector,
     RepetitionDetector,
+    ScientificStructureDetector,
     StyleRegisterDetector,
     TerminologyDetector,
     TypographyDetector,
@@ -75,6 +78,9 @@ class CorrectionOrchestrator:
             CorrectionCategory.ORTHOGRAPHY: OrthographicVariantsDetector(
                 self.config.orthographic_variants
             ),
+            CorrectionCategory.REFERENCES: ReferencesDetector(self.config.references),
+            CorrectionCategory.ACRONYMS: AcronymDetector(self.config.acronyms),
+            CorrectionCategory.STRUCTURE: ScientificStructureDetector(self.config.structure),
         }
 
         # Detectores que usan embeddings (inicializados bajo demanda)
@@ -368,6 +374,12 @@ class CorrectionOrchestrator:
             return self.config.orthographic_variants.enabled
         elif category == CorrectionCategory.STYLE_REGISTER:
             return self.config.style_register.enabled
+        elif category == CorrectionCategory.REFERENCES:
+            return self.config.references.enabled
+        elif category == CorrectionCategory.ACRONYMS:
+            return self.config.acronyms.enabled
+        elif category == CorrectionCategory.STRUCTURE:
+            return self.config.structure.enabled
         return False
 
     def _limit_issues(
@@ -400,6 +412,9 @@ class CorrectionOrchestrator:
             CorrectionCategory.POV: "punto de vista",
             CorrectionCategory.ORTHOGRAPHY: "variantes ortográficas",
             CorrectionCategory.STYLE_REGISTER: "estilo de registro",
+            CorrectionCategory.REFERENCES: "referencias bibliográficas",
+            CorrectionCategory.ACRONYMS: "siglas y abreviaturas",
+            CorrectionCategory.STRUCTURE: "estructura del documento",
         }.get(category, category.value)
 
     def get_summary(self, issues: list[CorrectionIssue]) -> dict:

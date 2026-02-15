@@ -697,6 +697,9 @@ class AlertEngine:
             "repetition": AlertCategory.REPETITION,
             "agreement": AlertCategory.AGREEMENT,
             "style_register": AlertCategory.STYLE,
+            "references": AlertCategory.STYLE,
+            "acronyms": AlertCategory.STYLE,
+            "structure": AlertCategory.STYLE,
         }
         alert_category = category_map.get(category, AlertCategory.STYLE)
 
@@ -710,6 +713,9 @@ class AlertEngine:
             "repetition": "Repetición",
             "agreement": "Concordancia",
             "style_register": "Estilo",
+            "references": "Referencias",
+            "acronyms": "Siglas",
+            "structure": "Estructura",
         }
         title_prefix = category_titles.get(category, "Corrección")
 

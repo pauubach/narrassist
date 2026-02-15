@@ -2138,16 +2138,16 @@ Requisito previo: corregir bugs descubiertos en la revisión antes de añadir 4 
 
 | Tarea | Estado | Archivo | Detalle |
 |-------|--------|---------|---------|
-| S18-A1 | ⬚ | `corrections/types.py` | 3 nuevos enums: `ReferencesIssueType` (6), `AcronymIssueType` (4), `StructureIssueType` (4) + `PARAGRAPH_TOO_SHORT`/`PARAGRAPH_TOO_LONG` en `ClarityIssueType` + 3 categorías en `CorrectionCategory` |
-| S18-A2 | ⬚ | `corrections/config.py` | `ReferencesConfig`, `AcronymConfig`, `StructureConfig` + campos en `CorrectionConfig` + to_dict/from_dict |
-| S18-A3 | ⬚ | `corrections/detectors/references.py` | `ReferencesDetector`: citas numéricas [1], author-year (García, 2024), bibliografía, formato mixto, citas huérfanas. `requires_spacy = False` |
-| S18-A4 | ⬚ | `corrections/detectors/acronyms.py` | `AcronymDetector`: definición antes de uso, formas inconsistentes, redefiniciones, siglas universales exentas (EEUU, ONU, UE, OMS). `requires_spacy = False` |
-| S18-A5 | ⬚ | `corrections/detectors/structure.py` | `ScientificStructureDetector` (no `StructureDetector` — naming conflict con `parsers/structure_detector.py`): secciones obligatorias por perfil (scientific/essay/technical), orden esperado, headers markdown + heurísticos |
-| S18-A6 | ⬚ | `corrections/detectors/clarity.py` | Extender `ClarityDetector` con `_check_paragraph_length()`: reutilizar `_split_sentences()` existente (L89-114) y split por `\n\s*\n` (L243). Párrafos <2 frases o >10 frases |
-| S18-A7 | ⬚ | `orchestrator.py` + `engine.py` + `_analysis_phases.py` + `__init__.py` | Registro de 3 detectores + clarity extension, mapeo AlertCategory.STYLE, activación por document_type |
-| S18-A8 | ⬚ | `tests/unit/` (×4 archivos) | ~48 tests: referencias (15), siglas (15), estructura (10), clarity extension (8) |
+| S18-A1 | ✅ | `corrections/types.py` | 3 nuevos enums: `ReferencesIssueType` (5), `AcronymIssueType` (4), `StructureIssueType` (3) + `PARAGRAPH_TOO_SHORT`/`PARAGRAPH_TOO_LONG` en `ClarityIssueType` + 3 categorías en `CorrectionCategory` |
+| S18-A2 | ✅ | `corrections/config.py` | `ReferencesConfig`, `AcronymConfig`, `StructureConfig` + campos paragraph_length en `ClarityConfig` + to_dict/from_dict |
+| S18-A3 | ✅ | `corrections/detectors/references.py` | `ReferencesDetector`: citas numéricas [1], author-year (García, 2024), bibliografía, formato mixto, citas huérfanas. `requires_spacy = False` |
+| S18-A4 | ✅ | `corrections/detectors/acronyms.py` | `AcronymDetector`: definición antes de uso, redefiniciones, siglas universales exentas. Normalización de expansiones (artículos iniciales). `requires_spacy = False` |
+| S18-A5 | ✅ | `corrections/detectors/scientific_structure.py` | `ScientificStructureDetector`: secciones obligatorias por perfil (scientific/essay/technical), orden esperado, headers markdown + heurísticos MAYÚSCULAS |
+| S18-A6 | ✅ | `corrections/detectors/clarity.py` | `_check_paragraph_length()`: split por `\n\s*\n`, heading detection (<80 chars + <10 words), párrafos <2 o >10 frases |
+| S18-A7 | ✅ | `orchestrator.py` + `engine.py` + `_analysis_phases.py` + `__init__.py` | 3 detectores registrados, AlertCategory.STYLE mapping, activación TEC/ENS/DIV por document_type |
+| S18-A8 | ✅ | `tests/unit/` (×4 archivos) | 49 tests: referencias (15), siglas (13), estructura (13), clarity extension (8). Todos verdes |
 
-**DoD S18-A**: Artículo científico sin bibliografía → alerta. Sigla sin definir → detectada. Estructura incompleta → flaggeada. Párrafo de 1 frase → alerta. 48 tests verdes.
+**DoD S18-A**: ✅ Artículo sin bibliografía → alerta. Sigla sin definir → detectada. Estructura incompleta → flaggeada. Párrafo de 1 frase → alerta. 49 tests verdes + 108 total detector tests sin regresiones.
 
 ##### Fase S18-B: CoherenceDetector con LLM [4-5h] → v0.10.1
 

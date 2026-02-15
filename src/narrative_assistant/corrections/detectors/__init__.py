@@ -13,8 +13,11 @@ from .crutch_words import CrutchWordsDetector
 from .field_terminology import FieldTerminologyDetector
 from .glossary import GlossaryDetector
 from .grammar import GrammarDetector
+from .acronyms import AcronymDetector
 from .orthographic_variants import OrthographicVariantsDetector
 from .pov import POVDetector
+from .references import ReferencesDetector
+from .scientific_structure import ScientificStructureDetector
 from .regional import RegionalDetector
 from .style_register import StyleRegisterDetector
 from .repetition import RepetitionDetector
@@ -36,5 +39,8 @@ __all__ = [
     "AnacolutoDetector",
     "POVDetector",
     "OrthographicVariantsDetector",
+    "ReferencesDetector",
+    "AcronymDetector",
+    "ScientificStructureDetector",
     "StyleRegisterDetector",
 ]

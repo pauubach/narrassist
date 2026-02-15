@@ -75,6 +75,8 @@ class ClarityIssueType(Enum):
     TOO_MANY_SUBORDINATES = "too_many_subordinates"  # Demasiadas subordinadas
     PARAGRAPH_NO_PAUSES = "paragraph_no_pauses"  # Párrafo sin pausas
     RUN_ON_SENTENCE = "run_on_sentence"  # Oración sin pausa adecuada
+    PARAGRAPH_TOO_SHORT = "paragraph_too_short"  # Párrafo con muy pocas frases (<2)
+    PARAGRAPH_TOO_LONG = "paragraph_too_long"  # Párrafo con demasiadas frases (>10)
 
 
 class GrammarIssueType(Enum):
@@ -138,6 +140,33 @@ class StyleRegisterIssueType(Enum):
     EMOTIONAL_LANGUAGE = "emotional_language"  # Lenguaje emocional (sorprendentemente)
 
 
+class ReferencesIssueType(Enum):
+    """Tipos de problemas con referencias y citas bibliográficas."""
+
+    NO_CITATIONS = "no_citations"  # Texto sin ninguna cita
+    ORPHAN_CITATION = "orphan_citation"  # Cita no encontrada en bibliografía
+    UNUSED_REFERENCE = "unused_reference"  # Referencia en bibliografía no citada
+    MIXED_FORMAT = "mixed_format"  # Formatos de cita mezclados (APA+IEEE)
+    NO_BIBLIOGRAPHY = "no_bibliography"  # Sin sección de bibliografía
+
+
+class AcronymIssueType(Enum):
+    """Tipos de problemas con siglas y abreviaturas."""
+
+    UNDEFINED_ACRONYM = "undefined_acronym"  # Sigla usada sin definir
+    LATE_DEFINITION = "late_definition"  # Sigla definida después de primer uso
+    INCONSISTENT_FORM = "inconsistent_form"  # Formas inconsistentes (NLP vs N.L.P.)
+    REDEFINED_ACRONYM = "redefined_acronym"  # Sigla redefinida con diferente expansión
+
+
+class StructureIssueType(Enum):
+    """Tipos de problemas de estructura de documento científico/académico."""
+
+    MISSING_SECTION = "missing_section"  # Sección obligatoria ausente
+    WRONG_ORDER = "wrong_order"  # Secciones en orden incorrecto
+    MISSING_ABSTRACT = "missing_abstract"  # Sin resumen/abstract
+
+
 class CorrectionCategory(Enum):
     """Categorías principales de correcciones."""
 
@@ -156,3 +185,6 @@ class CorrectionCategory(Enum):
     POV = "pov"  # Punto de vista narrativo
     ORTHOGRAPHY = "orthography"  # Variantes ortográficas RAE
     STYLE_REGISTER = "style_register"  # Estilo por tipo de documento
+    REFERENCES = "references"  # Referencias y citas bibliográficas
+    ACRONYMS = "acronyms"  # Siglas y abreviaturas
+    STRUCTURE = "structure"  # Estructura de documento científico/académico

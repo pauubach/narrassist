@@ -263,6 +263,11 @@ class ClarityConfig:
     # Párrafos
     min_pauses_per_100_words: int = 3  # Mínimo de comas/punto y coma por 100 palabras
 
+    # Longitud de párrafos
+    detect_paragraph_length: bool = True
+    min_paragraph_sentences: int = 2  # Menos de 2 frases = muy corto
+    max_paragraph_sentences: int = 10  # Más de 10 frases = muy largo
+
     # Confianza base
     base_confidence: float = 0.85
 
@@ -477,6 +482,53 @@ class StyleRegisterConfig:
 
 
 @dataclass
+class ReferencesConfig:
+    """Configuración del detector de referencias y citas bibliográficas."""
+
+    enabled: bool = False  # OFF por defecto, se activa según tipo
+
+    # Sub-detectores
+    detect_orphan_citations: bool = True
+    detect_unused_references: bool = True
+    detect_mixed_format: bool = True
+    detect_no_bibliography: bool = True
+
+    # Mínimo de citas esperadas para un texto científico
+    min_citations_expected: int = 3
+
+
+@dataclass
+class AcronymConfig:
+    """Configuración del detector de siglas y abreviaturas."""
+
+    enabled: bool = False  # OFF por defecto, se activa según tipo
+
+    # Rango de longitud para considerar sigla
+    min_acronym_length: int = 2
+    max_acronym_length: int = 8
+
+    # Siglas universales que no necesitan definición
+    known_acronyms: list[str] = field(
+        default_factory=lambda: [
+            "EEUU", "EE.UU.", "UE", "ONU", "OMS", "UNESCO", "RAE",
+            "PIB", "IVA", "IRPF", "DNI", "NIE", "NIF", "ISBN", "ISSN",
+            "DOI", "URL", "HTML", "CSS", "PDF", "USB", "GPS", "ADN",
+            "ARN", "VIH", "SIDA", "ONG", "OTAN", "NATO", "FMI", "BCE",
+        ]
+    )
+
+
+@dataclass
+class StructureConfig:
+    """Configuración del detector de estructura de documento científico."""
+
+    enabled: bool = False  # OFF por defecto, se activa según tipo
+
+    # Perfil de secciones requeridas
+    profile: str = "scientific"  # "scientific" | "essay" | "technical"
+
+
+@dataclass
 class CorrectionConfig:
     """
     Configuración global de correcciones.
@@ -505,6 +557,9 @@ class CorrectionConfig:
         default_factory=OrthographicVariantsConfig
     )
     style_register: StyleRegisterConfig = field(default_factory=StyleRegisterConfig)
+    references: ReferencesConfig = field(default_factory=ReferencesConfig)
+    acronyms: AcronymConfig = field(default_factory=AcronymConfig)
+    structure: StructureConfig = field(default_factory=StructureConfig)
 
     # Configuración global
     # Máximo de issues por categoría (para no abrumar)
@@ -716,6 +771,9 @@ class CorrectionConfig:
                 "warning_sentence_words": self.clarity.warning_sentence_words,
                 "max_subordinates": self.clarity.max_subordinates,
                 "min_pauses_per_100_words": self.clarity.min_pauses_per_100_words,
+                "detect_paragraph_length": self.clarity.detect_paragraph_length,
+                "min_paragraph_sentences": self.clarity.min_paragraph_sentences,
+                "max_paragraph_sentences": self.clarity.max_paragraph_sentences,
                 "base_confidence": self.clarity.base_confidence,
             },
             "grammar": {
@@ -792,6 +850,24 @@ class CorrectionConfig:
                 "skip_quotes": self.style_register.skip_quotes,
                 "min_confidence": self.style_register.min_confidence,
             },
+            "references": {
+                "enabled": self.references.enabled,
+                "detect_orphan_citations": self.references.detect_orphan_citations,
+                "detect_unused_references": self.references.detect_unused_references,
+                "detect_mixed_format": self.references.detect_mixed_format,
+                "detect_no_bibliography": self.references.detect_no_bibliography,
+                "min_citations_expected": self.references.min_citations_expected,
+            },
+            "acronyms": {
+                "enabled": self.acronyms.enabled,
+                "min_acronym_length": self.acronyms.min_acronym_length,
+                "max_acronym_length": self.acronyms.max_acronym_length,
+                "known_acronyms": self.acronyms.known_acronyms,
+            },
+            "structure": {
+                "enabled": self.structure.enabled,
+                "profile": self.structure.profile,
+            },
             "max_issues_per_category": self.max_issues_per_category,
             "use_llm_review": self.use_llm_review,
             "llm_review_model": self.llm_review_model,
@@ -863,6 +939,9 @@ class CorrectionConfig:
             warning_sentence_words=clarity_data.get("warning_sentence_words", 35),
             max_subordinates=clarity_data.get("max_subordinates", 3),
             min_pauses_per_100_words=clarity_data.get("min_pauses_per_100_words", 3),
+            detect_paragraph_length=clarity_data.get("detect_paragraph_length", True),
+            min_paragraph_sentences=clarity_data.get("min_paragraph_sentences", 2),
+            max_paragraph_sentences=clarity_data.get("max_paragraph_sentences", 10),
             base_confidence=clarity_data.get("base_confidence", 0.85),
         )
 
@@ -921,6 +1000,33 @@ class CorrectionConfig:
             base_confidence=ov_data.get("base_confidence", 0.85),
         )
 
+        # Parse references config
+        ref_data = data.get("references", {})
+        references_config = ReferencesConfig(
+            enabled=ref_data.get("enabled", False),
+            detect_orphan_citations=ref_data.get("detect_orphan_citations", True),
+            detect_unused_references=ref_data.get("detect_unused_references", True),
+            detect_mixed_format=ref_data.get("detect_mixed_format", True),
+            detect_no_bibliography=ref_data.get("detect_no_bibliography", True),
+            min_citations_expected=ref_data.get("min_citations_expected", 3),
+        )
+
+        # Parse acronyms config
+        acr_data = data.get("acronyms", {})
+        acronyms_config = AcronymConfig(
+            enabled=acr_data.get("enabled", False),
+            min_acronym_length=acr_data.get("min_acronym_length", 2),
+            max_acronym_length=acr_data.get("max_acronym_length", 8),
+            known_acronyms=acr_data.get("known_acronyms", AcronymConfig().known_acronyms),
+        )
+
+        # Parse structure config
+        struct_data = data.get("structure", {})
+        structure_config = StructureConfig(
+            enabled=struct_data.get("enabled", False),
+            profile=struct_data.get("profile", "scientific"),
+        )
+
         return cls(
             profile=DocumentProfile.from_dict(data.get("profile", {})),
             typography=TypographyConfig(**data.get("typography", {})),
@@ -937,6 +1043,9 @@ class CorrectionConfig:
             anacoluto=anacoluto_config,
             pov=pov_config,
             style_register=style_register_config,
+            references=references_config,
+            acronyms=acronyms_config,
+            structure=structure_config,
             max_issues_per_category=data.get("max_issues_per_category", 100),
             use_llm_review=data.get("use_llm_review", False),
             llm_review_model=data.get("llm_review_model", "llama3.2"),

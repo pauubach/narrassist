@@ -2484,8 +2484,29 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
         }
         doc_type_code = ctx.get("document_type", "FIC")
         profile, enabled = _STYLE_REGISTER_PROFILES.get(doc_type_code, ("moderate", False))
-        from narrative_assistant.corrections.config import StyleRegisterConfig
+        from narrative_assistant.corrections.config import (
+            AcronymConfig,
+            ReferencesConfig,
+            StructureConfig,
+            StyleRegisterConfig,
+        )
         correction_config.style_register = StyleRegisterConfig(enabled=enabled, profile=profile)
+
+        # Activar detectores científicos/académicos según tipo de documento
+        _SCIENTIFIC_DETECTORS: dict[str, tuple[str, bool]] = {
+            # (structure_profile, enable)
+            "TEC": ("scientific", True),
+            "ENS": ("essay", True),
+            "DIV": ("essay", True),
+        }
+        sci_config = _SCIENTIFIC_DETECTORS.get(doc_type_code)
+        if sci_config:
+            structure_profile, _ = sci_config
+            correction_config.references = ReferencesConfig(enabled=True)
+            correction_config.acronyms = AcronymConfig(enabled=True)
+            correction_config.structure = StructureConfig(
+                enabled=True, profile=structure_profile
+            )
 
         orchestrator = CorrectionOrchestrator(config=correction_config)
 
