@@ -1189,6 +1189,130 @@ class EntityRepository:
             )
             return cursor.lastrowid  # type: ignore[return-value]
 
+    def merge_entities_atomic(
+        self,
+        project_id: int,
+        primary_entity_id: int,
+        source_entities: list[dict],
+        combined_aliases: list[str],
+        new_merged_ids: list[int],
+        total_mention_delta: int,
+        merged_by: str = "user",
+    ) -> int:
+        """
+        Fusiona varias entidades en una sola de forma atómica.
+
+        Todas las operaciones de escritura (mover menciones, mover atributos,
+        desactivar fuentes, actualizar primaria, historial) se ejecutan en una
+        única transacción. Si alguna falla, se hace rollback completo.
+
+        Args:
+            project_id: ID del proyecto
+            primary_entity_id: ID de la entidad destino
+            source_entities: Lista de dicts con datos de las entidades a fusionar:
+                [{"id": int, "canonical_name": str, "entity_type": str,
+                  "aliases": list, "mention_count": int}, ...]
+            combined_aliases: Lista final de aliases para la entidad primaria
+            new_merged_ids: Lista acumulada de IDs fusionados
+            total_mention_delta: Incremento total de menciones
+            merged_by: Quién realizó la fusión
+
+        Returns:
+            Número de entidades fusionadas
+        """
+        if not source_entities:
+            return 0
+
+        merged_count = 0
+        source_entity_ids = [e["id"] for e in source_entities]
+        canonical_names_before = [e["canonical_name"] for e in source_entities]
+
+        with self.db.transaction() as conn:
+            for src in source_entities:
+                eid = src["id"]
+
+                # 1. Mover menciones
+                conn.execute(
+                    "UPDATE entity_mentions SET entity_id = ? WHERE entity_id = ?",
+                    (primary_entity_id, eid),
+                )
+
+                # 2. Mover atributos
+                conn.execute(
+                    "UPDATE entity_attributes SET entity_id = ? WHERE entity_id = ?",
+                    (primary_entity_id, eid),
+                )
+
+                # 3. Mover datos relacionados (FK en otras tablas)
+                conn.execute(
+                    "UPDATE temporal_markers SET entity_id = ? WHERE entity_id = ?",
+                    (primary_entity_id, eid),
+                )
+                # voice_profiles: mover si no existe destino, si no eliminar
+                existing = conn.execute(
+                    "SELECT 1 FROM voice_profiles WHERE entity_id = ?",
+                    (primary_entity_id,),
+                ).fetchone()
+                if existing:
+                    conn.execute(
+                        "DELETE FROM voice_profiles WHERE entity_id = ?", (eid,)
+                    )
+                else:
+                    conn.execute(
+                        "UPDATE voice_profiles SET entity_id = ? WHERE entity_id = ?",
+                        (primary_entity_id, eid),
+                    )
+
+                # 4. Soft-delete la entidad fuente
+                conn.execute(
+                    "UPDATE entities SET is_active = 0, updated_at = datetime('now') WHERE id = ?",
+                    (eid,),
+                )
+
+                merged_count += 1
+
+            # 5. Actualizar aliases y merged_from_ids en la entidad primaria
+            merged_data = json.dumps(
+                {"aliases": combined_aliases, "merged_ids": new_merged_ids}
+            )
+            conn.execute(
+                "UPDATE entities SET merged_from_ids = ?, updated_at = datetime('now') WHERE id = ?",
+                (merged_data, primary_entity_id),
+            )
+
+            # 6. Incrementar mention_count
+            if total_mention_delta > 0:
+                conn.execute(
+                    "UPDATE entities SET mention_count = mention_count + ? WHERE id = ?",
+                    (total_mention_delta, primary_entity_id),
+                )
+
+            # 7. Registrar en historial
+            old_value = json.dumps(
+                {
+                    "source_entity_ids": source_entity_ids,
+                    "source_snapshots": source_entities,
+                    "canonical_names_before": canonical_names_before,
+                }
+            )
+            new_value = json.dumps(
+                {"result_entity_id": primary_entity_id, "merged_by": merged_by}
+            )
+            note = f"Fusión de {merged_count} entidades en entidad {primary_entity_id}"
+            conn.execute(
+                """INSERT INTO review_history (
+                    project_id, action_type, target_type, target_id,
+                    old_value_json, new_value_json, note
+                ) VALUES (?, 'entity_merged', 'entity', ?, ?, ?, ?)""",
+                (project_id, primary_entity_id, old_value, new_value, note),
+            )
+
+        logger.info(
+            f"Atomic merge: {merged_count} entities into {primary_entity_id} "
+            f"for project {project_id}"
+        )
+        return merged_count
+
     def get_merge_history(self, project_id: int) -> list[MergeHistory]:
         """
         Obtiene historial de fusiones de un proyecto.

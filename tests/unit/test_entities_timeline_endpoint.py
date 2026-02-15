@@ -76,7 +76,7 @@ class TestEntityTimelineEndpoint:
         entity_repo, _ = mocked_repositories
         entity_repo.get_entity.return_value = _entity(project_id=999)
 
-        response = asyncio.run(get_entity_timeline(project_id=1, entity_id=7))
+        response = get_entity_timeline(project_id=1, entity_id=7)
 
         assert response.success is False
         assert response.error == "Entidad no encontrada"
@@ -86,7 +86,7 @@ class TestEntityTimelineEndpoint:
         entity_repo.get_entity.return_value = _entity(project_id=1)
         entity_repo.get_mentions_by_entity.return_value = []
 
-        response = asyncio.run(get_entity_timeline(project_id=1, entity_id=7))
+        response = get_entity_timeline(project_id=1, entity_id=7)
 
         assert response.success is True
         assert response.data == []
@@ -111,7 +111,7 @@ class TestEntityTimelineEndpoint:
             _chapter(chapter_id=200, chapter_number=1, title="Capítulo Uno"),
         ]
 
-        response = asyncio.run(get_entity_timeline(project_id=1, entity_id=7))
+        response = get_entity_timeline(project_id=1, entity_id=7)
         assert response.success is True
 
         first_event = response.data[0]
@@ -138,7 +138,7 @@ class TestEntityTimelineEndpoint:
             _chapter(chapter_id=1, chapter_number=1, title="Inicio")
         ]
 
-        response = asyncio.run(get_entity_timeline(project_id=1, entity_id=7))
+        response = get_entity_timeline(project_id=1, entity_id=7)
         assert response.success is True
 
         attribute_events = [e for e in response.data if e["type"] == "attribute"]
@@ -161,7 +161,7 @@ class TestEntityTimelineEndpoint:
             _chapter(chapter_id=10, chapter_number=4, title="Nudo")
         ]
 
-        response = asyncio.run(get_entity_timeline(project_id=1, entity_id=7))
+        response = get_entity_timeline(project_id=1, entity_id=7)
         assert response.success is True
 
         first_event = response.data[0]
@@ -173,7 +173,7 @@ class TestEntityTimelineEndpoint:
         entity_repo.get_entity.return_value = _entity(project_id=1)
         entity_repo.get_mentions_by_entity.side_effect = RuntimeError("boom")
 
-        response = asyncio.run(get_entity_timeline(project_id=1, entity_id=7))
+        response = get_entity_timeline(project_id=1, entity_id=7)
 
         assert response.success is False
         assert response.error == "Error interno del servidor"

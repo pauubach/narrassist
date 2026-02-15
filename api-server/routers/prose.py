@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Query
 router = APIRouter()
 
 @router.get("/api/projects/{project_id}/chapter-progress", response_model=ApiResponse)
-async def get_chapter_progress(
+def get_chapter_progress(
     project_id: int,
     mode: str = "basic",  # basic, standard, deep
     llm_model: str = "llama3.2",
@@ -225,7 +225,7 @@ def get_narrative_health(
 
 
 @router.get("/api/projects/{project_id}/sticky-sentences", response_model=ApiResponse)
-async def get_sticky_sentences(
+def get_sticky_sentences(
     project_id: int,
     threshold: float = Query(0.40, ge=0.0, le=1.0, description="Umbral de glue words (0.0-1.0)"),
     chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo"),
@@ -494,7 +494,7 @@ def get_sentence_energy(
 
 
 @router.get("/api/projects/{project_id}/echo-report", response_model=ApiResponse)
-async def get_echo_report(
+def get_echo_report(
     project_id: int,
     min_distance: int = Query(50, ge=10, le=500, description="Distancia mínima entre repeticiones"),
     include_semantic: bool = Query(False, description="Incluir repeticiones semánticas"),
@@ -632,7 +632,7 @@ async def get_echo_report(
 
 
 @router.get("/api/projects/{project_id}/duplicate-content", response_model=ApiResponse)
-async def get_duplicate_content(
+def get_duplicate_content(
     project_id: int,
     sentence_threshold: float = Query(0.90, ge=0.5, le=1.0, description="Umbral de similitud para frases"),
     paragraph_threshold: float = Query(0.85, ge=0.5, le=1.0, description="Umbral de similitud para párrafos"),
@@ -760,7 +760,7 @@ async def get_duplicate_content(
 
 
 @router.get("/api/projects/{project_id}/narrative-structure", response_model=ApiResponse)
-async def get_narrative_structure(
+def get_narrative_structure(
     project_id: int,
     min_confidence: float = Query(0.7, ge=0.3, le=1.0, description="Confianza mínima para detección"),
     chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo"),
@@ -862,7 +862,7 @@ async def get_narrative_structure(
 
 
 @router.get("/api/projects/{project_id}/dialogue-validation", response_model=ApiResponse)
-async def get_dialogue_validation(
+def get_dialogue_validation(
     project_id: int,
     max_unattributed: int = Query(3, ge=2, le=10, description="Máximo de diálogos consecutivos sin atribución"),
     chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo"),
@@ -1009,7 +1009,7 @@ async def get_dialogue_validation(
 
 
 @router.get("/api/projects/{project_id}/sentence-variation", response_model=ApiResponse)
-async def get_sentence_variation(
+def get_sentence_variation(
     project_id: int,
     chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo")
 ):
@@ -1161,7 +1161,7 @@ async def get_sentence_variation(
 
 
 @router.get("/api/projects/{project_id}/pacing-analysis", response_model=ApiResponse)
-async def get_pacing_analysis(
+def get_pacing_analysis(
     project_id: int,
     chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo")
 ):
@@ -1349,7 +1349,7 @@ async def get_pacing_analysis(
 
 
 @router.get("/api/projects/{project_id}/tension-curve", response_model=ApiResponse)
-async def get_tension_curve(
+def get_tension_curve(
     project_id: int,
     chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo")
 ):
@@ -1447,7 +1447,7 @@ async def get_tension_curve(
 
 
 @router.get("/api/pacing/genre-benchmarks", response_model=ApiResponse)
-async def get_genre_benchmarks(
+def get_genre_benchmarks(
     genre_code: Optional[str] = Query(None, description="Código de género (FIC, MEM, TEC, etc.). Si no se indica, devuelve todos.")
 ):
     """
@@ -1487,7 +1487,7 @@ async def get_genre_benchmarks(
 
 
 @router.get("/api/projects/{project_id}/pacing-analysis/genre-comparison", response_model=ApiResponse)
-async def get_pacing_genre_comparison(
+def get_pacing_genre_comparison(
     project_id: int,
     genre_code: str = Query(..., description="Código de género para comparar (FIC, MEM, TEC, etc.)")
 ):
@@ -1586,7 +1586,7 @@ async def get_pacing_genre_comparison(
 
 
 @router.get("/api/register/genre-benchmarks", response_model=ApiResponse)
-async def get_register_genre_benchmarks_endpoint(
+def get_register_genre_benchmarks_endpoint(
     genre_code: Optional[str] = Query(None, description="Código de género (FIC, MEM, TEC, etc.). Si no se indica, devuelve todos.")
 ):
     """
@@ -1629,7 +1629,7 @@ async def get_register_genre_benchmarks_endpoint(
 
 
 @router.get("/api/projects/{project_id}/story-bible", response_model=ApiResponse)
-async def get_story_bible(
+def get_story_bible(
     project_id: int,
     entity_type: Optional[str] = Query(None, description="Filtrar por tipo: character, location, organization, object"),
     include_voice: bool = Query(True, description="Incluir perfiles de voz"),
@@ -1692,7 +1692,7 @@ async def get_story_bible(
 
 
 @router.get("/api/projects/{project_id}/story-bible/{entity_id}", response_model=ApiResponse)
-async def get_story_bible_entry(
+def get_story_bible_entry(
     project_id: int,
     entity_id: int,
     include_voice: bool = Query(True),
@@ -1826,7 +1826,7 @@ def get_sensory_report(
 
 
 @router.get("/api/projects/{project_id}/age-readability", response_model=ApiResponse)
-async def get_age_readability(
+def get_age_readability(
     project_id: int,
     target_age_group: Optional[str] = Query(None, description="Grupo de edad objetivo (board_book, picture_book, early_reader, chapter_book, middle_grade, young_adult)")
 ):
@@ -1925,7 +1925,7 @@ async def get_age_readability(
 
 
 @router.get("/api/projects/{project_id}/semantic-redundancy", response_model=ApiResponse)
-async def get_semantic_redundancy(
+def get_semantic_redundancy(
     project_id: int,
     mode: str = Query("balanced", description="Modo de análisis: fast, balanced, thorough"),
     threshold: float = Query(0.85, ge=0.70, le=0.95, description="Umbral de similitud semántica"),

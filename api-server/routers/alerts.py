@@ -74,7 +74,7 @@ def _resolve_alert_positions(alert, chapters_cache: dict | None = None) -> tuple
     return start, end
 
 @router.get("/api/projects/{project_id}/alerts", response_model=ApiResponse)
-async def list_alerts(
+def list_alerts(
     project_id: int,
     status: Optional[str] = None,
     current_chapter: Optional[int] = None,
@@ -213,7 +213,7 @@ async def list_alerts(
 
 
 @router.patch("/api/projects/{project_id}/alerts/{alert_id}/status", response_model=ApiResponse)
-async def update_alert_status(project_id: int, alert_id: int, body: deps.AlertStatusRequest):
+def update_alert_status(project_id: int, alert_id: int, body: deps.AlertStatusRequest):
     """
     Actualiza el status de una alerta.
 
@@ -319,7 +319,7 @@ async def update_alert_status(project_id: int, alert_id: int, body: deps.AlertSt
 
 
 @router.post("/api/projects/{project_id}/alerts/{alert_id}/resolve", response_model=ApiResponse)
-async def resolve_alert(project_id: int, alert_id: int):
+def resolve_alert(project_id: int, alert_id: int):
     """Marca una alerta como resuelta. [DEPRECATED: usar PATCH /status]"""
     alert, error = _verify_alert_ownership(alert_id, project_id)
     if error:
@@ -330,7 +330,7 @@ async def resolve_alert(project_id: int, alert_id: int):
 
 
 @router.post("/api/projects/{project_id}/alerts/{alert_id}/dismiss", response_model=ApiResponse)
-async def dismiss_alert(project_id: int, alert_id: int):
+def dismiss_alert(project_id: int, alert_id: int):
     """Descarta una alerta. [DEPRECATED: usar PATCH /status]"""
     alert, error = _verify_alert_ownership(alert_id, project_id)
     if error:
@@ -341,7 +341,7 @@ async def dismiss_alert(project_id: int, alert_id: int):
 
 
 @router.post("/api/projects/{project_id}/alerts/{alert_id}/reopen", response_model=ApiResponse)
-async def reopen_alert(project_id: int, alert_id: int):
+def reopen_alert(project_id: int, alert_id: int):
     """Reabre una alerta. [DEPRECATED: usar PATCH /status]"""
     alert, error = _verify_alert_ownership(alert_id, project_id)
     if error:
@@ -352,7 +352,7 @@ async def reopen_alert(project_id: int, alert_id: int):
 
 
 @router.post("/api/projects/{project_id}/alerts/resolve-all", response_model=ApiResponse)
-async def resolve_all_alerts(project_id: int):
+def resolve_all_alerts(project_id: int):
     """
     Marca todas las alertas abiertas como resueltas.
     """
@@ -407,7 +407,7 @@ async def resolve_all_alerts(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/alerts/dismiss-batch", response_model=ApiResponse)
-async def dismiss_batch(project_id: int, body: deps.BatchDismissRequest):
+def dismiss_batch(project_id: int, body: deps.BatchDismissRequest):
     """
     Descarta múltiples alertas de una vez, persistiendo para re-análisis.
 
@@ -493,7 +493,7 @@ async def dismiss_batch(project_id: int, body: deps.BatchDismissRequest):
 
 
 @router.get("/api/projects/{project_id}/dismissals/stats", response_model=ApiResponse)
-async def get_dismissal_stats(project_id: int):
+def get_dismissal_stats(project_id: int):
     """
     Obtiene estadísticas de descartes por tipo de alerta y módulo.
 
@@ -535,7 +535,7 @@ async def get_dismissal_stats(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/alerts/apply-dismissals", response_model=ApiResponse)
-async def apply_dismissals(project_id: int):
+def apply_dismissals(project_id: int):
     """
     Aplica dismissals persistidos a alertas actuales.
 
@@ -562,7 +562,7 @@ async def apply_dismissals(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/alerts/recalibrate", response_model=ApiResponse)
-async def recalibrate_detectors(project_id: int):
+def recalibrate_detectors(project_id: int):
     """
     Recalibra la confianza de todos los detectores según el historial de descartes.
 
@@ -588,7 +588,7 @@ async def recalibrate_detectors(project_id: int):
 
 
 @router.get("/api/projects/{project_id}/alerts/calibration", response_model=ApiResponse)
-async def get_calibration_data(project_id: int):
+def get_calibration_data(project_id: int):
     """Obtiene los datos de calibración actuales por detector."""
     try:
         from narrative_assistant.persistence.database import get_database
@@ -627,7 +627,7 @@ async def get_calibration_data(project_id: int):
 
 
 @router.get("/api/projects/{project_id}/alerts/adaptive-weights", response_model=ApiResponse)
-async def get_adaptive_weights(project_id: int):
+def get_adaptive_weights(project_id: int):
     """Obtiene los pesos adaptativos per-project acumulados del feedback del usuario."""
     try:
         from narrative_assistant.alerts.engine import get_alert_engine
@@ -648,7 +648,7 @@ async def get_adaptive_weights(project_id: int):
 
 
 @router.get("/api/projects/{project_id}/suppression-rules", response_model=ApiResponse)
-async def get_suppression_rules(project_id: int):
+def get_suppression_rules(project_id: int):
     """Obtiene las reglas de supresión del proyecto (incluye globales)."""
     try:
         if not deps.dismissal_repository:
@@ -679,7 +679,7 @@ async def get_suppression_rules(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/suppression-rules", response_model=ApiResponse)
-async def create_suppression_rule(project_id: int, body: deps.SuppressionRuleRequest):
+def create_suppression_rule(project_id: int, body: deps.SuppressionRuleRequest):
     """
     Crea una regla de supresión.
 
@@ -717,7 +717,7 @@ async def create_suppression_rule(project_id: int, body: deps.SuppressionRuleReq
 
 
 @router.delete("/api/projects/{project_id}/suppression-rules/{rule_id}", response_model=ApiResponse)
-async def delete_suppression_rule(project_id: int, rule_id: int):
+def delete_suppression_rule(project_id: int, rule_id: int):
     """Elimina una regla de supresión."""
     try:
         if not deps.dismissal_repository:
@@ -739,7 +739,7 @@ async def delete_suppression_rule(project_id: int, rule_id: int):
 
 
 @router.put("/api/projects/{project_id}/alerts/{alert_id}/mark-resolved", response_model=ApiResponse)
-async def mark_alert_resolved(project_id: int, alert_id: int, body: deps.MarkResolvedRequest):
+def mark_alert_resolved(project_id: int, alert_id: int, body: deps.MarkResolvedRequest):
     """
     Confirma manualmente la resolución de una alerta (S14-07).
 
@@ -781,7 +781,7 @@ async def mark_alert_resolved(project_id: int, alert_id: int, body: deps.MarkRes
 
 
 @router.get("/api/projects/{project_id}/comparison/detail", response_model=ApiResponse)
-async def get_comparison_detail(project_id: int):
+def get_comparison_detail(project_id: int):
     """
     Obtiene el detalle completo de la última comparación (S14-07).
 

@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException
 router = APIRouter()
 
 @router.get("/api/llm/status", response_model=ApiResponse)
-async def get_llm_status():
+def get_llm_status():
     """
     Verifica si las funcionalidades LLM están disponibles.
 
@@ -81,7 +81,7 @@ async def get_llm_status():
 
 
 @router.post("/api/ollama/start", response_model=ApiResponse)
-async def start_ollama_service():
+def start_ollama_service():
     """
     Inicia el servicio de Ollama si está instalado pero no corriendo.
 
@@ -144,7 +144,7 @@ async def start_ollama_service():
 
 
 @router.get("/api/ollama/status", response_model=ApiResponse)
-async def get_ollama_status():
+def get_ollama_status():
     """
     Obtiene el estado detallado de Ollama.
 
@@ -199,7 +199,7 @@ async def get_ollama_status():
 
 
 @router.post("/api/ollama/pull/{model_name}", response_model=ApiResponse)
-async def pull_ollama_model(model_name: str):
+def pull_ollama_model(model_name: str):
     """
     Inicia descarga de un modelo de Ollama en segundo plano.
 
@@ -295,7 +295,7 @@ async def install_ollama_endpoint():
 
 
 @router.get("/api/languagetool/status", response_model=ApiResponse)
-async def get_languagetool_status():
+def get_languagetool_status():
     """
     Estado detallado de LanguageTool.
 
@@ -357,7 +357,7 @@ async def get_languagetool_status():
 
 
 @router.post("/api/languagetool/install", response_model=ApiResponse)
-async def install_languagetool_endpoint():
+def install_languagetool_endpoint():
     """
     Inicia instalación de LanguageTool + Java en background.
 
@@ -435,7 +435,7 @@ async def start_languagetool_endpoint():
 
 
 @router.post("/api/languagetool/stop", response_model=ApiResponse)
-async def stop_languagetool_endpoint():
+def stop_languagetool_endpoint():
     """
     Detiene el servidor LanguageTool.
 
@@ -462,7 +462,7 @@ async def stop_languagetool_endpoint():
 
 
 @router.post("/api/projects/{project_id}/chat", response_model=ApiResponse)
-async def chat_with_assistant(project_id: int, request: ChatRequest):
+def chat_with_assistant(project_id: int, request: ChatRequest):
     """
     Chat con el asistente LLM usando el documento como contexto.
 
@@ -640,7 +640,7 @@ en el contexto proporcionado, indícalo claramente.
 
 
 @router.get("/api/correction-presets", response_model=ApiResponse)
-async def get_correction_presets() -> ApiResponse:
+def get_correction_presets() -> ApiResponse:
     """
     Obtiene los presets de configuración de corrección disponibles.
 

@@ -13,7 +13,7 @@ from narrative_assistant.alerts.models import AlertStatus
 router = APIRouter()
 
 @router.get("/api/projects/{project_id}/chapters", response_model=ApiResponse)
-async def list_chapters(project_id: int):
+def list_chapters(project_id: int):
     """
     Lista todos los capítulos de un proyecto.
 
@@ -83,7 +83,7 @@ async def list_chapters(project_id: int):
 
 
 @router.get("/api/projects/{project_id}/chapters/{chapter_number}/annotations", response_model=ApiResponse)
-async def get_chapter_annotations(project_id: int, chapter_number: int):
+def get_chapter_annotations(project_id: int, chapter_number: int):
     """
     Obtiene anotaciones de gramática y ortografía para un capítulo.
 
@@ -152,7 +152,7 @@ async def get_chapter_annotations(project_id: int, chapter_number: int):
 
 
 @router.get("/api/projects/{project_id}/style-guide", response_model=ApiResponse)
-async def get_style_guide(project_id: int, format: str = "json", preview: bool = False):
+def get_style_guide(project_id: int, format: str = "json", preview: bool = False):
     """
     Genera y devuelve la guía de estilo del proyecto.
 
@@ -393,7 +393,7 @@ async def get_style_guide(project_id: int, format: str = "json", preview: bool =
 
 
 @router.get("/api/projects/{project_id}/timeline", response_model=ApiResponse)
-async def get_project_timeline(project_id: int, force_refresh: bool = False):
+def get_project_timeline(project_id: int, force_refresh: bool = False):
     """
     Obtiene el timeline temporal del proyecto.
 
@@ -660,7 +660,7 @@ async def get_project_timeline(project_id: int, force_refresh: bool = False):
 
 
 @router.get("/api/projects/{project_id}/temporal-markers", response_model=ApiResponse)
-async def get_temporal_markers(project_id: int, chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo")):
+def get_temporal_markers(project_id: int, chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo")):
     """
     Obtiene los marcadores temporales detectados en el proyecto.
 
@@ -721,7 +721,7 @@ async def get_temporal_markers(project_id: int, chapter_number: Optional[int] = 
 
 
 @router.get("/api/projects/{project_id}/chapters/{chapter_number}/emotional-analysis", response_model=ApiResponse)
-async def get_chapter_emotional_analysis(project_id: int, chapter_number: int):
+def get_chapter_emotional_analysis(project_id: int, chapter_number: int):
     """
     Obtiene el análisis emocional de un capítulo específico.
     """
@@ -792,7 +792,7 @@ async def get_chapter_emotional_analysis(project_id: int, chapter_number: int):
 
 
 @router.get("/api/projects/{project_id}/chapters/{chapter_number}/register-analysis", response_model=ApiResponse)
-async def get_chapter_register_analysis(
+def get_chapter_register_analysis(
     project_id: int,
     chapter_number: int,
     min_severity: str = Query("low", description="Severidad mínima: low, medium, high")
@@ -947,7 +947,7 @@ async def get_chapter_register_analysis(
 
 
 @router.get("/api/projects/{project_id}/chapters/{chapter_number}/dialogue-attributions", response_model=ApiResponse)
-async def get_dialogue_attributions(project_id: int, chapter_number: int):
+def get_dialogue_attributions(project_id: int, chapter_number: int):
     """
     Obtiene atribución de hablantes para los diálogos de un capítulo.
 
@@ -1135,7 +1135,7 @@ async def get_dialogue_attributions(project_id: int, chapter_number: int):
 
 
 @router.get("/api/projects/{project_id}/chapters/{chapter_number}/focalization/suggest", response_model=ApiResponse)
-async def suggest_chapter_focalization(project_id: int, chapter_number: int):
+def suggest_chapter_focalization(project_id: int, chapter_number: int):
     """Sugiere la focalización más probable para un capítulo."""
     try:
         from narrative_assistant.entities.repository import get_entity_repository
@@ -1192,7 +1192,7 @@ async def suggest_chapter_focalization(project_id: int, chapter_number: int):
 
 
 @router.post("/api/projects/{project_id}/focalization/suggest-all", response_model=ApiResponse)
-async def suggest_all_focalizations(project_id: int, auto_apply: bool = False):
+def suggest_all_focalizations(project_id: int, auto_apply: bool = False):
     """
     Sugiere focalizacion para todos los capitulos sin declaracion.
 
@@ -1292,7 +1292,7 @@ async def suggest_all_focalizations(project_id: int, auto_apply: bool = False):
 
 
 @router.get("/api/projects/{project_id}/chapters/{chapter_number}/scenes", response_model=ApiResponse)
-async def get_chapter_scenes(project_id: int, chapter_number: int):
+def get_chapter_scenes(project_id: int, chapter_number: int):
     """Obtiene las escenas de un capítulo específico."""
     try:
         from narrative_assistant.scenes import SceneService

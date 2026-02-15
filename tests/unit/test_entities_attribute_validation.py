@@ -44,9 +44,7 @@ class TestEntityAttributeCategoryValidation:
             confidence=1.0,
         )
 
-        response = asyncio.run(
-            create_entity_attribute(project_id=1, entity_id=7, body=body)
-        )
+        response = create_entity_attribute(project_id=1, entity_id=7, body=body)
 
         assert response.success is False
         assert "no permitida" in (response.error or "")
@@ -63,9 +61,7 @@ class TestEntityAttributeCategoryValidation:
             confidence=0.9,
         )
 
-        response = asyncio.run(
-            create_entity_attribute(project_id=1, entity_id=7, body=body)
-        )
+        response = create_entity_attribute(project_id=1, entity_id=7, body=body)
 
         assert response.success is True
         assert response.data["id"] == 123

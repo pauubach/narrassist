@@ -11,7 +11,7 @@ from fastapi import APIRouter, Body, HTTPException, Query
 router = APIRouter()
 
 @router.get("/api/projects/{project_id}/glossary", response_model=ApiResponse)
-async def list_glossary_entries(
+def list_glossary_entries(
     project_id: int,
     category: Optional[str] = None,
     only_technical: bool = False,
@@ -61,7 +61,7 @@ async def list_glossary_entries(
 
 
 @router.post("/api/projects/{project_id}/glossary", response_model=ApiResponse)
-async def create_glossary_entry(
+def create_glossary_entry(
     project_id: int,
     request: GlossaryEntryRequest,
 ) -> ApiResponse:
@@ -113,7 +113,7 @@ async def create_glossary_entry(
 
 
 @router.get("/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse)
-async def get_glossary_entry(
+def get_glossary_entry(
     project_id: int,
     entry_id: int,
 ) -> ApiResponse:
@@ -144,7 +144,7 @@ async def get_glossary_entry(
 
 
 @router.put("/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse)
-async def update_glossary_entry(
+def update_glossary_entry(
     project_id: int,
     entry_id: int,
     request: GlossaryEntryRequest,
@@ -196,7 +196,7 @@ async def update_glossary_entry(
 
 
 @router.delete("/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse)
-async def delete_glossary_entry(
+def delete_glossary_entry(
     project_id: int,
     entry_id: int,
 ) -> ApiResponse:
@@ -233,7 +233,7 @@ async def delete_glossary_entry(
 
 
 @router.get("/api/projects/{project_id}/glossary/context/llm", response_model=ApiResponse)
-async def get_glossary_llm_context(
+def get_glossary_llm_context(
     project_id: int,
     max_entries: int = 50,
     categories: Optional[str] = None,
@@ -282,7 +282,7 @@ async def get_glossary_llm_context(
 
 
 @router.get("/api/projects/{project_id}/glossary/export/publication", response_model=ApiResponse)
-async def export_glossary_for_publication(project_id: int) -> ApiResponse:
+def export_glossary_for_publication(project_id: int) -> ApiResponse:
     """
     Exporta el glosario formateado para incluir en la publicación.
 
@@ -315,7 +315,7 @@ async def export_glossary_for_publication(project_id: int) -> ApiResponse:
 
 
 @router.post("/api/projects/{project_id}/glossary/import", response_model=ApiResponse)
-async def import_glossary(
+def import_glossary(
     project_id: int,
     entries: list[dict] = Body(...),  # noqa: B008
     merge: bool = True,
@@ -357,7 +357,7 @@ async def import_glossary(
 
 
 @router.get("/api/projects/{project_id}/glossary/search", response_model=ApiResponse)
-async def search_glossary(
+def search_glossary(
     project_id: int,
     q: str = Query(..., min_length=1, description="Término a buscar"),
 ) -> ApiResponse:
@@ -400,7 +400,7 @@ async def search_glossary(
 
 
 @router.get("/api/projects/{project_id}/glossary/summary", response_model=ApiResponse)
-async def get_glossary_summary(project_id: int) -> ApiResponse:
+def get_glossary_summary(project_id: int) -> ApiResponse:
     """
     Obtiene un resumen del glosario del proyecto.
     """
@@ -450,7 +450,7 @@ async def get_glossary_summary(project_id: int) -> ApiResponse:
 
 
 @router.get("/api/projects/{project_id}/glossary/suggestions", response_model=ApiResponse)
-async def get_glossary_suggestions(
+def get_glossary_suggestions(
     project_id: int,
     min_frequency: int = Query(2, ge=1, le=10, description="Frecuencia mínima"),
     max_frequency: int = Query(50, ge=5, le=200, description="Frecuencia máxima"),
@@ -578,7 +578,7 @@ async def get_glossary_suggestions(
 
 
 @router.post("/api/projects/{project_id}/glossary/suggestions/accept", response_model=ApiResponse)
-async def accept_glossary_suggestion(
+def accept_glossary_suggestion(
     project_id: int,
     term: str = Body(..., embed=True),
     definition: str = Body("", embed=True),
@@ -642,7 +642,7 @@ async def accept_glossary_suggestion(
 
 
 @router.get("/api/dictionary/lookup/{word}", response_model=ApiResponse)
-async def dictionary_lookup(word: str):
+def dictionary_lookup(word: str):
     """
     Busca una palabra en los diccionarios locales.
 
@@ -688,7 +688,7 @@ async def dictionary_lookup(word: str):
 
 
 @router.get("/api/dictionary/synonyms/{word}", response_model=ApiResponse)
-async def get_synonyms(word: str):
+def get_synonyms(word: str):
     """
     Obtiene sinónimos de una palabra.
 
@@ -720,7 +720,7 @@ async def get_synonyms(word: str):
 
 
 @router.get("/api/dictionary/search", response_model=ApiResponse)
-async def dictionary_search(prefix: str, limit: int = 20):
+def dictionary_search(prefix: str, limit: int = 20):
     """
     Busca palabras que empiecen con un prefijo.
 
@@ -754,7 +754,7 @@ async def dictionary_search(prefix: str, limit: int = 20):
 
 
 @router.get("/api/dictionary/status", response_model=ApiResponse)
-async def dictionary_status():
+def dictionary_status():
     """
     Obtiene el estado de los diccionarios.
 
@@ -781,7 +781,7 @@ async def dictionary_status():
 
 
 @router.post("/api/dictionary/initialize", response_model=ApiResponse)
-async def initialize_dictionaries():
+def initialize_dictionaries():
     """
     Inicializa los diccionarios si no existen.
 
@@ -814,7 +814,7 @@ async def initialize_dictionaries():
 
 
 @router.post("/api/dictionary/custom", response_model=ApiResponse)
-async def add_custom_word(request: CustomWordRequest):
+def add_custom_word(request: CustomWordRequest):
     """
     Añade una palabra al diccionario personalizado.
 
@@ -853,7 +853,7 @@ async def add_custom_word(request: CustomWordRequest):
 
 
 @router.delete("/api/dictionary/custom/{word}", response_model=ApiResponse)
-async def remove_custom_word(word: str):
+def remove_custom_word(word: str):
     """
     Elimina una palabra del diccionario personalizado.
 
@@ -890,7 +890,7 @@ async def remove_custom_word(word: str):
 
 
 @router.get("/api/dictionary/custom", response_model=ApiResponse)
-async def list_custom_words():
+def list_custom_words():
     """
     Lista todas las palabras del diccionario personalizado.
 
@@ -917,7 +917,7 @@ async def list_custom_words():
 
 
 @router.get("/api/dictionary/external-links/{word}", response_model=ApiResponse)
-async def get_external_dictionary_links(word: str):
+def get_external_dictionary_links(word: str):
     """
     Obtiene enlaces a diccionarios externos para una palabra.
 

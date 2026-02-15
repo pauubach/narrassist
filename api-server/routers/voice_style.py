@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Query
 router = APIRouter()
 
 @router.get("/api/projects/{project_id}/voice-profiles", response_model=ApiResponse)
-async def get_voice_profiles(
+def get_voice_profiles(
     project_id: int,
     force_refresh: bool = Query(False, description="Forzar recálculo ignorando caché")
 ):
@@ -206,7 +206,7 @@ async def get_voice_profiles(
 
 
 @router.get("/api/projects/{project_id}/voice-profiles/compare", response_model=ApiResponse)
-async def compare_voice_profiles(
+def compare_voice_profiles(
     project_id: int,
     entity_a: int = Query(..., description="ID de la primera entidad"),
     entity_b: int = Query(..., description="ID de la segunda entidad"),
@@ -401,7 +401,7 @@ async def compare_voice_profiles(
 
 
 @router.get("/api/projects/{project_id}/voice-deviations", response_model=ApiResponse)
-async def get_voice_deviations(
+def get_voice_deviations(
     project_id: int,
     min_severity: str = Query("low", description="Severidad mínima: low, medium, high"),
     chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo"),
@@ -567,7 +567,7 @@ async def get_voice_deviations(
 
 
 @router.get("/api/projects/{project_id}/register-analysis", response_model=ApiResponse)
-async def get_register_analysis(
+def get_register_analysis(
     project_id: int,
     min_severity: str = Query("medium", description="Severidad mínima: low, medium, high"),
     chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo")
@@ -770,7 +770,7 @@ async def get_register_analysis(
 
 
 @router.get("/api/projects/{project_id}/speaker-corrections", response_model=ApiResponse)
-async def list_speaker_corrections(
+def list_speaker_corrections(
     project_id: int,
     chapter_number: Optional[int] = Query(None, description="Filtrar por capítulo")
 ):
@@ -836,7 +836,7 @@ async def list_speaker_corrections(
 
 
 @router.post("/api/projects/{project_id}/speaker-corrections", response_model=ApiResponse)
-async def create_speaker_correction(project_id: int, payload: deps.DialogueCorrectionRequest):
+def create_speaker_correction(project_id: int, payload: deps.DialogueCorrectionRequest):
     """
     Crea una corrección manual de atribución de hablante.
 
@@ -899,7 +899,7 @@ async def create_speaker_correction(project_id: int, payload: deps.DialogueCorre
 
 
 @router.delete("/api/projects/{project_id}/speaker-corrections/{correction_id}", response_model=ApiResponse)
-async def delete_speaker_correction(project_id: int, correction_id: int):
+def delete_speaker_correction(project_id: int, correction_id: int):
     """Elimina una corrección manual de atribución de hablante."""
     try:
         db = deps.get_database()  # type: ignore[misc]
@@ -920,7 +920,7 @@ async def delete_speaker_correction(project_id: int, correction_id: int):
 
 
 @router.get("/api/projects/{project_id}/focalization", response_model=ApiResponse)
-async def get_project_focalizations(project_id: int):
+def get_project_focalizations(project_id: int):
     """Obtiene todas las declaraciones de focalización de un proyecto."""
     try:
         from narrative_assistant.focalization import (  # type: ignore[attr-defined]
@@ -955,7 +955,7 @@ async def get_project_focalizations(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/focalization", response_model=ApiResponse)
-async def create_focalization(project_id: int, data: dict):
+def create_focalization(project_id: int, data: dict):
     """Crea una nueva declaración de focalización para un capítulo/escena."""
     try:
         from narrative_assistant.focalization import (  # type: ignore[attr-defined]
@@ -1003,7 +1003,7 @@ async def create_focalization(project_id: int, data: dict):
 
 
 @router.put("/api/projects/{project_id}/focalization/{declaration_id}", response_model=ApiResponse)
-async def update_focalization(project_id: int, declaration_id: int, data: dict):
+def update_focalization(project_id: int, declaration_id: int, data: dict):
     """Actualiza una declaración de focalización existente."""
     try:
         from narrative_assistant.focalization import (  # type: ignore[attr-defined]
@@ -1046,7 +1046,7 @@ async def update_focalization(project_id: int, declaration_id: int, data: dict):
 
 
 @router.delete("/api/projects/{project_id}/focalization/{declaration_id}", response_model=ApiResponse)
-async def delete_focalization(project_id: int, declaration_id: int):
+def delete_focalization(project_id: int, declaration_id: int):
     """Elimina una declaración de focalización."""
     try:
         from narrative_assistant.focalization import (  # type: ignore[attr-defined]
@@ -1076,7 +1076,7 @@ async def delete_focalization(project_id: int, declaration_id: int):
 
 
 @router.get("/api/projects/{project_id}/focalization/violations", response_model=ApiResponse)
-async def detect_focalization_violations(project_id: int):
+def detect_focalization_violations(project_id: int):
     """Detecta violaciones de focalización en todo el proyecto."""
     # Check enrichment cache first (S8a-13)
     from routers._enrichment_cache import get_cached_enrichment
@@ -1150,7 +1150,7 @@ async def detect_focalization_violations(project_id: int):
 
 
 @router.get("/api/projects/{project_id}/register-analysis/genre-comparison", response_model=ApiResponse)
-async def get_register_genre_comparison(
+def get_register_genre_comparison(
     project_id: int,
     genre_code: str = Query(..., description="Código de género para comparar (FIC, MEM, TEC, etc.)"),
     min_severity: str = Query("low", description="Severidad mínima para contar cambios: low, medium, high"),

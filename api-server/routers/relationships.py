@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Query
 router = APIRouter()
 
 @router.get("/api/projects/{project_id}/relationships", response_model=ApiResponse)
-async def get_project_relationships(project_id: int):
+def get_project_relationships(project_id: int):
     """
     Obtiene análisis de relaciones entre personajes de un proyecto.
 
@@ -305,7 +305,7 @@ async def get_project_relationships(project_id: int):
 
 
 @router.get("/api/projects/{project_id}/relationships/asymmetry/{entity_a_id}/{entity_b_id}", response_model=ApiResponse)
-async def get_knowledge_asymmetry(project_id: int, entity_a_id: int, entity_b_id: int):
+def get_knowledge_asymmetry(project_id: int, entity_a_id: int, entity_b_id: int):
     """
     Obtiene reporte detallado de asimetría de conocimiento entre dos personajes.
 
@@ -363,7 +363,7 @@ async def get_knowledge_asymmetry(project_id: int, entity_a_id: int, entity_b_id
 
 
 @router.get("/api/projects/{project_id}/characters/{entity_id}/knowledge", response_model=ApiResponse)
-async def get_character_knowledge(
+def get_character_knowledge(
     project_id: int,
     entity_id: int,
     mode: str = Query("auto", description="Modo: auto, rules, llm, hybrid")
@@ -486,7 +486,7 @@ async def get_character_knowledge(
 
 
 @router.get("/api/projects/{project_id}/knowledge/anachronisms", response_model=ApiResponse)
-async def get_knowledge_anachronisms(
+def get_knowledge_anachronisms(
     project_id: int,
     mode: str = Query("rules", description="Modo: rules, llm, hybrid"),
 ):
@@ -585,7 +585,7 @@ async def get_knowledge_anachronisms(
 
 
 @router.post("/api/projects/{project_id}/relationships", response_model=ApiResponse)
-async def create_relationship(project_id: int, payload: deps.CreateRelationshipRequest):
+def create_relationship(project_id: int, payload: deps.CreateRelationshipRequest):
     """
     Crea una nueva relación entre dos entidades.
 
@@ -674,7 +674,7 @@ async def create_relationship(project_id: int, payload: deps.CreateRelationshipR
 
 
 @router.delete("/api/projects/{project_id}/relationships/{relationship_id}", response_model=ApiResponse)
-async def delete_relationship(project_id: int, relationship_id: str):
+def delete_relationship(project_id: int, relationship_id: str):
     """
     Elimina una relación entre entidades.
 
@@ -704,7 +704,7 @@ async def delete_relationship(project_id: int, relationship_id: str):
 
 
 @router.post("/api/projects/{project_id}/characters/{character_id}/analyze-behavior", response_model=ApiResponse)
-async def analyze_character_behavior(project_id: int, character_id: int):
+def analyze_character_behavior(project_id: int, character_id: int):
     """
     Analiza el comportamiento de un personaje usando LLM para inferir expectativas.
 
@@ -811,7 +811,7 @@ async def analyze_character_behavior(project_id: int, character_id: int):
 
 
 @router.post("/api/projects/{project_id}/characters/{character_id}/detect-violations", response_model=ApiResponse)
-async def detect_character_violations(
+def detect_character_violations(
     project_id: int,
     character_id: int,
     chapter_number: Optional[int] = None
@@ -912,7 +912,7 @@ async def detect_character_violations(
 
 
 @router.get("/api/projects/{project_id}/characters/{character_id}/expectations", response_model=ApiResponse)
-async def get_character_expectations(project_id: int, character_id: int):
+def get_character_expectations(project_id: int, character_id: int):
     """
     Obtiene las expectativas comportamentales de un personaje.
 
@@ -962,7 +962,7 @@ async def get_character_expectations(project_id: int, character_id: int):
 
 
 @router.get("/api/projects/{project_id}/emotional-analysis", response_model=ApiResponse)
-async def get_emotional_analysis(project_id: int):
+def get_emotional_analysis(project_id: int):
     """
     Obtiene el análisis de coherencia emocional de un proyecto.
 
@@ -1078,7 +1078,7 @@ async def get_emotional_analysis(project_id: int):
 
 
 @router.get("/api/projects/{project_id}/characters/{character_name}/emotional-profile", response_model=ApiResponse)
-async def get_character_emotional_profile(project_id: int, character_name: str):
+def get_character_emotional_profile(project_id: int, character_name: str):
     """
     Obtiene el perfil emocional de un personaje específico.
 
@@ -1191,7 +1191,7 @@ async def get_character_emotional_profile(project_id: int, character_name: str):
 
 
 @router.get("/api/projects/{project_id}/vital-status", response_model=ApiResponse)
-async def get_vital_status_analysis(project_id: int):
+def get_vital_status_analysis(project_id: int):
     """
     Obtiene el análisis de estado vital de personajes.
 
@@ -1269,7 +1269,7 @@ async def get_vital_status_analysis(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/vital-status/generate-alerts", response_model=ApiResponse)
-async def generate_vital_status_alerts(project_id: int):
+def generate_vital_status_alerts(project_id: int):
     """
     Genera alertas a partir del análisis de estado vital.
 
@@ -1367,7 +1367,7 @@ async def generate_vital_status_alerts(project_id: int):
 
 
 @router.get("/api/projects/{project_id}/character-locations", response_model=ApiResponse)
-async def get_character_locations(project_id: int):
+def get_character_locations(project_id: int):
     """
     Obtiene el análisis de ubicaciones de personajes.
 
@@ -1619,7 +1619,7 @@ def get_character_archetypes(
 # ============================================================================
 
 @router.get("/api/projects/{project_id}/character-network", response_model=ApiResponse)
-async def get_character_network(project_id: int):
+def get_character_network(project_id: int):
     """
     Obtiene métricas de red de personajes (centralidad, puentes, evolución).
 
@@ -1724,7 +1724,7 @@ async def get_character_network(project_id: int):
 # ============================================================================
 
 @router.get("/api/projects/{project_id}/character-timeline", response_model=ApiResponse)
-async def get_character_timeline(project_id: int):
+def get_character_timeline(project_id: int):
     """
     Obtiene timeline de apariciones de personajes por capítulo.
 
@@ -1827,7 +1827,7 @@ async def get_character_timeline(project_id: int):
 
 
 @router.get("/api/projects/{project_id}/character-profiles", response_model=ApiResponse)
-async def get_character_profiles(project_id: int):
+def get_character_profiles(project_id: int):
     """
     Obtiene perfiles de 6 indicadores para todos los personajes.
 
@@ -1905,7 +1905,7 @@ async def get_character_profiles(project_id: int):
 
 
 @router.get("/api/projects/{project_id}/enrichment/stale", response_model=ApiResponse)
-async def get_stale_enrichments(project_id: int):
+def get_stale_enrichments(project_id: int):
     """
     Obtiene el estado de invalidación del proyecto.
 

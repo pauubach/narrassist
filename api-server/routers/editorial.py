@@ -18,7 +18,7 @@ from fastapi import APIRouter, Body, HTTPException, Query
 router = APIRouter()
 
 @router.get("/api/projects/{project_id}/editorial-rules", response_model=ApiResponse)
-async def get_editorial_rules(project_id: int):
+def get_editorial_rules(project_id: int):
     """
     Obtiene las reglas editoriales de un proyecto.
 
@@ -81,7 +81,7 @@ async def get_editorial_rules(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/editorial-rules", response_model=ApiResponse)
-async def save_editorial_rules(project_id: int, request: EditorialRulesRequest):
+def save_editorial_rules(project_id: int, request: EditorialRulesRequest):
     """
     Guarda las reglas editoriales de un proyecto.
 
@@ -140,7 +140,7 @@ async def save_editorial_rules(project_id: int, request: EditorialRulesRequest):
 
 
 @router.post("/api/projects/{project_id}/editorial-rules/check", response_model=ApiResponse)
-async def check_editorial_rules(project_id: int, text: str = Body(..., embed=True)):
+def check_editorial_rules(project_id: int, text: str = Body(..., embed=True)):
     """
     Aplica las reglas editoriales a un texto y devuelve los problemas encontrados.
 
@@ -325,7 +325,7 @@ def _rescan_typography_alerts(project_id: int, effective_config: dict) -> dict:
 
 
 @router.put("/api/projects/{project_id}/correction-config", response_model=ApiResponse)
-async def update_project_correction_config(
+def update_project_correction_config(
     project_id: str,
     update: CorrectionConfigUpdate,
 ) -> ApiResponse:
@@ -392,7 +392,7 @@ async def update_project_correction_config(
 
 
 @router.post("/api/projects/{project_id}/correction-config/apply-preset", response_model=ApiResponse)
-async def apply_correction_preset(
+def apply_correction_preset(
     project_id: str,
     preset_id: str = Query(..., description="ID del preset a aplicar"),
 ) -> ApiResponse:
@@ -452,7 +452,7 @@ async def apply_correction_preset(
 
 
 @router.delete("/api/projects/{project_id}/correction-config", response_model=ApiResponse)
-async def reset_project_correction_config(project_id: str) -> ApiResponse:
+def reset_project_correction_config(project_id: str) -> ApiResponse:
     """
     Elimina la configuración personalizada y vuelve a la por defecto.
     """
@@ -495,7 +495,7 @@ async def reset_project_correction_config(project_id: str) -> ApiResponse:
 
 
 @router.post("/api/projects/{project_id}/correction-config/detect", response_model=ApiResponse)
-async def detect_document_profile(project_id: str) -> ApiResponse:
+def detect_document_profile(project_id: str) -> ApiResponse:
     """
     Analiza el documento y sugiere un perfil de configuración.
 
@@ -696,7 +696,7 @@ async def detect_document_profile(project_id: str) -> ApiResponse:
 
 
 @router.get("/api/projects/{project_id}/scenes", response_model=ApiResponse)
-async def get_project_scenes(project_id: int):
+def get_project_scenes(project_id: int):
     """
     Obtiene todas las escenas de un proyecto con sus etiquetas.
 
@@ -769,7 +769,7 @@ async def get_project_scenes(project_id: int):
 
 
 @router.get("/api/projects/{project_id}/scenes/stats", response_model=ApiResponse)
-async def get_scenes_stats(project_id: int):
+def get_scenes_stats(project_id: int):
     """
     Obtiene solo las estadísticas de escenas (lightweight).
 
@@ -810,7 +810,7 @@ async def get_scenes_stats(project_id: int):
 
 
 @router.put("/api/projects/{project_id}/scenes/{scene_id}/tags", response_model=ApiResponse)
-async def tag_scene(project_id: int, scene_id: int, data: dict):
+def tag_scene(project_id: int, scene_id: int, data: dict):
     """
     Asigna etiquetas predefinidas a una escena.
 
@@ -871,7 +871,7 @@ async def tag_scene(project_id: int, scene_id: int, data: dict):
 
 
 @router.post("/api/projects/{project_id}/scenes/{scene_id}/custom-tags", response_model=ApiResponse)
-async def add_custom_tag(project_id: int, scene_id: int, data: dict):
+def add_custom_tag(project_id: int, scene_id: int, data: dict):
     """
     Añade una etiqueta personalizada a una escena.
 
@@ -911,7 +911,7 @@ async def add_custom_tag(project_id: int, scene_id: int, data: dict):
 
 
 @router.delete("/api/projects/{project_id}/scenes/{scene_id}/custom-tags/{tag_name}", response_model=ApiResponse)
-async def remove_custom_tag(project_id: int, scene_id: int, tag_name: str):
+def remove_custom_tag(project_id: int, scene_id: int, tag_name: str):
     """Elimina una etiqueta personalizada de una escena."""
     try:
         from narrative_assistant.scenes import SceneService
@@ -937,7 +937,7 @@ async def remove_custom_tag(project_id: int, scene_id: int, tag_name: str):
 
 
 @router.get("/api/projects/{project_id}/scenes/tag-catalog", response_model=ApiResponse)
-async def get_tag_catalog(project_id: int):
+def get_tag_catalog(project_id: int):
     """Obtiene el catálogo de etiquetas personalizadas disponibles en el proyecto."""
     try:
         from narrative_assistant.scenes import SceneService
@@ -967,7 +967,7 @@ async def get_tag_catalog(project_id: int):
 
 
 @router.get("/api/projects/{project_id}/scenes/filter", response_model=ApiResponse)
-async def filter_scenes(
+def filter_scenes(
     project_id: int,
     scene_type: Optional[str] = None,
     tone: Optional[str] = None,
@@ -1055,7 +1055,7 @@ async def filter_scenes(
 
 
 @router.get("/api/document-types", response_model=ApiResponse)
-async def get_document_types():
+def get_document_types():
     """
     Lista todos los tipos de documento disponibles.
 
@@ -1075,7 +1075,7 @@ async def get_document_types():
 
 
 @router.get("/api/projects/{project_id}/document-type", response_model=ApiResponse)
-async def get_project_document_type(project_id: int):
+def get_project_document_type(project_id: int):
     """
     Obtiene el tipo de documento actual de un proyecto.
 
@@ -1100,7 +1100,7 @@ async def get_project_document_type(project_id: int):
 
 
 @router.put("/api/projects/{project_id}/document-type", response_model=ApiResponse)
-async def set_project_document_type(
+def set_project_document_type(
     project_id: int,
     document_type: str = Body(..., embed=True),
     document_subtype: Optional[str] = Body(None, embed=True),
@@ -1152,7 +1152,7 @@ async def set_project_document_type(
 
 
 @router.get("/api/projects/{project_id}/feature-profile", response_model=ApiResponse)
-async def get_project_feature_profile(project_id: int):
+def get_project_feature_profile(project_id: int):
     """
     Obtiene el perfil de features para un proyecto.
 
@@ -1180,7 +1180,7 @@ async def get_project_feature_profile(project_id: int):
 
 
 @router.get("/api/projects/{project_id}/feature-availability/{feature}", response_model=ApiResponse)
-async def get_feature_availability(project_id: int, feature: str):
+def get_feature_availability(project_id: int, feature: str):
     """
     Comprueba la disponibilidad de una feature específica.
 
@@ -1212,7 +1212,7 @@ async def get_feature_availability(project_id: int, feature: str):
 
 
 @router.post("/api/projects/{project_id}/detect-document-type", response_model=ApiResponse)
-async def detect_document_type(project_id: int):
+def detect_document_type(project_id: int):
     """
     Detecta automáticamente el tipo de documento basándose en el contenido.
 
@@ -1254,7 +1254,7 @@ async def detect_document_type(project_id: int):
 
 
 @router.get("/api/correction-config/types", response_model=ApiResponse)
-async def get_correction_types():
+def get_correction_types():
     """
     Lista todos los tipos de documento con sus subtipos.
 
@@ -1274,7 +1274,7 @@ async def get_correction_types():
 
 
 @router.get("/api/correction-config/{type_code}", response_model=ApiResponse)
-async def get_correction_config_for_type(
+def get_correction_config_for_type(
     type_code: str,
     subtype_code: Optional[str] = Query(None, description="Código del subtipo")
 ):
@@ -1301,7 +1301,7 @@ async def get_correction_config_for_type(
 
 
 @router.get("/api/projects/{project_id}/correction-config", response_model=ApiResponse)
-async def get_project_correction_config(project_id: int):
+def get_project_correction_config(project_id: int):
     """
     Obtiene la configuración de corrección para un proyecto.
 
@@ -1339,7 +1339,7 @@ async def get_project_correction_config(project_id: int):
 
 
 @router.get("/api/correction-config/{type_code}/diff", response_model=ApiResponse)
-async def get_correction_config_diff(
+def get_correction_config_diff(
     type_code: str,
     subtype_code: Optional[str] = Query(None, description="Código del subtipo")
 ):
@@ -1364,7 +1364,7 @@ async def get_correction_config_diff(
 
 
 @router.get("/api/correction-config/defaults", response_model=ApiResponse)
-async def get_all_default_overrides():
+def get_all_default_overrides():
     """
     Lista todos los overrides de configuración definidos por el usuario.
 
@@ -1388,7 +1388,7 @@ async def get_all_default_overrides():
 
 
 @router.get("/api/correction-config/defaults/{type_code}", response_model=ApiResponse)
-async def get_type_default_override(
+def get_type_default_override(
     type_code: str,
     subtype_code: Optional[str] = Query(None, description="Código del subtipo")
 ):
@@ -1440,7 +1440,7 @@ async def get_type_default_override(
 
 
 @router.put("/api/correction-config/defaults/{type_code}", response_model=ApiResponse)
-async def set_type_default_override(
+def set_type_default_override(
     type_code: str,
     request: DefaultOverrideRequest,
     subtype_code: Optional[str] = Query(None, description="Código del subtipo")
@@ -1482,7 +1482,7 @@ async def set_type_default_override(
 
 
 @router.delete("/api/correction-config/defaults/{type_code}", response_model=ApiResponse)
-async def delete_type_default_override(
+def delete_type_default_override(
     type_code: str,
     subtype_code: Optional[str] = Query(None, description="Código del subtipo")
 ):
@@ -1517,7 +1517,7 @@ async def delete_type_default_override(
 
 
 @router.delete("/api/correction-config/defaults", response_model=ApiResponse)
-async def delete_all_default_overrides():
+def delete_all_default_overrides():
     """
     Elimina TODOS los overrides de configuración (full reset).
 
@@ -1541,7 +1541,7 @@ async def delete_all_default_overrides():
 
 
 @router.get("/api/correction-config/defaults/status", response_model=ApiResponse)
-async def get_defaults_status():
+def get_defaults_status():
     """
     Obtiene el estado de customización de todos los tipos.
 

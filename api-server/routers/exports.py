@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Query
 router = APIRouter()
 
 @router.get("/api/projects/{project_id}/export/document")
-async def export_document(
+def export_document(
     project_id: int,
     format: str = "docx",
     include_characters: bool = True,
@@ -142,7 +142,7 @@ async def export_document(
 
 
 @router.get("/api/projects/{project_id}/export/document/preview", response_model=ApiResponse)
-async def preview_document_export(
+def preview_document_export(
     project_id: int,
     include_characters: bool = True,
     include_alerts: bool = True,
@@ -260,7 +260,7 @@ async def preview_document_export(
 
 
 @router.get("/api/projects/{project_id}/export/corrected")
-async def export_corrected_document(
+def export_corrected_document(
     project_id: int,
     min_confidence: float = 0.5,
     categories: Optional[str] = None,
@@ -403,7 +403,7 @@ async def export_corrected_document(
 
 
 @router.get("/api/projects/{project_id}/export/review-report")
-async def export_review_report(
+def export_review_report(
     project_id: int,
     format: str = "docx",
     min_confidence: float = 0.0,
@@ -550,7 +550,7 @@ async def export_review_report(
 
 
 @router.get("/api/projects/{project_id}/export/review-report/preview", response_model=ApiResponse)
-async def preview_review_report(project_id: int):
+def preview_review_report(project_id: int):
     """
     Previsualiza los datos que se incluirán en el informe de revisión.
 
@@ -665,7 +665,7 @@ async def preview_review_report(project_id: int):
 
 
 @router.get("/api/projects/{project_id}/export/scrivener")
-async def export_scrivener(
+def export_scrivener(
     project_id: int,
     include_character_notes: bool = Query(True, description="Incluir fichas de personaje"),
     include_alerts_as_notes: bool = Query(True, description="Incluir alertas como notas"),
@@ -727,7 +727,7 @@ async def export_scrivener(
 
 
 @router.get("/api/projects/{project_id}/export/characters", response_model=ApiResponse)
-async def export_characters(
+def export_characters(
     project_id: int,
     format: str = "json",
     only_main: bool = True,
@@ -873,7 +873,7 @@ async def export_characters(
 
 
 @router.get("/api/projects/{project_id}/export/report", response_model=ApiResponse)
-async def export_report(
+def export_report(
     project_id: int,
     format: str = "json",
 ):
@@ -1004,7 +1004,7 @@ async def export_report(
 
 
 @router.get("/api/projects/{project_id}/export/alerts", response_model=ApiResponse)
-async def export_alerts(
+def export_alerts(
     project_id: int,
     format: str = "json",
     include_pending: bool = True,

@@ -22,7 +22,7 @@ from fastapi import APIRouter, HTTPException, Request
 router = APIRouter()
 
 @router.get("/api/health", response_model=HealthResponse)
-async def health_check():
+def health_check():
     """
     Health check endpoint - verifica que el servidor está funcionando.
 
@@ -38,7 +38,7 @@ async def health_check():
 
 
 @router.get("/api/info")
-async def system_info():
+def system_info():
     """
     Información del sistema - configuración, GPU, modelos, etc.
 
@@ -97,7 +97,7 @@ async def system_info():
 
 
 @router.get("/api/debug/diagnostic")
-async def debug_diagnostic():
+def debug_diagnostic():
     """
     Diagnóstico detallado del backend - para debugging de problemas.
     Devuelve el estado completo del sistema, paths, DB, módulos.
@@ -160,7 +160,7 @@ async def debug_diagnostic():
 
 
 @router.get("/api/debug/log")
-async def debug_log():
+def debug_log():
     """
     Devuelve el contenido del archivo de log del backend.
     El usuario puede compartir esto para diagnosticar problemas.
@@ -272,7 +272,7 @@ async def receive_frontend_logs(request: Request):
 
 
 @router.get("/api/debug/frontend-log")
-async def debug_frontend_log():
+def debug_frontend_log():
     """Devuelve el contenido del log del frontend."""
     _get_frontend_logger()  # Ensure file path is set
     content = ""
@@ -292,7 +292,7 @@ async def debug_frontend_log():
 
 
 @router.get("/api/system/python-status")
-async def python_status():
+def python_status():
     """
     Verifica el estado de Python en el sistema.
 
@@ -307,7 +307,7 @@ async def python_status():
 
 
 @router.get("/api/models/status")
-async def models_status():
+def models_status():
     """
     Verifica el estado de los modelos NLP necesarios.
 
@@ -428,7 +428,7 @@ async def models_status():
 
 
 @router.post("/api/dependencies/install")
-async def install_dependencies():
+def install_dependencies():
     """
     Instala las dependencias Python necesarias (numpy, spacy, sentence-transformers, etc.).
 
@@ -537,7 +537,7 @@ async def install_dependencies():
 
 
 @router.post("/api/models/download")
-async def download_models(request: DownloadModelsRequest):
+def download_models(request: DownloadModelsRequest):
     """
     Descarga los modelos NLP necesarios.
 
@@ -647,7 +647,7 @@ async def download_models(request: DownloadModelsRequest):
 
 
 @router.get("/api/models/download/progress")
-async def download_progress():
+def download_progress():
     """
     Obtiene el progreso de las descargas de modelos activas.
 
@@ -716,7 +716,7 @@ async def download_progress():
 
 
 @router.get("/api/system/capabilities")
-async def system_capabilities():
+def system_capabilities():
     """
     Capacidades del sistema - detección de hardware y métodos disponibles.
 
@@ -1074,7 +1074,7 @@ async def system_capabilities():
 
 
 @router.post("/api/system/database/repair", response_model=ApiResponse)
-async def repair_database_endpoint():
+def repair_database_endpoint():
     """
     Intenta reparar la base de datos sin perder datos.
 
@@ -1102,7 +1102,7 @@ async def repair_database_endpoint():
 
 
 @router.post("/api/system/database/reset", response_model=ApiResponse)
-async def reset_database_endpoint():
+def reset_database_endpoint():
     """
     Elimina y recrea la base de datos desde cero.
 
@@ -1128,7 +1128,7 @@ async def reset_database_endpoint():
 
 
 @router.post("/api/maintenance/clear-cache", response_model=ApiResponse)
-async def clear_cache():
+def clear_cache():
     """
     Limpia archivos temporales y caché del sistema.
 
@@ -1206,7 +1206,7 @@ async def clear_cache():
 
 
 @router.get("/api/maintenance/data-location", response_model=ApiResponse)
-async def get_data_location():
+def get_data_location():
     """
     Obtiene la ubicación actual de almacenamiento de datos.
 
@@ -1235,7 +1235,7 @@ async def get_data_location():
 
 
 @router.get("/api/system/resources", response_model=ApiResponse)
-async def get_resource_status():
+def get_resource_status():
     """
     Estado del gestor de recursos del sistema.
 
@@ -1305,7 +1305,7 @@ async def get_resource_status():
 
 
 @router.post("/api/maintenance/data-location", response_model=ApiResponse)
-async def change_data_location(request: ChangeDataLocationRequest):
+def change_data_location(request: ChangeDataLocationRequest):
     """
     Cambia la ubicación de almacenamiento de datos.
 

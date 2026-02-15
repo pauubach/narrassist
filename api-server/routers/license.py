@@ -22,7 +22,7 @@ def get_license_verifier():
 
 
 @router.get("/api/license/status", response_model=ApiResponse)
-async def get_license_status():
+def get_license_status():
     """
     Obtiene el estado actual de la licencia.
 
@@ -116,7 +116,7 @@ async def get_license_status():
 
 
 @router.post("/api/license/activate", response_model=ApiResponse)
-async def activate_license(request: LicenseActivationRequest):
+def activate_license(request: LicenseActivationRequest):
     """
     Activa una licencia con la clave proporcionada.
 
@@ -152,7 +152,7 @@ async def activate_license(request: LicenseActivationRequest):
 
 
 @router.post("/api/license/verify", response_model=ApiResponse)
-async def verify_license():
+def verify_license():
     """
     Verifica la licencia actual (online si es posible).
 
@@ -183,7 +183,7 @@ async def verify_license():
 
 
 @router.get("/api/license/devices", response_model=ApiResponse)
-async def get_license_devices():
+def get_license_devices():
     """
     Obtiene la lista de dispositivos registrados en la licencia.
 
@@ -228,7 +228,7 @@ async def get_license_devices():
 
 
 @router.post("/api/license/devices/deactivate", response_model=ApiResponse)
-async def deactivate_device(request: DeviceDeactivationRequest):
+def deactivate_device(request: DeviceDeactivationRequest):
     """
     Desactiva un dispositivo de la licencia.
 
@@ -262,7 +262,7 @@ async def deactivate_device(request: DeviceDeactivationRequest):
 
 
 @router.get("/api/license/usage", response_model=ApiResponse)
-async def get_license_usage():
+def get_license_usage():
     """
     Obtiene el uso de la licencia en el periodo actual (paginas).
 
@@ -308,7 +308,7 @@ async def get_license_usage():
 
 
 @router.get("/api/license/quota-status", response_model=ApiResponse)
-async def get_quota_status():
+def get_quota_status():
     """
     Estado ligero de cuota con porcentaje, nivel de aviso y dias restantes del periodo.
 
@@ -425,7 +425,7 @@ async def get_quota_status():
 
 
 @router.post("/api/license/record-usage", response_model=ApiResponse)
-async def record_usage(project_id: int = Body(..., embed=True)):
+def record_usage(project_id: int = Body(..., embed=True)):
     """
     Registra el uso de un manuscrito contra la cuota de paginas.
 
@@ -465,7 +465,7 @@ async def record_usage(project_id: int = Body(..., embed=True)):
 
 
 @router.get("/api/license/check-feature/{feature_name}", response_model=ApiResponse)
-async def check_feature_access(feature_name: str):
+def check_feature_access(feature_name: str):
     """
     Verifica si el usuario tiene acceso a una feature segun su tier.
 

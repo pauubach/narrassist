@@ -33,7 +33,7 @@ def patched_project_manager(monkeypatch):
 
 
 def _run_chat(project_id: int = 1, message: str = "hola"):
-    return asyncio.run(chat_with_assistant(project_id, ChatRequest(message=message)))
+    return chat_with_assistant(project_id, ChatRequest(message=message))
 
 
 def test_chat_unavailable_message_windows(monkeypatch, patched_project_manager):

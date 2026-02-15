@@ -13,7 +13,7 @@ from narrative_assistant.alerts.models import AlertStatus
 router = APIRouter()
 
 @router.get("/api/projects", response_model=ApiResponse)
-async def list_projects():
+def list_projects():
     """
     Lista todos los proyectos.
 
@@ -141,7 +141,7 @@ async def list_projects():
 
 
 @router.get("/api/projects/{project_id}", response_model=ApiResponse)
-async def get_project(project_id: int):
+def get_project(project_id: int):
     """
     Obtiene un proyecto por ID.
 
@@ -250,7 +250,7 @@ async def get_project(project_id: int):
 
 
 @router.get("/api/projects/{project_id}/analysis-status", response_model=ApiResponse)
-async def get_analysis_status(project_id: int):
+def get_analysis_status(project_id: int):
     """
     Obtiene el estado de ejecución de las fases de análisis para un proyecto.
 
@@ -366,7 +366,7 @@ async def get_analysis_status(project_id: int):
 
 
 @router.post("/api/projects", response_model=ApiResponse)
-async def create_project(
+def create_project(
     name: str = Body(...),
     description: Optional[str] = Body(None),
     file_path: Optional[str] = Body(None),
@@ -557,7 +557,7 @@ async def create_project(
 
 
 @router.delete("/api/projects/{project_id}", response_model=ApiResponse)
-async def delete_project(project_id: int):
+def delete_project(project_id: int):
     """
     Elimina un proyecto.
 
@@ -588,7 +588,7 @@ async def delete_project(project_id: int):
 
 
 @router.get("/api/projects/{project_id}/versions", response_model=ApiResponse)
-async def list_versions(project_id: int, limit: int = Query(50, ge=1, le=200)):
+def list_versions(project_id: int, limit: int = Query(50, ge=1, le=200)):
     """S15-02: Lista versiones con métricas para un proyecto.
 
     Returns:
@@ -632,7 +632,7 @@ async def list_versions(project_id: int, limit: int = Query(50, ge=1, le=200)):
 
 
 @router.get("/api/projects/{project_id}/versions/trend", response_model=ApiResponse)
-async def get_version_trend(project_id: int, limit: int = Query(10, ge=2, le=50)):
+def get_version_trend(project_id: int, limit: int = Query(10, ge=2, le=50)):
     """S15-02: Serie temporal simplificada para sparkline.
 
     Returns:

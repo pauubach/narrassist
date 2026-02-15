@@ -19,7 +19,7 @@ router = APIRouter()
 
 
 @router.get("/api/projects/{project_id}/entities", response_model=ApiResponse)
-async def list_entities(
+def list_entities(
     project_id: int,
     min_relevance: Optional[float] = None,
     min_mentions: Optional[int] = None,
@@ -166,7 +166,7 @@ async def list_entities(
 @router.post(
     "/api/projects/{project_id}/entities/preview-merge", response_model=ApiResponse
 )
-async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
+def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
     """
     Preview de fusión de entidades con análisis de similitud detallado y detección de conflictos.
 
@@ -456,7 +456,7 @@ async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
 
 
 @router.post("/api/projects/{project_id}/entities/merge", response_model=ApiResponse)
-async def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
+def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
     """
     Fusiona múltiples entidades en una sola entidad principal.
 
@@ -478,24 +478,19 @@ async def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
         if not primary_entity or primary_entity.project_id != project_id:
             return ApiResponse(success=False, error="Entidad principal no encontrada")
 
-        # Implementación de la fusión de entidades
-        merged_count = 0
-        source_entity_ids = []
-        source_snapshots = []
-        canonical_names_before = []
+        # Fase 1: Leer entidades fuente (no transaccional)
+        source_entities = []
         combined_aliases = set(primary_entity.aliases)
 
         for entity_id in entity_ids:
             if entity_id == primary_entity_id:
-                continue  # No fusionar consigo misma
+                continue
 
             entity = entity_repo.get_entity(entity_id)  # type: ignore[attr-defined]
             if not entity or entity.project_id != project_id:
                 continue
 
-            # Guardar snapshot para historial (permite undo)
-            source_entity_ids.append(entity_id)
-            source_snapshots.append(
+            source_entities.append(
                 {
                     "id": entity_id,
                     "canonical_name": entity.canonical_name,
@@ -504,57 +499,26 @@ async def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
                     "mention_count": entity.mention_count,
                 }
             )
-            canonical_names_before.append(entity.canonical_name)
-
-            # 1. Transferir menciones a la entidad principal
-            mentions_moved = entity_repo.move_mentions(entity_id, primary_entity_id)  # type: ignore[attr-defined]
-            logger.debug(
-                f"Moved {mentions_moved} mentions from entity {entity_id} to {primary_entity_id}"
-            )
-
-            # 2. Transferir atributos a la entidad principal
-            attrs_moved = entity_repo.move_attributes(entity_id, primary_entity_id)  # type: ignore[attr-defined]
-            logger.debug(
-                f"Moved {attrs_moved} attributes from entity {entity_id} to {primary_entity_id}"
-            )
-
-            # 3. Combinar aliases (incluir nombre canónico de la entidad fusionada)
             combined_aliases.add(entity.canonical_name)
             combined_aliases.update(entity.aliases)
 
-            # 4. Desactivar la entidad fusionada (soft delete para poder deshacer)
-            entity_repo.delete_entity(entity_id, hard_delete=False)  # type: ignore[attr-defined]
+        # Fase 2: Fusión atómica (todas las escrituras en una transacción)
+        combined_aliases.discard(primary_entity.canonical_name)
+        source_entity_ids = [e["id"] for e in source_entities]
+        new_merged_ids = list(
+            set(primary_entity.merged_from_ids + source_entity_ids)
+        )
+        total_mentions = sum(e.get("mention_count", 0) for e in source_entities)
 
-            merged_count += 1
-
-        if merged_count > 0:
-            # Actualizar aliases y merged_from_ids en la entidad principal
-            combined_aliases.discard(primary_entity.canonical_name)
-            new_merged_ids = list(
-                set(primary_entity.merged_from_ids + source_entity_ids)
-            )
-
-            entity_repo.update_entity(  # type: ignore[attr-defined]
-                primary_entity_id,
-                aliases=list(combined_aliases),
-                merged_from_ids=new_merged_ids,
-            )
-
-            # Actualizar contador de menciones
-            total_mentions = sum(s.get("mention_count", 0) for s in source_snapshots)
-            if total_mentions > 0:
-                entity_repo.increment_mention_count(primary_entity_id, total_mentions)  # type: ignore[attr-defined]
-
-            # Registrar fusión en historial (para poder deshacer)
-            entity_repo.add_merge_history(  # type: ignore[attr-defined]
-                project_id=project_id,
-                result_entity_id=primary_entity_id,
-                source_entity_ids=source_entity_ids,
-                source_snapshots=source_snapshots,
-                canonical_names_before=canonical_names_before,
-                merged_by="user",
-                note=f"Fusión de {merged_count} entidades en '{primary_entity.canonical_name}'",
-            )
+        merged_count = entity_repo.merge_entities_atomic(  # type: ignore[attr-defined]
+            project_id=project_id,
+            primary_entity_id=primary_entity_id,
+            source_entities=source_entities,
+            combined_aliases=list(combined_aliases),
+            new_merged_ids=new_merged_ids,
+            total_mention_delta=total_mentions,
+            merged_by="user",
+        )
 
         # Apply attribute conflict resolutions
         resolutions_applied = 0
@@ -644,7 +608,7 @@ async def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
 @router.get(
     "/api/projects/{project_id}/entities/merge-history", response_model=ApiResponse
 )
-async def get_merge_history(project_id: int):
+def get_merge_history(project_id: int):
     """
     Obtiene el historial de fusiones de entidades del proyecto.
 
@@ -670,7 +634,7 @@ async def get_merge_history(project_id: int):
     "/api/projects/{project_id}/entities/undo-merge/{merge_id}",
     response_model=ApiResponse,
 )
-async def undo_entity_merge(project_id: int, merge_id: int):
+def undo_entity_merge(project_id: int, merge_id: int):
     """
     Deshace una fusión de entidades, restaurando las entidades originales.
 
@@ -716,7 +680,7 @@ async def undo_entity_merge(project_id: int, merge_id: int):
 @router.get(
     "/api/projects/{project_id}/entities/{entity_id}", response_model=ApiResponse
 )
-async def get_entity(project_id: int, entity_id: int):
+def get_entity(project_id: int, entity_id: int):
     """
     Obtiene una entidad por su ID.
 
@@ -781,7 +745,7 @@ async def get_entity(project_id: int, entity_id: int):
 @router.put(
     "/api/projects/{project_id}/entities/{entity_id}", response_model=ApiResponse
 )
-async def update_entity(
+def update_entity(
     project_id: int, entity_id: int, body: deps.UpdateEntityRequest
 ):
     """
@@ -859,7 +823,7 @@ async def update_entity(
 @router.delete(
     "/api/projects/{project_id}/entities/{entity_id}", response_model=ApiResponse
 )
-async def delete_entity(project_id: int, entity_id: int, hard_delete: bool = False):
+def delete_entity(project_id: int, entity_id: int, hard_delete: bool = False):
     """
     Elimina (o desactiva) una entidad.
 
@@ -904,7 +868,7 @@ async def delete_entity(project_id: int, entity_id: int, hard_delete: bool = Fal
     "/api/projects/{project_id}/entities/{entity_id}/timeline",
     response_model=ApiResponse,
 )
-async def get_entity_timeline(project_id: int, entity_id: int):
+def get_entity_timeline(project_id: int, entity_id: int):
     """
     Obtiene la línea temporal de una entidad basada en sus menciones.
 
@@ -1059,7 +1023,7 @@ async def get_entity_timeline(project_id: int, entity_id: int):
     "/api/projects/{project_id}/entities/{entity_id}/mentions",
     response_model=ApiResponse,
 )
-async def get_entity_mentions(
+def get_entity_mentions(
     project_id: int,
     entity_id: int,
     chapter_number: Optional[int] = Query(
@@ -1368,7 +1332,7 @@ async def get_entity_mentions(
     "/api/projects/{project_id}/entities/{entity_id}/coreference",
     response_model=ApiResponse,
 )
-async def get_entity_coreference_info(project_id: int, entity_id: int):
+def get_entity_coreference_info(project_id: int, entity_id: int):
     """
     Obtiene información de correferencia para una entidad.
 
@@ -1551,7 +1515,7 @@ async def get_entity_coreference_info(project_id: int, entity_id: int):
 @router.get(
     "/api/projects/{project_id}/coreference-corrections", response_model=ApiResponse
 )
-async def list_coreference_corrections(project_id: int):
+def list_coreference_corrections(project_id: int):
     """Lista todas las correcciones manuales de correferencias de un proyecto."""
     try:
         db = deps.get_database()  # type: ignore[misc]
@@ -1606,7 +1570,7 @@ async def list_coreference_corrections(project_id: int):
 @router.post(
     "/api/projects/{project_id}/coreference-corrections", response_model=ApiResponse
 )
-async def create_coreference_correction(
+def create_coreference_correction(
     project_id: int, payload: deps.CoreferenceCorrectionRequest
 ):
     """
@@ -1712,7 +1676,7 @@ async def create_coreference_correction(
     "/api/projects/{project_id}/coreference-corrections/{correction_id}",
     response_model=ApiResponse,
 )
-async def delete_coreference_correction(project_id: int, correction_id: int):
+def delete_coreference_correction(project_id: int, correction_id: int):
     """Elimina una corrección manual de correferencia."""
     try:
         db = deps.get_database()  # type: ignore[misc]
@@ -1757,7 +1721,7 @@ async def delete_coreference_correction(project_id: int, correction_id: int):
 
 
 @router.get("/api/projects/{project_id}/entities/rejected", response_model=ApiResponse)
-async def list_rejected_entities(project_id: int):
+def list_rejected_entities(project_id: int):
     """
     Lista las entidades rechazadas por el usuario para un proyecto.
 
@@ -1803,7 +1767,7 @@ async def list_rejected_entities(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/entities/reject", response_model=ApiResponse)
-async def reject_entity_text(project_id: int, body: deps.RejectEntityRequest):
+def reject_entity_text(project_id: int, body: deps.RejectEntityRequest):
     """
     Rechaza un texto de entidad para que no se vuelva a detectar.
 
@@ -1872,7 +1836,7 @@ async def reject_entity_text(project_id: int, body: deps.RejectEntityRequest):
     "/api/projects/{project_id}/entities/reject/{entity_text}",
     response_model=ApiResponse,
 )
-async def unreject_entity_text(project_id: int, entity_text: str):
+def unreject_entity_text(project_id: int, entity_text: str):
     """
     Quita un texto de entidad de la lista de rechazadas.
 
@@ -1913,7 +1877,7 @@ async def unreject_entity_text(project_id: int, entity_text: str):
 
 
 @router.get("/api/entity-filters/stats", response_model=ApiResponse)
-async def get_filter_stats(project_id: Optional[int] = None):
+def get_filter_stats(project_id: Optional[int] = None):
     """
     Obtiene estadísticas del sistema de filtros de entidades.
 
@@ -1937,7 +1901,7 @@ async def get_filter_stats(project_id: Optional[int] = None):
 
 
 @router.get("/api/entity-filters/system-patterns", response_model=ApiResponse)
-async def list_system_patterns(language: str = "es", only_active: bool = False):
+def list_system_patterns(language: str = "es", only_active: bool = False):
     """
     Lista los patrones de falsos positivos del sistema.
 
@@ -2003,7 +1967,7 @@ async def list_system_patterns(language: str = "es", only_active: bool = False):
 @router.patch(
     "/api/entity-filters/system-patterns/{pattern_id}", response_model=ApiResponse
 )
-async def toggle_system_pattern(pattern_id: int, body: deps.TogglePatternRequest):
+def toggle_system_pattern(pattern_id: int, body: deps.TogglePatternRequest):
     """
     Activa o desactiva un patrón del sistema.
 
@@ -2038,7 +2002,7 @@ async def toggle_system_pattern(pattern_id: int, body: deps.TogglePatternRequest
 
 
 @router.get("/api/entity-filters/user-rejections", response_model=ApiResponse)
-async def list_user_rejections():
+def list_user_rejections():
     """
     Lista los rechazos globales del usuario.
 
@@ -2074,7 +2038,7 @@ async def list_user_rejections():
 
 
 @router.post("/api/entity-filters/user-rejections", response_model=ApiResponse)
-async def add_user_rejection(body: deps.UserRejectionRequest):
+def add_user_rejection(body: deps.UserRejectionRequest):
     """
     Añade un rechazo global del usuario.
 
@@ -2112,7 +2076,7 @@ async def add_user_rejection(body: deps.UserRejectionRequest):
 @router.delete(
     "/api/entity-filters/user-rejections/{rejection_id}", response_model=ApiResponse
 )
-async def remove_user_rejection(rejection_id: int):
+def remove_user_rejection(rejection_id: int):
     """
     Elimina un rechazo global del usuario.
 
@@ -2157,7 +2121,7 @@ async def remove_user_rejection(rejection_id: int):
 @router.get(
     "/api/projects/{project_id}/entity-filters/overrides", response_model=ApiResponse
 )
-async def list_project_overrides(project_id: int):
+def list_project_overrides(project_id: int):
     """
     Lista los overrides de entidades de un proyecto.
 
@@ -2202,7 +2166,7 @@ async def list_project_overrides(project_id: int):
 @router.post(
     "/api/projects/{project_id}/entity-filters/overrides", response_model=ApiResponse
 )
-async def add_project_override(project_id: int, body: deps.ProjectOverrideRequest):
+def add_project_override(project_id: int, body: deps.ProjectOverrideRequest):
     """
     Añade un override de entidad para un proyecto.
 
@@ -2253,7 +2217,7 @@ async def add_project_override(project_id: int, body: deps.ProjectOverrideReques
     "/api/projects/{project_id}/entity-filters/overrides/{override_id}",
     response_model=ApiResponse,
 )
-async def remove_project_override(project_id: int, override_id: int):
+def remove_project_override(project_id: int, override_id: int):
     """
     Elimina un override de entidad de un proyecto.
 
@@ -2298,7 +2262,7 @@ async def remove_project_override(project_id: int, override_id: int):
 
 
 @router.post("/api/entity-filters/check", response_model=ApiResponse)
-async def check_entity_filter(body: deps.CheckFilterRequest):
+def check_entity_filter(body: deps.CheckFilterRequest):
     """
     Verifica si una entidad sería filtrada por el sistema.
 
@@ -2340,7 +2304,7 @@ async def check_entity_filter(body: deps.CheckFilterRequest):
     "/api/projects/{project_id}/entities/{entity_id}/attributes",
     response_model=ApiResponse,
 )
-async def list_entity_attributes(project_id: int, entity_id: int):
+def list_entity_attributes(project_id: int, entity_id: int):
     """
     Lista todos los atributos de una entidad.
 
@@ -2375,7 +2339,7 @@ async def list_entity_attributes(project_id: int, entity_id: int):
     "/api/projects/{project_id}/entities/{entity_id}/attributes",
     response_model=ApiResponse,
 )
-async def create_entity_attribute(
+def create_entity_attribute(
     project_id: int, entity_id: int, body: deps.CreateAttributeRequest
 ):
     """
@@ -2471,7 +2435,7 @@ async def create_entity_attribute(
     "/api/projects/{project_id}/entities/{entity_id}/attributes/{attribute_id}",
     response_model=ApiResponse,
 )
-async def update_entity_attribute(
+def update_entity_attribute(
     project_id: int,
     entity_id: int,
     attribute_id: int,
@@ -2539,7 +2503,7 @@ async def update_entity_attribute(
     "/api/projects/{project_id}/entities/{entity_id}/attributes/{attribute_id}",
     response_model=ApiResponse,
 )
-async def delete_entity_attribute(project_id: int, entity_id: int, attribute_id: int):
+def delete_entity_attribute(project_id: int, entity_id: int, attribute_id: int):
     """
     Elimina un atributo.
 

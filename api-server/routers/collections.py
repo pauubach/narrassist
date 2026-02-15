@@ -61,7 +61,7 @@ def _get_cross_book_analyzer():
 # ==================== BK-05: Comparación antes/después ====================
 
 @router.get("/projects/{project_id}/comparison")
-async def get_comparison(project_id: int):
+def get_comparison(project_id: int):
     """Compara el estado actual contra el último snapshot pre-reanálisis."""
     service = _get_comparison_service()
     report = service.compare(project_id)
@@ -71,7 +71,7 @@ async def get_comparison(project_id: int):
 
 
 @router.get("/projects/{project_id}/comparison/summary")
-async def get_comparison_summary(project_id: int):
+def get_comparison_summary(project_id: int):
     """Resumen compacto de la comparación pre/post reanálisis (S13, BK-25 MVP)."""
     service = _get_comparison_service()
     report = service.compare(project_id)
@@ -96,7 +96,7 @@ async def get_comparison_summary(project_id: int):
 # ==================== BK-07: Collections CRUD ====================
 
 @router.post("/collections")
-async def create_collection(request: CreateCollectionRequest):
+def create_collection(request: CreateCollectionRequest):
     """Crea una nueva colección (saga/serie)."""
     repo = _get_collection_repo()
     collection_id = repo.create(request.name, request.description)
@@ -104,7 +104,7 @@ async def create_collection(request: CreateCollectionRequest):
 
 
 @router.get("/collections")
-async def list_collections():
+def list_collections():
     """Lista todas las colecciones."""
     repo = _get_collection_repo()
     collections = repo.list_all()
@@ -116,7 +116,7 @@ async def list_collections():
 
 
 @router.get("/collections/{collection_id}")
-async def get_collection(collection_id: int):
+def get_collection(collection_id: int):
     """Obtiene una colección con sus proyectos."""
     repo = _get_collection_repo()
     collection = repo.get(collection_id)
@@ -138,7 +138,7 @@ async def get_collection(collection_id: int):
 
 
 @router.put("/collections/{collection_id}")
-async def update_collection(collection_id: int, request: UpdateCollectionRequest):
+def update_collection(collection_id: int, request: UpdateCollectionRequest):
     """Actualiza nombre y/o descripción de una colección."""
     repo = _get_collection_repo()
     repo.update(collection_id, request.name, request.description)
@@ -146,7 +146,7 @@ async def update_collection(collection_id: int, request: UpdateCollectionRequest
 
 
 @router.delete("/collections/{collection_id}")
-async def delete_collection(collection_id: int):
+def delete_collection(collection_id: int):
     """Elimina una colección (los proyectos se desvinculan, no se borran)."""
     repo = _get_collection_repo()
     repo.delete(collection_id)
@@ -156,7 +156,7 @@ async def delete_collection(collection_id: int):
 # ==================== Project membership ====================
 
 @router.post("/collections/{collection_id}/projects/{project_id}")
-async def add_project_to_collection(collection_id: int, project_id: int, order: int = 0):
+def add_project_to_collection(collection_id: int, project_id: int, order: int = 0):
     """Añade un proyecto a la colección."""
     repo = _get_collection_repo()
     result = repo.add_project(collection_id, project_id, order)
@@ -166,7 +166,7 @@ async def add_project_to_collection(collection_id: int, project_id: int, order: 
 
 
 @router.delete("/collections/{collection_id}/projects/{project_id}")
-async def remove_project_from_collection(collection_id: int, project_id: int):
+def remove_project_from_collection(collection_id: int, project_id: int):
     """Quita un proyecto de la colección (limpia entity links asociados)."""
     repo = _get_collection_repo()
     repo.remove_project(collection_id, project_id)
@@ -176,7 +176,7 @@ async def remove_project_from_collection(collection_id: int, project_id: int):
 # ==================== Entity links ====================
 
 @router.get("/collections/{collection_id}/entity-links")
-async def get_entity_links(collection_id: int):
+def get_entity_links(collection_id: int):
     """Lista todos los enlaces de entidades de la colección."""
     repo = _get_collection_repo()
     links = repo.get_entity_links(collection_id)
@@ -199,7 +199,7 @@ async def get_entity_links(collection_id: int):
 
 
 @router.post("/collections/{collection_id}/entity-links")
-async def create_entity_link(collection_id: int, request: CreateEntityLinkRequest):
+def create_entity_link(collection_id: int, request: CreateEntityLinkRequest):
     """Crea un enlace entre entidades de distintos libros."""
     repo = _get_collection_repo()
     result = repo.create_entity_link(
@@ -217,7 +217,7 @@ async def create_entity_link(collection_id: int, request: CreateEntityLinkReques
 
 
 @router.delete("/collections/{collection_id}/entity-links/{link_id}")
-async def delete_entity_link(collection_id: int, link_id: int):
+def delete_entity_link(collection_id: int, link_id: int):
     """Elimina un enlace de entidades."""
     repo = _get_collection_repo()
     repo.delete_entity_link(link_id)
@@ -225,7 +225,7 @@ async def delete_entity_link(collection_id: int, link_id: int):
 
 
 @router.get("/collections/{collection_id}/entity-link-suggestions")
-async def get_link_suggestions(collection_id: int, threshold: float = Query(default=0.7, ge=0.0, le=1.0)):
+def get_link_suggestions(collection_id: int, threshold: float = Query(default=0.7, ge=0.0, le=1.0)):
     """Sugiere posibles enlaces entre entidades de distintos libros."""
     repo = _get_collection_repo()
     suggestions = repo.get_link_suggestions(collection_id, threshold)
@@ -251,7 +251,7 @@ async def get_link_suggestions(collection_id: int, threshold: float = Query(defa
 # ==================== Cross-book analysis ====================
 
 @router.get("/collections/{collection_id}/cross-book-analysis")
-async def cross_book_analysis(collection_id: int):
+def cross_book_analysis(collection_id: int):
     """Ejecuta análisis cross-book: compara atributos de entidades enlazadas."""
     analyzer = _get_cross_book_analyzer()
     report = analyzer.analyze(collection_id)

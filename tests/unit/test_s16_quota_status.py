@@ -73,8 +73,12 @@ def _make_verification(license_obj, quota_remaining):
 
 
 def _call(endpoint):
-    """Ejecuta un endpoint async de forma sincrona."""
-    return asyncio.run(endpoint())
+    """Ejecuta un endpoint (sync o async) de forma sincrona."""
+    import inspect
+    result = endpoint()
+    if inspect.iscoroutine(result):
+        return asyncio.run(result)
+    return result
 
 
 # ============================================================================

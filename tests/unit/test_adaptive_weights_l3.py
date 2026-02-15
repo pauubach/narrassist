@@ -494,7 +494,7 @@ class TestAdaptiveWeightRouterHooks:
         monkeypatch.setattr(deps, "alert_repository", alert_repo)
 
         with patch("narrative_assistant.alerts.engine.get_alert_engine", return_value=engine):
-            response = asyncio.run(resolve_all_alerts(1))
+            response = resolve_all_alerts(1)
 
         assert response.success is True
         alert_repo.update.assert_called_once_with(open_alert)
@@ -561,7 +561,7 @@ class TestAdaptiveWeightRouterHooks:
         )
 
         with patch("narrative_assistant.alerts.engine.get_alert_engine", return_value=engine):
-            response = asyncio.run(dismiss_batch(1, body))
+            response = dismiss_batch(1, body)
 
         assert response.success is True
         assert len(alert_repo.updated) == 2

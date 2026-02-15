@@ -75,7 +75,7 @@ def _get_project_or_error(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/export-work")
-async def export_work(project_id: int):
+def export_work(project_id: int):
     """
     Exporta el trabajo editorial del proyecto como archivo .narrassist.
 
@@ -207,7 +207,7 @@ async def import_work_preview(
 @router.post(
     "/api/projects/{project_id}/import-work/confirm", response_model=ApiResponse
 )
-async def import_work_confirm(
+def import_work_confirm(
     project_id: int,
     body: ImportConfirmRequest,
 ):

@@ -516,7 +516,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
 
 @router.post("/api/projects/{project_id}/analyze/partial", response_model=ApiResponse)
-async def start_partial_analysis(project_id: int, request: PartialAnalysisRequest):
+def start_partial_analysis(project_id: int, request: PartialAnalysisRequest):
     """
     Inicia un análisis parcial: ejecuta solo las fases solicitadas.
 
@@ -651,7 +651,7 @@ async def start_partial_analysis(project_id: int, request: PartialAnalysisReques
 
 
 @router.get("/api/projects/{project_id}/analysis/progress", response_model=ApiResponse)
-async def get_analysis_progress(project_id: int):
+def get_analysis_progress(project_id: int):
     """
     Obtiene el progreso actual del análisis de un proyecto.
 
@@ -712,7 +712,7 @@ async def get_analysis_progress(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/analysis/cancel", response_model=ApiResponse)
-async def cancel_analysis(project_id: int):
+def cancel_analysis(project_id: int):
     """
     Cancela el análisis en curso de un proyecto.
 
