@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/services/apiClient'
+import type { WorkspaceTab } from '@/types'
 
 export interface AnalysisProgress {
   project_id: number
@@ -109,7 +110,7 @@ export const PHASE_LABELS: Record<keyof ExecutedPhases, string> = {
  * Mapeo de tabs del workspace a las fases de análisis que requieren.
  * Si una tab no está en el mapa, no requiere análisis específico.
  */
-export type WorkspaceTab = 'text' | 'entities' | 'relationships' | 'alerts' | 'timeline' | 'style' | 'glossary' | 'summary'
+export type { WorkspaceTab }
 
 export const TAB_REQUIRED_PHASES: Partial<Record<WorkspaceTab, keyof ExecutedPhases>> = {
   // text: siempre disponible tras carga del documento

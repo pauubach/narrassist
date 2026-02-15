@@ -1,7 +1,7 @@
-import { ref, computed, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import type { ThemeMode } from '@/types'
-import { api } from '@/services/apiClient'
+import { useSystemStore } from './system'
 
 // Tauri imports (only available in Tauri environment)
 let tauriListen: ((event: string, handler: (event: { payload: unknown }) => void) => Promise<() => void>) | null = null
@@ -19,16 +19,9 @@ if (typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNAL
 }
 
 export const useAppStore = defineStore('app', () => {
-  // Estado
-  const backendConnected = ref(false)
-  const backendVersion = ref<string | null>(null)
-  const loading = ref(false)
-  const error = ref<string | null>(null)
-  const backendError = ref<string | null>(null)
+  // ── Theme ──────────────────────────────────────────────
   const theme = ref<ThemeMode>('auto')
   const isDark = ref(false)
-  let retryInterval: number | null = null
-  let _unlisten: (() => void) | null = null
 
   // Inicializar tema desde localStorage
   const savedTheme = localStorage.getItem('narrative_assistant_theme') as ThemeMode | null
@@ -67,67 +60,39 @@ export const useAppStore = defineStore('app', () => {
     localStorage.setItem('narrative_assistant_theme', theme.value)
   })
 
-  // Getters
-  const isReady = computed(() => backendConnected.value && !loading.value)
+  function setTheme(newTheme: ThemeMode) {
+    theme.value = newTheme
+  }
 
-  // Actions
-  async function checkBackendHealth() {
-    loading.value = true
-    error.value = null
-
-    try {
-      const data = await api.getRaw<{ status: string; version?: string }>('/api/health')
-      backendConnected.value = true
-      backendVersion.value = data.version || null
-      backendError.value = null
-      stopRetrying() // Stop retrying once connected
-    } catch (err) {
-      backendConnected.value = false
-      backendVersion.value = null
-      error.value = err instanceof Error ? err.message : 'Error desconocido'
-      console.error('Backend health check failed:', err)
-    } finally {
-      loading.value = false
+  function toggleTheme() {
+    if (theme.value === 'light') {
+      theme.value = 'dark'
+    } else if (theme.value === 'dark') {
+      theme.value = 'auto'
+    } else {
+      theme.value = 'light'
     }
   }
 
-  // Start retrying backend connection
-  function startRetrying() {
-    if (retryInterval) return
-    retryInterval = window.setInterval(async () => {
-      if (!backendConnected.value) {
-        await checkBackendHealth()
-      } else {
-        stopRetrying()
-      }
-    }, 3000) // Retry every 3 seconds
-  }
+  // ── Tauri integration ──────────────────────────────────
+  // Tauri events update systemStore (single source of truth for backend state)
 
-  // Stop retrying
-  function stopRetrying() {
-    if (retryInterval) {
-      clearInterval(retryInterval)
-      retryInterval = null
-    }
-  }
-
-  // Initialize Tauri event listener
   async function initTauriListener() {
     if (!tauriListen) return
 
     try {
-      _unlisten = await tauriListen('backend-status', (event) => {
+      await tauriListen('backend-status', (event) => {
         const payload = event.payload as { status: string; message: string }
         console.log('[Tauri] Backend status event:', payload)
 
+        const systemStore = useSystemStore()
         if (payload.status === 'running') {
-          backendConnected.value = true
-          backendError.value = null
-          stopRetrying()
+          systemStore.backendConnected = true
+          systemStore.backendStartupError = null
         } else if (payload.status === 'error') {
-          backendConnected.value = false
-          backendError.value = payload.message
-          startRetrying()
+          systemStore.backendConnected = false
+          systemStore.backendStartupError = payload.message
+          systemStore.startRetrying()
         }
       })
     } catch (err) {
@@ -144,7 +109,8 @@ export const useAppStore = defineStore('app', () => {
       return result
     } catch (err) {
       console.error('Failed to start backend server:', err)
-      backendError.value = err instanceof Error ? err.message : 'Error iniciando servidor'
+      const systemStore = useSystemStore()
+      systemStore.backendStartupError = err instanceof Error ? err.message : 'Error iniciando servidor'
       return null
     }
   }
@@ -152,42 +118,13 @@ export const useAppStore = defineStore('app', () => {
   // Initialize Tauri listener on store creation
   initTauriListener()
 
-  function clearError() {
-    error.value = null
-  }
-
-  function setTheme(newTheme: ThemeMode) {
-    theme.value = newTheme
-  }
-
-  function toggleTheme() {
-    if (theme.value === 'light') {
-      theme.value = 'dark'
-    } else if (theme.value === 'dark') {
-      theme.value = 'auto'
-    } else {
-      theme.value = 'light'
-    }
-  }
-
   return {
-    // State
-    backendConnected,
-    backendVersion,
-    loading,
-    error,
-    backendError,
+    // Theme
     theme,
     isDark,
-    // Getters
-    isReady,
-    // Actions
-    checkBackendHealth,
-    clearError,
     setTheme,
     toggleTheme,
-    startRetrying,
-    stopRetrying,
+    // Tauri
     startBackendServer
   }
 })

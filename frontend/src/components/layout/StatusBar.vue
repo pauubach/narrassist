@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { useAnalysisStore } from '@/stores/analysis'
-import { useAppStore } from '@/stores/app'
 import { useSystemStore } from '@/stores/system'
 import ProgressBar from 'primevue/progressbar'
 import Button from 'primevue/button'
@@ -41,22 +40,17 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const analysisStore = useAnalysisStore()
-const appStore = useAppStore()
 const systemStore = useSystemStore()
 
-// Versión de la aplicación (desde el backend, con fallback entre stores)
-// systemStore se inicializa via waitForBackend() en ModelSetupDialog al arrancar
-// appStore se inicializa via checkBackendHealth() en HomeView
+// Fuente única: systemStore (inicializado via waitForBackend en arranque)
 const appVersion = computed(() =>
-  appStore.backendVersion
-  || (systemStore.backendVersion !== 'unknown' ? systemStore.backendVersion : null)
-  || 'sin conexión'
+  systemStore.backendVersion !== 'unknown' ? systemStore.backendVersion : 'sin conexión'
 )
 
 // Si aún no tenemos versión, lanzar health check
 onMounted(async () => {
-  if (!appStore.backendVersion) {
-    await appStore.checkBackendHealth()
+  if (systemStore.backendVersion === 'unknown') {
+    await systemStore.checkBackendStatus()
   }
 })
 

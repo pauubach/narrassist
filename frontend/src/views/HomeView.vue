@@ -86,30 +86,25 @@ const router = useRouter()
 const appStore = useAppStore()
 const systemStore = useSystemStore()
 
-const backendStatus = computed(() => appStore.backendConnected)
-const backendError = computed(() => appStore.backendError)
+const backendStatus = computed(() => systemStore.backendConnected)
+const backendError = computed(() => systemStore.backendStartupError)
 const showBackendDisconnected = computed(() => !systemStore.backendStarting && !backendStatus.value)
 const isRetrying = ref(false)
 
 const retryConnection = async () => {
   isRetrying.value = true
-  await appStore.checkBackendHealth()
+  await systemStore.checkBackendStatus()
   if (!backendStatus.value) {
-    appStore.startRetrying()
+    systemStore.startRetrying()
   }
   isRetrying.value = false
 }
 
 onMounted(async () => {
-  await appStore.checkBackendHealth()
-  // Start auto-retry if not connected
+  await systemStore.checkBackendStatus()
   if (!backendStatus.value) {
-    appStore.startRetrying()
+    systemStore.startRetrying()
   }
-})
-
-onUnmounted(() => {
-  // Don't stop retrying when leaving home - let it continue in background
 })
 
 const goToProjects = () => {

@@ -110,6 +110,7 @@ export const useSystemStore = defineStore('system', () => {
   const backendStarting = ref(true)
   /** Error de timeout si el backend no responde a tiempo */
   const backendStartupError = ref<string | null>(null)
+  let retryInterval: number | null = null
 
   // Model status
   const modelsStatus = ref<ModelsStatus | null>(null)
@@ -579,6 +580,25 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
+  // ── Backend retry ─────────────────────────────────────
+  function startRetrying() {
+    if (retryInterval) return
+    retryInterval = window.setInterval(async () => {
+      if (!backendConnected.value) {
+        await checkBackendStatus()
+      } else {
+        stopRetrying()
+      }
+    }, 3000)
+  }
+
+  function stopRetrying() {
+    if (retryInterval) {
+      clearInterval(retryInterval)
+      retryInterval = null
+    }
+  }
+
   return {
     // State
     backendConnected,
@@ -615,6 +635,8 @@ export const useSystemStore = defineStore('system', () => {
     // Actions
     checkBackendStatus,
     waitForBackend,
+    startRetrying,
+    stopRetrying,
     checkModelsStatus,
     downloadModels,
     installDependencies,

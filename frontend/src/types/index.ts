@@ -24,6 +24,7 @@ export * from './domain/timeline'
 export * from './domain/chat'
 export * from './domain/corrections'
 export * from './domain/voice'
+export * from './domain/workspace'
 
 // =============================================================================
 // API Types (namespace para claridad)

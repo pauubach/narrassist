@@ -9,8 +9,9 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import type { WorkspaceTab } from '@/types'
 
-export type WorkspaceTab = 'text' | 'entities' | 'relationships' | 'alerts' | 'timeline' | 'style' | 'glossary' | 'summary'
+export type { WorkspaceTab }
 
 export type SidebarTab = 'chapters' | 'alerts' | 'characters' | 'assistant'
 
