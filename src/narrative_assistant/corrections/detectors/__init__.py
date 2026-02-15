@@ -16,6 +16,7 @@ from .grammar import GrammarDetector
 from .orthographic_variants import OrthographicVariantsDetector
 from .pov import POVDetector
 from .regional import RegionalDetector
+from .style_register import StyleRegisterDetector
 from .repetition import RepetitionDetector
 from .terminology import TerminologyDetector
 from .typography import TypographyDetector
@@ -35,4 +36,5 @@ __all__ = [
     "AnacolutoDetector",
     "POVDetector",
     "OrthographicVariantsDetector",
+    "StyleRegisterDetector",
 ]

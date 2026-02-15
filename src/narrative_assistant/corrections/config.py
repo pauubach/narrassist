@@ -447,6 +447,36 @@ class OrthographicVariantsConfig:
 
 
 @dataclass
+class StyleRegisterConfig:
+    """
+    Configuración del detector de estilo según tipo de documento.
+
+    Detecta violaciones de registro esperado (subjetividad en textos científicos,
+    imprecisión, retórica innecesaria, falta de hedging) según el perfil del documento.
+    """
+
+    enabled: bool = False  # OFF por defecto, se activa según tipo
+
+    # Sub-detectores
+    detect_first_person: bool = True
+    detect_opinion_verbs: bool = True
+    detect_vague_quantifiers: bool = True
+    detect_hedging_gaps: bool = True
+    detect_emotional_language: bool = True
+
+    # Perfil: "strict" (científico/técnico), "formal" (ensayo académico),
+    #         "moderate" (memorias/autoayuda), "free" (ficción)
+    profile: str = "moderate"
+
+    # Contexto: excluir diálogo y citas textuales
+    skip_dialogue: bool = True
+    skip_quotes: bool = True
+
+    # Confianza mínima para alertar
+    min_confidence: float = 0.7
+
+
+@dataclass
 class CorrectionConfig:
     """
     Configuración global de correcciones.
@@ -474,6 +504,7 @@ class CorrectionConfig:
     orthographic_variants: OrthographicVariantsConfig = field(
         default_factory=OrthographicVariantsConfig
     )
+    style_register: StyleRegisterConfig = field(default_factory=StyleRegisterConfig)
 
     # Configuración global
     # Máximo de issues por categoría (para no abrumar)
@@ -508,6 +539,7 @@ class CorrectionConfig:
             field_dictionary=FieldDictionaryConfig(
                 active_fields=[DocumentField.LITERARY, DocumentField.GENERAL],
             ),
+            style_register=StyleRegisterConfig(enabled=False, profile="free"),
         )
 
     @classmethod
@@ -532,6 +564,7 @@ class CorrectionConfig:
                 active_fields=[DocumentField.TECHNICAL, DocumentField.GENERAL],
                 alert_unexpected_field_terms=False,  # Tecnicismos esperados
             ),
+            style_register=StyleRegisterConfig(enabled=True, profile="strict"),
         )
 
     @classmethod
@@ -555,6 +588,7 @@ class CorrectionConfig:
             field_dictionary=FieldDictionaryConfig(
                 active_fields=[DocumentField.LEGAL, DocumentField.GENERAL],
             ),
+            style_register=StyleRegisterConfig(enabled=True, profile="strict"),
         )
 
     @classmethod
@@ -577,6 +611,7 @@ class CorrectionConfig:
             field_dictionary=FieldDictionaryConfig(
                 active_fields=[DocumentField.MEDICAL, DocumentField.GENERAL],
             ),
+            style_register=StyleRegisterConfig(enabled=True, profile="strict"),
         )
 
     @classmethod
@@ -600,6 +635,7 @@ class CorrectionConfig:
                 active_fields=[DocumentField.JOURNALISTIC, DocumentField.GENERAL],
                 suggest_accessible_alternatives=True,  # Para público general
             ),
+            style_register=StyleRegisterConfig(enabled=True, profile="formal"),
         )
 
     @classmethod
@@ -623,6 +659,7 @@ class CorrectionConfig:
                 active_fields=[DocumentField.SELFHELP, DocumentField.GENERAL],
                 suggest_accessible_alternatives=True,
             ),
+            style_register=StyleRegisterConfig(enabled=True, profile="moderate"),
         )
 
     def to_dict(self) -> dict:

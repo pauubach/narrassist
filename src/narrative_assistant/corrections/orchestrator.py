@@ -22,6 +22,7 @@ from .detectors import (
     POVDetector,
     RegionalDetector,
     RepetitionDetector,
+    StyleRegisterDetector,
     TerminologyDetector,
     TypographyDetector,
 )
@@ -69,6 +70,7 @@ class CorrectionOrchestrator:
             CorrectionCategory.CRUTCH_WORDS: CrutchWordsDetector(self.config.crutch_words),
             CorrectionCategory.ANACOLUTO: AnacolutoDetector(self.config.anacoluto),
             CorrectionCategory.POV: POVDetector(self.config.pov),
+            CorrectionCategory.STYLE_REGISTER: StyleRegisterDetector(self.config.style_register),
         }
 
         # Detectores que usan embeddings (inicializados bajo demanda)
@@ -343,6 +345,8 @@ class CorrectionOrchestrator:
             return self.config.anacoluto.enabled
         elif category == CorrectionCategory.POV:
             return self.config.pov.enabled
+        elif category == CorrectionCategory.STYLE_REGISTER:
+            return self.config.style_register.enabled
         return False
 
     def _limit_issues(
@@ -373,6 +377,7 @@ class CorrectionOrchestrator:
             CorrectionCategory.GLOSSARY: "glosario",
             CorrectionCategory.ANACOLUTO: "anacolutos",
             CorrectionCategory.POV: "punto de vista",
+            CorrectionCategory.STYLE_REGISTER: "estilo de registro",
         }.get(category, category.value)
 
     def get_summary(self, issues: list[CorrectionIssue]) -> dict:

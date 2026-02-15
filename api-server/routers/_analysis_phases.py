@@ -2458,6 +2458,25 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
         except Exception as cfg_err:
             logger.debug(f"Could not load project correction config: {cfg_err}")
 
+        # Activar style_register según tipo de documento clasificado
+        doc_type = ctx.get("document_type", "unknown")
+        _STYLE_REGISTER_PROFILES = {
+            "technical": ("strict", True),
+            "academic": ("strict", True),
+            "divulgation": ("strict", True),
+            "essay": ("formal", True),
+            "memoir": ("moderate", True),
+            "self_help": ("moderate", True),
+            "biography": ("moderate", True),
+            "fiction": ("free", False),
+            "drama": ("free", False),
+            "children": ("free", False),
+            "graphic": ("free", False),
+        }
+        profile, enabled = _STYLE_REGISTER_PROFILES.get(doc_type, ("moderate", False))
+        from narrative_assistant.corrections.config import StyleRegisterConfig
+        correction_config.style_register = StyleRegisterConfig(enabled=enabled, profile=profile)
+
         orchestrator = CorrectionOrchestrator(config=correction_config)
 
         correction_issues = orchestrator.analyze(

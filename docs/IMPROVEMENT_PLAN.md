@@ -2047,16 +2047,16 @@ Infraestructura existente (55% — backend core completo):
 > S16B NO debe implementarse hasta tener un backend de billing fiable (e.g., Cloud Functions,
 > servidor dedicado) con verificación de firma, idempotencia y reconciliación.
 
-**S16A: Quota Warnings + Tier UX [12h] (desktop-only, sin pagos)**
+**S16A: Quota Warnings + Tier UX [12h] (desktop-only, sin pagos) — ✅ COMPLETADO**
 
 | Tarea | Horas | Archivo | Detalle |
 |-------|-------|---------|---------|
-| S16-01 | 2h | `frontend/src/components/license/QuotaWarningBanner.vue` | Banner persistente: "Has usado 1,200 de 1,500 páginas este mes" (80%). A 90%: naranja con CTA "Ampliar". A 100%: rojo con "Límite alcanzado". |
-| S16-02 | 2h | `frontend/src/stores/license.ts` | Computed `quotaPercentage`, `quotaWarningLevel`. Auto-fetch al montar app. |
-| S16-03 | 2h | `api-server/routers/license.py` | `GET /api/license/quota-status` — devuelve `{used, limit, percentage, warning_level, days_remaining}`. |
-| S16-04 | 3h | `frontend/src/components/license/TierComparisonDialog.vue` | Feature matrix: Corrector vs Pro vs Editorial. Highlight current tier. CTA "Contactar para upgrade" (no pago directo). |
-| S16-05 | 1h | Tests | Test quota calculations. Test warning levels. |
-| S16-06 | 2h | Tests + docs | Test tier comparison render. Documentar tiers en FAQ. |
+| S16-01 | 2h | `frontend/src/components/license/QuotaWarningBanner.vue` | DONE — Banner 4 niveles (none/warning/danger/critical), dismissible con sessionStorage, auto-escalate |
+| S16-02 | 2h | `frontend/src/stores/license.ts` | DONE — `quotaPercentage`, `quotaWarningLevel` computeds, auto-fetch en mount |
+| S16-03 | 2h | `api-server/routers/license.py` | DONE — `GET /api/license/quota-status` con pages, percentage, warning_level, days_remaining |
+| S16-04 | 3h | `frontend/src/components/license/TierComparisonDialog.vue` | DONE — Feature matrix 11 features + 3 limits, founding badges, pricing con descuento |
+| S16-05 | 1h | Tests | DONE — 317 líneas en `test_s16_quota_status.py` |
+| S16-06 | 2h | Tests + docs | DONE — Tiers documentados en FAQ de UserGuideDialog |
 
 **S16B: Page Packs + Pagos [20-28h] (requiere backend público de billing)**
 
@@ -2073,6 +2073,54 @@ Infraestructura existente (55% — backend core completo):
 **Dependencias S16B**: Backend público de billing configurado. Stripe account. Clientes reales.
 **Criterio de éxito S16A**: Corrector ve cuántas páginas le quedan y qué incluye cada tier.
 **Criterio de éxito S16B**: Corrector compra pack de 500 páginas y se activa automáticamente.
+
+---
+
+#### Sprint S17: Detección de Estilo por Tipo de Documento [7-9h] ✅
+
+> **Lingüista Computacional**: "Detectar 1ª persona, verbos de opinión y cuantificadores vagos
+> en textos científicos es alta precisión con regex. Hedging gaps y lenguaje emocional también
+> son viables sin LLM."
+> **Corrector Editorial**: "Imprescindible para textos académicos y técnicos. En ficción no aplica."
+> **Arquitecto**: "5 sub-detectores independientes, sin spaCy (regex/lexical), ejecutan en paralelo
+> con tipografía. Perfiles por tipo de documento, exención automática de diálogo."
+
+| Tarea | Estado | Archivo | Detalle |
+|-------|--------|---------|---------|
+| ~~S17-01~~ | ✅ | `corrections/config.py` | `StyleRegisterConfig` dataclass + campo en `CorrectionConfig` + factory methods actualizados |
+| ~~S17-02~~ | ✅ | `corrections/types.py` | `StyleRegisterIssueType` enum (6 tipos) + `STYLE_REGISTER` en `CorrectionCategory` |
+| ~~S17-03~~ | ✅ | `corrections/detectors/style_register.py` | `StyleRegisterDetector`: 5 sub-detectores (1ª persona, opinión, vagos, hedging, emocional) |
+| ~~S17-04~~ | ✅ | `corrections/orchestrator.py` + `alerts/engine.py` | Registro en orquestador + mapeo a `AlertCategory.STYLE` |
+| ~~S17-05~~ | ✅ | `api-server/routers/_analysis_phases.py` | Activación automática según `document_type` (technical→strict, essay→formal, memoir→moderate, fiction→free) |
+| ~~S17-06~~ | ✅ | `tests/unit/test_style_register_detector.py` | 39 tests: perfiles × sub-detectores, exención diálogo, sugerencias, posiciones, hedging nearby |
+
+**Perfiles de estilo**:
+- **strict** (technical, academic, divulgation): Todo activo, confianza alta (~0.90)
+- **formal** (essay): Todo activo, confianza media (~0.70)
+- **moderate** (memoir, self_help, biography): Solo cuantificadores vagos + hedging gaps
+- **free** (fiction, drama, children, graphic): Detector desactivado
+
+**Sugerencias deterministas**: "Creemos que" → "Los datos sugieren que", "nosotros" → "Se observó",
+"varios estudios" → "[especifique número y cite]", "sorprendentemente" → [omitir/reformular].
+
+**Dependencias S17**: Ninguna (sistema de correcciones existente).
+**Criterio de éxito**: Artículo científico con subjetividad genera alertas de estilo; novela no.
+
+---
+
+### Backlog — Estilo Avanzado (post-S17)
+
+| ID | Acción | Detalle |
+|----|--------|---------|
+| BK-30 | RhetoricDetector (metáforas, símiles, preguntas retóricas) | Regex para patrones "como un/a" + POS. ~70% precisión estimada. |
+| BK-31 | LLM: subjetividad implícita | Prompt para qwen2.5: juicios morales disfrazados de hechos. ~80% precisión. |
+| BK-32 | LLM: coherencia argumentativa | Prompt para mistral: premisas→conclusión, saltos lógicos. ~72% precisión. |
+| BK-33 | LLM: afirmaciones sobreconfiadas | Prompt para qwen2.5: "siempre", "nunca", causación sin evidencia. ~79% precisión. |
+| BK-34 | Multi-model voting para estilo | Reutilizar patrón de expectation_inference.py. +15% precisión estimada. |
+| BK-35 | CorrectionConfigModal: pestaña "Estilo" | Matriz de severidad por regla × tipo documento. UI PrimeVue. |
+| BK-36 | Dashboard de métricas de estilo en StyleTab | Puntuación formalidad, adherencia al tipo, distribución por sub-detector. |
+| BK-37 | Estado "intencional" en alertas | Nuevo status + suppression_rules para persistir entre re-análisis. |
+| BK-38 | Perfiles estilo en correction_config/registry.py | Integrar con sistema nuevo de config (type→subtype→custom). |
 
 ---
 
@@ -2106,10 +2154,13 @@ Infraestructura existente (55% — backend core completo):
 ```
 COMPLETADO                                          PRÓXIMO (Version + Monetización)
 ───────────────────────────────────────────────── ──────────────────────────────────
-S0-S6 (NLP + Frontend) ✅                          S15 (BK-28 Version tracking)
-S7a-S7d (Licensing + UX) ✅                        S16 (BK-29 Step-up pricing)
-Sprint PP ✅ (17/17)                                ──────────────────────────────────
-Sprint S8 ✅ (S8a + S8b + S8c)                     APARCADO:
+S0-S6 (NLP + Frontend) ✅                          S16 (BK-29 Step-up pricing)
+S7a-S7d (Licensing + UX) ✅                        ──────────────────────────────────
+Sprint PP ✅ (17/17)                                BACKLOG ESTILO (BK-30..38):
+Sprint S8 ✅ (S8a + S8b + S8c)                     RhetoricDetector, LLM subjetividad,
+Sprint S15 ✅ (BK-28 Version tracking)              coherencia, config modal, dashboard
+Sprint S17 ✅ (Style Register Detection)            ──────────────────────────────────
+                                                    APARCADO:
 Sprint S9 ✅ (BK-09/15/17/10b/10c)                 BK-26 Collab online
 Sprint S10 ✅ (BK-14/11/12)                        Landing web, UserGuide PDF
 Sprint S11 ✅ (BK-13/16)                           EPUB/XLSX export, Maverick/BookNLP
@@ -2143,10 +2194,11 @@ Dependencias:
 | ~~Sprint S12~~ | ~~2-3h (1 día)~~ | ✅ COMPLETADO (BK-18) |
 | ~~Sprint S13~~ | ~~7-9h (1-2 días)~~ | ✅ COMPLETADO (BK-27 + BK-25 MVP) |
 | ~~Sprint S14~~ | ~~28-36h (5-7 días)~~ | ✅ COMPLETADO (BK-25 Revision Intelligence fases 1-3) |
-| Sprint S15 | 20-25h (4-5 días) | BK-28 fase 1 (version metrics, sparkline) |
+| ~~Sprint S15~~ | ~~20-25h (4-5 días)~~ | ✅ COMPLETADO (BK-28 version metrics, sparkline) |
 | Sprint S16A | 12h (2-3 días) | BK-29 UX (quota warnings, tier comparison) |
 | Sprint S16B | 20-28h (4-6 días) | BK-29 pagos (requiere backend billing público) |
-| **TOTAL restante** | **~52-65h (~2-3 semanas)** | S15 + S16A (+S16B condicionado) |
+| ~~Sprint S17~~ | ~~7-9h (1-2 días)~~ | ✅ COMPLETADO (Style Register: 5 sub-detectores, 4 perfiles, 39 tests) |
+| **TOTAL restante** | **~32-40h (~1-2 semanas)** | S16A (+S16B condicionado) |
 
 ---
 

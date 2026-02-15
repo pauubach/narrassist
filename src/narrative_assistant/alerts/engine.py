@@ -696,6 +696,7 @@ class AlertEngine:
             "punctuation": AlertCategory.PUNCTUATION,
             "repetition": AlertCategory.REPETITION,
             "agreement": AlertCategory.AGREEMENT,
+            "style_register": AlertCategory.STYLE,
         }
         alert_category = category_map.get(category, AlertCategory.STYLE)
 
@@ -708,6 +709,7 @@ class AlertEngine:
             "punctuation": "Puntuación",
             "repetition": "Repetición",
             "agreement": "Concordancia",
+            "style_register": "Estilo",
         }
         title_prefix = category_titles.get(category, "Corrección")
 

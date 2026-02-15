@@ -127,6 +127,17 @@ class POVIssueType(Enum):
     INCONSISTENT_OMNISCIENCE = "inconsistent_omniscience"  # Omnisciencia inconsistente
 
 
+class StyleRegisterIssueType(Enum):
+    """Tipos de violaciones de estilo por registro de documento."""
+
+    FIRST_PERSON_PRONOUN = "first_person_pronoun"  # Pronombre en 1ª persona
+    FIRST_PERSON_VERB = "first_person_verb"  # Verbo conjugado en 1ª persona
+    OPINION_VERB = "opinion_verb"  # Verbo de opinión (creo, opino, pienso)
+    VAGUE_QUANTIFIER = "vague_quantifier"  # Cuantificador impreciso (varios, muchos)
+    ASSERTION_NO_HEDGING = "assertion_no_hedging"  # Aserción sin matiz (demuestra vs sugiere)
+    EMOTIONAL_LANGUAGE = "emotional_language"  # Lenguaje emocional (sorprendentemente)
+
+
 class CorrectionCategory(Enum):
     """Categorías principales de correcciones."""
 
@@ -144,3 +155,4 @@ class CorrectionCategory(Enum):
     ANACOLUTO = "anacoluto"  # Anacolutos (rupturas sintácticas)
     POV = "pov"  # Punto de vista narrativo
     ORTHOGRAPHY = "orthography"  # Variantes ortográficas RAE
+    STYLE_REGISTER = "style_register"  # Estilo por tipo de documento
