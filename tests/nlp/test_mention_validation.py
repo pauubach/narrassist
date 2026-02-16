@@ -10,6 +10,8 @@ Suite completa de 30+ tests que cubren:
 - Casos ambiguos
 """
 
+import re
+
 import pytest
 
 from narrative_assistant.nlp.mention_validation import (
@@ -357,6 +359,96 @@ class TestEdgeCases:
 
         # Debe procesar sin timeout
         assert result.is_valid == False  # Contexto posesivo
+        assert result.confidence >= 0.85
+
+    def test_mention_at_text_start(self, validator_regex_only):
+        """Mención justo al inicio del texto (boundary condition)."""
+        text = "Isabel preparó el veneno con cuidado."
+        mention = Mention(text="Isabel", position=0)
+
+        result = validator_regex_only.validate(mention, text, {"Isabel"})
+
+        # Inicio de oración → alta confianza
+        assert result.is_valid == True
+        assert result.confidence >= 0.80
+
+    def test_mention_at_text_end(self, validator_regex_only):
+        """Mención justo al final del texto (boundary condition)."""
+        text = "El veneno fue preparado por Isabel"
+        mention = Mention(text="Isabel", position=text.index("Isabel"))
+
+        result = validator_regex_only.validate(mention, text, {"Isabel"})
+
+        # Pasiva con "por" → alta confianza
+        assert result.is_valid == True
+        assert result.confidence >= 0.85
+
+    def test_compound_name_with_apostrophe(self, validator_regex_only):
+        """Nombres compuestos con apóstrofo (O'Brien, D'Artagnan)."""
+        text = "O'Brien preparó el informe ayer."
+        mention = Mention(text="O'Brien", position=0)
+
+        result = validator_regex_only.validate(mention, text, {"O'Brien"})
+
+        assert result.is_valid == True
+        assert result.confidence >= 0.80
+
+    def test_compound_name_with_spaces(self, validator_regex_only):
+        """Nombres compuestos con espacios (María José, San Pedro)."""
+        text = "María José era la hermana del capitán."
+        mention = Mention(text="María José", position=0)
+
+        result = validator_regex_only.validate(mention, text, {"María José"})
+
+        assert result.is_valid == True
+        assert result.confidence >= 0.80
+
+    def test_mention_with_newline_before(self, validator_regex_only):
+        """Mención precedida por salto de línea."""
+        text = "El farmacéutico preparó el veneno.\n\nIsabel no sabía nada."
+        mention = Mention(text="Isabel", position=text.index("Isabel"))
+
+        result = validator_regex_only.validate(mention, text, {"Isabel"})
+
+        # Inicio de párrafo, pero regex no puede detectarlo visualmente
+        # → confianza media (no hay verbo inmediato después)
+        assert result.is_valid == True
+        assert result.confidence >= 0.60
+
+    def test_multiple_mentions_close_together(self, validator_regex_only):
+        """Múltiples menciones de la misma entidad muy cercanas."""
+        text = "Isabel vio a Isabel en el espejo. Isabel estaba cambiada."
+        positions = [m.start() for m in re.finditer(r"\bIsabel\b", text)]
+
+        results = []
+        for pos in positions:
+            mention = Mention(text="Isabel", position=pos)
+            results.append(validator_regex_only.validate(mention, text, {"Isabel"}))
+
+        # Todas deben ser válidas
+        assert all(r.is_valid for r in results)
+        assert len(results) == 3
+
+    def test_mention_inside_parentheses(self, validator_regex_only):
+        """Mención dentro de paréntesis (contexto explicativo)."""
+        text = "El farmacéutico (amante de Isabel) preparó el veneno."
+        mention = Mention(text="Isabel", position=text.index("Isabel"))
+
+        result = validator_regex_only.validate(mention, text, {"Isabel"})
+
+        # Contexto posesivo → debe filtrar
+        assert result.is_valid == False
+        assert result.confidence >= 0.85
+
+    def test_mention_with_multiple_whitespace(self, validator_regex_only):
+        """Mención con espacios múltiples alrededor."""
+        text = "El libro fue escrito por    Isabel    en 1920."
+        mention = Mention(text="Isabel", position=text.index("Isabel"))
+
+        result = validator_regex_only.validate(mention, text, {"Isabel"})
+
+        # Pasiva con "por" → alta confianza
+        assert result.is_valid == True
         assert result.confidence >= 0.85
 
 
