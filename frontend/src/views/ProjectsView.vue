@@ -32,8 +32,8 @@
 
     <div class="content">
       <!-- Estado: Cargando -->
-      <div v-if="projectsStore.loading" class="loading-state">
-        <DsSkeleton variant="card" :rows="3" />
+      <div v-if="projectsStore.loading" class="projects-grid">
+        <DsSkeleton v-for="i in 3" :key="i" variant="project-card" />
       </div>
 
       <!-- Estado: Error -->
@@ -638,7 +638,6 @@ onUnmounted(() => {
 }
 
 /* Estados vacíos */
-.loading-state,
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -646,11 +645,6 @@ onUnmounted(() => {
   justify-content: center;
   padding: 4rem 2rem;
   text-align: center;
-}
-
-.loading-state p {
-  margin-top: 1rem;
-  color: var(--text-color-secondary);
 }
 
 .empty-icon {

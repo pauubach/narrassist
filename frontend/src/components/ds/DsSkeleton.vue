@@ -20,6 +20,27 @@
       </div>
     </template>
 
+    <template v-else-if="variant === 'project-card'">
+      <div class="ds-skeleton__project-card">
+        <div class="ds-skeleton__pc-header">
+          <div class="ds-skeleton__pc-badge shimmer" />
+        </div>
+        <div class="ds-skeleton__pc-body">
+          <div class="ds-skeleton__line shimmer" style="width: 65%; height: 18px" />
+          <div class="ds-skeleton__line shimmer" style="width: 40%; height: 12px; opacity: 0.6" />
+          <div class="ds-skeleton__pc-stats">
+            <div class="ds-skeleton__pc-stat shimmer" />
+            <div class="ds-skeleton__pc-stat shimmer" />
+            <div class="ds-skeleton__pc-stat shimmer" />
+          </div>
+          <div class="ds-skeleton__line shimmer" style="width: 100%; height: 6px; border-radius: 3px" />
+        </div>
+        <div class="ds-skeleton__pc-footer">
+          <div class="ds-skeleton__line shimmer" style="width: 60px; height: 14px; margin-left: auto" />
+        </div>
+      </div>
+    </template>
+
     <template v-else>
       <!-- variant === 'text' -->
       <div
@@ -32,7 +53,7 @@
 
 <script setup lang="ts">
 interface Props {
-  variant?: 'text' | 'list' | 'card'
+  variant?: 'text' | 'list' | 'card' | 'project-card'
   rows?: number
   showAvatar?: boolean
 }
@@ -132,6 +153,51 @@ function lineWidth(index: number): string {
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-2, 0.5rem);
+}
+
+/* Project-card variant (matches ProjectsView cards) */
+.ds-skeleton__project-card {
+  border: 1px solid var(--surface-border, #e2e8f0);
+  border-radius: var(--app-radius);
+  overflow: hidden;
+}
+
+.ds-skeleton__pc-header {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  background: var(--surface-50, #f8fafc);
+}
+
+.ds-skeleton__pc-badge {
+  width: 60px;
+  height: 24px;
+  border-radius: var(--app-radius);
+}
+
+.ds-skeleton__pc-body {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ds-skeleton__pc-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 0.5rem 0;
+}
+
+.ds-skeleton__pc-stat {
+  height: 40px;
+  border-radius: var(--app-radius);
+}
+
+.ds-skeleton__pc-footer {
+  display: flex;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--surface-border, #e2e8f0);
 }
 
 /* Reduced motion */

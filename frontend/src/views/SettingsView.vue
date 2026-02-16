@@ -27,21 +27,15 @@
             </a>
           </li>
           <li>
+            <a href="#analizador-ia" :class="{ active: activeSection === 'analizador-ia' }" @click.prevent="scrollToSection('analizador-ia')">
+              <i class="pi pi-microchip-ai"></i>
+              <span>Analizador Semántico</span>
+            </a>
+          </li>
+          <li>
             <a href="#metodos-nlp" :class="{ active: activeSection === 'metodos-nlp' }" @click.prevent="scrollToSection('metodos-nlp')">
               <i class="pi pi-sliders-h"></i>
-              <span>Métodos de Análisis</span>
-            </a>
-          </li>
-          <li>
-            <a href="#notificaciones" :class="{ active: activeSection === 'notificaciones' }" @click.prevent="scrollToSection('notificaciones')">
-              <i class="pi pi-bell"></i>
-              <span>Notificaciones</span>
-            </a>
-          </li>
-          <li>
-            <a href="#privacidad" :class="{ active: activeSection === 'privacidad' }" @click.prevent="scrollToSection('privacidad')">
-              <i class="pi pi-shield"></i>
-              <span>Privacidad</span>
+              <span>Métodos de Detección</span>
             </a>
           </li>
           <li>
@@ -51,9 +45,9 @@
             </a>
           </li>
           <li>
-            <a href="#mantenimiento" :class="{ active: activeSection === 'mantenimiento' }" @click.prevent="scrollToSection('mantenimiento')">
-              <i class="pi pi-wrench"></i>
-              <span>Mantenimiento</span>
+            <a href="#datos-mantenimiento" :class="{ active: activeSection === 'datos-mantenimiento' }" @click.prevent="scrollToSection('datos-mantenimiento')">
+              <i class="pi pi-database"></i>
+              <span>Datos y Mantenimiento</span>
             </a>
           </li>
         </ul>
@@ -92,8 +86,8 @@
                 </p>
               </div>
 
-              <!-- Presets como botones -->
-              <div class="sensitivity-presets">
+              <!-- Presets como botones (2x2 en pantallas anchas) -->
+              <div class="sensitivity-presets-grid">
                 <button
                   v-for="preset in sensitivityPresets"
                   :key="preset.value"
@@ -227,20 +221,45 @@
                 />
               </div>
             </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Notificaciones de análisis</label>
+                <p class="setting-description">Notificar cuando el análisis se complete</p>
+              </div>
+              <div class="setting-control">
+                <ToggleSwitch
+                  v-model="settings.notifyAnalysisComplete"
+                  @change="onSettingChange"
+                />
+              </div>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Sonidos</label>
+                <p class="setting-description">Reproducir sonidos para eventos importantes</p>
+              </div>
+              <div class="setting-control">
+                <ToggleSwitch
+                  v-model="settings.soundEnabled"
+                  @change="onSettingChange"
+                />
+              </div>
+            </div>
           </template>
         </Card>
 
-        <!-- Métodos de Análisis -->
-        <Card id="metodos-nlp">
+        <!-- Analizador Semántico (IA) -->
+        <Card id="analizador-ia">
           <template #title>
             <div class="section-title">
-              <i class="pi pi-sliders-h"></i>
-              <span>Métodos de Análisis</span>
+              <i class="pi pi-microchip-ai"></i>
+              <span>Analizador Semántico</span>
               <Tag v-if="loadingCapabilities" value="Cargando..." severity="info" />
             </div>
           </template>
           <template #content>
-            <!-- 1. Analizador Semántico -->
             <div class="nlp-category">
               <div class="category-header">
                 <h4>
@@ -382,8 +401,19 @@
                 </div>
               </div>
             </div>
+          </template>
+        </Card>
 
-            <!-- 3. Correferencia -->
+        <!-- Métodos de Detección -->
+        <Card id="metodos-nlp">
+          <template #title>
+            <div class="section-title">
+              <i class="pi pi-sliders-h"></i>
+              <span>Métodos de Detección</span>
+            </div>
+          </template>
+          <template #content>
+            <!-- Correferencia -->
             <div class="nlp-category">
               <div class="category-header">
                 <h4><i class="pi pi-link"></i> Seguimiento de referencias</h4>
@@ -620,78 +650,6 @@
           </template>
         </Card>
 
-        <!-- Notificaciones -->
-        <Card id="notificaciones">
-          <template #title>
-            <div class="section-title">
-              <i class="pi pi-bell"></i>
-              <span>Notificaciones</span>
-            </div>
-          </template>
-          <template #content>
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Notificaciones de análisis</label>
-                <p class="setting-description">Notificar cuando el análisis se complete</p>
-              </div>
-              <div class="setting-control">
-                <ToggleSwitch
-                  v-model="settings.notifyAnalysisComplete"
-                  @change="onSettingChange"
-                />
-              </div>
-            </div>
-
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Sonidos</label>
-                <p class="setting-description">Reproducir sonidos para eventos importantes</p>
-              </div>
-              <div class="setting-control">
-                <ToggleSwitch
-                  v-model="settings.soundEnabled"
-                  @change="onSettingChange"
-                />
-              </div>
-            </div>
-          </template>
-        </Card>
-
-        <!-- Privacidad y Datos -->
-        <Card id="privacidad">
-          <template #title>
-            <div class="section-title">
-              <i class="pi pi-shield"></i>
-              <span>Privacidad y Datos</span>
-            </div>
-          </template>
-          <template #content>
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Ubicación de datos</label>
-                <p class="setting-description">
-                  Los proyectos se guardan en: <code>{{ dataLocation }}</code>
-                </p>
-              </div>
-              <div class="setting-control">
-                <Button
-                  label="Cambiar ubicación"
-                  icon="pi pi-folder-open"
-                  outlined
-                  @click="changeDataLocation"
-                />
-              </div>
-            </div>
-
-            <Message severity="info" :closable="false" class="info-message">
-              <span class="message-content">
-                <strong>Modo 100% offline:</strong> Tus manuscritos nunca salen de tu máquina.
-                Esta aplicación no envía datos a internet excepto para verificación de licencia.
-              </span>
-            </Message>
-          </template>
-        </Card>
-
         <!-- Correcciones -->
         <Card id="correcciones">
           <template #title>
@@ -868,15 +826,39 @@
           </template>
         </Card>
 
-        <!-- Acciones -->
-        <Card id="mantenimiento">
+        <!-- Datos y Mantenimiento -->
+        <Card id="datos-mantenimiento">
           <template #title>
             <div class="section-title">
-              <i class="pi pi-wrench"></i>
-              <span>Mantenimiento</span>
+              <i class="pi pi-database"></i>
+              <span>Datos y Mantenimiento</span>
             </div>
           </template>
           <template #content>
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Ubicación de datos</label>
+                <p class="setting-description">
+                  Los proyectos se guardan en: <code>{{ dataLocation }}</code>
+                </p>
+              </div>
+              <div class="setting-control">
+                <Button
+                  label="Cambiar ubicación"
+                  icon="pi pi-folder-open"
+                  outlined
+                  @click="changeDataLocation"
+                />
+              </div>
+            </div>
+
+            <Message severity="info" :closable="false" class="info-message">
+              <span class="message-content">
+                <strong>Modo 100% offline:</strong> Tus manuscritos nunca salen de tu máquina.
+                Esta aplicación no envía datos a internet excepto para verificación de licencia.
+              </span>
+            </Message>
+
             <div class="setting-item">
               <div class="setting-info">
                 <label class="setting-label">Modelos NLP</label>
@@ -1487,7 +1469,7 @@ const scrollToSection = (sectionId: string) => {
 const handleScroll = () => {
   if (!contentArea.value) return
 
-  const sections = ['apariencia', 'analisis', 'metodos-nlp', 'notificaciones', 'privacidad', 'correcciones', 'mantenimiento', 'acerca-de']
+  const sections = ['apariencia', 'analisis', 'analizador-ia', 'metodos-nlp', 'correcciones', 'datos-mantenimiento']
   const scrollPosition = contentArea.value.scrollTop + 100
 
   for (const sectionId of sections) {
@@ -1651,17 +1633,12 @@ async function onUninstallModel(modelName: string) {
 .settings-content {
   flex: 1;
   overflow-y: auto;
-  padding: 2rem;
+  padding: 2rem 2.5rem;
   scroll-behavior: smooth;
 }
 
-.settings-content > :deep(*) {
-  max-width: 800px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
 .settings-content > :deep(.p-card) {
+  max-width: 1100px;
   margin-bottom: 1.5rem;
 }
 
@@ -2373,10 +2350,10 @@ async function onUninstallModel(modelName: string) {
   margin-bottom: 0.5rem;
 }
 
-/* Presets como botones grandes */
-.sensitivity-presets {
-  display: flex;
-  flex-direction: column;
+/* Presets como botones grandes (2x2 en pantallas anchas) */
+.sensitivity-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 0.75rem;
   margin-bottom: 1.5rem;
 }

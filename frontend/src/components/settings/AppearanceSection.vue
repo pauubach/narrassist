@@ -156,71 +156,70 @@
     </div>
   </div>
 
-  <!-- Tamaño de fuente -->
-  <div class="setting-item">
-    <div class="setting-info">
-      <label class="setting-label">Tamaño de fuente</label>
-      <p class="setting-description">Tamaño base del texto en toda la aplicación</p>
+  <!-- Controles compactos: 2 columnas en pantallas anchas -->
+  <div class="compact-settings-grid">
+    <div class="setting-item">
+      <div class="setting-info">
+        <label class="setting-label">Tamaño de fuente</label>
+        <p class="setting-description">Tamaño base del texto</p>
+      </div>
+      <div class="setting-control">
+        <SelectButton
+          :model-value="themeStore.config.fontSize"
+          :options="fontSizeOptions"
+          option-label="label"
+          option-value="value"
+          @update:model-value="(val) => themeStore.setFontSize(val)"
+        />
+      </div>
     </div>
-    <div class="setting-control">
-      <SelectButton
-        :model-value="themeStore.config.fontSize"
-        :options="fontSizeOptions"
-        option-label="label"
-        option-value="value"
-        @update:model-value="(val) => themeStore.setFontSize(val)"
-      />
-    </div>
-  </div>
 
-  <!-- Interlineado -->
-  <div class="setting-item">
-    <div class="setting-info">
-      <label class="setting-label">Interlineado</label>
-      <p class="setting-description">Espaciado entre líneas del texto</p>
+    <div class="setting-item">
+      <div class="setting-info">
+        <label class="setting-label">Interlineado</label>
+        <p class="setting-description">Espaciado entre líneas</p>
+      </div>
+      <div class="setting-control">
+        <Select
+          :model-value="themeStore.config.lineHeight"
+          :options="lineHeightOptions"
+          option-label="label"
+          option-value="value"
+          @update:model-value="onLineHeightChange"
+        />
+      </div>
     </div>
-    <div class="setting-control">
-      <Select
-        :model-value="themeStore.config.lineHeight"
-        :options="lineHeightOptions"
-        option-label="label"
-        option-value="value"
-        @update:model-value="onLineHeightChange"
-      />
-    </div>
-  </div>
 
-  <!-- Radio de bordes -->
-  <div class="setting-item">
-    <div class="setting-info">
-      <label class="setting-label">Bordes redondeados</label>
-      <p class="setting-description">Nivel de redondeo en botones y tarjetas</p>
+    <div class="setting-item">
+      <div class="setting-info">
+        <label class="setting-label">Bordes redondeados</label>
+        <p class="setting-description">Redondeo en botones y tarjetas</p>
+      </div>
+      <div class="setting-control">
+        <SelectButton
+          :model-value="themeStore.config.radius"
+          :options="radiusOptions"
+          option-label="label"
+          option-value="value"
+          @update:model-value="(val) => themeStore.setRadius(val)"
+        />
+      </div>
     </div>
-    <div class="setting-control">
-      <SelectButton
-        :model-value="themeStore.config.radius"
-        :options="radiusOptions"
-        option-label="label"
-        option-value="value"
-        @update:model-value="(val) => themeStore.setRadius(val)"
-      />
-    </div>
-  </div>
 
-  <!-- Densidad de UI -->
-  <div class="setting-item">
-    <div class="setting-info">
-      <label class="setting-label">Densidad de la interfaz</label>
-      <p class="setting-description">Espaciado entre elementos de la interfaz</p>
-    </div>
-    <div class="setting-control">
-      <SelectButton
-        :model-value="themeStore.config.compactness"
-        :options="compactnessOptions"
-        option-label="label"
-        option-value="value"
-        @update:model-value="(val) => themeStore.setCompactness(val)"
-      />
+    <div class="setting-item">
+      <div class="setting-info">
+        <label class="setting-label">Densidad de la interfaz</label>
+        <p class="setting-description">Espaciado entre elementos</p>
+      </div>
+      <div class="setting-control">
+        <SelectButton
+          :model-value="themeStore.config.compactness"
+          :options="compactnessOptions"
+          option-label="label"
+          option-value="value"
+          @update:model-value="(val) => themeStore.setCompactness(val)"
+        />
+      </div>
     </div>
   </div>
 
@@ -638,5 +637,51 @@ const onReducedMotionChange = (val: boolean) => {
 /* Aumentar el tamaño de fuente en las previsualizaciones del selector para que se vea bien */
 .font-option .font-name {
   font-size: 1.1rem;
+}
+
+/* ============================================================================
+   Grid 2-col para controles compactos (font size, line height, radius, density)
+   ============================================================================ */
+
+.compact-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 0;
+  border-bottom: 1px solid var(--p-surface-200);
+}
+
+:global(.dark) .compact-settings-grid {
+  border-bottom-color: var(--p-surface-700);
+}
+
+.compact-settings-grid .setting-item {
+  border-bottom: none;
+  border-right: 1px solid var(--p-surface-200);
+}
+
+:global(.dark) .compact-settings-grid .setting-item {
+  border-right-color: var(--p-surface-700);
+}
+
+/* Remove right border on last column items */
+.compact-settings-grid .setting-item:nth-child(2n) {
+  border-right: none;
+}
+
+/* Single column: remove all right borders */
+@media (max-width: 900px) {
+  .compact-settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .compact-settings-grid .setting-item {
+    border-right: none;
+    border-bottom: 1px solid var(--p-surface-200);
+  }
+  :global(.dark) .compact-settings-grid .setting-item {
+    border-bottom-color: var(--p-surface-700);
+  }
+  .compact-settings-grid .setting-item:last-child {
+    border-bottom: none;
+  }
 }
 </style>
