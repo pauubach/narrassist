@@ -26,6 +26,16 @@ from .base import (
     GrammarSeverity,
 )
 
+# S15: Detector híbrido de 'a' tónica (lista + automático)
+try:
+    from .stress_detector import requires_masculine_article
+    STRESS_DETECTOR_AVAILABLE = True
+except ImportError:
+    STRESS_DETECTOR_AVAILABLE = False
+    def requires_masculine_article(*args, **kwargs):  # type: ignore
+        """Fallback cuando stress_detector no está disponible."""
+        return False
+
 # =============================================================================
 # Listas de verbos para reglas de dequeísmo/queísmo
 # =============================================================================
@@ -985,19 +995,25 @@ def check_gender_agreement(doc: Doc) -> list[GrammarIssue]:
                 # Regla: En SINGULAR llevan "el"/"un" (por eufonía)
                 # En PLURAL llevan "las"/"unas" (normal)
 
-                # EXCEPCIÓN: Verificar si es un caso que usa "la" explícitamente
-                if noun_lower in FEMININE_WITH_LA_EXCEPTIONS:
-                    continue  # Estas palabras usan "la", no "el"
+                # S15: Usar detector híbrido (lista + automático)
+                # Determinar si es plural
+                noun_is_plural_morph = noun.morph.get("Number")  # type: ignore[call-arg]
+                noun_is_plural = noun_is_plural_morph and noun_is_plural_morph[0] == "Plur"  # type: ignore[index]
 
-                if noun_lower in FEMININE_WITH_EL:
-                    # Obtener número del sustantivo
-                    noun_is_plural = noun.morph.get("Number")  # type: ignore[call-arg]
-                    noun_is_plural = noun_is_plural and noun_is_plural[0] == "Plur"  # type: ignore[index]
+                # Heurística si spaCy no da número
+                if not noun_is_plural:
+                    noun_is_plural = noun_lower.endswith("s")
 
-                    # Heurística si spaCy no da número: palabras que terminan en -s son plural
-                    if not noun_is_plural:
-                        noun_is_plural = noun_lower.endswith("s")
+                # Usar detector híbrido para verificar si requiere "el"
+                needs_masculine = requires_masculine_article(
+                    word=noun_lower,
+                    is_feminine=True,  # Asumimos que es femenino si llegamos aquí
+                    is_plural=noun_is_plural,
+                    use_static_list=True,  # Siempre usar lista estática (fast path)
+                    use_automatic_detection=STRESS_DETECTOR_AVAILABLE,  # Auto solo si disponible
+                )
 
+                if needs_masculine:
                     # SINGULAR: debe usar "el"/"un", NO "la"/"una"
                     if not noun_is_plural and det_lower in ("la", "una"):
                         issues.append(

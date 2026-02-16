@@ -26,6 +26,9 @@ dependencies = [
     # coreferee incompatible con spacy>=3.7 - hacer opcional con fallback
     "sentence-transformers>=2.2.0,<3.0.0",
 
+    # Spanish linguistics (S15 - hybrid a-tónica detection)
+    "silabeador>=1.1.0",  # Syllabification and stress detection (99.81% accuracy)
+
     # Document parsing (MVP)
     "python-docx>=1.1.0",
     "chardet>=5.0.0",
