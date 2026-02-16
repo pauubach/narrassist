@@ -331,7 +331,10 @@
                   <p class="llm-model-desc">{{ model.description }}</p>
                   <div class="llm-model-footer">
                     <template v-if="getModelOperationLabel(model.value)">
-                      <Tag :value="getModelOperationLabel(model.value) || ''" severity="info" />
+                      <span class="llm-model-busy">
+                        <i class="pi pi-spin pi-spinner"></i>
+                        {{ getModelOperationLabel(model.value) }}
+                      </span>
                     </template>
                     <template v-else-if="model.installed">
                       <span class="llm-model-installed"><i class="pi pi-check"></i> Instalado</span>
@@ -1915,6 +1918,19 @@ async function onUninstallModel(modelName: string) {
 
 .llm-model-installed i {
   font-size: 0.7rem;
+}
+
+.llm-model-busy {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--p-primary-color);
+}
+
+.llm-model-busy i {
+  font-size: 0.75rem;
 }
 
 .llm-model-action {
