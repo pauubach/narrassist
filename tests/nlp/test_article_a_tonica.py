@@ -175,6 +175,38 @@ class TestArticleATonica:
         issues = check_gender_agreement(doc)
         assert len(issues) == 0
 
+    # =============================================================================
+    # Nuevas palabras (S15 - investigación ampliada)
+    # =============================================================================
+
+    def test_singular_el_acta(self, nlp):
+        """✓ 'el acta' es correcto."""
+        text = "El acta fue firmada por todos."
+        doc = nlp(text)
+        issues = check_gender_agreement(doc)
+        assert len(issues) == 0
+
+    def test_singular_el_aria(self, nlp):
+        """✓ 'el aria' es correcto."""
+        text = "El aria fue cantada magistralmente."
+        doc = nlp(text)
+        issues = check_gender_agreement(doc)
+        assert len(issues) == 0
+
+    def test_singular_el_ascua(self, nlp):
+        """✓ 'el ascua' es correcto."""
+        text = "El ascua todavía estaba caliente."
+        doc = nlp(text)
+        issues = check_gender_agreement(doc)
+        assert len(issues) == 0
+
+    def test_singular_el_anima(self, nlp):
+        """✓ 'el ánima' es correcto."""
+        text = "El ánima errante vagaba por la casa."
+        doc = nlp(text)
+        issues = check_gender_agreement(doc)
+        assert len(issues) == 0
+
 
 class TestArticleATonicaEdgeCases:
     """Tests para casos especiales y edge cases."""
@@ -204,3 +236,50 @@ class TestArticleATonicaEdgeCases:
 
         # Debe detectar 2 errores: "la ama" y "la agua"
         assert len(issues) >= 2, f"Debe detectar 2 errores, encontró {len(issues)}"
+
+
+class TestArticleATonicaExceptions:
+    """Tests para excepciones de la regla (usan 'la', no 'el')."""
+
+    def test_letra_a_usa_la(self, nlp):
+        """✓ 'la a' es correcto (letra del alfabeto)."""
+        text = "La a es la primera letra."
+        doc = nlp(text)
+        issues = check_gender_agreement(doc)
+
+        # No debe reportar error: "la a" es correcto (excepción RAE)
+        errors = [i for i in issues if "la a" in i.text.lower()]
+        assert len(errors) == 0, "No debe reportar error en 'la a' (letra del alfabeto)"
+
+    def test_letra_hache_usa_la(self, nlp):
+        """✓ 'la hache' es correcto (letra del alfabeto)."""
+        text = "La hache es muda en español."
+        doc = nlp(text)
+        issues = check_gender_agreement(doc)
+
+        # No debe reportar error: "la hache" es correcto (excepción RAE)
+        errors = [i for i in issues if "hache" in i.text.lower()]
+        assert len(errors) == 0, "No debe reportar error en 'la hache' (letra del alfabeto)"
+
+    def test_letra_alfa_usa_la(self, nlp):
+        """✓ 'la alfa' es correcto (letra griega)."""
+        text = "La alfa y la omega."
+        doc = nlp(text)
+        issues = check_gender_agreement(doc)
+
+        # No debe reportar error: "la alfa" es correcto (excepción RAE)
+        errors = [i for i in issues if "alfa" in i.text.lower()]
+        assert len(errors) == 0, "No debe reportar error en 'la alfa' (letra griega)"
+
+    def test_adjetivo_interpuesto_usa_la(self, nlp):
+        """✓ 'la majestuosa águila' es correcto (adjetivo interpuesto)."""
+        # Nota: Este caso es complejo de detectar automáticamente
+        # La regla dice: cuando hay adjetivo entre artículo y sustantivo, usar "la"
+        text = "La majestuosa águila sobrevolaba el valle."
+        doc = nlp(text)
+        issues = check_gender_agreement(doc)
+
+        # Idealmente NO debe reportar error
+        # (pero puede reportarlo si no detectamos el adjetivo interpuesto)
+        # Este test documenta el comportamiento esperado
+        pass  # No hacer assert por ahora, solo documentar

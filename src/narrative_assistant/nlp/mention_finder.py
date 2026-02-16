@@ -3,11 +3,15 @@ Buscador de menciones adicionales de entidades.
 
 Después del NER, busca ocurrencias adicionales de nombres ya conocidos
 en el texto para completar el conteo de menciones.
+
+Incluye validación adaptativa (regex + spaCy) para filtrar menciones
+en contextos posesivos (ej: "el amante de Isabel").
 """
 
 import logging
 import re
 from dataclasses import dataclass
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +25,8 @@ class FoundMention:
     start_char: int
     end_char: int
     confidence: float = 0.9
+    validation_method: Optional[str] = None  # "regex", "spacy", None
+    validation_reasoning: Optional[str] = None  # Explicación de validación
 
 
 class MentionFinder:
@@ -29,6 +35,9 @@ class MentionFinder:
 
     Complementa el NER buscando todas las ocurrencias de nombres
     que ya fueron identificados como entidades.
+
+    Incluye sistema de validación adaptativa para filtrar contextos
+    posesivos (ej: "el amante de Isabel" → Isabel NO es el referente).
     """
 
     # Palabras que no deben buscarse como menciones (muy comunes)
@@ -59,6 +68,8 @@ class MentionFinder:
         min_name_length: int = 2,
         case_sensitive: bool = False,
         whole_word_only: bool = True,
+        filter_possessive_contexts: bool = True,
+        use_spacy_validation: bool = True,
     ):
         """
         Inicializa el buscador.
@@ -67,10 +78,27 @@ class MentionFinder:
             min_name_length: Longitud mínima de nombre a buscar
             case_sensitive: Si la búsqueda distingue mayúsculas
             whole_word_only: Si buscar solo palabras completas
+            filter_possessive_contexts: Si filtrar menciones en contextos posesivos
+                (ej: "el amante de Isabel" → Isabel NO es el referente principal)
+            use_spacy_validation: Si usar spaCy para validación sintáctica avanzada
         """
         self.min_name_length = min_name_length
         self.case_sensitive = case_sensitive
         self.whole_word_only = whole_word_only
+        self.filter_possessive_contexts = filter_possessive_contexts
+        self.use_spacy_validation = use_spacy_validation
+
+        # Lazy loading del validador
+        self._validator = None
+
+    @property
+    def validator(self):
+        """Lazy loading del validador de menciones."""
+        if self._validator is None and self.filter_possessive_contexts:
+            from narrative_assistant.nlp.mention_validation import create_validator_chain
+
+            self._validator = create_validator_chain(use_spacy=self.use_spacy_validation)
+        return self._validator
 
     def find_all_mentions(
         self,
@@ -89,7 +117,7 @@ class MentionFinder:
             existing_positions: Posiciones ya detectadas por NER (para evitar duplicados)
 
         Returns:
-            Lista de menciones encontradas
+            Lista de menciones encontradas (ya validadas si filter_possessive_contexts=True)
         """
         mentions = []
         existing = existing_positions or set()
@@ -188,20 +216,67 @@ class MentionFinder:
                 if end < len(text) and text[end].isalpha():
                     continue
 
-                mentions.append(
-                    FoundMention(
-                        entity_name=canonical_name,
-                        surface_form=match.group(),
-                        start_char=start,
-                        end_char=end,
-                        confidence=0.85,  # Menor que NER (0.9-1.0)
+                # Validar contexto sintáctico (si está habilitado)
+                if self.filter_possessive_contexts and self.validator:
+                    validation_result = self._validate_mention(
+                        canonical_name, start, end, text
                     )
-                )
+
+                    if not validation_result.is_valid:
+                        logger.debug(
+                            f"Skipping mention '{canonical_name}' at {start}: "
+                            f"{validation_result.reasoning}"
+                        )
+                        continue
+
+                    # Añadir con información de validación
+                    mentions.append(
+                        FoundMention(
+                            entity_name=canonical_name,
+                            surface_form=match.group(),
+                            start_char=start,
+                            end_char=end,
+                            confidence=validation_result.confidence,
+                            validation_method=validation_result.method.value,
+                            validation_reasoning=validation_result.reasoning,
+                        )
+                    )
+                else:
+                    # Sin validación, añadir directamente
+                    mentions.append(
+                        FoundMention(
+                            entity_name=canonical_name,
+                            surface_form=match.group(),
+                            start_char=start,
+                            end_char=end,
+                            confidence=0.85,  # Menor que NER (0.9-1.0)
+                        )
+                    )
 
         except re.error as e:
             logger.warning(f"Regex error searching for '{search_name}': {e}")
 
         return mentions
+
+    def _validate_mention(self, entity_name: str, start: int, end: int, text: str):
+        """
+        Valida una mención usando el sistema adaptativo de validación.
+
+        Args:
+            entity_name: Nombre canónico de la entidad
+            start: Posición de inicio
+            end: Posición de fin
+            text: Texto completo
+
+        Returns:
+            ValidationResult
+        """
+        from narrative_assistant.nlp.mention_validation import Mention
+
+        mention = Mention(text=entity_name, position=start)
+        entities_set = {entity_name}
+
+        return self.validator.validate(mention, text, entities_set)
 
     def count_mentions_for_entity(
         self,
@@ -244,6 +319,14 @@ class MentionFinder:
         return total
 
 
-def get_mention_finder() -> MentionFinder:
-    """Obtiene instancia del buscador de menciones."""
-    return MentionFinder()
+def get_mention_finder(filter_possessive_contexts: bool = True) -> MentionFinder:
+    """
+    Obtiene instancia del buscador de menciones.
+
+    Args:
+        filter_possessive_contexts: Si filtrar menciones en contextos posesivos
+
+    Returns:
+        MentionFinder configurado
+    """
+    return MentionFinder(filter_possessive_contexts=filter_possessive_contexts)
