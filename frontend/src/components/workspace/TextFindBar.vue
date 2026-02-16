@@ -257,17 +257,17 @@ defineExpose({ focusInput })
 .find-bar-inner {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.375rem 0.5rem;
-  background: var(--surface-card);
-  border: 1px solid var(--surface-border);
-  border-radius: var(--app-radius);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  background: var(--ds-surface-card);
+  border: 1px solid var(--ds-surface-border);
+  border-radius: var(--ds-radius-md);
+  box-shadow: var(--ds-shadow-md);
 }
 
 .find-bar-icon {
-  color: var(--text-color-secondary);
-  font-size: 0.875rem;
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-size-sm);
   flex-shrink: 0;
 }
 
@@ -275,27 +275,29 @@ defineExpose({ focusInput })
   border: none;
   outline: none;
   background: transparent;
-  color: var(--text-color);
-  font-size: 0.875rem;
+  color: var(--ds-color-text);
+  font-size: var(--ds-font-size-sm);
   width: 200px;
-  padding: 0.25rem 0.375rem;
+  padding: var(--ds-space-1) var(--ds-space-2);
   font-family: inherit;
 }
 
 .find-input::placeholder {
-  color: var(--text-color-secondary);
+  color: var(--ds-color-text-secondary);
 }
 
 .match-count {
-  font-size: 0.75rem;
-  color: var(--text-color-secondary);
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-text-secondary);
   white-space: nowrap;
-  padding: 0 0.25rem;
+  padding: 0 var(--ds-space-2);
   flex-shrink: 0;
+  min-width: 70px;
+  text-align: center;
 }
 
 .match-count.no-matches {
-  color: var(--red-500);
+  color: var(--ds-color-danger);
 }
 
 /* Transition */
@@ -314,25 +316,27 @@ defineExpose({ focusInput })
 <style>
 /* Global styles for dynamically injected mark elements */
 mark.text-find-match {
-  background-color: rgba(255, 213, 0, 0.4);
-  border-radius: 2px;
+  background-color: var(--ds-color-warning-soft, rgba(255, 213, 0, 0.3));
+  border-radius: var(--ds-radius-sm);
   color: inherit;
+  padding: 0 2px;
 }
 
 mark.text-find-match.text-find-current {
-  background-color: rgba(255, 150, 0, 0.6);
-  outline: 2px solid var(--primary-color);
-  border-radius: 2px;
+  background-color: var(--ds-color-primary-soft, rgba(59, 130, 246, 0.3));
+  outline: 2px solid var(--ds-color-primary);
+  outline-offset: 1px;
+  border-radius: var(--ds-radius-sm);
+  font-weight: var(--ds-font-weight-medium);
 }
 
 /* Dark mode — stronger highlights for contrast on dark backgrounds */
 .dark mark.text-find-match {
-  background-color: rgba(255, 213, 0, 0.35);
-  color: #1a1a1a;
+  background-color: rgba(255, 213, 0, 0.25);
 }
 
 .dark mark.text-find-match.text-find-current {
-  background-color: rgba(255, 170, 0, 0.7);
-  color: #1a1a1a;
+  background-color: rgba(59, 130, 246, 0.35);
+  outline-color: var(--ds-color-primary);
 }
 </style>

@@ -239,6 +239,26 @@ export function useMentionNavigation(projectId: () => number) {
   }
 
   /**
+   * Va a la primera aparición en un capítulo específico
+   * @param chapterNumber Número del capítulo
+   * @returns true si se encontró una mención en ese capítulo, false si no
+   */
+  function goToChapter(chapterNumber: number): boolean {
+    if (!state.value.mentions.length) return false
+
+    // Buscar la primera mención en el capítulo especificado
+    const mentionIndex = state.value.mentions.findIndex(
+      m => m.chapterNumber === chapterNumber
+    )
+
+    if (mentionIndex === -1) return false
+
+    state.value.currentIndex = mentionIndex
+    navigateToCurrentMention()
+    return true
+  }
+
+  /**
    * Limpia el estado de navegación
    */
   function clear() {
@@ -284,6 +304,7 @@ export function useMentionNavigation(projectId: () => number) {
     goToPrevious,
     goToNext,
     goToMention,
+    goToChapter,
     navigateToCurrentMention,
     clear,
   }

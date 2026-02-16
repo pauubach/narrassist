@@ -191,6 +191,13 @@ function onMentionNavKeydown(event: KeyboardEvent) {
     mentionNav.goToMention(mentionNav.totalMentions.value - 1)
   }
 }
+
+/**
+ * Navega a la primera aparición en un capítulo específico
+ */
+function onChapterClick(chapterNumber: number) {
+  mentionNav.goToChapter(chapterNumber)
+}
 </script>
 
 <template>
@@ -279,18 +286,23 @@ function onMentionNavKeydown(event: KeyboardEvent) {
           Apariciones por capítulo
         </div>
         <div class="mini-timeline">
-          <div
+          <button
             v-for="ch in chapterAppearances"
             :key="ch.chapterNumber"
+            type="button"
             class="timeline-bar"
-            :title="`Cap. ${ch.chapterNumber}: ${ch.mentionCount} menciones`"
+            :class="{
+              'timeline-bar--active': mentionNav.currentMention.value?.chapterNumber === ch.chapterNumber
+            }"
+            :title="`Cap. ${ch.chapterNumber}: ${ch.mentionCount} menciones - Click para ir a la primera aparición`"
+            @click="onChapterClick(ch.chapterNumber)"
           >
             <div
               class="bar-fill"
               :style="{ height: `${Math.max(ch.percentage, 8)}%` }"
             ></div>
             <span class="bar-label">{{ ch.chapterNumber }}</span>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -746,20 +758,51 @@ function onMentionNavKeydown(event: KeyboardEvent) {
   height: 100%;
   min-width: 12px;
   max-width: 24px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.2s ease;
+}
+
+.timeline-bar:hover {
+  transform: translateY(-2px);
+}
+
+.timeline-bar:hover .bar-fill {
+  opacity: 0.8;
+}
+
+.timeline-bar:active {
+  transform: translateY(0);
+}
+
+.timeline-bar--active .bar-fill {
+  background: var(--ds-color-primary-emphasis, var(--ds-color-primary));
+  box-shadow: 0 0 0 2px var(--ds-color-primary-soft);
+}
+
+.timeline-bar--active .bar-label {
+  color: var(--ds-color-primary);
+  font-weight: var(--ds-font-weight-semibold);
 }
 
 .bar-fill {
   width: 100%;
   background: var(--ds-color-primary);
   border-radius: 2px 2px 0 0;
-  transition: height 0.3s ease;
+  transition: all 0.2s ease;
   margin-top: auto;
+  pointer-events: none;
 }
 
 .bar-label {
   font-size: 0.625rem;
   color: var(--ds-color-text-secondary);
   margin-top: 2px;
+  pointer-events: none;
+  transition: color 0.2s ease, font-weight 0.2s ease;
 }
 
 /* Alerts section */

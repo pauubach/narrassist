@@ -42,18 +42,11 @@ const severityOrder: Record<AlertSeverity, number> = {
 /** Total de alertas */
 const totalCount = computed(() => props.alerts.length)
 
-/** Número máximo de alertas a mostrar en el panel */
-const MAX_VISIBLE_ALERTS = 15
-
-/** Alertas ordenadas por severidad, limitadas */
+/** Alertas ordenadas por severidad (sin límite) */
 const sortedAlerts = computed(() => {
   return [...props.alerts]
     .sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity])
-    .slice(0, MAX_VISIBLE_ALERTS)
 })
-
-/** Si hay más alertas de las que mostramos */
-const hasMoreAlerts = computed(() => props.alerts.length > MAX_VISIBLE_ALERTS)
 
 /** Truncar título si es muy largo */
 function truncateTitle(title: string, maxLen = 45): string {
@@ -65,10 +58,6 @@ function handleAlertClick(alert: Alert) {
   emit('alert-click', alert)
   // Navegar al texto donde está la alerta, no a la pantalla de alertas
   emit('alert-navigate', alert)
-}
-
-function handleViewAll() {
-  emit('navigate')
 }
 </script>
 
@@ -104,16 +93,6 @@ function handleViewAll() {
           :style="{ backgroundColor: getSeverityColor(alert.severity) }"
         ></span>
         <span class="alert-title">{{ truncateTitle(alert.title) }}</span>
-      </button>
-
-      <button
-        v-if="hasMoreAlerts"
-        type="button"
-        class="view-all-row"
-        @click="handleViewAll"
-      >
-        <i class="pi pi-arrow-right"></i>
-        <span>Ver todas ({{ totalCount }})</span>
       </button>
     </div>
   </div>
@@ -203,31 +182,5 @@ function handleViewAll() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.view-all-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--ds-space-2);
-  padding: var(--ds-space-2) var(--ds-space-3);
-  margin-top: var(--ds-space-2);
-  border: none;
-  background: transparent;
-  border-radius: var(--ds-radius-md);
-  cursor: pointer;
-  transition: background-color var(--ds-transition-fast);
-  width: 100%;
-  font-size: var(--ds-font-size-xs);
-  color: var(--ds-color-text-secondary);
-}
-
-.view-all-row:hover {
-  background: var(--ds-surface-hover);
-  color: var(--ds-color-text);
-}
-
-.view-all-row i {
-  font-size: 0.75rem;
 }
 </style>
