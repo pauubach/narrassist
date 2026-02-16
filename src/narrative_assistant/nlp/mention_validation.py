@@ -291,6 +291,73 @@ class RegexValidator:
         # Extraer contexto antes (para verificar "verbo a ENTIDAD")
         context_start = max(0, mention_start - 50)
         before = context[context_start:mention_start]
+        mention_end = mention_start + len(mention.text)
+        after = context[mention_end : mention_end + 50]
+
+        # ===================================================================
+        # PATRONES ADICIONALES ESPAÑOLES (Mejora 6)
+        # ===================================================================
+
+        # Patrón 1: GERUNDIO - "siendo Isabel la reina"
+        gerundio_pattern = re.compile(
+            r"\b(siendo|estando|habiendo|viniendo|yendo)\s*$", re.IGNORECASE
+        )
+        if gerundio_pattern.search(before):
+            return ValidationResult(
+                is_valid=True,
+                confidence=0.88,
+                method=ValidationMethod.REGEX,
+                reasoning=f"Construcción con gerundio: '{gerundio_pattern.search(before).group(1)} {mention.text}'",
+                metadata={"pattern": "gerundio"},
+            )
+
+        # Patrón 2: PASIVA - "fue escrito por Isabel"
+        pasiva_pattern = re.compile(
+            r"\bpor\s*$", re.IGNORECASE
+        )
+        if pasiva_pattern.search(before):
+            # Verificar que antes hay verbo en pasiva
+            before_extended = context[max(0, mention_start - 100):mention_start]
+            if re.search(r"\b(fue|fueron|era|eran|ha sido|había sido)\s+\w+\s+por\s*$", before_extended, re.IGNORECASE):
+                return ValidationResult(
+                    is_valid=True,
+                    confidence=0.90,
+                    method=ValidationMethod.REGEX,
+                    reasoning=f"Complemento agente (pasiva): 'por {mention.text}'",
+                    metadata={"pattern": "passive_agent"},
+                )
+
+        # Patrón 3: VOCATIVO - "¡Isabel, ven aquí!"
+        vocativo_pattern = re.compile(
+            r"[¡!]\s*$", re.IGNORECASE
+        )
+        if vocativo_pattern.search(before) and re.match(r"\s*[,!]", after):
+            return ValidationResult(
+                is_valid=True,
+                confidence=0.92,
+                method=ValidationMethod.REGEX,
+                reasoning=f"Vocativo (llamada directa): '¡{mention.text}!'",
+                metadata={"pattern": "vocative"},
+            )
+
+        # Patrón 4: APOSICIÓN - "la reina, Isabel, entró" o "su hermana, María, era"
+        aposicion_pattern = re.compile(
+            r",\s*$", re.IGNORECASE
+        )
+        if aposicion_pattern.search(before) and re.match(r"\s*,", after):
+            # Verificar que antes hay sustantivo con determinante (probablemente aposición)
+            if re.search(r"\b(el|la|los|las|su|sus|mi|mis|tu|tus)\s+\w+\s*,\s*$", before, re.IGNORECASE):
+                return ValidationResult(
+                    is_valid=True,
+                    confidence=0.88,
+                    method=ValidationMethod.REGEX,
+                    reasoning=f"Aposición: 'X, {mention.text}, ...'",
+                    metadata={"pattern": "apposition"},
+                )
+
+        # ===================================================================
+        # PATRONES ORIGINALES
+        # ===================================================================
 
         # Patrón: "VERBO a ENTIDAD" (objeto directo con preposición "a")
         # Ej: "Mencionó a Roberto", "Vio a María"
@@ -317,10 +384,6 @@ class RegexValidator:
         if mention_start < 3 or (
             mention_start > 0 and context[mention_start - 2] == "."
         ):
-            # Extraer siguiente palabra (verbo potencial)
-            mention_end = mention_start + len(mention.text)
-            after = context[mention_end : mention_end + 30]
-
             # Patrones de verbos típicos
             verb_pattern = re.compile(
                 r"^\s+(preparó|ordenó|entró|salió|llegó|vio|dijo|fue|era|es|estaba|había|hizo|tomó|cogió)",

@@ -15,6 +15,9 @@ export interface Mention {
   contextAfter: string | null
   confidence: number
   source: string
+  // Campos de validación (desde mention_validation.py)
+  validationMethod?: string | null  // "regex", "spacy", null
+  validationReasoning?: string | null  // Explicación del rol sintáctico
 }
 
 export interface MentionNavigationState {
@@ -48,20 +51,55 @@ export function useMentionNavigation(projectId: () => number) {
     error: null,
   })
 
+  // Filtros (Mejora 2)
+  const filterOnlyActive = ref(false)
+
   // Computed
   const isActive = computed(() => state.value.entityId !== null && state.value.mentions.length > 0)
+
+  /**
+   * Filtra menciones según criterios activos.
+   *
+   * Menciones "activas" son aquellas donde la entidad es referente principal:
+   * - Sujeto, objeto, verbo comunicativo (confianza >= 0.80)
+   * - Excluye contextos posesivos (confianza < 0.70)
+   */
+  const filteredMentions = computed(() => {
+    if (!filterOnlyActive.value) {
+      return state.value.mentions
+    }
+
+    return state.value.mentions.filter(m => {
+      // Filtro por confianza: >= 0.75 (umbral para "activa")
+      if (m.confidence < 0.75) return false
+
+      // Verificar reasoning si está disponible
+      const reasoning = m.validationReasoning?.toLowerCase() || ''
+
+      // Excluir contextos posesivos explícitamente
+      if (reasoning.includes('posesivo') || reasoning.includes('genitivo')) {
+        return false
+      }
+
+      // Mantener roles activos
+      const activeRoles = ['sujeto', 'objeto', 'verbo', 'comunicativo', 'gerundio', 'pasiva', 'vocativo', 'aposición']
+      return activeRoles.some(role => reasoning.includes(role)) || m.confidence >= 0.85
+    })
+  })
+
   const currentMention = computed(() => {
-    if (state.value.currentIndex < 0 || state.value.currentIndex >= state.value.mentions.length) {
+    const mentions = filteredMentions.value
+    if (state.value.currentIndex < 0 || state.value.currentIndex >= mentions.length) {
       return null
     }
-    return state.value.mentions[state.value.currentIndex]
+    return mentions[state.value.currentIndex]
   })
-  const totalMentions = computed(() => state.value.mentions.length)
+  const totalMentions = computed(() => filteredMentions.value.length)
   const canGoPrevious = computed(() => state.value.currentIndex > 0)
-  const canGoNext = computed(() => state.value.currentIndex < state.value.mentions.length - 1)
+  const canGoNext = computed(() => state.value.currentIndex < filteredMentions.value.length - 1)
   const navigationLabel = computed(() => {
     if (!isActive.value) return ''
-    return `${state.value.currentIndex + 1} / ${state.value.mentions.length}`
+    return `${state.value.currentIndex + 1} / ${filteredMentions.value.length}`
   })
 
   /**
@@ -289,6 +327,7 @@ export function useMentionNavigation(projectId: () => number) {
   return {
     // Estado
     state,
+    filterOnlyActive,  // Mejora 2: filtro de menciones activas
 
     // Computed
     isActive,
@@ -297,6 +336,7 @@ export function useMentionNavigation(projectId: () => number) {
     canGoPrevious,
     canGoNext,
     navigationLabel,
+    filteredMentions,  // Mejora 2: menciones filtradas
 
     // Acciones
     loadMentions,

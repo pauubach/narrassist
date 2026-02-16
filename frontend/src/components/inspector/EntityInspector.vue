@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
+import InputSwitch from 'primevue/inputswitch'
 import DsBadge from '@/components/ds/DsBadge.vue'
 import type { Entity, Alert } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
@@ -135,6 +136,54 @@ const otherAlerts = computed(() => {
 })
 
 const _hasRelatedAlerts = computed(() => relatedAlerts.value.length > 0)
+
+// ============================================================================
+// Mention Role Statistics (Mejora 3)
+// ============================================================================
+
+interface RoleStats {
+  total: number
+  asSubject: number      // Sujeto (nsubj, etc.)
+  asObject: number       // Objeto directo/indirecto
+  inDialogue: number     // Tema de conversación (verbos comunicativos)
+  passive: number        // Contextos pasivos (< 0.75 confianza)
+  protagonismScore: number  // % de menciones activas (sujeto + objeto + diálogo)
+}
+
+const roleStats = computed<RoleStats>(() => {
+  const stats: RoleStats = {
+    total: mentionNav.state.value.mentions.length,
+    asSubject: 0,
+    asObject: 0,
+    inDialogue: 0,
+    passive: 0,
+    protagonismScore: 0,
+  }
+
+  mentionNav.state.value.mentions.forEach((m: any) => {
+    const reasoning = (m.validationReasoning?.toLowerCase() || '') as string
+    const conf = m.confidence || 0
+
+    // Categorizar por rol sintáctico
+    if (reasoning.includes('sujeto')) {
+      stats.asSubject++
+    } else if (reasoning.includes('objeto')) {
+      stats.asObject++
+    } else if (reasoning.includes('comunicativo') || reasoning.includes('verbo')) {
+      stats.inDialogue++
+    } else if (conf < 0.75 || reasoning.includes('posesivo')) {
+      stats.passive++
+    }
+  })
+
+  // Calcular protagonismo (%)
+  const activeCount = stats.asSubject + stats.asObject + stats.inDialogue
+  stats.protagonismScore = stats.total > 0 ? Math.round((activeCount / stats.total) * 100) : 0
+
+  return stats
+})
+
+const hasRoleStats = computed(() => roleStats.value.total > 0)
 
 // ============================================================================
 // Mini Timeline
@@ -306,6 +355,57 @@ function onChapterClick(chapterNumber: number) {
         </div>
       </div>
 
+      <!-- Estadísticas de Roles (Mejora 3) -->
+      <div v-if="hasRoleStats" class="info-section role-stats-section">
+        <div class="section-label">
+          <i class="pi pi-users"></i>
+          Análisis de protagonismo
+        </div>
+
+        <!-- Barra de protagonismo -->
+        <div class="protagonism-meter">
+          <div class="meter-header">
+            <span class="meter-label">Menciones activas</span>
+            <span class="meter-value">{{ roleStats.protagonismScore }}%</span>
+          </div>
+          <div class="meter-bar">
+            <div
+              class="meter-fill"
+              :class="{
+                'meter-fill--high': roleStats.protagonismScore >= 70,
+                'meter-fill--medium': roleStats.protagonismScore >= 40 && roleStats.protagonismScore < 70,
+                'meter-fill--low': roleStats.protagonismScore < 40
+              }"
+              :style="{ width: `${roleStats.protagonismScore}%` }"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Desglose por roles -->
+        <div class="role-breakdown">
+          <div v-if="roleStats.asSubject > 0" class="role-stat">
+            <i class="pi pi-user" style="color: var(--green-500)"></i>
+            <span class="role-count">{{ roleStats.asSubject }}</span>
+            <span class="role-label">como sujeto</span>
+          </div>
+          <div v-if="roleStats.asObject > 0" class="role-stat">
+            <i class="pi pi-arrow-right" style="color: var(--blue-500)"></i>
+            <span class="role-count">{{ roleStats.asObject }}</span>
+            <span class="role-label">como objeto</span>
+          </div>
+          <div v-if="roleStats.inDialogue > 0" class="role-stat">
+            <i class="pi pi-comments" style="color: var(--purple-500)"></i>
+            <span class="role-count">{{ roleStats.inDialogue }}</span>
+            <span class="role-label">en diálogos</span>
+          </div>
+          <div v-if="roleStats.passive > 0" class="role-stat role-stat--muted">
+            <i class="pi pi-minus-circle" style="color: var(--ds-color-text-secondary)"></i>
+            <span class="role-count">{{ roleStats.passive }}</span>
+            <span class="role-label">pasivas</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Alertas de inconsistencias de atributos -->
       <div v-if="attributeAlerts.length > 0" class="info-section alerts-section">
         <div class="section-label section-label-warning">
@@ -364,6 +464,20 @@ function onChapterClick(chapterNumber: number) {
         <span class="nav-title">APARICIONES</span>
         <span class="nav-hint">← → para navegar</span>
       </div>
+
+      <!-- Filtro: Solo apariciones activas (Mejora 2) -->
+      <div class="nav-filter">
+        <label for="filter-active" class="filter-label">
+          <i class="pi pi-filter" style="font-size: 0.75rem"></i>
+          Solo activas
+        </label>
+        <InputSwitch
+          id="filter-active"
+          v-model="mentionNav.filterOnlyActive.value"
+          v-tooltip.bottom="'Mostrar solo menciones donde el personaje es sujeto/objeto (excluye contextos posesivos)'"
+        />
+      </div>
+
       <div class="nav-controls">
         <Button
           v-tooltip.bottom="'Anterior (←)'"
@@ -647,6 +761,32 @@ function onChapterClick(chapterNumber: number) {
   border-radius: var(--ds-radius-md);
 }
 
+/* Filtro de menciones activas (Mejora 2) */
+.nav-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--ds-space-2);
+  background: var(--p-surface-50, #f9fafb);
+  border-radius: var(--ds-radius-sm);
+  margin-bottom: var(--ds-space-3);
+  gap: var(--ds-space-2);
+}
+
+.filter-label {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+  font-size: var(--ds-font-size-sm);
+  color: var(--ds-color-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.filter-label i {
+  color: var(--ds-color-text-secondary);
+}
+
 .nav-controls {
   display: flex;
   align-items: center;
@@ -726,6 +866,107 @@ function onChapterClick(chapterNumber: number) {
   background: rgba(234, 179, 8, 0.1);
   border-color: rgba(234, 179, 8, 0.3);
   color: var(--p-yellow-400, #facc15);
+}
+
+/* Role Statistics (Mejora 3) */
+.role-stats-section .section-label {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  margin-bottom: var(--ds-space-3);
+}
+
+.role-stats-section .section-label i {
+  color: var(--ds-color-primary);
+}
+
+.protagonism-meter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+  margin-bottom: var(--ds-space-3);
+}
+
+.meter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.meter-label {
+  font-size: var(--ds-font-size-sm);
+  color: var(--ds-color-text);
+  font-weight: var(--ds-font-weight-medium);
+}
+
+.meter-value {
+  font-size: var(--ds-font-size-lg);
+  font-weight: var(--ds-font-weight-bold);
+  color: var(--ds-color-primary);
+}
+
+.meter-bar {
+  height: 8px;
+  background: var(--ds-surface-ground);
+  border-radius: var(--ds-radius-full);
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  border-radius: var(--ds-radius-full);
+  transition: width 0.3s ease;
+}
+
+.meter-fill--high {
+  background: linear-gradient(90deg, var(--green-500), var(--green-600));
+}
+
+.meter-fill--medium {
+  background: linear-gradient(90deg, var(--blue-500), var(--blue-600));
+}
+
+.meter-fill--low {
+  background: linear-gradient(90deg, var(--orange-500), var(--orange-600));
+}
+
+.role-breakdown {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--ds-space-2);
+}
+
+.role-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2);
+  background: var(--ds-surface-ground);
+  border-radius: var(--ds-radius-sm);
+}
+
+.role-stat i {
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.role-stat .role-count {
+  font-size: var(--ds-font-size-sm);
+  font-weight: var(--ds-font-weight-bold);
+  color: var(--ds-color-text);
+}
+
+.role-stat .role-label {
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-text-secondary);
+}
+
+.role-stat--muted {
+  opacity: 0.7;
+}
+
+.dark .role-breakdown .role-stat {
+  background: var(--ds-surface-section);
 }
 
 /* Mini Timeline */

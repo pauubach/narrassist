@@ -361,7 +361,93 @@ class TestEdgeCases:
 
 
 # ==============================================================================
-# 8. REGRESIONES
+# 8. PATRONES ADICIONALES ESPAÑOLES (Mejora 6)
+# ==============================================================================
+
+
+class TestSpanishPatterns:
+    """Tests para patrones adicionales del español literario."""
+
+    @pytest.mark.parametrize(
+        "text,entity",
+        [
+            # Gerundio
+            ("Siendo Isabel la reina, ordenó zarpar.", "Isabel"),
+            ("Estando María en París, no pudo asistir.", "María"),
+            ("Habiendo Roberto confesado, fue liberado.", "Roberto"),
+            # Pasiva
+            ("El libro fue escrito por Isabel en 1920.", "Isabel"),
+            ("La carta había sido firmada por María.", "María"),
+            ("El veneno fue preparado por Roberto.", "Roberto"),
+            # Vocativo
+            ("¡Isabel, ven aquí inmediatamente!", "Isabel"),
+            ("¡María!", "María"),
+            ("¡Roberto, cuidado!", "Roberto"),
+            # Aposición
+            ("La reina, Isabel, entró al salón.", "Isabel"),
+            ("Su hermana, María, era médica.", "María"),
+        ],
+    )
+    def test_spanish_patterns_keep_mention(self, validator_regex_only, text, entity):
+        """Patrones españoles (gerundio, pasiva, vocativo, aposición) deben mantenerse."""
+        mention = Mention(text=entity, position=text.index(entity))
+        result = validator_regex_only.validate(mention, text, {entity})
+
+        assert result.is_valid == True
+        assert result.confidence >= 0.85
+        # Debe mencionar el patrón específico
+        assert any(
+            pattern in result.reasoning.lower()
+            for pattern in ["gerundio", "pasiva", "agente", "vocativo", "aposición"]
+        )
+
+    def test_gerundio_being(self, validator_regex_only):
+        """Gerundio 'siendo' debe detectarse correctamente."""
+        text = "Siendo Isabel la única heredera, recibió todo."
+        mention = Mention(text="Isabel", position=text.index("Isabel"))
+
+        result = validator_regex_only.validate(mention, text, {"Isabel"})
+
+        assert result.is_valid == True
+        assert result.confidence >= 0.85
+        assert "gerundio" in result.reasoning.lower()
+
+    def test_passive_agent_por(self, validator_regex_only):
+        """Complemento agente con 'por' debe detectarse."""
+        text = "La novela fue escrita por Isabel hace años."
+        mention = Mention(text="Isabel", position=text.index("Isabel"))
+
+        result = validator_regex_only.validate(mention, text, {"Isabel"})
+
+        assert result.is_valid == True
+        assert result.confidence >= 0.85
+        assert "pasiva" in result.reasoning.lower() or "agente" in result.reasoning.lower()
+
+    def test_vocative_with_exclamation(self, validator_regex_only):
+        """Vocativo con exclamación debe detectarse."""
+        text = "¡Isabel, ven rápido!"
+        mention = Mention(text="Isabel", position=text.index("Isabel"))
+
+        result = validator_regex_only.validate(mention, text, {"Isabel"})
+
+        assert result.is_valid == True
+        assert result.confidence >= 0.85
+        assert "vocativo" in result.reasoning.lower()
+
+    def test_apposition_between_commas(self, validator_regex_only):
+        """Aposición entre comas debe detectarse."""
+        text = "La reina, Isabel, ordenó la ejecución."
+        mention = Mention(text="Isabel", position=text.index("Isabel"))
+
+        result = validator_regex_only.validate(mention, text, {"Isabel"})
+
+        assert result.is_valid == True
+        assert result.confidence >= 0.85
+        assert "aposición" in result.reasoning.lower()
+
+
+# ==============================================================================
+# 9. REGRESIONES
 # ==============================================================================
 
 
