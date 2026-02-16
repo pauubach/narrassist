@@ -2099,7 +2099,7 @@ onUnmounted(() => {
   background: var(--surface-card);
   border-radius: var(--app-radius);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  z-index: 10;
+  z-index: var(--ds-z-popover);
   overflow: hidden;
 }
 

@@ -197,7 +197,7 @@ async function runAnalysis() {
   align-items: center;
   justify-content: center;
   background: var(--ds-surface-ground);
-  z-index: 10;
+  z-index: var(--ds-z-fixed);
 }
 
 .not-executed-content {
@@ -291,7 +291,7 @@ async function runAnalysis() {
   align-items: center;
   justify-content: center;
   background: var(--ds-surface-ground);
-  z-index: 10;
+  z-index: var(--ds-z-fixed);
 }
 
 .failed-content {
@@ -320,7 +320,7 @@ async function runAnalysis() {
   justify-content: center;
   gap: var(--ds-space-3);
   background: color-mix(in srgb, var(--ds-surface-ground, #f8fafc) 95%, transparent);
-  z-index: 20;
+  z-index: var(--ds-z-modal-backdrop);
 }
 
 /* Dark mode */

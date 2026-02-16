@@ -181,7 +181,7 @@ const goToSettings = () => {
   right: 1rem;
   display: flex;
   gap: 0.5rem;
-  z-index: 10;
+  z-index: var(--ds-z-fixed);
 }
 
 .welcome-container {

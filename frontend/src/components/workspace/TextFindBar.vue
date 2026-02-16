@@ -250,7 +250,7 @@ defineExpose({ focusInput })
   position: absolute;
   top: 0;
   right: 1rem;
-  z-index: 10;
+  z-index: var(--ds-z-sticky);
   padding-top: 0.5rem;
 }
 
