@@ -47,8 +47,9 @@ export interface ExecutedPhases {
   register: boolean
   pacing: boolean
   coherence: boolean
-  // Alertas
-  alerts: boolean
+  // Alertas (progresivas)
+  alerts_grammar: boolean  // alertas de gramática emitidas (parcial)
+  alerts: boolean          // todas las alertas emitidas (completo)
   // Análisis avanzado
   temporal: boolean
   emotional: boolean
@@ -69,6 +70,7 @@ export const ANALYSIS_DEPENDENCIES: Record<keyof ExecutedPhases, (keyof Executed
   attributes: ['entities', 'coreference'],
   relationships: ['entities', 'coreference'],
   interactions: ['entities'],
+  alerts_grammar: ['grammar'],
   alerts: ['entities', 'coherence'],
   spelling: ['parsing'],
   grammar: ['parsing'],
@@ -93,6 +95,7 @@ export const PHASE_LABELS: Record<keyof ExecutedPhases, string> = {
   attributes: 'Extracción de atributos',
   relationships: 'Detección de relaciones',
   interactions: 'Detección de interacciones',
+  alerts_grammar: 'Alertas de gramática',
   alerts: 'Generación de alertas',
   spelling: 'Ortografía',
   grammar: 'Gramática',
@@ -112,19 +115,31 @@ export const PHASE_LABELS: Record<keyof ExecutedPhases, string> = {
  */
 export type { WorkspaceTab }
 
-export const TAB_REQUIRED_PHASES: Partial<Record<WorkspaceTab, keyof ExecutedPhases>> = {
-  // text: siempre disponible tras carga del documento
-  // entities necesita NER + fusión + atributos para estar completa
-  entities: 'attributes',
-  relationships: 'coreference',
-  alerts: 'alerts',
-  // timeline necesita entidades unificadas (tras fusión)
-  timeline: 'coreference',
-  style: 'grammar',
-  // glossary y summary: disponibles tras fusión de entidades
-  glossary: 'coreference',
-  summary: 'coreference',
+/**
+ * Gating de dos niveles para tabs.
+ * - partial: fase mínima para mostrar contenido (dot naranja, datos parciales)
+ * - complete: fase para check verde (todos los datos disponibles)
+ */
+export const TAB_PHASE_GATES: Partial<Record<WorkspaceTab, {
+  partial: keyof ExecutedPhases
+  complete: keyof ExecutedPhases
+}>> = {
+  entities: { partial: 'entities', complete: 'attributes' },
+  alerts: { partial: 'alerts_grammar', complete: 'alerts' },
+  relationships: { partial: 'coreference', complete: 'coreference' },
+  timeline: { partial: 'coreference', complete: 'coreference' },
+  style: { partial: 'grammar', complete: 'register' },
+  glossary: { partial: 'coreference', complete: 'coreference' },
+  summary: { partial: 'coreference', complete: 'coreference' },
 }
+
+/**
+ * Backward-compatible: fase mínima para que un tab sea accesible.
+ * Usa el nivel `partial` del gating de dos niveles.
+ */
+export const TAB_REQUIRED_PHASES: Partial<Record<WorkspaceTab, keyof ExecutedPhases>> = Object.fromEntries(
+  Object.entries(TAB_PHASE_GATES).map(([tab, gates]) => [tab, gates.partial])
+) as Partial<Record<WorkspaceTab, keyof ExecutedPhases>>
 
 /**
  * Descripción de qué contenido se verá cuando se ejecute la fase.
@@ -165,6 +180,7 @@ const BACKEND_PHASE_TO_FRONTEND: Record<string, keyof ExecutedPhases | null> = {
   attributes: 'attributes',
   consistency: 'coherence',
   grammar: 'grammar',
+  alerts_grammar: 'alerts_grammar',
   alerts: 'alerts',
   relationships: 'relationships',
   voice: 'voice_profiles',
@@ -506,17 +522,24 @@ export const useAnalysisStore = defineStore('analysis', () => {
    * - completed: La fase se ejecutó correctamente
    * - failed: El análisis falló (status error/failed)
    */
-  type TabStatus = 'idle' | 'pending' | 'running' | 'completed' | 'failed'
+  type TabStatus = 'idle' | 'pending' | 'running' | 'partial' | 'completed' | 'failed'
 
   function getTabStatus(projectId: number, tab: WorkspaceTab): TabStatus {
-    const requiredPhase = TAB_REQUIRED_PHASES[tab]
+    const gates = TAB_PHASE_GATES[tab]
 
     // Tab 'text' no requiere fase → siempre disponible
-    if (!requiredPhase) return 'completed'
+    if (!gates) return 'completed'
 
-    const executed = isPhaseExecuted(projectId, requiredPhase)
+    const completeExecuted = isPhaseExecuted(projectId, gates.complete)
+    if (completeExecuted) return 'completed'
 
-    if (executed) return 'completed'
+    const partialExecuted = isPhaseExecuted(projectId, gates.partial)
+    if (partialExecuted) {
+      // Datos parciales disponibles. Si el análisis sigue → partial, si no → completed
+      // (caso: partial === complete ya cubierto arriba)
+      if (_analyzing.value[projectId]) return 'partial'
+      return 'completed'
+    }
 
     // Verificar si hay un análisis fallido para este proyecto
     const analysis = _analyses.value[projectId]
@@ -525,7 +548,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     }
 
     // Verificar si la fase está corriendo
-    if (isPhaseRunning(requiredPhase)) return 'running'
+    if (isPhaseRunning(gates.partial)) return 'running'
 
     // Análisis global en curso → running
     if (_analyzing.value[projectId]) return 'running'

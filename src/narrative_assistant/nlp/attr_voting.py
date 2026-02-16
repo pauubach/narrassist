@@ -165,9 +165,15 @@ class AttributeVotingMixin:
 
         # Normalizar pesos basándose en métodos ACTIVOS (que están en extractions)
         # Esto evita que los pesos entrenados para LLM penalicen otros métodos
-        # cuando LLM no está habilitado
+        # cuando LLM no está habilitado.
+        # Floor mínimo de 0.10 por método: evita que pesos entrenados sobreajustados
+        # marginalicen métodos regex/dependency que detectan atributos fiablemente.
+        MIN_METHOD_WEIGHT = 0.10
         active_methods = set(extractions.keys())
-        active_weights = {m: METHOD_WEIGHTS.get(m, 0.15) for m in active_methods}
+        active_weights = {
+            m: max(MIN_METHOD_WEIGHT, METHOD_WEIGHTS.get(m, 0.15))
+            for m in active_methods
+        }
         total_active_weight = sum(active_weights.values())
 
         if total_active_weight > 0:

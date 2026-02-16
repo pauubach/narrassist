@@ -1762,8 +1762,8 @@ REGLAS:
 - hair_modification valores: natural, teñido, decolorado, mechas, reflejos (detectar "rubia de bote" = teñido)
 - IMPORTANTE: Si el atributo se refiere a un pronombre (Él, Ella, él, ella), resuelve el pronombre al nombre del personaje más cercano mencionado antes. Ejemplo: "Juan entró. Él era carpintero" -> entity="Juan", key="profession", value="carpintero"
 
-RESPONDE SOLO JSON (sin markdown, sin explicaciones):
-{{"attributes":[{{"entity":"María","key":"eye_color","value":"azules","evidence":"ojos azules brillaban"}}]}}"""
+RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de las entidades tal como aparecen en ENTIDADES:
+{{"attributes":[{{"entity":"María Sánchez","key":"eye_color","value":"azules","evidence":"ojos azules brillaban"}}]}}"""
 
         try:
             response = llm_client.complete(
@@ -1794,6 +1794,26 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                             ):
                                 logger.debug(f"LLM alucinó entidad '{entity_name}' no presente en texto/menciones")
                                 continue
+
+                        # Normalizar nombre parcial al canónico completo.
+                        # El LLM suele devolver "María" en vez de "María Sánchez".
+                        if known_entity_names and entity_name.lower() not in known_entity_names_lower:
+                            name_lower = entity_name.lower()
+                            canonical_match = next(
+                                (
+                                    cn for cn in known_entity_names
+                                    if cn.lower().startswith(name_lower + " ")
+                                    or cn.lower().split()[0] == name_lower
+                                ),
+                                None,
+                            )
+                            if canonical_match:
+                                logger.debug(
+                                    f"LLM nombre parcial '{entity_name}' → "
+                                    f"canónico '{canonical_match}'"
+                                )
+                                entity_name = canonical_match
+                                attr_data["entity"] = canonical_match
 
                     # Validar compatibilidad tipo↔key si hay tipos explícitos
                     key_str_raw = attr_data.get("key", "other").lower()
@@ -3054,14 +3074,17 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         Returns:
             Lista de atributos extraídos
         """
-        nlp = self._get_nlp()
-        if not nlp:
-            return []
+        # Reutilizar doc cacheado de extract_attributes() si está disponible
+        doc = getattr(self, "_spacy_doc", None)
+        if doc is None:
+            nlp = self._get_nlp()
+            if not nlp:
+                return []
+            doc = nlp(text)
 
         attributes: list[ExtractedAttribute] = []
 
         try:
-            doc = nlp(text)
 
             # Índices de menciones para búsqueda y tipo de entidad.
             mention_spans = {}
@@ -3273,6 +3296,85 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                                         sentence_idx=sent_idx,
                                     )
                                     attributes.append(attr)
+
+                    # === Patrón 4: Sustantivo corporal + amod ===
+                    # "Sus ojos azules brillaban", "su cabello largo y negro"
+                    # "con barba espesa y ojos marrones"
+                    # Detecta: NOUN(ojos/cabello/barba) + ADJ(amod) → atributo
+                    _BODY_PART_KEY_MAP = {
+                        "ojo": AttributeKey.EYE_COLOR,
+                        "ojos": AttributeKey.EYE_COLOR,
+                        "pupila": AttributeKey.EYE_COLOR,
+                        "iris": AttributeKey.EYE_COLOR,
+                        "mirada": AttributeKey.EYE_COLOR,
+                        "cabello": AttributeKey.HAIR_COLOR,
+                        "pelo": AttributeKey.HAIR_COLOR,
+                        "melena": AttributeKey.HAIR_COLOR,
+                        "barba": AttributeKey.FACIAL_HAIR,
+                        "bigote": AttributeKey.FACIAL_HAIR,
+                        "patilla": AttributeKey.FACIAL_HAIR,
+                        "patillas": AttributeKey.FACIAL_HAIR,
+                    }
+                    _HAIR_TYPE_ADJS = {
+                        "largo", "corto", "liso", "rizado", "ondulado",
+                        "recogido", "suelto", "trenzado",
+                    }
+                    if token.pos_ == "NOUN" and token.lemma_.lower() in _BODY_PART_KEY_MAP:
+                        base_key = _BODY_PART_KEY_MAP[token.lemma_.lower()]
+                        adj_children = [
+                            c for c in token.children
+                            if c.pos_ == "ADJ" and c.dep_ == "amod"
+                        ]
+                        if adj_children:
+                            # Resolver entidad: buscar posesivo (det), prep "de X", o proximidad
+                            entity_name = None
+                            for child in token.children:
+                                # "Sus ojos" → det posesivo
+                                if child.dep_ == "det" and child.lemma_.lower() in (
+                                    "su", "sus", "mi", "mis", "tu", "tus",
+                                ):
+                                    entity_name = self._find_nearest_entity(
+                                        text, token.idx, entity_mentions,
+                                    )
+                                    break
+                                # "los ojos de María" → nmod/case
+                                if child.dep_ == "nmod" and child.pos_ == "PROPN":
+                                    entity_name = self._resolve_entity_from_token(
+                                        child, mention_spans, doc,
+                                    )
+                                    break
+                            # Fallback: prepositional context "con barba espesa y ojos marrones"
+                            if not entity_name:
+                                entity_name = self._find_nearest_entity(
+                                    text, token.idx, entity_mentions,
+                                )
+
+                            if entity_name:
+                                for adj in adj_children:
+                                    adj_lower = adj.text.lower()
+                                    # Determinar key: pelo/cabello + adj de tipo → hair_type
+                                    if base_key == AttributeKey.HAIR_COLOR and adj_lower in _HAIR_TYPE_ADJS:
+                                        attr_key = AttributeKey.HAIR_TYPE
+                                    else:
+                                        attr_key = base_key
+
+                                    if self._validate_value(attr_key, adj_lower):
+                                        sent_list = list(doc.sents)
+                                        sent_idx = sent_list.index(sent) if sent in sent_list else 0
+                                        attr = ExtractedAttribute(
+                                            entity_name=entity_name,
+                                            category=AttributeCategory.PHYSICAL,
+                                            key=attr_key,
+                                            value=adj_lower,
+                                            source_text=sent.text,
+                                            start_char=token.idx,
+                                            end_char=adj.idx + len(adj.text),
+                                            confidence=0.70,
+                                            chapter_id=chapter_id,
+                                            assignment_source=AssignmentSource.EXPLICIT_SUBJECT,
+                                            sentence_idx=sent_idx,
+                                        )
+                                        attributes.append(attr)
 
         except Exception as e:
             logger.warning(f"Error en extracción por dependencias: {e}")

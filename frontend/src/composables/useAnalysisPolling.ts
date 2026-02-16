@@ -36,7 +36,8 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
   let pollingInterval: ReturnType<typeof setInterval> | null = null
   let chaptersLoadedDuringAnalysis = false
   let entitiesLoadedDuringAnalysis = false
-  let alertsLoadedDuringAnalysis = false
+  let alertsPartialLoaded = false
+  let alertsFullLoaded = false
 
   // ── Computed ─────────────────────────────────────────────
 
@@ -82,10 +83,18 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
         loadEntities(project.value!.id)
       }
 
-      // Incremental loading: alerts (after grammar phase)
-      const grammarPhase = progressData.phases?.find((p: { id: string }) => p.id === 'grammar')
-      if (grammarPhase?.completed && !alertsLoadedDuringAnalysis && alerts.value.length === 0) {
-        alertsLoadedDuringAnalysis = true
+      // Incremental loading: alerts (two-stage)
+      // Stage 1: grammar alerts available (partial)
+      const alertsGrammarPhase = progressData.phases?.find((p: { id: string }) => p.id === 'alerts_grammar')
+      if (alertsGrammarPhase?.completed && !alertsPartialLoaded) {
+        alertsPartialLoaded = true
+        loadAlerts(project.value!.id)
+      }
+
+      // Stage 2: all alerts available (consistency + grammar)
+      const alertsPhase = progressData.phases?.find((p: { id: string }) => p.id === 'alerts')
+      if (alertsPhase?.completed && !alertsFullLoaded) {
+        alertsFullLoaded = true
         loadAlerts(project.value!.id)
       }
 
@@ -134,7 +143,8 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
     if (pollingInterval) return
     chaptersLoadedDuringAnalysis = false
     entitiesLoadedDuringAnalysis = false
-    alertsLoadedDuringAnalysis = false
+    alertsPartialLoaded = false
+    alertsFullLoaded = false
     pollingInterval = setInterval(pollProgress, 1500)
     pollProgress()
   }

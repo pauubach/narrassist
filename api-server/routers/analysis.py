@@ -300,8 +300,12 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
         def run_real_analysis():
             """Ejecuta el análisis real — orquestador que delega en funciones de fase."""
+            import concurrent.futures
+
             from routers._analysis_phases import (
                 ProgressTracker,
+                _emit_consistency_alerts,
+                _emit_grammar_alerts,
                 apply_license_and_settings,
                 claim_heavy_slot_or_queue,
                 handle_analysis_error,
@@ -421,12 +425,33 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 run_ollama_healthcheck(ctx, tracker)
 
                 # Tier 2: Heavy phases (exclusive — one project at a time)
+                # NER → LLM validation → Fusion (sequential, each depends on previous)
                 run_ner(ctx, tracker)
                 run_llm_entity_validation(ctx, tracker)
                 run_fusion(ctx, tracker)
-                run_attributes(ctx, tracker)
-                run_consistency(ctx, tracker)
-                run_grammar(ctx, tracker)
+
+                # Grammar is independent of attributes/consistency.
+                # Run in parallel: Thread 1 = grammar → grammar_alerts
+                #                  Thread 2 = attributes → consistency
+                def _run_grammar_pipeline():
+                    run_grammar(ctx, tracker)
+                    _emit_grammar_alerts(ctx, tracker)
+
+                def _run_attrs_consistency_pipeline():
+                    run_attributes(ctx, tracker)
+                    run_consistency(ctx, tracker)
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+                    future_grammar = pool.submit(_run_grammar_pipeline)
+                    future_attrs = pool.submit(_run_attrs_consistency_pipeline)
+                    # Propagate exceptions from either thread
+                    future_grammar.result()
+                    future_attrs.result()
+
+                # Consistency alerts need attributes (produced by thread 2)
+                _emit_consistency_alerts(ctx, tracker)
+
+                # Finalize alerts phase (marks completion, applies dismissals)
                 run_alerts(ctx, tracker)
 
                 # S8a-15: Release heavy slot — enrichment is CPU-only,
@@ -436,11 +461,16 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 # S8a-17: Capture entity fingerprint before enrichment
                 entity_fp = capture_entity_fingerprint(ctx["db_session"], project_id)
 
-                # Tier 3: Enrichment phases (CPU-only, no GPU/LLM needed)
-                run_relationships_enrichment(ctx, tracker)
-                run_voice_enrichment(ctx, tracker)
-                run_prose_enrichment(ctx, tracker)
-                run_health_enrichment(ctx, tracker)
+                # Tier 3: Enrichment phases (CPU-only, independent of each other)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+                    futures = [
+                        pool.submit(run_relationships_enrichment, ctx, tracker),
+                        pool.submit(run_voice_enrichment, ctx, tracker),
+                        pool.submit(run_prose_enrichment, ctx, tracker),
+                        pool.submit(run_health_enrichment, ctx, tracker),
+                    ]
+                    for f in concurrent.futures.as_completed(futures):
+                        f.result()  # Propagate exceptions
 
                 # S15: Write version metrics after all enrichment phases
                 write_version_metrics(ctx)

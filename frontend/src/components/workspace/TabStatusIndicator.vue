@@ -1,5 +1,5 @@
 <script lang="ts">
-export type TabStatus = 'idle' | 'pending' | 'running' | 'completed' | 'failed'
+export type TabStatus = 'idle' | 'pending' | 'running' | 'partial' | 'completed' | 'failed'
 </script>
 
 <script setup lang="ts">
@@ -21,6 +21,7 @@ const props = defineProps<{
 }>()
 
 const showDot = computed(() => props.status === 'running')
+const showPartial = computed(() => props.status === 'partial')
 const showCheck = computed(() => props.status === 'completed' && !props.count)
 const showFailed = computed(() => props.status === 'failed')
 const showCount = computed(() => props.count !== undefined && props.count > 0)
@@ -40,6 +41,9 @@ const badgeClass = computed(() => {
   <span class="tab-status" aria-hidden="true">
     <!-- Dot animado: fase en ejecucion -->
     <span v-if="showDot" class="tab-status__dot tab-status__dot--running" />
+
+    <!-- Partial: datos disponibles pero incompletos -->
+    <span v-else-if="showPartial" class="tab-status__dot tab-status__dot--partial" />
 
     <!-- Check: fase completada sin conteo -->
     <i v-else-if="showCheck" class="pi pi-check tab-status__check" />
@@ -73,13 +77,19 @@ const badgeClass = computed(() => {
   animation: pulse-dot 1.5s ease-in-out infinite;
 }
 
+.tab-status__dot--partial {
+  background-color: var(--ds-alert-medium, #f59e0b);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.5; transform: scale(0.75); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tab-status__dot--running {
+  .tab-status__dot--running,
+  .tab-status__dot--partial {
     animation: none;
   }
 }

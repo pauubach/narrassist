@@ -163,6 +163,29 @@ class ProgressTracker:
         """Establece el status (thread-safe, para transiciones críticas)."""
         self._write(status=status, **extra)
 
+    def mark_phase_completed(self, phase_key: str):
+        """Marca una sub-fase virtual como completada (para alertas incrementales).
+
+        Añade la fase al array de fases si no existe, o la marca como completed.
+        El frontend usa esto para desbloquear tabs progresivamente.
+        """
+        with deps._progress_lock:
+            storage = deps.analysis_progress_storage.get(self.project_id)
+            if not storage:
+                return
+            phases_list = storage.get("phases", [])
+            existing = next((p for p in phases_list if p.get("id") == phase_key), None)
+            if existing:
+                existing["completed"] = True
+                existing["current"] = False
+            else:
+                phases_list.append({
+                    "id": phase_key,
+                    "name": phase_key,
+                    "completed": True,
+                    "current": False,
+                })
+
     def update_time_remaining(self):
         """Calcula tiempo restante usando tiempos reales de fases completadas."""
         now = time.time()
@@ -1796,21 +1819,13 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
 
                 if batch_mentions:
                     try:
-                        import concurrent.futures
-
-                        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                            future = executor.submit(
-                                attr_extractor.extract_attributes,
-                                full_text,
-                                batch_mentions,
-                                None,
-                            )
-                            try:
-                                batch_result = future.result(timeout=30)
-                                if batch_result.is_success and batch_result.value:
-                                    all_extracted_attrs.extend(batch_result.value.attributes)
-                            except concurrent.futures.TimeoutError:
-                                logger.warning(f"Timeout extrayendo atributos para: {names_str}")
+                        batch_result = attr_extractor.extract_attributes(
+                            full_text,
+                            batch_mentions,
+                            None,
+                        )
+                        if batch_result.is_success and batch_result.value:
+                            all_extracted_attrs.extend(batch_result.value.attributes)
                     except Exception as e:
                         logger.warning(f"Error extrayendo atributos para {names_str}: {e}")
 
@@ -1921,15 +1936,32 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
                     if not attr.entity_name:
                         continue
 
+                    # Buscar entidad: primero match exacto, luego parcial (primer nombre)
+                    attr_name_lower = attr.entity_name.lower()
                     matching_entity = next(
                         (
                             e
                             for e in character_entities
                             if e.canonical_name
-                            and e.canonical_name.lower() == attr.entity_name.lower()
+                            and e.canonical_name.lower() == attr_name_lower
                         ),
                         None,
                     )
+                    if not matching_entity:
+                        # Fallback: match por primer nombre (LLM suele devolver "María"
+                        # cuando el canónico es "María Sánchez")
+                        matching_entity = next(
+                            (
+                                e
+                                for e in character_entities
+                                if e.canonical_name
+                                and (
+                                    e.canonical_name.lower().startswith(attr_name_lower + " ")
+                                    or e.canonical_name.lower().split()[0] == attr_name_lower
+                                )
+                            ),
+                            None,
+                        )
                     if matching_entity:
                         try:
                             attr_key = (
@@ -2517,7 +2549,7 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
         correction_issues = orchestrator.analyze(
             text=full_text,
             chapter_index=None,
-            spacy_doc=None,
+            spacy_doc=ctx.get("spacy_doc"),
         )
 
         logger.info(f"Corrections analysis found {len(correction_issues)} suggestions")
@@ -2550,56 +2582,16 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
 # ============================================================================
 
 
-def run_alerts(ctx: dict, tracker: ProgressTracker):
-    """Fase 8: Creación de alertas a partir de todos los hallazgos."""
-    from narrative_assistant.alerts.engine import AlertCategory, AlertSeverity, get_alert_engine
+def _emit_grammar_alerts(ctx: dict, tracker: ProgressTracker):
+    """Emite alertas de gramática y correcciones editoriales (parcial, tras run_grammar)."""
+    from narrative_assistant.alerts.engine import get_alert_engine
 
     project_id = ctx["project_id"]
-    inconsistencies = ctx.get("inconsistencies", [])
     grammar_issues = ctx.get("grammar_issues", [])
     correction_issues = ctx.get("correction_issues", [])
-    vital_status_report = ctx.get("vital_status_report")
-    location_report = ctx.get("location_report")
-    ooc_report = ctx.get("ooc_report")
-    anachronism_report = ctx.get("anachronism_report")
-
-    tracker.start_phase("alerts", 8, "Preparando observaciones y sugerencias...")
 
     alerts_created = 0
     alert_engine = get_alert_engine()
-
-    # Alertas de inconsistencias de atributos
-    if inconsistencies:
-        for inc in inconsistencies:
-            try:
-                alert_result = alert_engine.create_from_attribute_inconsistency(
-                    project_id=project_id,
-                    entity_name=inc.entity_name,
-                    entity_id=inc.entity_id,
-                    attribute_key=(
-                        inc.attribute_key.value
-                        if hasattr(inc.attribute_key, "value")
-                        else str(inc.attribute_key)
-                    ),
-                    value1=inc.value1,
-                    value2=inc.value2,
-                    value1_source={
-                        "chapter": inc.value1_chapter,
-                        "excerpt": inc.value1_excerpt,
-                        "start_char": inc.value1_position,
-                    },
-                    value2_source={
-                        "chapter": inc.value2_chapter,
-                        "excerpt": inc.value2_excerpt,
-                        "start_char": inc.value2_position,
-                    },
-                    explanation=inc.explanation,
-                    confidence=inc.confidence,
-                )
-                if alert_result.is_success:
-                    alerts_created += 1
-            except Exception as e:
-                logger.warning(f"Error creating attribute inconsistency alert: {e}")
 
     # Alertas de errores gramaticales
     if grammar_issues:
@@ -2649,6 +2641,63 @@ def run_alerts(ctx: dict, tracker: ProgressTracker):
                     alerts_created += 1
             except Exception as e:
                 logger.warning(f"Error creating correction alert: {e}")
+
+    # Marcar fase parcial de alertas como completada
+    tracker.mark_phase_completed("alerts_grammar")
+    _update_storage(project_id, metrics_update={"alerts_generated": alerts_created})
+    logger.info(f"Grammar alerts emitted: {alerts_created} alerts")
+
+    ctx.setdefault("alerts_created", 0)
+    ctx["alerts_created"] += alerts_created
+    ctx["_grammar_alerts_emitted"] = True
+
+
+def _emit_consistency_alerts(ctx: dict, tracker: ProgressTracker):
+    """Emite alertas de consistencia narrativa (tras run_consistency)."""
+    from narrative_assistant.alerts.engine import AlertCategory, AlertSeverity, get_alert_engine
+
+    project_id = ctx["project_id"]
+    inconsistencies = ctx.get("inconsistencies", [])
+    vital_status_report = ctx.get("vital_status_report")
+    location_report = ctx.get("location_report")
+    ooc_report = ctx.get("ooc_report")
+    anachronism_report = ctx.get("anachronism_report")
+
+    alerts_created = 0
+    alert_engine = get_alert_engine()
+
+    # Alertas de inconsistencias de atributos
+    if inconsistencies:
+        for inc in inconsistencies:
+            try:
+                alert_result = alert_engine.create_from_attribute_inconsistency(
+                    project_id=project_id,
+                    entity_name=inc.entity_name,
+                    entity_id=inc.entity_id,
+                    attribute_key=(
+                        inc.attribute_key.value
+                        if hasattr(inc.attribute_key, "value")
+                        else str(inc.attribute_key)
+                    ),
+                    value1=inc.value1,
+                    value2=inc.value2,
+                    value1_source={
+                        "chapter": inc.value1_chapter,
+                        "excerpt": inc.value1_excerpt,
+                        "start_char": inc.value1_position,
+                    },
+                    value2_source={
+                        "chapter": inc.value2_chapter,
+                        "excerpt": inc.value2_excerpt,
+                        "start_char": inc.value2_position,
+                    },
+                    explanation=inc.explanation,
+                    confidence=inc.confidence,
+                )
+                if alert_result.is_success:
+                    alerts_created += 1
+            except Exception as e:
+                logger.warning(f"Error creating attribute inconsistency alert: {e}")
 
     # Alertas de estado vital
     if vital_status_report and hasattr(vital_status_report, "post_mortem_appearances"):
@@ -2742,11 +2791,30 @@ def run_alerts(ctx: dict, tracker: ProgressTracker):
             except Exception as e:
                 logger.warning(f"Error creating anachronism alert: {e}")
 
-    tracker.end_phase("alerts", 8)
-    _update_storage(project_id, metrics_update={"alerts_generated": alerts_created})
-    logger.info(f"Alerts phase complete: {alerts_created} alerts created")
+    ctx.setdefault("alerts_created", 0)
+    ctx["alerts_created"] += alerts_created
+    ctx["_consistency_alerts_emitted"] = True
+    logger.info(f"Consistency alerts emitted: {alerts_created} alerts")
 
-    ctx["alerts_created"] = alerts_created
+
+def run_alerts(ctx: dict, tracker: ProgressTracker):
+    """Fase 8: Finaliza emisión de alertas y aplica reglas post-procesamiento."""
+    project_id = ctx["project_id"]
+
+    tracker.start_phase("alerts", 8, "Finalizando alertas...")
+
+    # Emitir alertas de gramática si no se emitieron antes (ejecución secuencial legacy)
+    if not ctx.get("_grammar_alerts_emitted"):
+        _emit_grammar_alerts(ctx, tracker)
+
+    # Emitir alertas de consistencia si no se emitieron antes
+    if not ctx.get("_consistency_alerts_emitted"):
+        _emit_consistency_alerts(ctx, tracker)
+
+    tracker.end_phase("alerts", 8)
+    total = ctx.get("alerts_created", 0)
+    _update_storage(project_id, metrics_update={"alerts_generated": total})
+    logger.info(f"Alerts phase complete: {total} total alerts")
 
     # SP-1: Auto-descartar alertas que el usuario ya había descartado
     _apply_saved_dismissals(project_id)
