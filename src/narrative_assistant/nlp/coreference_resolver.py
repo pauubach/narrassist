@@ -819,49 +819,6 @@ def _get_default_coref_methods() -> list[CorefMethod]:
         ]
 
 
-def _select_coref_model() -> str:
-    """
-    S2-05: Selecciona el mejor modelo LLM para correferencias en español.
-
-    Estrategia: Qwen 2.5 es superior para tareas lingüísticas en español.
-    Si está disponible en Ollama, se prefiere sobre llama3.2.
-    """
-    try:
-        from ..llm.client import get_llm_client
-
-        client = get_llm_client()
-        if client and client.is_available:
-            available = getattr(client, "_available_models", None)
-            if available is None:
-                # Intentar obtener modelos disponibles
-                try:
-                    import requests  # type: ignore[import-untyped]
-
-                    resp = requests.get("http://localhost:11434/api/tags", timeout=2)
-                    if resp.status_code == 200:
-                        models = [
-                            m["name"].split(":")[0]
-                            for m in resp.json().get("models", [])
-                        ]
-                        if "qwen2.5" in models:
-                            logger.info(
-                                "S2-05: Usando Qwen 2.5 para correferencias (mejor español)"
-                            )
-                            return "qwen2.5"
-                        if "mistral" in models:
-                            return "mistral"
-                except Exception as e:
-                    logger.debug(
-                        f"Error obteniendo lista de modelos Ollama disponibles: {e}"
-                    )
-    except Exception as e:
-        logger.debug(
-            f"Error conectando con servidor Ollama para detectar modelo preferido: {e}"
-        )
-
-    return "llama3.2"  # Fallback
-
-
 @dataclass
 class CorefConfig:
     """Configuración del sistema de correferencias."""
@@ -876,15 +833,15 @@ class CorefConfig:
     consensus_threshold: float = 0.6  # Mínimo % de métodos que deben acordar
     max_antecedent_distance: int = 5  # Máx oraciones hacia atrás
     use_chapter_boundaries: bool = True  # Respetar límites de capítulo
-    ollama_model: str = "llama3.2"  # Modelo LLM por defecto
     ollama_timeout: int = 600  # 10 min - CPU sin GPU es muy lento
     use_llm_for_coref: bool | None = field(default=None)  # None = auto (GPU sí, CPU no)
 
     # S2-04: Pesos adaptativos
     use_adaptive_weights: bool = True  # Cargar pesos aprendidos si existen
 
-    # S2-05: Preferencia de modelo para español
-    prefer_spanish_model: bool = True  # Prefiere Qwen 2.5 para correferencias
+    # Votación por roles (config.py gestiona modelos)
+    quality_level: str = "rapida"  # rapida/completa/experta
+    sensitivity: float = 5.0  # Slider sensibilidad 1-10
 
     def __post_init__(self):
         """Ajusta configuración según hardware y preferencias."""
@@ -894,10 +851,6 @@ class CorefConfig:
             if adaptive:
                 self.method_weights = adaptive
                 logger.info("Usando pesos adaptativos para correferencias")
-
-        # S2-05: Auto-seleccionar modelo preferido para español
-        if self.prefer_spanish_model and self.ollama_model == "llama3.2":
-            self.ollama_model = _select_coref_model()
 
         # Ajustar uso de LLM según hardware
         if self.use_llm_for_coref is None:
@@ -1031,11 +984,21 @@ class LLMCorefMethod:
 
     Aprovecha la comprensión semántica profunda del LLM
     para resolver correferencias complejas.
+
+    Usa votación multi-modelo por roles (config.py gestiona modelos).
     """
 
-    def __init__(self, model: str = "llama3.2", timeout: int = 600):
+    def __init__(
+        self,
+        model: str = "llama3.2",
+        timeout: int = 600,
+        quality_level: str = "rapida",
+        sensitivity: float = 5.0,
+    ):
         self.model = model
         self.timeout = timeout  # 10 min default - CPU sin GPU es lento
+        self.quality_level = quality_level
+        self.sensitivity = sensitivity
         self._client = None
         self._lock = threading.Lock()
 
@@ -1063,7 +1026,7 @@ class LLMCorefMethod:
         candidates: list[Mention],
         context: str,
     ) -> list[tuple[Mention, float, str]]:
-        """Resuelve usando el LLM local."""
+        """Resuelve usando el LLM local (votación o modelo único)."""
         if not self.client or not candidates:
             return []
 
@@ -1097,20 +1060,21 @@ CANDIDATO: [número]
 CONFIANZA: [alta/media/baja]
 RAZÓN: [explicación breve]"""
 
+        system = "Eres un experto en análisis lingüístico del español. Tu tarea es resolver correferencias (determinar a quién o qué se refiere un pronombre o expresión)."
+
         try:
-            response = self.client.complete(
+            voting_result = self.client.voting_query(
+                task_name="coreference",
                 prompt=prompt,
-                system="Eres un experto en análisis lingüístico del español. Tu tarea es resolver correferencias (determinar a quién o qué se refiere un pronombre o expresión).",
+                system=system,
+                quality_level=self.quality_level,
+                sensitivity=self.sensitivity,
                 max_tokens=200,
                 temperature=0.1,
             )
-
-            if not response:
-                return []
-
-            # Parsear respuesta
-            results = self._parse_llm_response(response, candidates)
-            return results
+            if voting_result.is_valid and voting_result.consensus:
+                return self._parse_llm_response(voting_result.consensus, candidates)
+            return []
 
         except Exception as e:
             logger.debug(f"Error en LLM coref: {e}")
@@ -1500,7 +1464,9 @@ class CoreferenceVotingResolver(
         method_classes = {
             CorefMethod.EMBEDDINGS: EmbeddingsCorefMethod,
             CorefMethod.LLM: lambda: LLMCorefMethod(
-                model=self.config.ollama_model, timeout=self.config.ollama_timeout
+                timeout=self.config.ollama_timeout,
+                quality_level=self.config.quality_level,
+                sensitivity=self.config.sensitivity,
             ),
             CorefMethod.MORPHO: MorphoCorefMethod,
             CorefMethod.HEURISTICS: HeuristicsCorefMethod,

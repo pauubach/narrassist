@@ -318,105 +318,106 @@
                 />
               </div>
 
-              <!-- Grid de modelos (siempre visible) -->
-              <div class="llm-models-grid">
-                <div
-                  v-for="model in availableLLMOptions"
-                  :key="model.value"
-                  class="llm-model-card"
-                  :class="{
-                    enabled: isLLMModelEnabled(model.value),
-                    disabled: ollamaState !== 'ready',
-                  }"
-                  @click="ollamaState === 'ready' ? toggleLLMModel(model.value) : undefined"
-                >
-                  <div class="llm-model-header">
-                    <ToggleSwitch
-                      :model-value="isLLMModelEnabled(model.value)"
-                      :disabled="ollamaState !== 'ready'"
-                      @click.stop
-                      @update:model-value="toggleLLMModel(model.value)"
-                    />
-                    <div class="llm-model-name">
-                      <span class="llm-model-label">{{ model.label }}</span>
-                      <span class="llm-model-subtitle">{{ model.subtitle }}</span>
+              <!-- Nivel de calidad (Rápida / Completa / Experta) -->
+              <div class="quality-level-section" v-if="ollamaState === 'ready'">
+                <div class="setting-info" style="margin-bottom: 0.75rem;">
+                  <label class="setting-label">Nivel de análisis</label>
+                  <p class="setting-description">
+                    Más motores = mayor precisión pero más tiempo
+                  </p>
+                </div>
+                <div class="quality-level-cards">
+                  <div
+                    v-for="level in qualityLevels"
+                    :key="level.value"
+                    class="quality-level-card"
+                    :class="{
+                      selected: settings.qualityLevel === level.value,
+                      disabled: !level.available,
+                      recommended: level.recommended,
+                    }"
+                    @click="level.available ? selectQualityLevel(level.value) : undefined"
+                    v-tooltip.top="level.reason || ''"
+                  >
+                    <div class="quality-level-header">
+                      <i :class="level.icon"></i>
+                      <strong>{{ level.label }}</strong>
+                      <Tag v-if="level.recommended" value="Recomendado" severity="success" class="recommended-badge" />
                     </div>
-                    <Tag
-                      :value="getSpeedLabel(model.speed)"
-                      :severity="getSpeedSeverity(model.speed)"
-                      class="speed-badge"
-                    />
-                  </div>
-                  <p class="llm-model-desc">{{ model.description }}</p>
-                  <div class="llm-model-footer">
-                    <template v-if="getModelOperationLabel(model.value)">
-                      <span class="llm-model-busy">
-                        <i class="pi pi-spin pi-spinner"></i>
-                        {{ getModelOperationLabel(model.value) }}
-                      </span>
-                    </template>
-                    <template v-else-if="model.installed">
-                      <span class="llm-model-installed"><i class="pi pi-check"></i> Instalado</span>
-                      <Button
-                        v-if="canUninstallModel(model.value)"
-                        label="Desinstalar"
-                        icon="pi pi-trash"
-                        size="small"
-                        text
-                        severity="secondary"
-                        class="llm-model-action"
-                        @click.stop="onUninstallModel(model.value)"
-                      />
-                    </template>
-                    <template v-else>
-                      <Button
-                        label="Descargar"
-                        icon="pi pi-download"
-                        size="small"
-                        severity="primary"
-                        outlined
-                        class="llm-model-action"
-                        :disabled="isModelBusy(model.value)"
-                        @click.stop="onInstallModel(model.value)"
-                      />
-                    </template>
+                    <p class="quality-level-desc">{{ level.description }}</p>
+                    <span v-if="level.estimate" class="quality-level-time">{{ level.estimate }}</span>
                   </div>
                 </div>
               </div>
 
-              <!-- Modo de análisis -->
-              <div class="setting-item">
+              <!-- Slider de sensibilidad -->
+              <div class="setting-item" v-if="ollamaState === 'ready'">
                 <div class="setting-info">
-                  <label class="setting-label">Análisis rápido</label>
+                  <label class="setting-label">Sensibilidad de detección</label>
                   <p class="setting-description">
-                    Respuestas más rápidas pero menos detalladas
+                    {{ llmSensitivityLabel }}
                   </p>
                 </div>
-                <div class="setting-control">
-                  <ToggleSwitch
-                    v-model="settings.prioritizeSpeed"
-                    :disabled="ollamaState !== 'ready'"
-                    @change="onSettingChange"
+                <div class="setting-control" style="min-width: 200px;">
+                  <Slider
+                    v-model="settings.llmSensitivity"
+                    :min="1"
+                    :max="10"
+                    :step="1"
+                    @change="onLlmSensitivityChange"
                   />
+                  <span class="slider-value">{{ settings.llmSensitivity ?? 5 }}</span>
                 </div>
               </div>
 
-              <!-- Síntesis multi-modelo -->
-              <div class="setting-item">
-                <div class="setting-info">
-                  <label class="setting-label">Síntesis multi-modelo</label>
+              <!-- Motores activos (colapsable) -->
+              <div class="setting-item motors-section" v-if="ollamaState === 'ready'">
+                <div class="setting-info" @click="showMotors = !showMotors" style="cursor: pointer;">
+                  <label class="setting-label">
+                    <i :class="showMotors ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" style="font-size: 0.8em; margin-right: 0.3em;"></i>
+                    Motores activos
+                  </label>
                   <p class="setting-description">
-                    Combina respuestas de 2 modelos para mayor precisión (requiere GPU)
+                    {{ activeMotorsCount }} motor{{ activeMotorsCount !== 1 ? 'es' : '' }} configurado{{ activeMotorsCount !== 1 ? 's' : '' }}
                   </p>
                 </div>
-                <div class="setting-control">
-                  <ToggleSwitch
-                    v-model="settings.multiModelSynthesis"
-                    :disabled="ollamaState !== 'ready' || installedLlmCount < 2"
-                    @change="onSettingChange"
-                  />
+              </div>
+              <div v-if="showMotors && ollamaState === 'ready'" class="motors-list">
+                <div class="motor-item">
+                  <i class="pi pi-globe"></i>
+                  <div>
+                    <strong>Motor de idioma</strong>
+                    <span>Comprensión profunda del español</span>
+                  </div>
+                  <Tag value="Activo" severity="success" />
+                </div>
+                <div class="motor-item" v-if="settings.qualityLevel !== 'rapida'">
+                  <i class="pi pi-users"></i>
+                  <div>
+                    <strong>Motor de personajes</strong>
+                    <span>Análisis narrativo, voz y estilo</span>
+                  </div>
+                  <Tag value="Activo" severity="success" />
+                </div>
+                <div class="motor-item" v-if="settings.qualityLevel === 'experta'">
+                  <i class="pi pi-cog"></i>
+                  <div>
+                    <strong>Motor de razonamiento</strong>
+                    <span>Lógica temporal y causal</span>
+                  </div>
+                  <Tag value="Activo" severity="success" />
                 </div>
               </div>
+
+              <!-- Download progress (when changing quality level) -->
+              <DsDownloadProgress
+                v-if="qualityLevelDownloading"
+                label="Descargando motores de análisis..."
+                :percentage="ollamaDownloadProgress?.percentage ?? null"
+                class="ollama-progress-wrapper"
+                style="margin-top: 0.5rem;"
+              />
+
             </div>
           </template>
         </Card>
@@ -1033,7 +1034,7 @@ import {
   getFieldLabel, getRegisterLabel, getAudienceLabel,
   getDashLabel, getQuoteLabel,
   getSensitivityLabel, getSensitivitySeverity,
-  getRegionLabel, getSpeedLabel, getSpeedSeverity,
+  getRegionLabel,
 } from '@/utils/settingsLabels'
 import { safeSetItem, safeGetItem } from '@/utils/safeStorage'
 
@@ -1056,7 +1057,7 @@ const {
 const {
   ollamaState, ollamaActionConfig, ollamaStatusMessage,
   ollamaStarting, modelDownloading, ollamaDownloadProgress,
-  installModel, uninstallModel, isModelBusy, getModelOperationLabel,
+  installModel,
   cleanup: cleanupOllama,
 } = useOllamaManagement()
 
@@ -1066,7 +1067,136 @@ const {
   setCharacterKnowledgeMode, applyRecommendedConfig,
 } = useNLPMethods(settings, saveSettings, applyDefaultsFromCapabilities)
 
-const installedLlmCount = computed(() => availableLLMOptions.value.filter(o => o.installed).length)
+// ── Quality Level system ────────────────────────────────────
+
+const showMotors = ref(false)
+const qualityLevelDownloading = ref(false)
+
+const qualityLevels = ref([
+  {
+    value: 'rapida',
+    label: 'Rápida',
+    description: 'Análisis rápido con un motor',
+    icon: 'pi pi-bolt',
+    available: true,
+    recommended: false,
+    reason: null as string | null,
+    estimate: null as string | null,
+  },
+  {
+    value: 'completa',
+    label: 'Completa',
+    description: 'Verificación cruzada con 2 motores',
+    icon: 'pi pi-check-circle',
+    available: true,
+    recommended: false,
+    reason: null as string | null,
+    estimate: null as string | null,
+  },
+  {
+    value: 'experta',
+    label: 'Experta',
+    description: 'Máxima precisión con 3 motores votando',
+    icon: 'pi pi-star',
+    available: true,
+    recommended: false,
+    reason: null as string | null,
+    estimate: null as string | null,
+  },
+])
+
+const activeMotorsCount = computed(() => {
+  const level = settings.value.qualityLevel || 'rapida'
+  if (level === 'experta') return 3
+  if (level === 'completa') return 2
+  return 1
+})
+
+const llmSensitivityLabel = computed(() => {
+  const val = settings.value.llmSensitivity ?? 5
+  if (val <= 3) return 'Menos alertas, más precisas (pocos falsos positivos)'
+  if (val >= 8) return 'Más alertas, posibles falsos positivos'
+  return 'Equilibrio entre precisión y cobertura'
+})
+
+async function loadQualityLevels() {
+  try {
+    const response = await fetch('/api/services/llm/hardware')
+    const data = await response.json()
+    if (data.success && data.data?.levels) {
+      for (const apiLevel of data.data.levels) {
+        const local = qualityLevels.value.find(l => l.value === apiLevel.value)
+        if (local) {
+          local.available = apiLevel.available
+          local.recommended = apiLevel.recommended
+          local.reason = apiLevel.reason
+        }
+      }
+    }
+
+    // Cargar estimaciones
+    const estResponse = await fetch('/api/services/llm/estimates?word_count=50000')
+    const estData = await estResponse.json()
+    if (estData.success && estData.data?.estimates) {
+      for (const [level, est] of Object.entries(estData.data.estimates)) {
+        const local = qualityLevels.value.find(l => l.value === level)
+        if (local && est && typeof est === 'object' && 'description' in est) {
+          local.estimate = (est as { description: string }).description
+        }
+      }
+    }
+
+    // Cargar config actual
+    const cfgResponse = await fetch('/api/services/llm/config')
+    const cfgData = await cfgResponse.json()
+    if (cfgData.success && cfgData.data) {
+      settings.value.qualityLevel = cfgData.data.qualityLevel || 'rapida'
+      settings.value.llmSensitivity = cfgData.data.sensitivity ?? 5
+    }
+  } catch (e) {
+    console.debug('Error loading quality levels:', e)
+  }
+}
+
+async function selectQualityLevel(level: string) {
+  settings.value.qualityLevel = level
+  try {
+    const response = await fetch('/api/services/llm/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        qualityLevel: level,
+        sensitivity: settings.value.llmSensitivity ?? 5,
+      }),
+    })
+    const data = await response.json()
+
+    if (data.success && data.data?.modelsToDownload?.length > 0) {
+      // Auto-download missing models
+      qualityLevelDownloading.value = true
+      for (const modelName of data.data.modelsToDownload) {
+        await installModel(modelName)
+      }
+      qualityLevelDownloading.value = false
+    }
+
+    onSettingChange()
+  } catch (e) {
+    console.error('Error setting quality level:', e)
+  }
+}
+
+function onLlmSensitivityChange() {
+  fetch('/api/services/llm/config', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      qualityLevel: settings.value.qualityLevel || 'rapida',
+      sensitivity: settings.value.llmSensitivity ?? 5,
+    }),
+  }).catch(e => console.debug('Error saving sensitivity:', e))
+  onSettingChange()
+}
 
 // ── System capabilities (proxied from store) ───────────────
 
@@ -1094,37 +1224,6 @@ const hardwareTooltip = computed(() => {
   }
   return `Modo CPU: ${hw.cpu.name}`
 })
-
-// ── LLM model toggle (card grid) ───────────────────────────
-
-function isLLMModelEnabled(modelValue: string): boolean {
-  return settings.value.enabledInferenceMethods.includes(modelValue)
-}
-
-function toggleLLMModel(modelValue: string) {
-  const current = settings.value.enabledInferenceMethods
-  if (current.includes(modelValue)) {
-    // Prevent disabling the last one
-    if (current.length <= 1) {
-      toast.add({ severity: 'warn', summary: 'Mínimo requerido', detail: 'Debes mantener al menos un modelo seleccionado.', life: 3000 })
-      return
-    }
-    settings.value.enabledInferenceMethods = current.filter(m => m !== modelValue)
-  } else {
-    settings.value.enabledInferenceMethods = [...current, modelValue]
-    // Auto-install if not installed
-    const option = availableLLMOptions.value.find(o => o.value === modelValue)
-    if (option && !option.installed) {
-      installModel(modelValue).then(ok => {
-        if (!ok) {
-          settings.value.enabledInferenceMethods = settings.value.enabledInferenceMethods.filter(m => m !== modelValue)
-          onSettingChange()
-        }
-      })
-    }
-  }
-  onSettingChange()
-}
 
 // ── NLP model download ──────────────────────────────────────
 
@@ -1326,6 +1425,7 @@ onMounted(async () => {
   await loadSystemCapabilities()
   await loadCurrentDataLocation()
   await loadCorrectionPresets()
+  await loadQualityLevels()
 })
 
 onUnmounted(() => {
@@ -1505,38 +1605,7 @@ const handleScroll = () => {
   }
 }
 
-function canUninstallModel(modelName: string): boolean {
-  const installedCount = availableLLMOptions.value.filter(o => o.installed).length
-  const option = availableLLMOptions.value.find(o => o.value === modelName)
-  return Boolean(option?.installed) && installedCount > 1
-}
 
-async function onInstallModel(modelName: string) {
-  const ok = await installModel(modelName)
-  if (!ok) return
-
-  if (!settings.value.enabledInferenceMethods.includes(modelName)) {
-    settings.value.enabledInferenceMethods.push(modelName)
-    onSettingChange()
-  }
-}
-
-async function onUninstallModel(modelName: string) {
-  if (!canUninstallModel(modelName)) {
-    toast.add({ severity: 'warn', summary: 'No permitido', detail: 'Debe quedar al menos 1 modelo instalado.', life: 3500 })
-    return
-  }
-
-  const ok = await uninstallModel(modelName)
-  if (!ok) return
-
-  settings.value.enabledInferenceMethods = settings.value.enabledInferenceMethods.filter(m => m !== modelName)
-  if (settings.value.enabledInferenceMethods.length === 0) {
-    const fallback = availableLLMOptions.value.find(o => o.installed && o.value !== modelName)
-    settings.value.enabledInferenceMethods = [fallback?.value || 'llama3.2']
-  }
-  onSettingChange()
-}
 </script>
 
 <style scoped>
@@ -1819,119 +1888,141 @@ async function onUninstallModel(modelName: string) {
 
 /* ── LLM model card grid ──────────────────────────────────── */
 
-.llm-models-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
+/* Quality Level cards */
+.quality-level-section {
   margin-bottom: 1rem;
 }
 
-.llm-model-card {
+.quality-level-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.quality-level-card {
+  border: 2px solid var(--p-surface-200);
+  border-radius: 8px;
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--p-surface-0);
+}
+
+.quality-level-card:hover:not(.disabled) {
+  border-color: var(--p-primary-300);
+  background: var(--p-primary-50);
+}
+
+.quality-level-card.selected {
+  border-color: var(--p-primary-500);
+  background: var(--p-primary-50);
+}
+
+.quality-level-card.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quality-level-card.recommended:not(.selected) {
+  border-color: var(--p-green-200);
+}
+
+.quality-level-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.3rem;
+}
+
+.quality-level-header i {
+  color: var(--p-primary-500);
+  font-size: 1.1rem;
+}
+
+.quality-level-header strong {
+  font-size: 0.95rem;
+}
+
+.recommended-badge {
+  font-size: 0.65rem !important;
+  padding: 0.1rem 0.3rem !important;
+}
+
+.quality-level-desc {
+  font-size: 0.8rem;
+  color: var(--p-text-secondary-color);
+  margin: 0 0 0.3rem 0;
+}
+
+.quality-level-time {
+  font-size: 0.75rem;
+  color: var(--p-text-secondary-color);
+  font-style: italic;
+}
+
+.slider-value {
+  font-weight: 600;
+  font-size: 0.9rem;
+  min-width: 1.5rem;
+  text-align: center;
+  margin-left: 0.5rem;
+}
+
+/* Motors section */
+.motors-list {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.75rem;
-  border: 1px solid var(--p-surface-300);
-  border-radius: 0.5rem;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding-left: 0.5rem;
+}
+
+.motor-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border-radius: 6px;
   background: var(--p-surface-50);
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
 }
 
-.llm-model-card:hover:not(.disabled) {
-  background: var(--p-surface-100);
+.motor-item i {
+  font-size: 1.1rem;
+  color: var(--p-primary-400);
 }
 
-.llm-model-card.enabled {
-  border-color: var(--p-primary-color);
-  background: color-mix(in srgb, var(--p-primary-color) 6%, var(--p-surface-0));
+.motor-item div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
-.llm-model-card.disabled {
-  opacity: 0.55;
-  cursor: default;
+.motor-item strong {
+  font-size: 0.85rem;
 }
 
-:global(.dark) .llm-model-card {
+.motor-item span {
+  font-size: 0.75rem;
+  color: var(--p-text-secondary-color);
+}
+
+:global(.dark) .quality-level-card {
   background: var(--p-surface-800);
   border-color: var(--p-surface-600);
 }
 
-:global(.dark) .llm-model-card:hover:not(.disabled) {
+:global(.dark) .quality-level-card.selected {
+  background: var(--p-primary-900);
+  border-color: var(--p-primary-400);
+}
+
+:global(.dark) .quality-level-card:hover:not(.disabled) {
+  background: var(--p-primary-900);
+  border-color: var(--p-primary-500);
+}
+
+:global(.dark) .motor-item {
   background: var(--p-surface-700);
-}
-
-:global(.dark) .llm-model-card.enabled {
-  border-color: var(--p-primary-color);
-  background: color-mix(in srgb, var(--p-primary-color) 10%, var(--p-surface-800));
-}
-
-.llm-model-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.llm-model-name {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-}
-
-.llm-model-label {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--p-text-color);
-}
-
-.llm-model-subtitle {
-  font-size: 0.72rem;
-  color: var(--p-text-muted-color);
-}
-
-.llm-model-desc {
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--p-text-muted-color);
-  line-height: 1.3;
-}
-
-.llm-model-footer {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.15rem;
-}
-
-.llm-model-installed {
-  font-size: 0.75rem;
-  color: var(--p-green-500);
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.llm-model-installed i {
-  font-size: 0.7rem;
-}
-
-.llm-model-busy {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--p-primary-color);
-}
-
-.llm-model-busy i {
-  font-size: 0.75rem;
-}
-
-.llm-model-action {
-  margin-left: auto;
-  font-size: 0.75rem !important;
 }
 
 /* Inline badges en sección header */

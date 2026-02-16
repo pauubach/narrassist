@@ -52,25 +52,16 @@ class ViolationSeverity(Enum):
 class InferenceMethod(Enum):
     """Métodos de inferencia disponibles."""
 
-    # Modelos LLM locales (vía Ollama)
-    LLAMA3_2 = "llama3.2"  # Llama 3.2 3B - Rápido, buena calidad
-    MISTRAL = "mistral"  # Mistral 7B - Mayor calidad, más lento
-    GEMMA2 = "gemma2"  # Gemma 2 9B - Alta calidad
-    QWEN2_5 = "qwen2.5"  # Qwen 2.5 7B - Muy bueno en español
-
-    # Métodos basados en reglas/heurísticas
+    VOTING_LLM = "voting_llm"  # Votación multi-modelo por roles (config.py)
     RULE_BASED = "rule_based"  # Patrones y heurísticas
     EMBEDDINGS = "embeddings"  # Similitud semántica con embeddings
 
 
 # Pesos por defecto para votación
 DEFAULT_WEIGHTS = {
-    InferenceMethod.LLAMA3_2: 0.25,
-    InferenceMethod.MISTRAL: 0.30,
-    InferenceMethod.GEMMA2: 0.25,
-    InferenceMethod.QWEN2_5: 0.30,
-    InferenceMethod.RULE_BASED: 0.15,
-    InferenceMethod.EMBEDDINGS: 0.20,
+    InferenceMethod.VOTING_LLM: 0.50,
+    InferenceMethod.RULE_BASED: 0.25,
+    InferenceMethod.EMBEDDINGS: 0.25,
 }
 
 
@@ -189,18 +180,20 @@ class CharacterBehaviorProfile:
 class InferenceConfig:
     """Configuración para el motor de inferencia."""
 
-    # Métodos habilitados - Por defecto TODOS los métodos están disponibles
-    # ya que todos los modelos vienen pre-instalados con la aplicación
+    # Métodos habilitados — votación por roles + reglas + embeddings
     enabled_methods: list[InferenceMethod] = field(
         default_factory=lambda: [
-            InferenceMethod.LLAMA3_2,
-            InferenceMethod.MISTRAL,
-            InferenceMethod.GEMMA2,
-            InferenceMethod.QWEN2_5,
+            InferenceMethod.VOTING_LLM,
             InferenceMethod.RULE_BASED,
             InferenceMethod.EMBEDDINGS,
         ]
     )
+
+    # Nivel de calidad para votación (se propaga a config.py)
+    quality_level: str = "rapida"
+
+    # Sensibilidad (slider 1-10 del frontend)
+    sensitivity: float = 5.0
 
     # Pesos personalizados (opcional)
     custom_weights: dict[InferenceMethod, float] | None = None
@@ -292,17 +285,9 @@ Responde SIEMPRE en formato JSON válido."""
         """Verifica qué métodos están disponibles."""
         from .client import get_llm_client
 
-        # Verificar modelos LLM
         client = get_llm_client()
         if client and client.is_available:
-            # Verificar cada modelo en Ollama
-            for method in [
-                InferenceMethod.LLAMA3_2,
-                InferenceMethod.MISTRAL,
-                InferenceMethod.GEMMA2,
-                InferenceMethod.QWEN2_5,
-            ]:
-                self._ollama_available[method.value] = self._check_ollama_model(method.value)
+            self._ollama_available["voting_llm"] = True
 
         # Verificar embeddings
         try:
@@ -312,32 +297,16 @@ Responde SIEMPRE en formato JSON válido."""
         except Exception as e:
             logger.debug(f"Error cargando modelo de embeddings para inferencia: {e}")
 
-    def _check_ollama_model(self, model_name: str) -> bool:
-        """Verifica si un modelo específico está disponible en Ollama."""
-        try:
-            import httpx
-
-            response = httpx.get("http://localhost:11434/api/tags", timeout=2.0)
-            if response.status_code == 200:
-                models = [m.get("name", "") for m in response.json().get("models", [])]
-                return any(model_name in m for m in models)
-        except Exception as e:
-            logger.debug(f"Error verificando disponibilidad del modelo Ollama '{model_name}': {e}")
-        return False
-
     @property
     def is_available(self) -> bool:
         """Verifica si al menos un método está disponible."""
-        # Rule-based siempre está disponible
         if InferenceMethod.RULE_BASED in self._config.enabled_methods:
             return True
 
-        # Verificar LLMs
-        for method in self._config.enabled_methods:
-            if method.value in self._ollama_available and self._ollama_available[method.value]:
+        if InferenceMethod.VOTING_LLM in self._config.enabled_methods:
+            if self._ollama_available.get("voting_llm", False):
                 return True
 
-        # Verificar embeddings
         return bool(
             InferenceMethod.EMBEDDINGS in self._config.enabled_methods and self._embeddings_model
         )
@@ -350,15 +319,9 @@ Responde SIEMPRE en formato JSON válido."""
         if InferenceMethod.RULE_BASED in self._config.enabled_methods:
             methods.append("rule_based")
 
-        for method in [
-            InferenceMethod.LLAMA3_2,
-            InferenceMethod.MISTRAL,
-            InferenceMethod.GEMMA2,
-            InferenceMethod.QWEN2_5,
-        ]:
-            if method in self._config.enabled_methods:
-                if self._ollama_available.get(method.value, False):
-                    methods.append(method.value)
+        if InferenceMethod.VOTING_LLM in self._config.enabled_methods:
+            if self._ollama_available.get("voting_llm", False):
+                methods.append("voting_llm")
 
         if InferenceMethod.EMBEDDINGS in self._config.enabled_methods and self._embeddings_model:
             methods.append("embeddings")
@@ -396,40 +359,27 @@ Responde SIEMPRE en formato JSON válido."""
                 all_values.setdefault(value, []).append(conf)
             methods_used.append("rule_based")
 
-        # 2. Análisis con modelos LLM
-        llm_methods = [
-            (InferenceMethod.LLAMA3_2, "llama3.2"),
-            (InferenceMethod.MISTRAL, "mistral"),
-            (InferenceMethod.GEMMA2, "gemma2"),
-            (InferenceMethod.QWEN2_5, "qwen2.5"),
-        ]
-
-        for method, model_name in llm_methods:
-            if method not in self._config.enabled_methods:
-                continue
-            if not self._ollama_available.get(model_name, False):
-                continue
-
-            result = self._analyze_with_llm(
-                model_name, character_name, text_samples, chapter_numbers, existing_attributes
+        # 2. Análisis con votación LLM por roles
+        if InferenceMethod.VOTING_LLM in self._config.enabled_methods:
+            voting_result = self._analyze_with_voting(
+                character_name, text_samples, chapter_numbers, existing_attributes
             )
-            if result:
-                for trait in result.get("personality_traits", []):
+            if voting_result:
+                for trait in voting_result.get("personality_traits", []):
                     all_traits.setdefault(trait, []).append(0.8)
-                for value in result.get("values", []):
+                for value in voting_result.get("values", []):
                     all_values.setdefault(value, []).append(0.8)
 
-                # Convertir expectativas
-                for exp_data in result.get("behavioral_expectations", []):
+                for exp_data in voting_result.get("behavioral_expectations", []):
                     try:
                         exp = self._parse_expectation(
-                            exp_data, character_id, character_name, model_name
+                            exp_data, character_id, character_name, "voting_llm"
                         )
                         all_expectations.append(exp)
                     except Exception as e:
                         logger.debug(f"Error parseando expectativa: {e}")
 
-                methods_used.append(model_name)
+                methods_used.append("voting_llm")
 
         # 3. Análisis con embeddings (similitud semántica)
         if InferenceMethod.EMBEDDINGS in self._config.enabled_methods and self._embeddings_model:
@@ -486,17 +436,22 @@ Responde SIEMPRE en formato JSON válido."""
 
         return traits, values
 
-    def _analyze_with_llm(
+    def _analyze_with_voting(
         self,
-        model_name: str,
         character_name: str,
         text_samples: list[str],
         chapter_numbers: list[int],
         existing_attributes: dict | None,
     ) -> dict | None:
-        """Análisis usando un modelo LLM específico."""
+        """Análisis usando votación multi-modelo por roles."""
         try:
-            import httpx
+            from .client import get_llm_client
+
+            client = get_llm_client()
+            if not client or not client.is_available:
+                return None
+
+            from narrative_assistant.llm.sanitization import sanitize_for_prompt
 
             samples_text = "\n\n---\n\n".join(
                 [
@@ -504,8 +459,6 @@ Responde SIEMPRE en formato JSON válido."""
                     for text, ch in zip(text_samples, chapter_numbers, strict=False)
                 ]
             )
-
-            from narrative_assistant.llm.sanitization import sanitize_for_prompt
 
             safe_name = sanitize_for_prompt(character_name, max_length=200)
             safe_attrs = sanitize_for_prompt(existing_attributes, max_length=2000) if existing_attributes else "Ninguno especificado"  # type: ignore[arg-type]
@@ -526,49 +479,58 @@ Extrae la siguiente información sobre el personaje:
 {{
   "personality_traits": ["lista de rasgos de personalidad observados"],
   "values": ["valores y principios que guían al personaje"],
-  "fears": ["miedos o preocupaciones del personaje"],
-  "goals": ["objetivos o motivaciones"],
-  "speech_patterns": ["patrones de habla distintivos"],
   "behavioral_expectations": [
     {{
       "type": "behavioral|relational|knowledge|capability|temporal|contextual",
       "description": "qué esperaríamos que haga/no haga",
       "reasoning": "por qué esperamos esto basado en el texto",
-      "confidence": 0.0-1.0,
-      "source_chapters": [números de capítulos],
-      "related_traits": ["rasgos relacionados"]
+      "confidence": 0.0-1.0
     }}
   ]
 }}"""
 
-            response = httpx.post(
-                "http://localhost:11434/api/generate",
-                json={
-                    "model": model_name,
-                    "prompt": f"{self.CHARACTER_ANALYSIS_SYSTEM}\n\n{prompt}",
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.3,
-                        "num_predict": 2048,
-                    },
-                },
-                timeout=600.0,  # 10 min - CPU sin GPU es muy lento
+            import json
+
+            def parse_json_response(response: str) -> dict | None:
+                try:
+                    cleaned = response.strip()
+                    if cleaned.startswith("```"):
+                        lines = cleaned.split("\n")
+                        lines = [ln for ln in lines if not ln.startswith("```")]
+                        cleaned = "\n".join(lines)
+                    start = cleaned.find("{")
+                    end = cleaned.rfind("}") + 1
+                    if start != -1 and end > start:
+                        return json.loads(cleaned[start:end])
+                except Exception:
+                    pass
+                return None
+
+            voting_result = client.voting_query(
+                task_name="expectations",
+                prompt=prompt,
+                system=self.CHARACTER_ANALYSIS_SYSTEM,
+                parse_fn=parse_json_response,
+                quality_level=self._config.quality_level,
+                sensitivity=self._config.sensitivity,
+                max_tokens=800,
+                temperature=0.3,
             )
 
-            if response.status_code == 200:
-                text = response.json().get("response", "")
-                # Extraer JSON de la respuesta
-                start = text.find("{")
-                end = text.rfind("}") + 1
-                if start != -1 and end > start:
-                    import json
+            if voting_result.is_valid and voting_result.consensus:
+                logger.info(
+                    f"Expectativas para '{character_name}': "
+                    f"modelos={voting_result.models_used}, "
+                    f"confianza={voting_result.confidence:.2f}, "
+                    f"fallbacks={voting_result.fallbacks_applied}"
+                )
+                return voting_result.consensus
 
-                    return json.loads(text[start:end])  # type: ignore[no-any-return]
+            return None
 
         except Exception as e:
-            logger.debug(f"Error en análisis LLM ({model_name}): {e}")
-
-        return None
+            logger.warning(f"Error en análisis con votación: {e}")
+            return None
 
     def _analyze_with_embeddings(self, text_samples: list[str]) -> dict[str, float]:
         """Análisis usando similitud de embeddings."""
@@ -703,22 +665,15 @@ Extrae la siguiente información sobre el personaje:
                 key = f"{v.violation_text[:50]}:{v.explanation[:50]}"
                 all_violations.setdefault(key, []).append(v)
 
-        # 2. Detección con LLMs
-        for method, model_name in [
-            (InferenceMethod.LLAMA3_2, "llama3.2"),
-            (InferenceMethod.MISTRAL, "mistral"),
-        ]:
-            if method not in self._config.enabled_methods:
-                continue
-            if not self._ollama_available.get(model_name, False):
-                continue
-
-            llm_violations = self._detect_with_llm(
-                model_name, profile, text, chapter_number, position
-            )
-            for v in llm_violations:
-                key = f"{v.violation_text[:50]}:{v.explanation[:50]}"
-                all_violations.setdefault(key, []).append(v)
+        # 2. Detección con LLMs (votación multi-modelo o legacy)
+        if InferenceMethod.VOTING_LLM in self._config.enabled_methods:
+            if self._ollama_available.get("voting_llm", False):
+                voting_violations = self._detect_violations_with_voting(
+                    profile, text, chapter_number, position
+                )
+                for v in voting_violations:
+                    key = f"{v.violation_text[:50]}:{v.explanation[:50]}"
+                    all_violations.setdefault(key, []).append(v)
 
         # Consolidar con votación
         final_violations = []
@@ -735,6 +690,100 @@ Extrae la siguiente información sobre el personaje:
                 final_violations.append(best)
 
         return final_violations
+
+    def _detect_violations_with_voting(
+        self,
+        profile: CharacterBehaviorProfile,
+        text: str,
+        chapter_number: int,
+        position: int,
+    ) -> list[ExpectationViolation]:
+        """Detecta violaciones usando votación multi-modelo por roles."""
+        try:
+            from .client import get_llm_client
+            from narrative_assistant.llm.sanitization import sanitize_for_prompt
+
+            client = get_llm_client()
+            if not client or not client.is_available:
+                return []
+
+            safe_name = sanitize_for_prompt(profile.character_name, max_length=200)
+            safe_traits = sanitize_for_prompt(
+                ", ".join(profile.personality_traits[:10]), max_length=500
+            )
+            safe_text = sanitize_for_prompt(text[:4000], max_length=4000)
+
+            prompt = f"""Analiza si el siguiente texto contiene comportamientos que contradicen
+el perfil del personaje "{safe_name}".
+
+RASGOS CONOCIDOS: {safe_traits}
+
+TEXTO A ANALIZAR:
+{safe_text}
+
+Si hay violaciones, responde en JSON:
+{{
+  "violations": [
+    {{
+      "text": "fragmento del texto que viola el perfil",
+      "explanation": "por qué contradice los rasgos",
+      "severity": "alta|media|baja"
+    }}
+  ]
+}}
+
+Si no hay violaciones, responde: {{"violations": []}}"""
+
+            import json
+
+            def parse_violations(response: str) -> dict | None:
+                try:
+                    cleaned = response.strip()
+                    if cleaned.startswith("```"):
+                        lines = cleaned.split("\n")
+                        lines = [ln for ln in lines if not ln.startswith("```")]
+                        cleaned = "\n".join(lines)
+                    start = cleaned.find("{")
+                    end = cleaned.rfind("}") + 1
+                    if start != -1 and end > start:
+                        return json.loads(cleaned[start:end])
+                except Exception:
+                    pass
+                return None
+
+            result = client.voting_query(
+                task_name="ooc",
+                prompt=prompt,
+                system="Eres un experto en análisis narrativo de textos en español.",
+                parse_fn=parse_violations,
+                quality_level=self._config.quality_level,
+                sensitivity=self._config.sensitivity,
+                max_tokens=600,
+                temperature=0.3,
+            )
+
+            if not result.is_valid or not result.consensus:
+                return []
+
+            violations = []
+            for v_data in result.consensus.get("violations", []):
+                violations.append(
+                    ExpectationViolation(
+                        character_id=profile.character_id,
+                        character_name=profile.character_name,
+                        violation_text=v_data.get("text", ""),
+                        explanation=v_data.get("explanation", ""),
+                        chapter_number=chapter_number,
+                        position=position,
+                        consensus_score=result.confidence,
+                        detection_methods=["voting_llm"],
+                    )
+                )
+            return violations
+
+        except Exception as e:
+            logger.warning(f"Error en detección de violaciones con votación: {e}")
+            return []
 
     def _detect_with_rules(
         self,
@@ -800,168 +849,6 @@ Extrae la siguiente información sobre el personaje:
                                 consensus_score=0.5,
                             )
                         )
-
-        return violations
-
-    def _detect_with_llm(
-        self,
-        model_name: str,
-        profile: CharacterBehaviorProfile,
-        text: str,
-        chapter_number: int,
-        position: int,
-    ) -> list[ExpectationViolation]:
-        """
-        Detecta violaciones de expectativas usando LLM.
-
-        Envía el perfil del personaje y el texto al modelo LLM para
-        analizar si hay comportamientos que contradicen la caracterización.
-        """
-        import json
-
-        import httpx
-
-        violations = []
-
-        try:
-            from narrative_assistant.llm.sanitization import sanitize_for_prompt
-
-            # Sanitizar texto del manuscrito antes de enviarlo al LLM (A-10)
-            safe_name = sanitize_for_prompt(profile.character_name, max_length=200)
-            safe_text = sanitize_for_prompt(text[:2000], max_length=2000)
-
-            # Preparar contexto del personaje
-            traits_text = (
-                ", ".join(profile.personality_traits[:10])
-                if profile.personality_traits
-                else "sin rasgos definidos"
-            )
-            values_text = (
-                ", ".join(profile.values[:5]) if profile.values else "sin valores definidos"
-            )
-
-            # Formatear expectativas para el prompt
-            expectations_text = (
-                "\n".join(
-                    [
-                        f"- [{e.expectation_type.value}] {e.description} (confianza: {e.confidence:.0%})"
-                        for e in profile.expectations[:5]
-                    ]
-                )
-                if profile.expectations
-                else "Sin expectativas definidas"
-            )
-
-            prompt = f"""Analiza si el siguiente texto contiene comportamientos que contradicen la caracterización establecida del personaje.
-
-PERSONAJE: {safe_name}
-
-RASGOS DE PERSONALIDAD: {traits_text}
-
-VALORES: {values_text}
-
-EXPECTATIVAS COMPORTAMENTALES:
-{expectations_text}
-
-TEXTO A ANALIZAR:
-"{safe_text}"
-
-Si encuentras violaciones de las expectativas, responde con JSON:
-{{
-  "violations": [
-    {{
-      "violation_text": "extracto corto del texto donde ocurre la violación",
-      "severity": "critical|high|medium|low",
-      "explanation": "explicación de por qué es una violación",
-      "expectation_violated": "descripción de la expectativa violada",
-      "justifications": ["posible justificación 1", "posible justificación 2"]
-    }}
-  ]
-}}
-
-Si NO hay violaciones, responde:
-{{"violations": []}}
-
-IMPORTANTE: Solo marca como violación si claramente contradice la caracterización. No marques si es ambiguo o podría tener justificación narrativa."""
-
-            response = httpx.post(
-                "http://localhost:11434/api/generate",
-                json={
-                    "model": model_name,
-                    "prompt": f"{self.CHARACTER_ANALYSIS_SYSTEM}\n\n{prompt}",
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.2,  # Bajo para más consistencia
-                        "num_predict": 1024,
-                    },
-                },
-                timeout=120.0,
-            )
-
-            if response.status_code == 200:
-                response_text = response.json().get("response", "")
-
-                # Extraer JSON de la respuesta
-                start = response_text.find("{")
-                end = response_text.rfind("}") + 1
-                if start != -1 and end > start:
-                    data = json.loads(response_text[start:end])
-
-                    for v in data.get("violations", []):
-                        # Mapear severidad
-                        severity_map = {
-                            "critical": ViolationSeverity.CRITICAL,
-                            "high": ViolationSeverity.HIGH,
-                            "medium": ViolationSeverity.MEDIUM,
-                            "low": ViolationSeverity.LOW,
-                        }
-                        severity = severity_map.get(
-                            v.get("severity", "medium"), ViolationSeverity.MEDIUM
-                        )
-
-                        # Encontrar o crear expectativa relacionada
-                        related_exp = next(
-                            (
-                                e
-                                for e in profile.expectations
-                                if v.get("expectation_violated", "").lower()
-                                in e.description.lower()
-                            ),
-                            None,
-                        )
-                        if not related_exp:
-                            related_exp = BehavioralExpectation(
-                                character_id=profile.character_id,
-                                character_name=profile.character_name,
-                                expectation_type=ExpectationType.BEHAVIORAL,
-                                description=v.get(
-                                    "expectation_violated", "Expectativa de comportamiento"
-                                ),
-                                reasoning="Detectado por análisis LLM",
-                                confidence=0.6,
-                            )
-
-                        violation = ExpectationViolation(
-                            expectation=related_exp,
-                            violation_text=v.get("violation_text", text[:100]),
-                            chapter_number=chapter_number,
-                            position=position,
-                            severity=severity,
-                            explanation=v.get("explanation", ""),
-                            possible_justifications=v.get("justifications", []),
-                            detection_methods=[model_name],
-                            consensus_score=0.6,  # Un solo método
-                        )
-                        violations.append(violation)
-
-                    logger.debug(f"LLM ({model_name}) detectó {len(violations)} violaciones")
-
-        except json.JSONDecodeError as e:
-            logger.debug(f"Error parseando respuesta JSON de {model_name}: {e}")
-        except httpx.TimeoutException:
-            logger.debug(f"Timeout en detección LLM ({model_name})")
-        except Exception as e:
-            logger.debug(f"Error en detección LLM ({model_name}): {e}")
 
         return violations
 

@@ -828,8 +828,26 @@ def analyze_character_behavior(project_id: int, character_id: int):
                 existing_attrs[attr.attribute_name] = []
             existing_attrs[attr.attribute_name].append(attr.value)
 
+        # Leer configuración LLM actual
+        _ql, _sens = "rapida", 5.0
+        try:
+            from narrative_assistant.persistence.database import get_database as _get_db
+            _db = _get_db()
+            with _db.get_connection() as _conn:
+                _row = _conn.execute(
+                    "SELECT quality_level, sensitivity FROM llm_config LIMIT 1"
+                ).fetchone()
+            if _row:
+                _ql = _row[0] or "rapida"
+                _sens = float(_row[1]) if _row[1] is not None else 5.0
+        except Exception:
+            pass
+
         # Analizar con LLM
-        engine = ExpectationInferenceEngine()
+        from narrative_assistant.llm.expectation_inference import InferenceConfig
+        engine = ExpectationInferenceEngine(
+            config=InferenceConfig(quality_level=_ql, sensitivity=_sens)
+        )
         profile = engine.analyze_character(
             character_id=character_id,
             character_name=entity.canonical_name,

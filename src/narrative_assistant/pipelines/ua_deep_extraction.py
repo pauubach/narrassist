@@ -497,13 +497,7 @@ class PipelineDeepExtractionMixin:
             # Configurar métodos según disponibilidad
             enabled_methods = [InferenceMethod.RULE_BASED]
             if self.config.use_llm:
-                enabled_methods.extend(
-                    [
-                        InferenceMethod.LLAMA3_2,
-                        InferenceMethod.MISTRAL,
-                        InferenceMethod.QWEN2_5,
-                    ]
-                )
+                enabled_methods.append(InferenceMethod.VOTING_LLM)
             enabled_methods.append(InferenceMethod.EMBEDDINGS)
 
             config = InferenceConfig(

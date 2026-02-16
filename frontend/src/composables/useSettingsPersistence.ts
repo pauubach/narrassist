@@ -39,6 +39,8 @@ export interface Settings {
   multiModelSynthesis: boolean
   enabledNLPMethods: EnabledMethods
   characterKnowledgeMode: string
+  qualityLevel: string
+  llmSensitivity: number
 }
 
 // ── Constants ──────────────────────────────────────────────
@@ -61,6 +63,8 @@ const DEFAULT_SETTINGS: Settings = {
   enabledInferenceMethods: ['llama3.2'],
   prioritizeSpeed: false,
   multiModelSynthesis: true,
+  qualityLevel: 'rapida',
+  llmSensitivity: 5,
   enabledNLPMethods: {
     coreference: ['embeddings', 'morpho', 'heuristics'],
     ner: ['spacy', 'gazetteer'],
@@ -72,7 +76,7 @@ const DEFAULT_SETTINGS: Settings = {
 }
 
 // Valid LLM method values (basic methods like rule_based/embeddings are always active)
-const VALID_INFERENCE_METHODS = ['llama3.2', 'mistral', 'gemma2', 'qwen2.5']
+const VALID_INFERENCE_METHODS = ['llama3.2', 'mistral', 'gemma2', 'qwen2.5', 'qwen3', 'hermes3', 'deepseek-r1']
 
 // ── Composable ─────────────────────────────────────────────
 

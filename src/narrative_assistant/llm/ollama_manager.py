@@ -43,6 +43,7 @@ class OllamaStatus(Enum):
     INSTALLED_NOT_RUNNING = "installed_not_running"
     RUNNING = "running"
     STARTING = "starting"
+    STOPPED = "stopped"
     ERROR = "error"
 
 
@@ -65,6 +66,10 @@ class OllamaModel:
     description: str
     is_downloaded: bool = False
     is_default: bool = False
+    min_ram_gb: float = 4.0  # RAM mínima recomendada
+    is_core: bool = False  # Modelo principal (vs fallback)
+    is_legacy: bool = False  # Modelo reemplazado por uno mejor
+    benchmark_toks: float | None = None  # tok/s medido (post-descarga)
 
 
 @dataclass
@@ -114,32 +119,64 @@ class OllamaConfig:
     force_cpu: bool = False
 
 
-# Modelos disponibles
+# Modelos disponibles — core (votación), fallback y legacy
 AVAILABLE_MODELS = [
+    # === Modelos Core (votación por roles) ===
+    OllamaModel(
+        name="qwen3",
+        display_name="Qwen 3 (14B)",
+        size_gb=8.5,
+        description="Motor de idioma: comprension profunda del espanol y razonamiento.",
+        is_core=True,
+        min_ram_gb=12.0,
+    ),
+    OllamaModel(
+        name="hermes3",
+        display_name="Hermes 3 (8B)",
+        size_gb=4.7,
+        description="Motor de personajes: analisis narrativo, voz y estilo literario.",
+        is_core=True,
+        min_ram_gb=8.0,
+    ),
+    OllamaModel(
+        name="deepseek-r1",
+        display_name="DeepSeek-R1 (7B)",
+        size_gb=4.4,
+        description="Motor de razonamiento: logica temporal, causal y deductiva.",
+        is_core=True,
+        min_ram_gb=8.0,
+    ),
+    # === Modelos Fallback ===
     OllamaModel(
         name="llama3.2",
         display_name="Llama 3.2 (3B)",
         size_gb=2.0,
-        description="Modelo rapido, buena calidad general. Funciona bien en CPU.",
+        description="Modelo ligero universal. Funciona bien en CPU.",
         is_default=True,
+        min_ram_gb=4.0,
     ),
     OllamaModel(
         name="qwen2.5",
         display_name="Qwen 2.5 (7B)",
         size_gb=4.4,
-        description="Excelente para textos en espanol. Requiere mas recursos.",
-    ),
-    OllamaModel(
-        name="mistral",
-        display_name="Mistral (7B)",
-        size_gb=4.1,
-        description="Mayor calidad de razonamiento. Requiere mas recursos.",
+        description="Alternativa para espanol cuando Qwen 3 no cabe en memoria.",
+        min_ram_gb=8.0,
     ),
     OllamaModel(
         name="gemma2",
         display_name="Gemma 2 (9B)",
         size_gb=5.4,
-        description="Alta calidad, el mas lento. Requiere GPU o mucha RAM.",
+        description="Alternativa narrativa. Requiere GPU o mucha RAM.",
+        min_ram_gb=10.0,
+    ),
+    # === Legacy (reemplazado por Hermes 3) ===
+    OllamaModel(
+        name="mistral",
+        display_name="Mistral (7B)",
+        size_gb=4.1,
+        description="Reemplazado por Hermes 3. Disponible como fallback de razonamiento.",
+        is_legacy=True,
+        min_ram_gb=8.0,
     ),
 ]
 
@@ -916,7 +953,7 @@ class OllamaManager:
 
         # Reiniciar con force_cpu
         self._config.force_cpu = True
-        self._status = OllamaStatus.STOPPED  # type: ignore[attr-defined]
+        self._status = OllamaStatus.STOPPED
         return self.start_service(force_cpu=True)
 
     def ensure_running(self, force_cpu: bool = False) -> tuple[bool, str]:
@@ -1032,6 +1069,15 @@ class OllamaManager:
                 if progress_callback:
                     progress_callback(progress)
                 logger.info(f"Modelo {model_name} descargado correctamente")
+
+                # Micro-benchmark automático post-descarga
+                try:
+                    toks = self.benchmark_model(model_name)
+                    if toks:
+                        logger.info(f"Benchmark post-descarga {model_name}: {toks:.1f} tok/s")
+                except Exception as e:
+                    logger.debug(f"Benchmark post-descarga {model_name} omitido: {e}")
+
                 return True, f"Modelo {model_name} descargado"
             else:
                 # Construir mensaje de error descriptivo
@@ -1133,8 +1179,86 @@ class OllamaManager:
                     description=model.description,
                     is_downloaded=model_name in self._downloaded_models,
                     is_default=model.is_default,
+                    min_ram_gb=model.min_ram_gb,
+                    is_core=model.is_core,
+                    is_legacy=model.is_legacy,
+                    benchmark_toks=model.benchmark_toks,
                 )
         return None
+
+    def benchmark_model(self, model_name: str) -> float | None:
+        """
+        Ejecuta un micro-benchmark de un modelo (~30 tokens).
+
+        Mide tok/s real en el hardware actual. Se ejecuta automáticamente
+        después de descargar un modelo.
+
+        Args:
+            model_name: Nombre del modelo a benchmarkear
+
+        Returns:
+            tok/s medido, o None si falla
+        """
+        if not self.is_running:
+            logger.warning(f"Benchmark de {model_name}: Ollama no corriendo")
+            return None
+
+        try:
+            import httpx
+
+            host = self._config.host
+            start = time.time()
+
+            response = httpx.post(
+                f"{host}/api/chat",
+                json={
+                    "model": model_name,
+                    "messages": [
+                        {"role": "user", "content": "Cuenta del 1 al 10."}
+                    ],
+                    "stream": False,
+                    "options": {"num_predict": 30},
+                },
+                timeout=120.0,
+            )
+
+            elapsed = time.time() - start
+
+            if response.status_code == 200:
+                data = response.json()
+                # Ollama devuelve eval_count y eval_duration en nanoseconds
+                eval_count = data.get("eval_count", 0)
+                eval_duration_ns = data.get("eval_duration", 0)
+
+                if eval_count > 0 and eval_duration_ns > 0:
+                    toks = eval_count / (eval_duration_ns / 1e9)
+                elif elapsed > 0:
+                    # Fallback: estimar por tokens generados / tiempo total
+                    content = data.get("message", {}).get("content", "")
+                    estimated_tokens = len(content.split()) * 1.3
+                    toks = estimated_tokens / elapsed
+                else:
+                    return None
+
+                logger.info(
+                    f"Benchmark {model_name}: {toks:.1f} tok/s "
+                    f"({eval_count} tokens en {elapsed:.1f}s)"
+                )
+
+                # Actualizar en el catálogo
+                for model in AVAILABLE_MODELS:
+                    if model.name == model_name:
+                        model.benchmark_toks = toks
+                        break
+
+                return toks
+
+            logger.warning(f"Benchmark {model_name}: HTTP {response.status_code}")
+            return None
+
+        except Exception as e:
+            logger.warning(f"Benchmark {model_name} falló: {e}")
+            return None
 
 
 def get_ollama_manager(config: OllamaConfig | None = None) -> OllamaManager:

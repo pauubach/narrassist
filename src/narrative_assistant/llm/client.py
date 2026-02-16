@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import threading
+import time
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -350,12 +351,12 @@ class LocalLLMClient:
         vram_gb = 0.0
 
         try:
-            from ..core.device import get_gpu_device  # type: ignore[attr-defined]
+            from ..core.device import get_device_detector
 
-            gpu = get_gpu_device()
-            if gpu:
+            cuda = get_device_detector().detect_cuda()
+            if cuda:
                 has_gpu = True
-                vram_gb = gpu.total_memory_gb or 0.0
+                vram_gb = cuda.memory_gb or 0.0
                 if vram_gb > 8:
                     has_high_vram = True
         except Exception:
@@ -584,8 +585,8 @@ class LocalLLMClient:
         )
 
         options: dict[str, Any] = {
-            "num_predict": max_tokens or self._config.max_tokens,
-            "temperature": temperature or self._config.temperature,
+            "num_predict": max_tokens if max_tokens is not None else self._config.max_tokens,
+            "temperature": temperature if temperature is not None else self._config.temperature,
         }
         if self._ollama_num_gpu is not None:
             options["num_gpu"] = self._ollama_num_gpu
@@ -642,8 +643,8 @@ class LocalLLMClient:
 
             result = self._transformers_pipeline(
                 full_prompt,
-                max_new_tokens=max_tokens or self._config.max_tokens,
-                temperature=temperature or self._config.temperature,
+                max_new_tokens=max_tokens if max_tokens is not None else self._config.max_tokens,
+                temperature=temperature if temperature is not None else self._config.temperature,
                 do_sample=True,
                 pad_token_id=self._transformers_pipeline.tokenizer.eos_token_id,
             )
@@ -712,6 +713,227 @@ class LocalLLMClient:
             logger.error(f"Error parseando JSON: {e}")
             logger.debug(f"Respuesta recibida: {response[:500]}")
             return None
+
+    def voting_query(
+        self,
+        task_name: str,
+        prompt: str,
+        system: str,
+        parse_fn: Callable[[str], Any] | None = None,
+        quality_level: Any | None = None,
+        sensitivity: float = 5.0,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> "VotingResult":
+        """
+        Ejecuta una query con votación multi-modelo por roles.
+
+        Obtiene la configuración de votación para la tarea, resuelve fallbacks
+        con los modelos realmente disponibles, ejecuta cada slot secuencialmente,
+        y consolida los resultados con pesos ponderados.
+
+        Args:
+            task_name: Nombre de la tarea (debe coincidir con AnalysisTask)
+            prompt: Prompt para el LLM
+            system: System prompt
+            parse_fn: Función para parsear la respuesta cruda. Si None, devuelve texto.
+            quality_level: QualityLevel override. Si None, usa el configurado en DB.
+            sensitivity: Valor del slider de sensibilidad (1-10)
+            max_tokens: Override de tokens máximos
+            temperature: Override de temperatura
+
+        Returns:
+            VotingResult con consenso, confianza y detalles por modelo
+        """
+        from .config import (
+            AnalysisTask,
+            QualityLevel,
+            VotingResult,
+            get_voting_config,
+        )
+
+        # Resolver tarea
+        try:
+            task = AnalysisTask(task_name)
+        except ValueError:
+            logger.error(f"Tarea desconocida para votación: {task_name}")
+            return VotingResult(
+                consensus=None, confidence=0.0,
+                models_used=[], roles_used=[],
+            )
+
+        # Nivel de calidad
+        if quality_level is None:
+            quality_level = QualityLevel.RAPIDA
+        elif isinstance(quality_level, str):
+            try:
+                quality_level = QualityLevel(quality_level)
+            except ValueError:
+                quality_level = QualityLevel.RAPIDA
+
+        # Obtener modelos disponibles
+        available = self._get_available_ollama_models()
+
+        # Resolver configuración de votación
+        config = get_voting_config(task, available, quality_level, sensitivity)
+
+        if not config.slots:
+            logger.error(f"Votación {task_name}: sin modelos disponibles")
+            return VotingResult(
+                consensus=None, confidence=0.0,
+                models_used=[], roles_used=[],
+            )
+
+        # Ejecutar cada slot
+        per_model_results: dict[str, Any] = {}
+        per_model_times: dict[str, float] = {}
+        fallbacks_applied: list[str] = []
+        models_used: list[str] = []
+        roles_used = []
+
+        # Detectar fallbacks
+        from .config import QUALITY_MATRIX
+        original_config = QUALITY_MATRIX.get(task)
+        if original_config:
+            original_models = {s.model_name for s in original_config.slot_for_level(quality_level)}
+            for slot in config.slots:
+                if slot.model_name not in original_models:
+                    # Encontrar qué modelo original fue sustituido
+                    for orig_slot in original_config.slot_for_level(quality_level):
+                        if orig_slot.role == slot.role and orig_slot.model_name != slot.model_name:
+                            fallbacks_applied.append(
+                                f"{orig_slot.model_name}→{slot.model_name} ({slot.role.value})"
+                            )
+
+        for slot in config.slots:
+            start = time.time()
+            try:
+                response = self.complete(
+                    prompt=prompt,
+                    system=system,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    model_name=slot.model_name,
+                )
+            except Exception as e:
+                elapsed = time.time() - start
+                logger.warning(
+                    f"Votación {task_name}/{slot.model_name}: error en complete(): {e}"
+                )
+                per_model_times[slot.model_name] = elapsed
+                continue
+            elapsed = time.time() - start
+
+            if response:
+                try:
+                    parsed = parse_fn(response) if parse_fn else response
+                except Exception as e:
+                    logger.warning(
+                        f"Votación {task_name}/{slot.model_name}: error en parse_fn: {e}"
+                    )
+                    per_model_times[slot.model_name] = elapsed
+                    continue
+                per_model_results[slot.model_name] = parsed
+                per_model_times[slot.model_name] = elapsed
+                models_used.append(slot.model_name)
+                roles_used.append(slot.role)
+                logger.debug(
+                    f"Votación {task_name}/{slot.model_name} "
+                    f"({slot.role.value}, peso {slot.weight:.2f}): "
+                    f"{elapsed:.1f}s"
+                )
+            else:
+                logger.warning(
+                    f"Votación {task_name}/{slot.model_name}: sin respuesta"
+                )
+                per_model_times[slot.model_name] = elapsed
+
+        # Consolidar resultados
+        consensus, confidence = self._compute_consensus(
+            per_model_results, config.slots, config.min_confidence
+        )
+
+        result = VotingResult(
+            consensus=consensus,
+            confidence=confidence,
+            models_used=models_used,
+            roles_used=roles_used,
+            per_model_results=per_model_results,
+            per_model_times=per_model_times,
+            fallbacks_applied=fallbacks_applied,
+        )
+
+        logger.info(
+            f"Votación {task_name}: {len(models_used)} modelos, "
+            f"confianza {confidence:.2f}, "
+            f"fallbacks: {fallbacks_applied or 'ninguno'}"
+        )
+
+        return result
+
+    def _get_available_ollama_models(self) -> set[str]:
+        """Obtiene los modelos de Ollama realmente instalados."""
+        try:
+            import httpx
+
+            host = self._config.ollama_host
+            response = httpx.get(f"{host}/api/tags", timeout=5.0)
+            if response.status_code == 200:
+                data = response.json()
+                models = set()
+                for m in data.get("models", []):
+                    name = m.get("name", "").split(":")[0]
+                    if name:
+                        models.add(name)
+                return models
+        except Exception as e:
+            logger.debug(f"Error obteniendo modelos Ollama: {e}")
+
+        # Fallback: devolver modelo configurado
+        return {self._config.ollama_model}
+
+    def _compute_consensus(
+        self,
+        results: dict[str, Any],
+        slots: list,
+        min_confidence: float,
+    ) -> tuple[Any, float]:
+        """
+        Consolida resultados de votación ponderada.
+
+        Para texto libre: selecciona el resultado del modelo con mayor peso.
+        Para datos estructurados (dict): fusiona campos con pesos.
+
+        Returns:
+            (consensus_result, confidence)
+        """
+        if not results:
+            return None, 0.0
+
+        # Mapear modelo → peso
+        weight_map = {s.model_name: s.weight for s in slots}
+
+        # Si solo hay 1 resultado, usarlo directamente
+        if len(results) == 1:
+            model, result = next(iter(results.items()))
+            confidence = weight_map.get(model, 0.5)
+            return result, confidence
+
+        # Múltiples resultados: usar el de mayor peso como base
+        sorted_results = sorted(
+            results.items(),
+            key=lambda x: weight_map.get(x[0], 0),
+            reverse=True,
+        )
+
+        best_model, best_result = sorted_results[0]
+        total_weight = sum(weight_map.get(m, 0) for m in results)
+
+        # Confianza: promedio ponderado (todos respondieron = alta confianza)
+        expected_weight = sum(s.weight for s in slots)
+        confidence = total_weight / expected_weight if expected_weight > 0 else 0.0
+
+        return best_result, confidence
 
 
 def _validate_ollama_host(host: str) -> str:

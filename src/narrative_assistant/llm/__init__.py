@@ -71,6 +71,23 @@ from .ollama_manager import (
     is_ollama_available,
     reset_ollama_manager,
 )
+from .config import (
+    # Enums
+    AnalysisTask,
+    ModelRole,
+    QualityLevel,
+    # Dataclasses
+    HardwareProfile,
+    TaskVotingConfig,
+    VotingResult,
+    VotingSlot,
+    # Funciones
+    get_available_levels,
+    get_required_models,
+    get_voting_config,
+    recommend_level,
+    resolve_fallbacks,
+)
 from .llamacpp_manager import (
     # Constantes
     AVAILABLE_MODELS as LLAMACPP_MODELS,
@@ -126,6 +143,19 @@ __all__ = [
     "download_llm_model",
     # Deprecated
     "get_claude_client",
+    # Config - Votación por roles
+    "ModelRole",
+    "QualityLevel",
+    "AnalysisTask",
+    "VotingSlot",
+    "TaskVotingConfig",
+    "VotingResult",
+    "HardwareProfile",
+    "resolve_fallbacks",
+    "get_voting_config",
+    "get_required_models",
+    "recommend_level",
+    "get_available_levels",
     # LlamaCpp
     "LlamaCppStatus",
     "LlamaCppModelInfo",

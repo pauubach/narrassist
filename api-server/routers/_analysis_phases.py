@@ -550,6 +550,25 @@ def apply_license_and_settings(ctx: dict, tracker: ProgressTracker):
 
     ctx["analysis_config"] = analysis_config
 
+    # Extraer configuración LLM (quality_level + sensitivity) de la tabla llm_config
+    try:
+        from narrative_assistant.persistence.database import get_database
+
+        db = get_database()
+        with db.get_connection() as conn:
+            row = conn.execute(
+                "SELECT quality_level, sensitivity FROM llm_config LIMIT 1"
+            ).fetchone()
+        if row:
+            ctx["quality_level"] = row[0] or "rapida"
+            ctx["sensitivity"] = float(row[1]) if row[1] is not None else 5.0
+        else:
+            ctx["quality_level"] = "rapida"
+            ctx["sensitivity"] = 5.0
+    except Exception:
+        ctx["quality_level"] = "rapida"
+        ctx["sensitivity"] = 5.0
+
 
 # ============================================================================
 # Phase 1: Parsing
@@ -1428,7 +1447,9 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                 min_confidence=0.5,
                 consensus_threshold=0.6,
                 use_chapter_boundaries=True,
-                ollama_model="llama3.2",
+                quality_level=ctx.get("quality_level", "rapida"),
+                sensitivity=ctx.get("sensitivity", 5.0),
+                use_voting=True,
             )
 
             coref_result = resolve_coreferences_voting(

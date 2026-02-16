@@ -210,37 +210,27 @@ class TestAdaptiveWeights:
 class TestQwen25Coref:
     """Tests para la preferencia de Qwen 2.5 en correferencias."""
 
-    def test_coref_config_has_prefer_spanish(self):
-        """CorefConfig tiene el campo prefer_spanish_model."""
+    def test_coref_config_has_quality_level(self):
+        """CorefConfig tiene campo quality_level para votación por roles."""
         from narrative_assistant.nlp.coreference_resolver import CorefConfig
 
-        config = CorefConfig(prefer_spanish_model=False)
-        assert hasattr(config, "prefer_spanish_model")
+        config = CorefConfig(use_adaptive_weights=False)
+        assert hasattr(config, "quality_level")
+        assert config.quality_level == "rapida"
 
-    def test_coref_config_default_prefers_spanish(self):
-        """Por defecto, prefer_spanish_model es True."""
+    def test_coref_config_has_sensitivity(self):
+        """CorefConfig tiene campo sensitivity para slider."""
         from narrative_assistant.nlp.coreference_resolver import CorefConfig
 
-        config = CorefConfig(prefer_spanish_model=False, use_adaptive_weights=False)
-        # Default value
-        assert CorefConfig.__dataclass_fields__["prefer_spanish_model"].default is True
-
-    def test_select_coref_model_fallback(self):
-        """Si no hay Ollama, retorna llama3.2."""
-        from narrative_assistant.nlp.coreference_resolver import _select_coref_model
-
-        # Patch the import inside the function
-        with patch.dict("sys.modules", {"narrative_assistant.llm.client": MagicMock(side_effect=ImportError)}):
-            with patch("narrative_assistant.nlp.coreference_resolver._select_coref_model") as mock:
-                mock.return_value = "llama3.2"
-                result = mock()
-                assert result == "llama3.2"
+        config = CorefConfig(use_adaptive_weights=False)
+        assert hasattr(config, "sensitivity")
+        assert config.sensitivity == 5.0
 
     def test_coref_config_adaptive_weights_flag(self):
         """CorefConfig tiene el campo use_adaptive_weights."""
         from narrative_assistant.nlp.coreference_resolver import CorefConfig
 
-        config = CorefConfig(use_adaptive_weights=False, prefer_spanish_model=False)
+        config = CorefConfig(use_adaptive_weights=False)
         assert hasattr(config, "use_adaptive_weights")
 
 

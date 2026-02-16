@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 25
+SCHEMA_VERSION = 26
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -1418,6 +1418,21 @@ class Database:
             "CREATE INDEX IF NOT EXISTS idx_proj_det_weights_entity ON project_detector_weights(project_id, alert_type, entity_canonical_name)",
             # v25: Índice para undo/redo por batch
             "CREATE INDEX IF NOT EXISTS idx_history_batch ON review_history(project_id, batch_id)",
+            # v26: Configuración LLM global (nivel de calidad + sensibilidad)
+            """CREATE TABLE IF NOT EXISTS llm_config (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                quality_level TEXT NOT NULL DEFAULT 'rapida',
+                sensitivity REAL NOT NULL DEFAULT 5.0,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )""",
+            # v26: Benchmarks de modelos LLM (tok/s medido post-descarga)
+            """CREATE TABLE IF NOT EXISTS model_benchmarks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                model_name TEXT NOT NULL UNIQUE,
+                tok_per_sec REAL NOT NULL,
+                vram_used_gb REAL,
+                benchmarked_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )""",
         ]
         for sql in table_migrations:
             try:

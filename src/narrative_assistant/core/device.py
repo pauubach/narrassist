@@ -504,3 +504,91 @@ def get_safe_batch_size(default: int, device_info: DeviceInfo | None = None) -> 
             return max(16, default // 2)  # VRAM media
 
     return default
+
+
+# =============================================================================
+# Detección de capacidad de hardware para modelos LLM
+# =============================================================================
+
+
+def _get_system_ram_gb() -> float:
+    """Obtiene la RAM total del sistema en GB."""
+    try:
+        import psutil
+
+        return psutil.virtual_memory().total / (1024**3)
+    except ImportError:
+        pass
+
+    # Fallback por plataforma
+    system = platform.system().lower()
+    if system == "linux":
+        try:
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if line.startswith("MemTotal:"):
+                        return int(line.split()[1]) / (1024 * 1024)
+        except Exception:
+            pass
+    return 8.0  # Default conservador
+
+
+def detect_capacity() -> "HardwareProfile":
+    """
+    Detecta la capacidad efectiva del hardware para modelos LLM.
+
+    Prioridad de presupuesto:
+    1. VRAM (NVIDIA CUDA) → el modelo corre en GPU, VRAM es el límite
+    2. Unified Memory (Apple Metal) → 75% de RAM total
+    3. RAM (CPU-only) → 50% de RAM total (conservador)
+
+    Returns:
+        HardwareProfile con presupuesto efectivo calculado
+    """
+    from ..llm.config import HardwareProfile
+
+    detector = get_device_detector()
+    ram_gb = _get_system_ram_gb()
+
+    # 1. CUDA VRAM
+    cuda = detector.detect_cuda()
+    if cuda and cuda.memory_gb:
+        logger.info(
+            f"Capacidad LLM: CUDA {cuda.memory_gb:.1f} GB VRAM, "
+            f"{ram_gb:.1f} GB RAM → budget {cuda.memory_gb:.1f} GB"
+        )
+        return HardwareProfile(
+            vram_gb=cuda.memory_gb,
+            unified_memory_gb=None,
+            ram_gb=ram_gb,
+            device_type="cuda",
+            effective_budget_gb=cuda.memory_gb,
+        )
+
+    # 2. Apple Metal (unified memory)
+    mps = detector.detect_mps()
+    if mps:
+        budget = ram_gb * 0.75
+        logger.info(
+            f"Capacidad LLM: Metal unified {ram_gb:.1f} GB → budget {budget:.1f} GB"
+        )
+        return HardwareProfile(
+            vram_gb=None,
+            unified_memory_gb=ram_gb,
+            ram_gb=ram_gb,
+            device_type="mps",
+            effective_budget_gb=budget,
+        )
+
+    # 3. CPU only
+    budget = ram_gb * 0.5
+    logger.info(
+        f"Capacidad LLM: CPU only, {ram_gb:.1f} GB RAM → budget {budget:.1f} GB"
+    )
+    return HardwareProfile(
+        vram_gb=None,
+        unified_memory_gb=None,
+        ram_gb=ram_gb,
+        device_type="cpu",
+        effective_budget_gb=budget,
+    )

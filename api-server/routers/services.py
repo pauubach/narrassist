@@ -18,8 +18,8 @@ from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
 
-_MODEL_SPEED_ORDER = ["llama3.2", "qwen2.5", "mistral", "gemma2"]
-_MODEL_QUALITY_ORDER = ["qwen2.5", "gemma2", "mistral", "llama3.2"]
+_MODEL_SPEED_ORDER = ["llama3.2", "hermes3", "deepseek-r1", "qwen2.5", "qwen3", "mistral", "gemma2"]
+_MODEL_QUALITY_ORDER = ["qwen3", "hermes3", "deepseek-r1", "qwen2.5", "gemma2", "mistral", "llama3.2"]
 
 
 def _normalize_model_name(model_name: str) -> str:
@@ -972,4 +972,198 @@ def get_correction_presets() -> ApiResponse:
         logger.error(f"Error getting correction presets: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
+
+# =============================================================================
+# LLM Configuration endpoints
+# =============================================================================
+
+
+@router.get("/llm/hardware")
+async def get_llm_hardware():
+    """Detecta capacidad de hardware y recomienda nivel de calidad."""
+    try:
+        from narrative_assistant.core.device import detect_capacity
+        from narrative_assistant.llm.config import get_available_levels, recommend_level
+
+        profile = detect_capacity()
+        recommended = recommend_level(profile)
+        levels = get_available_levels(profile)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "hardware": {
+                    "vram_gb": profile.vram_gb,
+                    "unified_memory_gb": profile.unified_memory_gb,
+                    "ram_gb": round(profile.ram_gb, 1),
+                    "device_type": profile.device_type,
+                    "effective_budget_gb": round(profile.effective_budget_gb, 1),
+                    "has_gpu": profile.has_gpu,
+                },
+                "recommended_level": recommended.value,
+                "levels": [
+                    {
+                        "value": lv["level"].value,
+                        "label": lv["label"],
+                        "description": lv["description"],
+                        "available": lv["available"],
+                        "reason": lv["reason"],
+                        "recommended": lv["recommended"],
+                    }
+                    for lv in levels
+                ],
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error detecting hardware: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@router.get("/llm/config")
+async def get_llm_config():
+    """Obtiene configuración LLM actual (nivel + sensibilidad)."""
+    try:
+        from narrative_assistant.persistence.database import get_database
+
+        db = get_database()
+        with db.get_connection() as conn:
+            row = conn.execute("SELECT quality_level, sensitivity FROM llm_config LIMIT 1").fetchone()
+
+        if row:
+            quality_level, sensitivity = row
+        else:
+            quality_level, sensitivity = "rapida", 5.0
+
+        return ApiResponse(
+            success=True,
+            data={"qualityLevel": quality_level, "sensitivity": sensitivity},
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting LLM config: {e}", exc_info=True)
+        return ApiResponse(success=True, data={"qualityLevel": "rapida", "sensitivity": 5.0})
+
+
+@router.put("/llm/config")
+async def update_llm_config(request: dict):
+    """Actualiza nivel de calidad y/o sensibilidad. Trigger auto-download si es necesario."""
+    try:
+        from narrative_assistant.llm.config import QualityLevel, get_required_models
+        from narrative_assistant.persistence.database import get_database
+
+        quality_level = request.get("qualityLevel", "rapida")
+        sensitivity = max(1.0, min(10.0, float(request.get("sensitivity", 5.0))))
+
+        # Validar nivel
+        try:
+            level = QualityLevel(quality_level)
+        except ValueError:
+            return ApiResponse(success=False, error=f"Nivel inválido: {quality_level}")
+
+        # Persistir
+        db = get_database()
+        with db.get_connection() as conn:
+            row = conn.execute("SELECT id FROM llm_config LIMIT 1").fetchone()
+            if row:
+                conn.execute(
+                    "UPDATE llm_config SET quality_level=?, sensitivity=?, updated_at=datetime('now') WHERE id=?",
+                    (quality_level, sensitivity, row[0]),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO llm_config (quality_level, sensitivity) VALUES (?, ?)",
+                    (quality_level, sensitivity),
+                )
+            conn.commit()
+
+        # Verificar qué modelos se necesitan descargar
+        required = get_required_models(level)
+        try:
+            from narrative_assistant.llm.ollama_manager import get_ollama_manager
+
+            manager = get_ollama_manager()
+            installed = {m.split(":")[0] for m in manager.downloaded_models}
+            missing = required - installed
+        except Exception:
+            missing = set()
+
+        return ApiResponse(
+            success=True,
+            data={
+                "qualityLevel": quality_level,
+                "sensitivity": sensitivity,
+                "modelsToDownload": list(missing),
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error updating LLM config: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@router.get("/llm/models")
+async def get_llm_models():
+    """Lista modelos con estado (installed, available, legacy)."""
+    try:
+        from narrative_assistant.llm.ollama_manager import AVAILABLE_MODELS, get_ollama_manager
+
+        manager = get_ollama_manager()
+        installed = {m.split(":")[0] for m in manager.downloaded_models}
+
+        models = []
+        for model in AVAILABLE_MODELS:
+            models.append({
+                "name": model.name,
+                "displayName": model.display_name,
+                "sizeGb": model.size_gb,
+                "description": model.description,
+                "isInstalled": model.name in installed,
+                "isCore": model.is_core,
+                "isLegacy": model.is_legacy,
+                "minRamGb": model.min_ram_gb,
+                "benchmarkToks": model.benchmark_toks,
+            })
+
+        return ApiResponse(success=True, data={"models": models})
+
+    except Exception as e:
+        logger.error(f"Error listing LLM models: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@router.get("/llm/estimates")
+async def get_llm_estimates(word_count: int = 50000):
+    """Estimaciones de tiempo por nivel y conteo de palabras."""
+    try:
+        from narrative_assistant.core.device import detect_capacity
+        from narrative_assistant.llm.config import QualityLevel, estimate_analysis_time
+
+        profile = detect_capacity()
+
+        # Cargar benchmarks reales si existen
+        benchmarks: dict[str, float] = {}
+        try:
+            from narrative_assistant.persistence.database import get_database
+
+            db = get_database()
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT model_name, tok_per_sec FROM model_benchmarks").fetchall()
+            benchmarks = {row[0]: row[1] for row in rows}
+        except Exception:
+            pass
+
+        estimates = {}
+        for level in QualityLevel:
+            est = estimate_analysis_time(profile, level, word_count, benchmarks or None)
+            estimates[level.value] = est
+
+        return ApiResponse(
+            success=True,
+            data={"wordCount": word_count, "estimates": estimates},
+        )
+
+    except Exception as e:
+        logger.error(f"Error calculating estimates: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
 
