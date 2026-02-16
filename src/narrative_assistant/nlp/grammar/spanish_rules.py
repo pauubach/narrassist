@@ -867,8 +867,14 @@ def check_gender_agreement(doc: Doc) -> list[GrammarIssue]:
     """
     issues = []
 
-    # Sustantivos femeninos que llevan "el" por empezar con "a" tónica
-    FEMININE_WITH_EL = {"agua", "águila", "alma", "arma", "hambre", "área", "aula", "hacha", "hada"}
+    # Sustantivos femeninos que llevan "el" por empezar con "a/ha" tónica (singular)
+    # Regla: En singular usan "el", en plural usan "las"
+    # Ej: "el ama" (✓), "la ama" (✗), "las amas" (✓)
+    FEMININE_WITH_EL = {
+        "agua", "águila", "alma", "arma", "hambre", "área", "aula", "hacha", "hada",
+        "ama", "ala", "alba", "alga", "anca", "ancla", "ansia", "arca", "arpa",
+        "asa", "aspa", "asta", "aura", "ave", "aya", "habla", "haba", "hache"
+    }
 
     # Fallback: palabras muy comunes con género conocido
     # (Usado cuando spaCy no proporciona morfología, ej: detecta como PROPN)
@@ -944,10 +950,20 @@ def check_gender_agreement(doc: Doc) -> list[GrammarIssue]:
                 noun = doc[j]
                 noun_lower = noun.lower_
 
-                # Caso especial: sustantivos femeninos con "a" tónica
-                # Estos llevan "el" pero son femeninos (ej: "el agua fría")
+                # Caso especial: sustantivos femeninos con "a/ha" tónica
+                # Regla: En SINGULAR llevan "el"/"un" (por eufonía)
+                # En PLURAL llevan "las"/"unas" (normal)
                 if noun_lower in FEMININE_WITH_EL:
-                    if det_lower == "la":
+                    # Obtener número del sustantivo
+                    noun_is_plural = noun.morph.get("Number")  # type: ignore[call-arg]
+                    noun_is_plural = noun_is_plural and noun_is_plural[0] == "Plur"  # type: ignore[index]
+
+                    # Heurística si spaCy no da número: palabras que terminan en -s son plural
+                    if not noun_is_plural:
+                        noun_is_plural = noun_lower.endswith("s")
+
+                    # SINGULAR: debe usar "el"/"un", NO "la"/"una"
+                    if not noun_is_plural and det_lower in ("la", "una"):
                         issues.append(
                             GrammarIssue(
                                 text=f"{det.text} {noun.text}",
@@ -956,11 +972,28 @@ def check_gender_agreement(doc: Doc) -> list[GrammarIssue]:
                                 sentence=det.sent.text if det.sent else "",
                                 error_type=GrammarErrorType.GENDER_AGREEMENT,
                                 severity=GrammarSeverity.ERROR,
-                                suggestion=f"el {noun_lower}",
+                                suggestion=f"{'el' if det_lower == 'la' else 'un'} {noun_lower}",
                                 confidence=0.95,
                                 detection_method=GrammarDetectionMethod.SPACY_DEP,
-                                explanation=f"'{noun_lower}' lleva 'el' por empezar con 'a' tónica (pero es femenino)",
-                                rule_id="GENDER_AGREEMENT_A_TONICA",
+                                explanation=f"'{noun_lower}' (singular) lleva '{'el' if det_lower == 'la' else 'un'}' por empezar con 'a' tónica",
+                                rule_id="GENDER_AGREEMENT_A_TONICA_SINGULAR",
+                            )
+                        )
+                    # PLURAL: debe usar "las"/"unas", NO "los"/"unos"
+                    elif noun_is_plural and det_lower in ("los", "unos"):
+                        issues.append(
+                            GrammarIssue(
+                                text=f"{det.text} {noun.text}",
+                                start_char=det.idx,
+                                end_char=noun.idx + len(noun),
+                                sentence=det.sent.text if det.sent else "",
+                                error_type=GrammarErrorType.GENDER_AGREEMENT,
+                                severity=GrammarSeverity.ERROR,
+                                suggestion=f"{'las' if det_lower == 'los' else 'unas'} {noun_lower}",
+                                confidence=0.95,
+                                detection_method=GrammarDetectionMethod.SPACY_DEP,
+                                explanation=f"'{noun_lower}' (plural) es femenino, debe usar '{'las' if det_lower == 'los' else 'unas'}'",
+                                rule_id="GENDER_AGREEMENT_A_TONICA_PLURAL",
                             )
                         )
                     continue  # No verificar más para estos

@@ -131,6 +131,12 @@ class AgreementDetector(BaseDetector):
                 if child.pos_ not in ("DET", "ADJ"):
                     continue
 
+                # SKIP: Si el adjetivo es un participio en construcción de gerundio/absoluto
+                # Ej: "con la mandíbula apretada, visiblemente furioso"
+                # "apretada" SÍ modifica "mandíbula", pero "furioso" modifica al SUJETO
+                if child.pos_ == "ADJ" and self._is_subject_modifier(child):
+                    continue  # No verificar, probablemente concuerda con el sujeto
+
                 child_gender = self._get_gender(child)
                 if child_gender is None:
                     continue
@@ -266,6 +272,48 @@ class AgreementDetector(BaseDetector):
             return str(number[0])  # "Sing" o "Plur"
         return None
 
+    def _is_subject_modifier(self, adj_token) -> bool:
+        """
+        Detecta si un adjetivo probablemente modifica al SUJETO de la oración
+        en lugar del sustantivo más cercano.
+
+        Ejemplos:
+        - "dijo Carlos con la mandíbula apretada, visiblemente furioso"
+          → "furioso" modifica a "Carlos" (sujeto), no a "mandíbula"
+        - "María salió de la habitación, furiosa"
+          → "furiosa" modifica a "María" (sujeto)
+
+        Heurísticas:
+        1. Adjetivo después de coma seguida de verbo conjugado
+        2. Adjetivo modificado por adverbio de modo (visiblemente, claramente)
+        3. Adjetivo en construcción absoluta (separado por coma)
+        """
+        # Buscar si hay adverbio de modo modificando este adjetivo
+        for child in adj_token.children:
+            if child.pos_ == "ADV" and child.dep_ == "advmod":
+                # Adverbios como "visiblemente", "claramente" sugieren modificación del sujeto
+                return True
+
+        # Verificar si está después de una coma (construcción absoluta)
+        idx = adj_token.i
+        if idx > 0:
+            prev_token = adj_token.doc[idx - 1]
+            if prev_token.text == ",":
+                # Adjetivo después de coma probablemente modifica al sujeto
+                return True
+
+        # Verificar si hay preposición "con" antes (complemento circunstancial)
+        # "con la mandíbula apretada" → "apretada" SÍ modifica "mandíbula"
+        # pero si hay coma después, el siguiente adjetivo modifica al sujeto
+        head = adj_token.head
+        if head.pos_ == "NOUN":
+            for sibling in head.children:
+                if sibling.dep_ == "case" and sibling.lower_ == "con":
+                    # Es parte de un complemento con "con", probablemente modifica al sustantivo
+                    return False
+
+        return False
+
     def _is_valid_exception(self, noun, modifier) -> bool:
         """Verifica si es una excepción válida (ej: el agua)."""
         lemma = noun.lemma_.lower()
@@ -283,6 +331,10 @@ class AgreementDetector(BaseDetector):
             "hada",
             "hacha",
             "habla",
+            "ama",
+            "ala",
+            "alba",
+            "alga",
         }
 
         if lemma in euphonic_feminines:

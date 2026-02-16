@@ -187,14 +187,13 @@ class AlertRepository:
         chapter_max: int | None = None,
     ) -> Result[list[Alert]]:
         """
-        Obtiene alertas priorizadas por relevancia al capítulo actual.
+        Obtiene alertas priorizadas por importancia y ubicación.
 
-        Orden de priorización:
-        1. Alertas del capítulo actual (si se especifica)
-        2. Alertas de capítulos cercanos (±2 capítulos)
-        3. Por severidad (critical > high > medium > low > info)
-        4. Por confianza (mayor primero)
-        5. Por fecha de creación (más recientes primero)
+        Orden de priorización (S15):
+        1. Por severidad (critical > warning > info > hint)
+        2. Por confianza (mayor primero)
+        3. Por ubicación en el texto (start_char/chapter)
+        4. Por fecha de creación (más recientes primero)
 
         Args:
             project_id: ID del proyecto
@@ -207,32 +206,21 @@ class AlertRepository:
             Result con lista de alertas priorizadas
         """
         try:
-            # Construir query base
+            # Construir query base con priorización por severity PRIMERO (S15)
             query = """
                 SELECT *,
-                    CASE
-                        WHEN chapter = ? THEN 0
-                        WHEN chapter BETWEEN ? AND ? THEN 1
-                        ELSE 2
-                    END as chapter_priority,
                     CASE severity
                         WHEN 'critical' THEN 0
-                        WHEN 'high' THEN 1
-                        WHEN 'medium' THEN 2
-                        WHEN 'low' THEN 3
-                        WHEN 'info' THEN 4
-                        ELSE 5
+                        WHEN 'warning' THEN 1
+                        WHEN 'info' THEN 2
+                        WHEN 'hint' THEN 3
+                        ELSE 4
                     END as severity_priority
                 FROM alerts
                 WHERE project_id = ?
             """
 
-            # Parámetros base para chapter_priority
-            chapter_for_priority = current_chapter if current_chapter is not None else -999
-            nearby_start = chapter_for_priority - 2
-            nearby_end = chapter_for_priority + 2
-
-            params: list = [chapter_for_priority, nearby_start, nearby_end, project_id]
+            params: list = [project_id]
 
             # Filtro por rango de capítulos (BK-27)
             if chapter_min is not None:
@@ -248,12 +236,12 @@ class AlertRepository:
                 query += f" AND status IN ({placeholders})"
                 params.extend([s.value for s in status_filter])
 
-            # Ordenar por prioridad
+            # Ordenar por prioridad (S15): severity > confianza > posición > fecha
             query += """
                 ORDER BY
-                    chapter_priority ASC,
                     severity_priority ASC,
                     confidence DESC,
+                    COALESCE(start_char, chapter * 10000, 999999999) ASC,
                     created_at DESC
             """
 
