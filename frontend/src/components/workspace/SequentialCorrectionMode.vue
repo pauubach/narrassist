@@ -29,6 +29,7 @@ import Message from 'primevue/message'
 import type { Alert, AlertSource } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import { useWorkspaceStore } from '@/stores/workspace'
+import AlertDiffView from '@/components/alerts/AlertDiffView.vue'
 
 interface ChapterInfo {
   id: number
@@ -322,11 +323,11 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
           </div>
         </div>
 
-        <!-- Text Context -->
-        <div class="text-context" aria-label="Contexto del texto">
+        <!-- Vista comparativa: cuando hay excerpt Y suggestion -->
+        <div v-if="currentAlert.excerpt && currentAlert.suggestion" class="text-context">
           <div class="context-header">
-            <span class="context-label">TEXTO</span>
-            <!-- Múltiples botones si hay sources (inconsistencias) -->
+            <span class="context-label">COMPARATIVA</span>
+            <!-- Navegación a fuentes -->
             <div v-if="hasMultipleSources" class="multi-source-nav">
               <span class="nav-hint">Ver en documento:</span>
               <Button
@@ -341,7 +342,42 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
                 @click="navigateToText(source)"
               />
             </div>
-            <!-- Botón único si no hay múltiples sources -->
+            <Button
+              v-else
+              icon="pi pi-external-link"
+              label="Ver en documento"
+              text
+              size="small"
+              @click="navigateToText()"
+            />
+          </div>
+          <div class="context-body">
+            <AlertDiffView
+              :excerpt="currentAlert.excerpt"
+              :suggestion="currentAlert.suggestion"
+              layout="auto"
+            />
+          </div>
+        </div>
+
+        <!-- Solo texto (sin suggestion) -->
+        <div v-else-if="currentAlert.excerpt" class="text-context">
+          <div class="context-header">
+            <span class="context-label">TEXTO</span>
+            <div v-if="hasMultipleSources" class="multi-source-nav">
+              <span class="nav-hint">Ver en documento:</span>
+              <Button
+                v-for="(source, index) in alertSources"
+                :key="index"
+                v-tooltip.bottom="getSourceLocation(source)"
+                icon="pi pi-external-link"
+                :label="getSourceLabel(source)"
+                text
+                size="small"
+                class="source-nav-btn"
+                @click="navigateToText(source)"
+              />
+            </div>
             <Button
               v-else
               icon="pi pi-external-link"
@@ -360,8 +396,8 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
           </div>
         </div>
 
-        <!-- Suggestion if available -->
-        <div v-if="currentAlert.suggestion" class="alert-suggestion">
+        <!-- Solo suggestion (sin excerpt) -->
+        <div v-if="currentAlert.suggestion && !currentAlert.excerpt" class="alert-suggestion">
           <div class="suggestion-header">
             <i class="pi pi-lightbulb"></i>
             <span>Sugerencia</span>

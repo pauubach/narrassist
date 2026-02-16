@@ -27,6 +27,12 @@ interface Props {
   analysisError?: boolean
   /** Timestamp del último análisis */
   lastAnalysisTime?: string | null
+  /** Total de alertas (todos los estados) para progreso de revisión */
+  totalAlertCount?: number
+  /** Alertas resueltas */
+  resolvedCount?: number
+  /** Alertas descartadas */
+  dismissedCount?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -36,7 +42,10 @@ const props = withDefaults(defineProps<Props>(), {
   alertCount: 0,
   hasAnalysis: false,
   analysisError: false,
-  lastAnalysisTime: null
+  lastAnalysisTime: null,
+  totalAlertCount: 0,
+  resolvedCount: 0,
+  dismissedCount: 0,
 })
 
 const analysisStore = useAnalysisStore()
@@ -53,6 +62,16 @@ onMounted(async () => {
     await systemStore.checkBackendStatus()
   }
 })
+
+// Progreso de revisión
+const reviewedCount = computed(() => (props.resolvedCount ?? 0) + (props.dismissedCount ?? 0))
+const reviewProgress = computed(() => {
+  if (!props.totalAlertCount || props.totalAlertCount === 0) return 0
+  return Math.round((reviewedCount.value / props.totalAlertCount) * 100)
+})
+const showReviewProgress = computed(() =>
+  props.totalAlertCount != null && props.totalAlertCount > 0
+)
 
 // Estado local para expandir/colapsar detalles
 const showDetails = ref(false)
@@ -269,6 +288,13 @@ function toggleDetails() {
         <i class="pi pi-exclamation-triangle"></i>
         {{ alertCount }} alertas
       </span>
+      <span v-if="showReviewProgress" class="stat-item stat-review" :title="`${resolvedCount} resueltas, ${dismissedCount} descartadas, ${totalAlertCount - reviewedCount} pendientes`">
+        <i class="pi pi-check-square"></i>
+        {{ reviewProgress }}% revisado ({{ reviewedCount }}/{{ totalAlertCount }})
+        <span class="review-progress-bar">
+          <span class="review-progress-fill" :style="{ width: reviewProgress + '%' }"></span>
+        </span>
+      </span>
     </div>
 
     <!-- Sección central: Estado/Progreso de análisis -->
@@ -432,6 +458,30 @@ function toggleDetails() {
   color: var(--orange-500);
 }
 
+.stat-review {
+  color: var(--green-600);
+  gap: 0.25rem !important;
+}
+
+.review-progress-bar {
+  display: inline-block;
+  width: 40px;
+  height: 6px;
+  background: var(--surface-200);
+  border-radius: 3px;
+  overflow: hidden;
+  vertical-align: middle;
+  margin-left: 0.25rem;
+}
+
+.review-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--green-500);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
 /* Analysis state (when not analyzing) */
 .status-analysis-state {
   display: flex;
@@ -480,12 +530,12 @@ function toggleDetails() {
 }
 
 .status-queued-heavy {
-  color: var(--blue-600);
-  background: var(--blue-50);
+  color: var(--p-primary-600, #2563eb);
+  background: color-mix(in srgb, var(--p-primary-color, #3b82f6) 8%, transparent);
 }
 
 .status-queued-heavy i {
-  color: var(--blue-500);
+  color: var(--p-primary-500, #3b82f6);
 }
 
 .status-queued-heavy .queued-heavy-check {
@@ -865,7 +915,7 @@ function toggleDetails() {
 }
 
 .dark .status-queued-heavy {
-  background: color-mix(in srgb, var(--p-primary-color, #3B82F6) 15%, transparent);
+  background: color-mix(in srgb, var(--p-primary-color, #3b82f6) 15%, transparent);
   color: var(--p-primary-300, #93c5fd);
 }
 

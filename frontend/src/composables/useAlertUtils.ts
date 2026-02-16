@@ -273,6 +273,42 @@ const statusConfigs: Record<AlertStatus, StatusConfig> = {
   },
 }
 
+/**
+ * Meta-categorías para agrupación simplificada de alertas.
+ * Agrupa las 14 categorías en 3 grupos de alto nivel.
+ */
+export const META_CATEGORIES = {
+  errors: {
+    key: 'errors' as const,
+    label: 'Errores',
+    icon: 'pi pi-times-circle',
+    color: 'var(--red-500)',
+    bgColor: 'var(--red-50)',
+    darkBgColor: 'color-mix(in srgb, var(--red-900) 40%, transparent)',
+    categories: ['grammar', 'typography', 'punctuation', 'agreement'] as AlertCategory[],
+  },
+  inconsistencies: {
+    key: 'inconsistencies' as const,
+    label: 'Inconsistencias',
+    icon: 'pi pi-exclamation-triangle',
+    color: 'var(--yellow-600)',
+    bgColor: 'var(--yellow-50)',
+    darkBgColor: 'color-mix(in srgb, var(--yellow-900) 40%, transparent)',
+    categories: ['attribute', 'timeline', 'relationship', 'location', 'behavior', 'knowledge'] as AlertCategory[],
+  },
+  suggestions: {
+    key: 'suggestions' as const,
+    label: 'Sugerencias',
+    icon: 'pi pi-lightbulb',
+    color: 'var(--green-600)',
+    bgColor: 'var(--green-50)',
+    darkBgColor: 'color-mix(in srgb, var(--green-900) 40%, transparent)',
+    categories: ['style', 'structure', 'repetition', 'other'] as AlertCategory[],
+  },
+} as const
+
+export type MetaCategoryKey = keyof typeof META_CATEGORIES
+
 export function useAlertUtils() {
   /**
    * Obtiene la configuración de una severidad

@@ -400,6 +400,23 @@
                   />
                 </div>
               </div>
+
+              <!-- Síntesis multi-modelo -->
+              <div class="setting-item">
+                <div class="setting-info">
+                  <label class="setting-label">Síntesis multi-modelo</label>
+                  <p class="setting-description">
+                    Combina respuestas de 2 modelos para mayor precisión (requiere GPU)
+                  </p>
+                </div>
+                <div class="setting-control">
+                  <ToggleSwitch
+                    v-model="settings.multiModelSynthesis"
+                    :disabled="ollamaState !== 'ready' || installedLlmCount < 2"
+                    @change="onSettingChange"
+                  />
+                </div>
+              </div>
             </div>
           </template>
         </Card>
@@ -1048,6 +1065,8 @@ const {
   getNLPMethodsForCategory, isMethodEnabled, toggleMethod,
   setCharacterKnowledgeMode, applyRecommendedConfig,
 } = useNLPMethods(settings, saveSettings, applyDefaultsFromCapabilities)
+
+const installedLlmCount = computed(() => availableLLMOptions.value.filter(o => o.installed).length)
 
 // ── System capabilities (proxied from store) ───────────────
 

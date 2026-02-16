@@ -36,6 +36,7 @@ export interface Settings {
   soundEnabled: boolean
   enabledInferenceMethods: string[]
   prioritizeSpeed: boolean
+  multiModelSynthesis: boolean
   enabledNLPMethods: EnabledMethods
   characterKnowledgeMode: string
 }
@@ -59,6 +60,7 @@ const DEFAULT_SETTINGS: Settings = {
   soundEnabled: true,
   enabledInferenceMethods: ['llama3.2'],
   prioritizeSpeed: false,
+  multiModelSynthesis: true,
   enabledNLPMethods: {
     coreference: ['embeddings', 'morpho', 'heuristics'],
     ner: ['spacy', 'gazetteer'],
@@ -109,6 +111,7 @@ export function useSettingsPersistence() {
           inferenceMinConsensus: parsed.inferenceMinConsensus ?? 60,
           enabledInferenceMethods: filteredMethods.length > 0 ? filteredMethods : ['llama3.2'],
           prioritizeSpeed: parsed.prioritizeSpeed ?? false,
+          multiModelSynthesis: parsed.multiModelSynthesis ?? true,
           enabledNLPMethods: parsed.enabledNLPMethods ?? {
             coreference: ['embeddings', 'morpho', 'heuristics'],
             ner: ['spacy', 'gazetteer'],

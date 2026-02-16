@@ -19,7 +19,7 @@ from fastapi import APIRouter, HTTPException
 router = APIRouter()
 
 _MODEL_SPEED_ORDER = ["llama3.2", "qwen2.5", "mistral", "gemma2"]
-_MODEL_QUALITY_ORDER = ["gemma2", "mistral", "qwen2.5", "llama3.2"]
+_MODEL_QUALITY_ORDER = ["qwen2.5", "gemma2", "mistral", "llama3.2"]
 
 
 def _normalize_model_name(model_name: str) -> str:
@@ -36,6 +36,90 @@ def _sorted_models(
         {_normalize_model_name(m) for m in models if m},
         key=lambda m: order_map.get(m, len(order_map)),
     )
+
+
+def _build_synthesis_prompt(user_question: str, responses: dict[str, str]) -> str:
+    """Construye prompt para sintetizar respuestas de múltiples modelos."""
+    parts = [f'El usuario preguntó: "{user_question}"\n']
+    parts.append("Estas son las respuestas de varios modelos:\n")
+
+    for i, (model, response) in enumerate(responses.items(), 1):
+        parts.append(f"--- Modelo {i} ({model}) ---")
+        parts.append(response)
+        parts.append("")
+
+    parts.append(
+        "Sintetiza estas respuestas en UNA sola respuesta coherente y concisa. "
+        "Combina la información de todos los modelos, elimina redundancias, "
+        "y mantén las referencias [REF:N] cuando aparezcan. "
+        "NO menciones que hay varios modelos ni que estás sintetizando."
+    )
+    return "\n".join(parts)
+
+
+def _multi_model_chat(
+    llm_client,
+    candidate_models: list[str],
+    user_prompt: str,
+    system_prompt: str,
+) -> tuple:
+    """
+    Envía la pregunta a todos los modelos y sintetiza las respuestas.
+
+    Returns:
+        (response, model_label, models_used)
+    """
+    responses: dict[str, str] = {}
+
+    for model_name in candidate_models:
+        try:
+            result = llm_client.complete(
+                prompt=user_prompt,
+                system=system_prompt,
+                max_tokens=1000,
+                temperature=0.35,
+                model_name=model_name,
+            )
+            if result and result.strip():
+                responses[model_name] = result.strip()
+        except Exception as e:
+            logger.warning(f"Model {model_name} failed in multi-model chat: {e}")
+
+    if not responses:
+        return None, None, []
+
+    if len(responses) == 1:
+        model = next(iter(responses))
+        return responses[model], model, [model]
+
+    # Sintetizar con el modelo de mayor calidad disponible
+    synthesis_model = _sorted_models(responses.keys(), prioritize_speed=False)[0]
+
+    synthesis_prompt = _build_synthesis_prompt(user_prompt, responses)
+    try:
+        synthesis = llm_client.complete(
+            prompt=synthesis_prompt,
+            system=(
+                "Eres un sintetizador experto. Combina las respuestas de varios "
+                "modelos en una sola respuesta coherente, concisa y precisa. "
+                "Mantén las referencias [REF:N] si aparecen."
+            ),
+            max_tokens=1000,
+            temperature=0.3,
+            model_name=synthesis_model,
+        )
+    except Exception as e:
+        logger.warning(f"Synthesis failed: {e}")
+        synthesis = None
+
+    if synthesis and synthesis.strip():
+        model_label = f"síntesis ({', '.join(responses.keys())})"
+        return synthesis.strip(), model_label, list(responses.keys())
+
+    # Fallback: devolver la respuesta del mejor modelo
+    best = _sorted_models(responses.keys(), prioritize_speed=False)[0]
+    return responses[best], best, list(responses.keys())
+
 
 @router.get("/api/llm/status", response_model=ApiResponse)
 def get_llm_status():
@@ -707,27 +791,39 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
         # ================================================================
         try:
             from narrative_assistant.llm.client import get_llm_scheduler
+
+            has_gpu = getattr(llm_client, '_ollama_num_gpu', None) != 0
+            multi_model_enabled = bool(ctx.get("multiModelSynthesis", True))
+            use_multi_model = has_gpu and multi_model_enabled and len(candidate_models) >= 2
+
             response = None
             used_model = None
+            models_used: list[str] = []
 
             with get_llm_scheduler().chat_priority():
-                for model_name in candidate_models:
-                    response = llm_client.complete(
-                        prompt=request.message,
-                        system=system_prompt,
-                        max_tokens=1000,
-                        temperature=0.35,
-                        model_name=model_name,
+                if use_multi_model:
+                    response, used_model, models_used = _multi_model_chat(
+                        llm_client, candidate_models, request.message, system_prompt,
                     )
-                    if response and response.strip():
-                        used_model = model_name
-                        break
+                else:
+                    for model_name in candidate_models:
+                        response = llm_client.complete(
+                            prompt=request.message,
+                            system=system_prompt,
+                            max_tokens=1000,
+                            temperature=0.35,
+                            model_name=model_name,
+                        )
+                        if response and response.strip():
+                            used_model = model_name
+                            models_used = [model_name]
+                            break
 
             if response and response.strip():
                 # Parsear referencias [REF:N]
                 references = build_reference_index(response, ref_map)
 
-                using_cpu = getattr(llm_client, '_ollama_num_gpu', None) == 0
+                multi_model_used = use_multi_model and len(models_used) > 1
                 return ApiResponse(
                     success=True,
                     data={
@@ -735,8 +831,10 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
                         "references": references,
                         "contextUsed": context_sources,
                         "model": used_model or llm_client.model_name,
-                        "usingCpu": using_cpu,
+                        "usingCpu": not has_gpu,
                         "candidateModels": candidate_models,
+                        "multiModel": multi_model_used,
+                        "modelsUsed": models_used,
                     }
                 )
             else:

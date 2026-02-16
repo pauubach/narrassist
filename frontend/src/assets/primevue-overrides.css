@@ -1314,27 +1314,27 @@ html.dark .p-button-text.p-button-rounded:hover {
   color: var(--p-primary-200, #bfdbfe) !important;
 }
 
-/* Botones outlined necesitan mejor contraste */
+/* Botones outlined necesitan mejor contraste — sigue primary color del tema */
 .p-button-outlined {
-  color: #1d4ed8 !important; /* blue-700 */
-  border-color: #3b82f6 !important; /* blue-500 */
+  color: var(--p-primary-700, #1d4ed8) !important;
+  border-color: var(--p-primary-500, #3b82f6) !important;
 }
 
 .p-button-outlined:hover {
-  background: rgba(59, 130, 246, 0.08) !important;
-  color: #1e40af !important;
+  background: color-mix(in srgb, var(--p-primary-500, #3b82f6) 8%, transparent) !important;
+  color: var(--p-primary-800, #1e40af) !important;
 }
 
 .dark .p-button-outlined,
 html.dark .p-button-outlined {
-  color: #93c5fd !important; /* blue-300 */
-  border-color: #60a5fa !important; /* blue-400 */
+  color: var(--p-primary-300, #93c5fd) !important;
+  border-color: var(--p-primary-400, #60a5fa) !important;
 }
 
 .dark .p-button-outlined:hover,
 html.dark .p-button-outlined:hover {
-  background: rgba(147, 197, 253, 0.12) !important;
-  color: #bfdbfe !important;
+  background: color-mix(in srgb, var(--p-primary-300, #93c5fd) 12%, transparent) !important;
+  color: var(--p-primary-200, #bfdbfe) !important;
 }
 
 /* ============================================================================
@@ -1353,24 +1353,24 @@ html.dark .floating-actions {
 
 /* Force icon buttons in floating actions to have proper contrast */
 .floating-actions .p-button {
-  color: #1e40af !important; /* blue-800: 8.5:1 on white */
+  color: var(--p-primary-800, #1e40af) !important;
 }
 
 .floating-actions .p-button:hover {
-  color: #1d4ed8 !important; /* blue-700 */
-  background: rgba(59, 130, 246, 0.12) !important;
+  color: var(--p-primary-700, #1d4ed8) !important;
+  background: color-mix(in srgb, var(--p-primary-500, #3b82f6) 12%, transparent) !important;
 }
 
 /* Dark mode floating action buttons */
 .dark .floating-actions .p-button,
 html.dark .floating-actions .p-button {
-  color: #93c5fd !important; /* blue-300: 8.5:1 on dark */
+  color: var(--p-primary-300, #93c5fd) !important;
 }
 
 .dark .floating-actions .p-button:hover,
 html.dark .floating-actions .p-button:hover {
-  color: #bfdbfe !important; /* blue-200 */
-  background: rgba(147, 197, 253, 0.15) !important;
+  color: var(--p-primary-200, #bfdbfe) !important;
+  background: color-mix(in srgb, var(--p-primary-300, #93c5fd) 15%, transparent) !important;
 }
 
 /* ============================================================================
@@ -1721,9 +1721,9 @@ html.scrivener-theme.dark {
   --scrivener-error-icon: #f87171;
   --scrivener-error-bg: rgba(239, 68, 68, 0.15);
   --scrivener-border: #504834;
-  --scrivener-primary-text: #93c5fd;
-  --scrivener-primary-text-hover: #bfdbfe;
-  --scrivener-primary-bg-hover: rgba(147, 197, 253, 0.12);
+  --scrivener-primary-text: var(--p-primary-300, #93c5fd);
+  --scrivener-primary-text-hover: var(--p-primary-200, #bfdbfe);
+  --scrivener-primary-bg-hover: color-mix(in srgb, var(--p-primary-300, #93c5fd) 12%, transparent);
 
   /* Override de colores de alerta para mejor visibilidad */
   --ds-alert-critical: #ef4444 !important;
@@ -1991,9 +1991,9 @@ html.scrivener-theme:not(.dark) {
   --scrivener-error-icon: #dc2626;
   --scrivener-error-bg: #fef2f2;
   --scrivener-border: #D8CAB0;
-  --scrivener-primary-text: #1e40af;
-  --scrivener-primary-text-hover: #1d4ed8;
-  --scrivener-primary-bg-hover: rgba(59, 130, 246, 0.1);
+  --scrivener-primary-text: var(--p-primary-800, #1e40af);
+  --scrivener-primary-text-hover: var(--p-primary-700, #1d4ed8);
+  --scrivener-primary-bg-hover: color-mix(in srgb, var(--p-primary-500, #3b82f6) 10%, transparent);
 }
 
 /* --- Mensajes de error --- */

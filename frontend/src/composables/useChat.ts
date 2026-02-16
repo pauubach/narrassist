@@ -87,6 +87,7 @@ export function useChat(projectId: number) {
       const parsed = JSON.parse(raw) as {
         enabledInferenceMethods?: string[]
         prioritizeSpeed?: boolean
+        multiModelSynthesis?: boolean
       }
 
       const selected = Array.isArray(parsed.enabledInferenceMethods)
@@ -96,6 +97,7 @@ export function useChat(projectId: number) {
       return {
         enabledInferenceMethods: selected,
         prioritizeSpeed: parsed.prioritizeSpeed ?? false,
+        multiModelSynthesis: parsed.multiModelSynthesis ?? true,
       }
     } catch {
       return undefined
@@ -165,6 +167,8 @@ export function useChat(projectId: number) {
           status: 'complete',
           contextUsed: chatResponse.contextUsed,
           references: chatResponse.references,
+          multiModel: chatResponse.multiModel,
+          modelsUsed: chatResponse.modelsUsed,
         }
         messages.value.push(assistantMessage)
       } else {

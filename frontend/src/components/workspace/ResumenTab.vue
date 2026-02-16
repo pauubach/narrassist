@@ -50,6 +50,17 @@ const stats = computed(() => ({
   activeAlerts: props.alerts.filter(a => a.status === 'active').length
 }))
 
+// Progreso de revisión
+const reviewStats = computed(() => {
+  const total = props.alerts.length
+  const resolved = props.alerts.filter(a => a.status === 'resolved').length
+  const dismissed = props.alerts.filter(a => a.status === 'dismissed').length
+  const reviewed = resolved + dismissed
+  const pending = total - reviewed
+  const percent = total > 0 ? Math.round((reviewed / total) * 100) : 0
+  return { total, resolved, dismissed, reviewed, pending, percent }
+})
+
 // Distribución de alertas por severidad
 const alertDistribution = computed(() => {
   const dist = { critical: 0, high: 0, medium: 0, low: 0, info: 0 }
@@ -278,6 +289,42 @@ const originalDocumentName = computed(() => {
           </div>
         </div>
       </div>
+
+      <!-- Review Progress (solo si hay alertas) -->
+      <Card v-if="reviewStats.total > 0" class="chart-card review-progress-card">
+        <template #title>
+          <i class="pi pi-check-square"></i>
+          Progreso de Revisión
+        </template>
+        <template #content>
+          <div class="review-progress-content">
+            <div class="review-progress-header">
+              <span class="review-percent">{{ reviewStats.percent }}%</span>
+              <span class="review-fraction">{{ reviewStats.reviewed }} / {{ reviewStats.total }}</span>
+            </div>
+            <div class="review-bar-track">
+              <div class="review-bar-fill" :style="{ width: reviewStats.percent + '%' }"></div>
+            </div>
+            <div class="review-breakdown">
+              <div class="review-breakdown-item">
+                <span class="breakdown-dot breakdown-resolved"></span>
+                <span class="breakdown-label">Resueltas</span>
+                <span class="breakdown-count">{{ reviewStats.resolved }}</span>
+              </div>
+              <div class="review-breakdown-item">
+                <span class="breakdown-dot breakdown-dismissed"></span>
+                <span class="breakdown-label">Descartadas</span>
+                <span class="breakdown-count">{{ reviewStats.dismissed }}</span>
+              </div>
+              <div class="review-breakdown-item">
+                <span class="breakdown-dot breakdown-pending"></span>
+                <span class="breakdown-label">Pendientes</span>
+                <span class="breakdown-count">{{ reviewStats.pending }}</span>
+              </div>
+            </div>
+          </div>
+        </template>
+      </Card>
 
       <!-- Row 2: Two-column grid for charts -->
       <div class="charts-row">
@@ -622,6 +669,78 @@ const originalDocumentName = computed(() => {
   font-size: 0.8125rem;
   color: var(--text-color-secondary);
   white-space: nowrap;
+}
+
+/* ── Review Progress ── */
+.review-progress-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.review-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.review-percent {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--green-600);
+  line-height: 1;
+}
+
+.review-fraction {
+  font-size: 0.875rem;
+  color: var(--text-color-secondary);
+}
+
+.review-bar-track {
+  height: 10px;
+  background: var(--surface-200);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.review-bar-fill {
+  height: 100%;
+  background: var(--green-500);
+  border-radius: 5px;
+  transition: width 0.3s ease;
+}
+
+.review-breakdown {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 0.25rem;
+}
+
+.review-breakdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+}
+
+.breakdown-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.breakdown-resolved { background: var(--green-500); }
+.breakdown-dismissed { background: var(--surface-400); }
+.breakdown-pending { background: var(--orange-400); }
+
+.breakdown-label {
+  color: var(--text-color-secondary);
+}
+
+.breakdown-count {
+  font-weight: 600;
+  color: var(--text-color);
 }
 
 /* ── Row 2: Charts row (two columns) ── */

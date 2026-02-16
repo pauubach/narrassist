@@ -295,13 +295,22 @@ function clearSelectionContext() {
       >
         <div v-if="msg.status !== 'error'" class="message-content">
           <!-- Assistant messages: use ChatMessageContent for reference support -->
-          <ChatMessageContent
-            v-if="msg.role === 'assistant'"
-            :content="msg.content"
-            :references="msg.references"
-            :context-used="msg.contextUsed"
-            @navigate-reference="handleReferenceClick"
-          />
+          <template v-if="msg.role === 'assistant'">
+            <ChatMessageContent
+              :content="msg.content"
+              :references="msg.references"
+              :context-used="msg.contextUsed"
+              @navigate-reference="handleReferenceClick"
+            />
+            <span
+              v-if="msg.multiModel && msg.modelsUsed"
+              class="synthesis-badge"
+              v-tooltip.top="'Respuesta combinada de: ' + msg.modelsUsed.join(', ')"
+            >
+              <i class="pi pi-sparkles"></i>
+              Síntesis &middot; {{ msg.modelsUsed.length }} modelos
+            </span>
+          </template>
           <template v-else>
             {{ msg.content }}
           </template>
@@ -600,6 +609,22 @@ function clearSelectionContext() {
 .message-error-content i {
   flex-shrink: 0;
   margin-top: 2px;
+}
+
+.synthesis-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  color: var(--p-primary-color);
+  background: color-mix(in srgb, var(--p-primary-color) 10%, transparent);
+  border-radius: 12px;
+}
+
+.synthesis-badge i {
+  font-size: 0.65rem;
 }
 
 .message-loading {

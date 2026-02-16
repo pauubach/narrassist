@@ -5,22 +5,33 @@
         <h1>Proyectos</h1>
       </div>
       <div class="header-right">
-        <DsInput
-          v-model="searchQuery"
-          placeholder="Buscar proyectos..."
-          icon="pi pi-search"
-          clearable
-          class="search-input"
+        <div class="header-group header-filters">
+          <DsInput
+            v-model="searchQuery"
+            placeholder="Buscar proyectos..."
+            icon="pi pi-search"
+            clearable
+            class="search-input"
+          />
+          <Select
+            v-model="sortBy"
+            :options="sortOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Ordenar por"
+            class="sort-dropdown"
+            append-to="self"
+          />
+        </div>
+        <span class="header-divider"></span>
+        <Button
+          v-tooltip.bottom="viewMode === 'grid' ? 'Vista lista' : 'Vista tarjetas'"
+          :icon="viewMode === 'grid' ? 'pi pi-list' : 'pi pi-th-large'"
+          text
+          rounded
+          @click="toggleViewMode"
         />
-        <Select
-          v-model="sortBy"
-          :options="sortOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="Ordenar por"
-          class="sort-dropdown"
-          append-to="self"
-        />
+        <span class="header-divider"></span>
         <Button
           label="Nuevo Proyecto"
           icon="pi pi-plus"
@@ -63,7 +74,7 @@
       <!-- Estado: Lista de proyectos -->
       <div v-else class="projects-list">
         <!-- Grid de proyectos -->
-        <div class="projects-grid">
+        <div v-if="viewMode === 'grid'" class="projects-grid">
           <Card
             v-for="project in filteredProjects"
             :key="project.id"
@@ -133,6 +144,17 @@
                 :show-value="false"
                 class="mt-3"
               />
+
+              <!-- Review progress (solo si análisis completo y hay stats cacheadas) -->
+              <div v-if="getReviewProgress(project.id)" class="review-progress mt-3">
+                <div class="review-progress-header">
+                  <span class="review-label">Revisión</span>
+                  <span class="review-value">{{ getReviewProgress(project.id)?.percent ?? 0 }}%</span>
+                </div>
+                <div class="review-bar-track">
+                  <div class="review-bar-fill" :style="{ width: (getReviewProgress(project.id)?.percent ?? 0) + '%' }"></div>
+                </div>
+              </div>
             </template>
 
             <template #footer>
@@ -147,6 +169,71 @@
             </template>
           </Card>
         </div>
+
+        <!-- List view (DataTable) -->
+        <DataTable
+          v-else
+          :value="filteredProjects"
+          row-hover
+          striped-rows
+          class="projects-table"
+          @row-click="(e) => openProject(e.data.id)"
+        >
+          <Column header="Nombre" field="name" sortable>
+            <template #body="{ data }">
+              <div class="list-name">
+                <i :class="getFormatIcon(data.documentFormat)" class="list-format-icon"></i>
+                <span>{{ data.name }}</span>
+                <Badge
+                  v-if="data.openAlertsCount && data.openAlertsCount > 0"
+                  :value="data.openAlertsCount"
+                  :severity="getAlertSeverity(data.highestAlertSeverity)"
+                  class="list-alert-badge"
+                />
+              </div>
+            </template>
+          </Column>
+          <Column header="Palabras" field="wordCount" sortable style="width: 100px; text-align: right">
+            <template #body="{ data }">
+              {{ data.wordCount.toLocaleString() }}
+            </template>
+          </Column>
+          <Column header="Capítulos" field="chapterCount" sortable style="width: 90px; text-align: center">
+            <template #body="{ data }">
+              {{ data.chapterCount }}
+            </template>
+          </Column>
+          <Column header="Análisis" sortable field="analysisProgress" style="width: 110px">
+            <template #body="{ data }">
+              <span v-if="data.analysisStatus === 'queued'" class="stat-queued">En cola</span>
+              <span v-else>{{ data.analysisProgress ?? 0 }}%</span>
+            </template>
+          </Column>
+          <Column header="Revisión" style="width: 100px">
+            <template #body="{ data }">
+              <span v-if="getReviewProgress(data.id)" class="list-review">
+                {{ getReviewProgress(data.id)?.percent ?? 0 }}%
+              </span>
+              <span v-else class="list-no-data">—</span>
+            </template>
+          </Column>
+          <Column header="Modificado" field="lastModified" sortable style="width: 120px">
+            <template #body="{ data }">
+              {{ formatDate(data.lastModified) }}
+            </template>
+          </Column>
+          <Column style="width: 50px">
+            <template #body="{ data }">
+              <Button
+                icon="pi pi-ellipsis-v"
+                text
+                rounded
+                size="small"
+                @click.stop="showProjectMenu($event, data)"
+              />
+            </template>
+          </Column>
+        </DataTable>
       </div>
     </div>
 
@@ -251,11 +338,14 @@ import DsSkeleton from '@/components/ds/DsSkeleton.vue'
 import Message from 'primevue/message'
 import Menu from 'primevue/menu'
 import Badge from 'primevue/badge'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
 import ConfirmDialog from 'primevue/confirmdialog'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import type { Project } from '@/types'
-// import { transformProjects, transformProject } from '@/types/transformers'  // Reserved
+import { getProjectStats } from '@/composables/useGlobalStats'
+import { safeGetItem, safeSetItem } from '@/utils/safeStorage'
 import { api } from '@/services/apiClient'
 
 const router = useRouter()
@@ -265,6 +355,12 @@ const projectsStore = useProjectsStore()
 const analysisStore = useAnalysisStore()
 
 // Estado de la vista
+const viewMode = ref<'grid' | 'list'>((safeGetItem('na_projects_view_mode') as 'grid' | 'list') || 'grid')
+const toggleViewMode = () => {
+  viewMode.value = viewMode.value === 'grid' ? 'list' : 'grid'
+  safeSetItem('na_projects_view_mode', viewMode.value)
+}
+
 const showCreateDialog = ref(false)
 const showValidation = ref(false)
 const creatingProject = ref(false)
@@ -511,6 +607,14 @@ const deleteProject = (projectId: number) => {
   })
 }
 
+const getReviewProgress = (projectId: number) => {
+  const stats = getProjectStats(projectId)
+  if (!stats || stats.total === 0) return null
+  const reviewed = stats.resolved + stats.dismissed
+  const percent = Math.round((reviewed / stats.total) * 100)
+  return { percent, reviewed, total: stats.total }
+}
+
 const getFormatIcon = (format: string) => {
   const icons: Record<string, string> = {
     'DOCX': 'pi pi-file-word',
@@ -596,7 +700,20 @@ onUnmounted(() => {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
+}
+
+.header-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-divider {
+  width: 1px;
+  height: 1.5rem;
+  background: var(--surface-border);
+  margin: 0 0.25rem;
 }
 
 .search-wrapper {
@@ -789,6 +906,43 @@ onUnmounted(() => {
   margin-top: 0.25rem;
 }
 
+/* Review progress in cards */
+.review-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.review-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.review-label {
+  color: var(--text-color-secondary);
+}
+
+.review-value {
+  font-weight: 600;
+  color: var(--green-600);
+}
+
+.review-bar-track {
+  height: 6px;
+  background: var(--surface-200);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.review-bar-fill {
+  height: 100%;
+  background: var(--green-500);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
 .card-footer {
   display: flex;
   justify-content: flex-end;
@@ -847,5 +1001,46 @@ onUnmounted(() => {
 
 .text-red-500 {
   color: #ef4444;
+}
+
+/* ── List view (DataTable) ── */
+.projects-table {
+  border: 1px solid var(--surface-border);
+  border-radius: var(--app-radius);
+  overflow: hidden;
+}
+
+.projects-table :deep(.p-datatable-row-action) {
+  cursor: pointer;
+}
+
+.projects-table :deep(tr) {
+  cursor: pointer;
+}
+
+.list-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.list-format-icon {
+  color: var(--text-color-secondary);
+  font-size: 0.875rem;
+}
+
+.list-alert-badge {
+  font-size: 0.7rem;
+}
+
+.list-review {
+  color: var(--green-600);
+  font-weight: 600;
+}
+
+.list-no-data {
+  color: var(--text-color-secondary);
+  opacity: 0.5;
 }
 </style>

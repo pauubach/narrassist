@@ -422,6 +422,9 @@
         :alert-count="alertsCount"
         :has-analysis="project.analysisStatus === 'completed'"
         :analysis-error="project.analysisStatus === 'error'"
+        :total-alert-count="alerts.length"
+        :resolved-count="alerts.filter(a => a.status === 'resolved').length"
+        :dismissed-count="alerts.filter(a => a.status === 'dismissed').length"
       />
     </div>
   </div>
@@ -457,6 +460,7 @@ import { resetGlobalHighlight } from '@/composables/useHighlight'
 import { api } from '@/services/apiClient'
 import { useNotifications } from '@/composables/useNotifications'
 import { useGlobalUndo } from '@/composables/useGlobalUndo'
+import { updateProjectStats } from '@/composables/useGlobalStats'
 import { useToast } from 'primevue/usetoast'
 
 const route = useRoute()
@@ -1128,6 +1132,13 @@ watch(() => workspaceStore.activeTab, async (newTab) => {
   if (newTab === 'relationships' && (!relationships.value || relationships.value.length === 0)) {
     await loadEntities(project.value.id)
     await loadRelationships(project.value.id)
+  }
+})
+
+// Cachear stats de alertas para métricas globales (HomeView)
+watch(alerts, (newAlerts) => {
+  if (project.value && newAlerts.length > 0) {
+    updateProjectStats(project.value.id, project.value.name, newAlerts)
   }
 })
 

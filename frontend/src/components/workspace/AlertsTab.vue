@@ -10,7 +10,8 @@ import DsEmptyState from '@/components/ds/DsEmptyState.vue'
 import ChapterRangeSelector from '@/components/alerts/ChapterRangeSelector.vue'
 import SequentialCorrectionMode from './SequentialCorrectionMode.vue'
 import type { Alert, AlertSeverity, AlertStatus, AlertSource } from '@/types'
-import { useAlertUtils } from '@/composables/useAlertUtils'
+import { useAlertUtils, META_CATEGORIES, type MetaCategoryKey } from '@/composables/useAlertUtils'
+import AlertDiffView from '@/components/alerts/AlertDiffView.vue'
 import { useListKeyboardNav } from '@/composables/useListKeyboardNav'
 import { useSequentialMode } from '@/composables/useSequentialMode'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -79,6 +80,28 @@ const sequentialMode = useSequentialMode(
 
 // Estado para diálogos
 const showResolveAllDialog = ref(false)
+
+// Meta-categorías
+const selectedMetaCategory = ref<MetaCategoryKey | null>(null)
+
+const metaCategoryCounts = computed(() => {
+  const active = props.alerts.filter(a => a.status === 'active')
+  return {
+    errors: active.filter(a => META_CATEGORIES.errors.categories.includes(a.category)).length,
+    inconsistencies: active.filter(a => META_CATEGORIES.inconsistencies.categories.includes(a.category)).length,
+    suggestions: active.filter(a => META_CATEGORIES.suggestions.categories.includes(a.category)).length,
+  }
+})
+
+function toggleMetaCategory(key: MetaCategoryKey) {
+  if (selectedMetaCategory.value === key) {
+    selectedMetaCategory.value = null
+    selectedCategories.value = []
+  } else {
+    selectedMetaCategory.value = key
+    selectedCategories.value = [...META_CATEGORIES[key].categories]
+  }
+}
 
 // Estado de filtros
 const searchQuery = ref('')
@@ -444,6 +467,40 @@ defineExpose({ focusSearch })
       </div>
     </div>
 
+    <!-- Meta-categorías -->
+    <div class="meta-categories" role="group" aria-label="Grupos de alertas">
+      <button
+        class="meta-card"
+        :class="{ 'meta-card--active': selectedMetaCategory === 'errors' }"
+        :aria-pressed="selectedMetaCategory === 'errors'"
+        @click="toggleMetaCategory('errors')"
+      >
+        <i :class="META_CATEGORIES.errors.icon" class="meta-icon meta-icon--errors"></i>
+        <span class="meta-count">{{ metaCategoryCounts.errors }}</span>
+        <span class="meta-label">{{ META_CATEGORIES.errors.label }}</span>
+      </button>
+      <button
+        class="meta-card"
+        :class="{ 'meta-card--active': selectedMetaCategory === 'inconsistencies' }"
+        :aria-pressed="selectedMetaCategory === 'inconsistencies'"
+        @click="toggleMetaCategory('inconsistencies')"
+      >
+        <i :class="META_CATEGORIES.inconsistencies.icon" class="meta-icon meta-icon--inconsistencies"></i>
+        <span class="meta-count">{{ metaCategoryCounts.inconsistencies }}</span>
+        <span class="meta-label">{{ META_CATEGORIES.inconsistencies.label }}</span>
+      </button>
+      <button
+        class="meta-card"
+        :class="{ 'meta-card--active': selectedMetaCategory === 'suggestions' }"
+        :aria-pressed="selectedMetaCategory === 'suggestions'"
+        @click="toggleMetaCategory('suggestions')"
+      >
+        <i :class="META_CATEGORIES.suggestions.icon" class="meta-icon meta-icon--suggestions"></i>
+        <span class="meta-count">{{ metaCategoryCounts.suggestions }}</span>
+        <span class="meta-label">{{ META_CATEGORIES.suggestions.label }}</span>
+      </button>
+    </div>
+
     <!-- Estadísticas rápidas -->
     <div class="alerts-stats" role="group" aria-label="Estadísticas por severidad">
       <div
@@ -501,6 +558,15 @@ defineExpose({ focusSearch })
         <p v-if="alert.description" class="alert-description">
           {{ alert.description }}
         </p>
+
+        <!-- Vista comparativa inline (cuando hay excerpt y suggestion) -->
+        <AlertDiffView
+          v-if="alert.excerpt && alert.suggestion"
+          :excerpt="alert.excerpt"
+          :suggestion="alert.suggestion"
+          layout="auto"
+          class="alert-diff-inline"
+        />
 
         <div class="alert-footer">
           <span v-if="alert.confidence" class="alert-confidence">
@@ -782,6 +848,97 @@ defineExpose({ focusSearch })
 .alert-item:hover .alert-actions {
   opacity: 1;
 }
+
+/* Meta-categories */
+.meta-categories {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.meta-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem 0.5rem;
+  border-radius: var(--app-radius);
+  border: 1px solid var(--surface-200);
+  background: var(--surface-card);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.meta-card:hover {
+  background: var(--surface-hover);
+}
+
+.meta-icon {
+  font-size: 1rem;
+}
+
+.meta-icon--errors { color: var(--red-500); }
+.meta-icon--inconsistencies { color: var(--yellow-600); }
+.meta-icon--suggestions { color: var(--green-600); }
+
+.meta-count {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-color);
+  line-height: 1.2;
+}
+
+.meta-label {
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+}
+
+.meta-card--active {
+  border-color: var(--primary-color);
+  background: var(--primary-50);
+  box-shadow: 0 0 0 1px var(--primary-color);
+}
+
+.meta-card--active.meta-card:hover {
+  background: var(--primary-100);
+}
+
+/* Diff inline in alert list */
+.alert-diff-inline {
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+  border-radius: var(--app-radius);
+  overflow: hidden;
+}
+
+/* Dark mode */
+.dark .meta-categories {
+  background: var(--surface-800);
+}
+
+.dark .meta-card {
+  border-color: var(--surface-600);
+  background: var(--surface-800);
+}
+
+.dark .meta-card:hover {
+  background: var(--surface-700);
+}
+
+.dark .meta-card--active {
+  border-color: var(--primary-color);
+  background: var(--primary-900);
+}
+
+.dark .meta-card--active.meta-card:hover {
+  background: var(--primary-800);
+}
+
+.dark .meta-icon--inconsistencies { color: var(--yellow-400); }
+.dark .meta-icon--suggestions { color: var(--green-400); }
 
 /* Dark mode */
 .dark .alerts-stats {

@@ -6,6 +6,7 @@ import Badge from 'primevue/badge'
 import type { Alert, Entity, Chapter } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import { useWorkspaceStore } from '@/stores/workspace'
+import AlertDiffView from '@/components/alerts/AlertDiffView.vue'
 
 /**
  * AlertModal - Modal de detalle completo de una alerta
@@ -161,8 +162,18 @@ function formatDate(date: Date): string {
         </div>
       </section>
 
-      <!-- Sugerencia -->
-      <section v-if="hasSuggestion" class="section">
+      <!-- Vista comparativa: cuando hay excerpt Y suggestion -->
+      <section v-if="alert.excerpt && alert.suggestion" class="section">
+        <h3><i class="pi pi-arrows-h"></i> Original vs Propuesta</h3>
+        <AlertDiffView
+          :excerpt="alert.excerpt"
+          :suggestion="alert.suggestion"
+          layout="stacked"
+        />
+      </section>
+
+      <!-- Solo sugerencia (sin excerpt) -->
+      <section v-else-if="hasSuggestion" class="section">
         <h3><i class="pi pi-lightbulb"></i> Sugerencia</h3>
         <div class="suggestion-box">
           <i class="pi pi-check"></i>

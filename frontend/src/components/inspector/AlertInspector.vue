@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import type { Alert, AlertSource } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
+import AlertDiffView from '@/components/alerts/AlertDiffView.vue'
 
 /**
  * AlertInspector - Panel de detalles de alerta para el inspector.
@@ -196,8 +197,17 @@ function goToNextOccurrence() {
         <p class="explanation">{{ alert.explanation }}</p>
       </div>
 
-      <!-- Sugerencia -->
-      <div v-if="alert.suggestion" class="info-section suggestion-section">
+      <!-- Vista comparativa: cuando hay excerpt Y suggestion -->
+      <AlertDiffView
+        v-if="alert.excerpt && alert.suggestion"
+        :excerpt="alert.excerpt"
+        :suggestion="alert.suggestion"
+        layout="auto"
+        class="info-section"
+      />
+
+      <!-- Solo sugerencia (sin excerpt) -->
+      <div v-else-if="alert.suggestion" class="info-section suggestion-section">
         <div class="section-label">
           <i class="pi pi-lightbulb"></i>
           Sugerencia
@@ -205,8 +215,8 @@ function goToNextOccurrence() {
         <p class="suggestion">{{ alert.suggestion }}</p>
       </div>
 
-      <!-- Contexto del texto (excerpt) -->
-      <div v-if="alert.excerpt" class="info-section excerpt-section">
+      <!-- Solo contexto del texto (sin suggestion) -->
+      <div v-else-if="alert.excerpt" class="info-section excerpt-section">
         <div class="section-label">
           <i class="pi pi-file-edit"></i>
           Contexto en el texto

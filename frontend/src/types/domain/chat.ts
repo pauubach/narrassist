@@ -37,6 +37,10 @@ export interface ChatMessage {
   error?: string
   /** Navigable references for this message */
   references?: ChatReference[]
+  /** Whether the response was synthesized from multiple models */
+  multiModel?: boolean
+  /** Models that contributed to this response */
+  modelsUsed?: string[]
 }
 
 /** Request to chat endpoint */
@@ -49,6 +53,7 @@ export interface ChatRequest {
   context?: {
     enabledInferenceMethods?: string[]
     prioritizeSpeed?: boolean
+    multiModelSynthesis?: boolean
   }
   /** Selected text from the document viewer */
   selectedText?: string
@@ -68,4 +73,8 @@ export interface ChatResponse {
   candidateModels?: string[]
   /** Navigable references in the response */
   references?: ChatReference[]
+  /** Whether the response was synthesized from multiple models */
+  multiModel?: boolean
+  /** Models that contributed to this response */
+  modelsUsed?: string[]
 }
