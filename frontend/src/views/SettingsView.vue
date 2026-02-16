@@ -240,56 +240,28 @@
             </div>
           </template>
           <template #content>
-            <!-- 1. Hardware Info Banner (CPU/GPU) -->
-            <Message
-              v-if="systemCapabilities"
-              :severity="systemCapabilities.hardware.has_gpu ? 'success' : systemCapabilities.hardware.gpu_blocked ? 'warn' : 'info'"
-              :closable="false"
-              class="hardware-banner"
-            >
-              <div class="hardware-info">
-                <i :class="systemCapabilities.hardware.has_gpu ? 'pi pi-bolt' : systemCapabilities.hardware.gpu_blocked ? 'pi pi-exclamation-triangle' : 'pi pi-desktop'"></i>
-                <div>
-                  <template v-if="systemCapabilities.hardware.has_gpu">
-                    <strong>Aceleración por hardware detectada</strong>
-                    <span>
-                      - {{ systemCapabilities.hardware.gpu?.name }}
-                      <template v-if="systemCapabilities.hardware.gpu?.memory_gb">
-                        ({{ systemCapabilities.hardware.gpu?.memory_gb.toFixed(1) }} GB)
-                      </template>
-                    </span>
-                  </template>
-                  <template v-else-if="systemCapabilities.hardware.gpu_blocked">
-                    <strong>Hardware no compatible</strong>
-                    <span>
-                      - {{ systemCapabilities.hardware.gpu_blocked.name }}
-                      no es compatible con el análisis avanzado
-                      (Compute Capability {{ systemCapabilities.hardware.gpu_blocked.compute_capability }},
-                      se requiere {{ systemCapabilities.hardware.gpu_blocked.min_required }}+).
-                      Usando CPU.
-                    </span>
-                  </template>
-                  <template v-else>
-                    <strong>Modo CPU</strong>
-                    <span>- {{ systemCapabilities.hardware.cpu.name }}</span>
-                  </template>
-                </div>
-              </div>
-            </Message>
-
-            <!-- 2. Analizador Semántico -->
+            <!-- 1. Analizador Semántico -->
             <div class="nlp-category">
               <div class="category-header">
-                <h4><i class="pi pi-microchip-ai"></i> Analizador Semántico</h4>
+                <h4>
+                  <i class="pi pi-microchip-ai"></i> Analizador Semántico
+                  <!-- Hardware inline badge -->
+                  <Tag
+                    v-if="systemCapabilities"
+                    v-tooltip.top="hardwareTooltip"
+                    :value="hardwareBadgeLabel"
+                    :severity="systemCapabilities.hardware.has_gpu ? 'success' : 'secondary'"
+                    class="hardware-inline-badge"
+                  />
+                  <!-- Status inline badge -->
+                  <Tag
+                    v-if="systemCapabilities && ollamaState === 'ready'"
+                    :value="ollamaStatusMessage"
+                    severity="success"
+                    class="ollama-inline-badge"
+                  />
+                </h4>
                 <span class="category-desc">Motor de análisis avanzado del significado y contexto</span>
-              </div>
-
-              <!-- Estado del analizador compacto cuando está listo -->
-              <div v-if="systemCapabilities && ollamaState === 'ready'" class="ollama-ready-bar">
-                <div class="ollama-ready-info">
-                  <i class="pi pi-check-circle"></i>
-                  <span>Analizador listo · {{ systemCapabilities.ollama.models.length }} modelo(s)</span>
-                </div>
               </div>
 
               <!-- Banner de acción cuando el analizador NO está listo -->
@@ -327,56 +299,75 @@
                 />
               </div>
 
-              <!-- Selector de modelos -->
-              <div class="setting-item" :class="{ 'setting-disabled': ollamaState !== 'ready' }">
-                <div class="setting-info">
-                  <label class="setting-label">Modelos de análisis</label>
-                  <p class="setting-description">
-                    Selecciona qué modelos usar para el análisis semántico.
-                  </p>
-                </div>
-                <div class="setting-control wide">
-                  <MultiSelect
-                    v-model="settings.enabledInferenceMethods"
-                    :options="availableLLMOptions"
-                    option-label="label"
-                    option-value="value"
-                    placeholder="Seleccionar modelos"
-                    display="chip"
-                    :show-toggle-all="false"
-                    :disabled="ollamaState !== 'ready'"
-                    @change="onSettingChange"
-                  >
-                    <template #option="slotProps">
-                      <div class="method-option">
-                        <div class="method-info">
-                          <span class="method-name">{{ slotProps.option.label }}</span>
-                          <span class="method-desc">{{ slotProps.option.description }}</span>
-                        </div>
-                        <div class="method-badges">
-                          <Badge
-                            :value="getSpeedLabel(slotProps.option.speed)"
-                            :severity="getSpeedSeverity(slotProps.option.speed)"
-                            class="speed-badge"
-                          />
-                          <Tag
-                            v-if="!slotProps.option.installed"
-                            value="No instalado"
-                            severity="warning"
-                            class="method-tag"
-                          />
-                        </div>
-                      </div>
+              <!-- Grid de modelos (siempre visible) -->
+              <div class="llm-models-grid">
+                <div
+                  v-for="model in availableLLMOptions"
+                  :key="model.value"
+                  class="llm-model-card"
+                  :class="{
+                    enabled: isLLMModelEnabled(model.value),
+                    disabled: ollamaState !== 'ready',
+                  }"
+                  @click="ollamaState === 'ready' ? toggleLLMModel(model.value) : undefined"
+                >
+                  <div class="llm-model-header">
+                    <ToggleSwitch
+                      :model-value="isLLMModelEnabled(model.value)"
+                      :disabled="ollamaState !== 'ready'"
+                      @click.stop
+                      @update:model-value="toggleLLMModel(model.value)"
+                    />
+                    <div class="llm-model-name">
+                      <span class="llm-model-label">{{ model.label }}</span>
+                      <span class="llm-model-subtitle">{{ model.subtitle }}</span>
+                    </div>
+                    <Tag
+                      :value="getSpeedLabel(model.speed)"
+                      :severity="getSpeedSeverity(model.speed)"
+                      class="speed-badge"
+                    />
+                  </div>
+                  <p class="llm-model-desc">{{ model.description }}</p>
+                  <div class="llm-model-footer">
+                    <template v-if="getModelOperationLabel(model.value)">
+                      <Tag :value="getModelOperationLabel(model.value) || ''" severity="info" />
                     </template>
-                  </MultiSelect>
+                    <template v-else-if="model.installed">
+                      <span class="llm-model-installed"><i class="pi pi-check"></i> Instalado</span>
+                      <Button
+                        v-if="canUninstallModel(model.value)"
+                        label="Desinstalar"
+                        icon="pi pi-trash"
+                        size="small"
+                        text
+                        severity="secondary"
+                        class="llm-model-action"
+                        @click.stop="onUninstallModel(model.value)"
+                      />
+                    </template>
+                    <template v-else>
+                      <Button
+                        label="Descargar"
+                        icon="pi pi-download"
+                        size="small"
+                        severity="primary"
+                        outlined
+                        class="llm-model-action"
+                        :disabled="isModelBusy(model.value)"
+                        @click.stop="onInstallModel(model.value)"
+                      />
+                    </template>
+                  </div>
                 </div>
               </div>
 
+              <!-- Modo de análisis -->
               <div class="setting-item">
                 <div class="setting-info">
-                  <label class="setting-label">Priorizar velocidad</label>
+                  <label class="setting-label">Análisis rápido</label>
                   <p class="setting-description">
-                    Usar configuración optimizada para respuestas rápidas sobre calidad
+                    Respuestas más rápidas pero menos detalladas
                   </p>
                 </div>
                 <div class="setting-control">
@@ -1021,8 +1012,6 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
-import MultiSelect from 'primevue/multiselect'
-import Badge from 'primevue/badge'
 import Tag from 'primevue/tag'
 import DsDownloadProgress from '@/components/ds/DsDownloadProgress.vue'
 import Divider from 'primevue/divider'
@@ -1065,6 +1054,7 @@ const {
 const {
   ollamaState, ollamaActionConfig, ollamaStatusMessage,
   ollamaStarting, modelDownloading, ollamaDownloadProgress,
+  installModel, uninstallModel, isModelBusy, getModelOperationLabel,
   cleanup: cleanupOllama,
 } = useOllamaManagement()
 
@@ -1078,6 +1068,59 @@ const {
 
 const systemCapabilities = computed(() => systemStore.systemCapabilities)
 const loadingCapabilities = computed(() => systemStore.capabilitiesLoading)
+
+// ── Hardware inline badge ───────────────────────────────────
+
+const hardwareBadgeLabel = computed(() => {
+  if (!systemCapabilities.value) return ''
+  const hw = systemCapabilities.value.hardware
+  if (hw.has_gpu) return hw.gpu?.name || 'GPU'
+  return 'CPU'
+})
+
+const hardwareTooltip = computed(() => {
+  if (!systemCapabilities.value) return ''
+  const hw = systemCapabilities.value.hardware
+  if (hw.has_gpu) {
+    const mem = hw.gpu?.memory_gb ? ` (${hw.gpu.memory_gb.toFixed(1)} GB)` : ''
+    return `Aceleración por hardware: ${hw.gpu?.name}${mem}`
+  }
+  if (hw.gpu_blocked) {
+    return `${hw.gpu_blocked.name} no compatible (Compute Capability ${hw.gpu_blocked.compute_capability}, se requiere ${hw.gpu_blocked.min_required}+). Usando CPU.`
+  }
+  return `Modo CPU: ${hw.cpu.name}`
+})
+
+// ── LLM model toggle (card grid) ───────────────────────────
+
+function isLLMModelEnabled(modelValue: string): boolean {
+  return settings.value.enabledInferenceMethods.includes(modelValue)
+}
+
+function toggleLLMModel(modelValue: string) {
+  const current = settings.value.enabledInferenceMethods
+  if (current.includes(modelValue)) {
+    // Prevent disabling the last one
+    if (current.length <= 1) {
+      toast.add({ severity: 'warn', summary: 'Mínimo requerido', detail: 'Debes mantener al menos un modelo seleccionado.', life: 3000 })
+      return
+    }
+    settings.value.enabledInferenceMethods = current.filter(m => m !== modelValue)
+  } else {
+    settings.value.enabledInferenceMethods = [...current, modelValue]
+    // Auto-install if not installed
+    const option = availableLLMOptions.value.find(o => o.value === modelValue)
+    if (option && !option.installed) {
+      installModel(modelValue).then(ok => {
+        if (!ok) {
+          settings.value.enabledInferenceMethods = settings.value.enabledInferenceMethods.filter(m => m !== modelValue)
+          onSettingChange()
+        }
+      })
+    }
+  }
+  onSettingChange()
+}
 
 // ── NLP model download ──────────────────────────────────────
 
@@ -1457,6 +1500,39 @@ const handleScroll = () => {
     }
   }
 }
+
+function canUninstallModel(modelName: string): boolean {
+  const installedCount = availableLLMOptions.value.filter(o => o.installed).length
+  const option = availableLLMOptions.value.find(o => o.value === modelName)
+  return Boolean(option?.installed) && installedCount > 1
+}
+
+async function onInstallModel(modelName: string) {
+  const ok = await installModel(modelName)
+  if (!ok) return
+
+  if (!settings.value.enabledInferenceMethods.includes(modelName)) {
+    settings.value.enabledInferenceMethods.push(modelName)
+    onSettingChange()
+  }
+}
+
+async function onUninstallModel(modelName: string) {
+  if (!canUninstallModel(modelName)) {
+    toast.add({ severity: 'warn', summary: 'No permitido', detail: 'Debe quedar al menos 1 modelo instalado.', life: 3500 })
+    return
+  }
+
+  const ok = await uninstallModel(modelName)
+  if (!ok) return
+
+  settings.value.enabledInferenceMethods = settings.value.enabledInferenceMethods.filter(m => m !== modelName)
+  if (settings.value.enabledInferenceMethods.length === 0) {
+    const fallback = availableLLMOptions.value.find(o => o.installed && o.value !== modelName)
+    settings.value.enabledInferenceMethods = [fallback?.value || 'llama3.2']
+  }
+  onSettingChange()
+}
 </script>
 
 <style scoped>
@@ -1738,12 +1814,166 @@ const handleScroll = () => {
 
 .speed-badge {
   font-size: 0.7rem;
+  font-weight: 600;
+  border: 1px solid transparent;
 }
 
-/* MultiSelect styling - estilos específicos del componente */
-/* Los estilos globales del panel están en primevue-overrides.css */
-.setting-control.wide :deep(.p-multiselect) {
-  width: 100%;
+/* ── LLM model card grid ──────────────────────────────────── */
+
+.llm-models-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.llm-model-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  border: 1px solid var(--p-surface-300);
+  border-radius: 0.5rem;
+  background: var(--p-surface-50);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.llm-model-card:hover:not(.disabled) {
+  background: var(--p-surface-100);
+}
+
+.llm-model-card.enabled {
+  border-color: var(--p-primary-color);
+  background: color-mix(in srgb, var(--p-primary-color) 6%, var(--p-surface-0));
+}
+
+.llm-model-card.disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+:global(.dark) .llm-model-card {
+  background: var(--p-surface-800);
+  border-color: var(--p-surface-600);
+}
+
+:global(.dark) .llm-model-card:hover:not(.disabled) {
+  background: var(--p-surface-700);
+}
+
+:global(.dark) .llm-model-card.enabled {
+  border-color: var(--p-primary-color);
+  background: color-mix(in srgb, var(--p-primary-color) 10%, var(--p-surface-800));
+}
+
+.llm-model-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.llm-model-name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.llm-model-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--p-text-color);
+}
+
+.llm-model-subtitle {
+  font-size: 0.72rem;
+  color: var(--p-text-muted-color);
+}
+
+.llm-model-desc {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--p-text-muted-color);
+  line-height: 1.3;
+}
+
+.llm-model-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+
+.llm-model-installed {
+  font-size: 0.75rem;
+  color: var(--p-green-500);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.llm-model-installed i {
+  font-size: 0.7rem;
+}
+
+.llm-model-action {
+  margin-left: auto;
+  font-size: 0.75rem !important;
+}
+
+/* Inline badges en sección header */
+.hardware-inline-badge {
+  font-size: 0.7rem !important;
+  padding: 0.15rem 0.4rem !important;
+  vertical-align: middle;
+  margin-left: 0.4rem;
+}
+
+.ollama-inline-badge {
+  font-size: 0.7rem !important;
+  padding: 0.15rem 0.4rem !important;
+  vertical-align: middle;
+  margin-left: 0.25rem;
+}
+
+/* Speed badges - contraste alto */
+.speed-badge.p-tag-success {
+  background: var(--green-100) !important;
+  color: var(--green-800) !important;
+  border-color: var(--green-300) !important;
+}
+
+.speed-badge.p-tag-warn,
+.speed-badge.p-tag-warning {
+  background: var(--yellow-100) !important;
+  color: var(--yellow-900) !important;
+  border-color: var(--yellow-400) !important;
+}
+
+.speed-badge.p-tag-danger {
+  background: var(--red-100) !important;
+  color: var(--red-800) !important;
+  border-color: var(--red-400) !important;
+}
+
+:global(.dark) .speed-badge.p-tag-success {
+  background: var(--green-900) !important;
+  color: var(--green-200) !important;
+  border-color: var(--green-700) !important;
+}
+
+:global(.dark) .speed-badge.p-tag-warn,
+:global(.dark) .speed-badge.p-tag-warning {
+  background: var(--yellow-900) !important;
+  color: var(--yellow-200) !important;
+  border-color: var(--yellow-700) !important;
+}
+
+:global(.dark) .speed-badge.p-tag-danger {
+  background: var(--red-900) !important;
+  color: var(--red-200) !important;
+  border-color: var(--red-700) !important;
 }
 
 /* Badges de velocidad - alineación vertical */
@@ -1787,34 +2017,6 @@ const handleScroll = () => {
    Métodos de Análisis - Sección de configuración granular
    ============================================================================ */
 
-.hardware-banner {
-  margin-bottom: 1.5rem;
-}
-
-.hardware-banner :deep(.p-message-wrapper) {
-  padding: 0.75rem 1rem;
-}
-
-.hardware-info {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.hardware-info i {
-  font-size: 1.25rem;
-}
-
-.hardware-info div {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.hardware-info span {
-  font-size: 0.9rem;
-  color: var(--p-text-muted-color);
-}
 
 .nlp-category {
   margin-bottom: 2rem;
@@ -2057,8 +2259,8 @@ const handleScroll = () => {
 }
 
 :global(.dark) .ollama-action-card.ollama-state-no_models {
-  background: rgba(59, 130, 246, 0.1);
-  border-color: var(--blue-800);
+  background: color-mix(in srgb, var(--p-primary-color, #3B82F6) 10%, transparent);
+  border-color: var(--p-primary-800, #1e40af);
 }
 
 :global(.dark) .ollama-action-content > i {

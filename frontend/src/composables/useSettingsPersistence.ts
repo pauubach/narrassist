@@ -58,7 +58,7 @@ const DEFAULT_SETTINGS: Settings = {
   notifyAnalysisComplete: true,
   soundEnabled: true,
   enabledInferenceMethods: ['llama3.2'],
-  prioritizeSpeed: true,
+  prioritizeSpeed: false,
   enabledNLPMethods: {
     coreference: ['embeddings', 'morpho', 'heuristics'],
     ner: ['spacy', 'gazetteer'],

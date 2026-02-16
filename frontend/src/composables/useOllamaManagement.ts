@@ -26,6 +26,7 @@ export function useOllamaManagement() {
   const ollamaStarting = ref(false)
   const modelDownloading = ref(false)
   const ollamaDownloadProgress = ref<{ percentage: number; status: string; error?: string } | null>(null)
+  const modelOperations = ref<Record<string, 'installing' | 'uninstalling'>>({})
   let ollamaDownloadPollTimer: ReturnType<typeof setInterval> | null = null
 
   // ── State machine ───────────────────────────────────────
@@ -74,7 +75,10 @@ export function useOllamaManagement() {
       not_installed: 'Necesitas instalar el analizador semántico',
       not_running: 'El analizador est\u00E1 instalado pero no se ha iniciado',
       no_models: 'El analizador est\u00E1 listo, pero necesitas descargar un modelo',
-      ready: `${systemCapabilities.value?.ollama.models.length || 0} modelo(s) disponible(s)`,
+      ready: (() => {
+        const count = systemCapabilities.value?.ollama.models.length || 0
+        return count === 1 ? '1 modelo disponible' : `${count} modelos disponibles`
+      })(),
     }
     return messages[ollamaState.value]
   })
@@ -156,60 +160,136 @@ export function useOllamaManagement() {
   // ── Download model ──────────────────────────────────────
 
   async function downloadDefaultModel() {
+    return downloadModel('llama3.2')
+  }
+
+  async function downloadModel(modelName: string): Promise<boolean> {
+    const normalized = modelName.split(':')[0]
     modelDownloading.value = true
+    modelOperations.value[normalized] = 'installing'
     ollamaDownloadProgress.value = null
-    toast.add({ severity: 'info', summary: 'Descargando modelo', detail: 'Descargando modelo de an\u00E1lisis (~2GB). Esto puede tardar varios minutos...', life: 5000 })
+    toast.add({
+      severity: 'info',
+      summary: 'Descargando modelo',
+      detail: `Descargando ${normalized}. Esto puede tardar varios minutos...`,
+      life: 5000,
+    })
 
     try {
-      const result = await api.postRaw<{ success: boolean; error?: string }>('/api/ollama/pull/llama3.2')
+      const result = await api.postRaw<{ success: boolean; error?: string }>(`/api/ollama/pull/${normalized}`)
       if (!result.success) {
         toast.add({ severity: 'error', summary: 'Error', detail: result.error || 'No se pudo iniciar la descarga', life: 5000 })
         modelDownloading.value = false
-        return
+        delete modelOperations.value[normalized]
+        return false
       }
 
       let pollCount = 0
-      ollamaDownloadPollTimer = setInterval(async () => {
-        pollCount++
-        if (pollCount > 900) {
-          stopOllamaDownloadPolling()
-          modelDownloading.value = false
-          ollamaDownloadProgress.value = null
-          toast.add({ severity: 'error', summary: 'Timeout', detail: 'La descarga tard\u00F3 demasiado', life: 5000 })
-          return
-        }
-
-        try {
-          const statusResult = await api.getRaw<any>('/api/ollama/status')
-          const dp = statusResult.data?.download_progress
-          if (dp) {
-            ollamaDownloadProgress.value = dp
-          }
-
-          if (dp?.status === 'complete' || (!statusResult.data?.is_downloading && statusResult.data?.downloaded_models?.includes('llama3.2'))) {
+      return await new Promise<boolean>((resolve) => {
+        ollamaDownloadPollTimer = setInterval(async () => {
+          pollCount++
+          if (pollCount > 900) {
             stopOllamaDownloadPolling()
-            ollamaDownloadProgress.value = null
             modelDownloading.value = false
-            await reloadCapabilities()
-            toast.add({ severity: 'success', summary: 'Modelo descargado', detail: 'An\u00E1lisis sem\u00E1ntico disponible', life: 3000 })
+            ollamaDownloadProgress.value = null
+            delete modelOperations.value[normalized]
+            toast.add({ severity: 'error', summary: 'Timeout', detail: 'La descarga tard\u00F3 demasiado', life: 5000 })
+            resolve(false)
             return
           }
 
-          if (dp?.status === 'error') {
-            stopOllamaDownloadPolling()
-            ollamaDownloadProgress.value = null
-            modelDownloading.value = false
-            toast.add({ severity: 'error', summary: 'Error', detail: dp.error || 'Error descargando modelo', life: 5000 })
-            return
+          try {
+            const statusResult = await api.getRaw<any>('/api/ollama/status')
+            const dp = statusResult.data?.download_progress
+            if (dp) {
+              ollamaDownloadProgress.value = dp
+            }
+
+            const downloadedModels: string[] = statusResult.data?.downloaded_models || []
+            if (dp?.status === 'complete' || (!statusResult.data?.is_downloading && downloadedModels.includes(normalized))) {
+              stopOllamaDownloadPolling()
+              ollamaDownloadProgress.value = null
+              modelDownloading.value = false
+              delete modelOperations.value[normalized]
+              await reloadCapabilities()
+              toast.add({ severity: 'success', summary: 'Modelo descargado', detail: `${normalized} disponible`, life: 3000 })
+              resolve(true)
+              return
+            }
+
+            if (dp?.status === 'error') {
+              stopOllamaDownloadPolling()
+              ollamaDownloadProgress.value = null
+              modelDownloading.value = false
+              delete modelOperations.value[normalized]
+              toast.add({ severity: 'error', summary: 'Error', detail: dp.error || 'Error descargando modelo', life: 5000 })
+              resolve(false)
+              return
+            }
+          } catch {
+            // Ignore poll errors
           }
-        } catch {
-          // Ignore poll errors
-        }
-      }, 1000)
+        }, 1000)
+      })
     } catch {
       toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo descargar el modelo de IA', life: 3000 })
       modelDownloading.value = false
+      delete modelOperations.value[normalized]
+      return false
     }
+  }
+
+  async function installModel(modelName: string): Promise<boolean> {
+    return downloadModel(modelName)
+  }
+
+  async function uninstallModel(modelName: string): Promise<boolean> {
+    const normalized = modelName.split(':')[0]
+    modelOperations.value[normalized] = 'uninstalling'
+    try {
+      const result = await api.del<{ success: boolean; error?: string; data?: { remaining_models?: string[] } }>(`/api/ollama/model/${normalized}`)
+      if (!result.success) {
+        toast.add({
+          severity: 'warn',
+          summary: 'No se pudo desinstalar',
+          detail: result.error || `No se pudo desinstalar ${normalized}`,
+          life: 4500,
+        })
+        return false
+      }
+
+      await reloadCapabilities()
+      toast.add({
+        severity: 'success',
+        summary: 'Modelo desinstalado',
+        detail: `${normalized} eliminado correctamente`,
+        life: 3000,
+      })
+      return true
+    } catch {
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: `No se pudo desinstalar ${normalized}`,
+        life: 4500,
+      })
+      return false
+    } finally {
+      delete modelOperations.value[normalized]
+    }
+  }
+
+  function isModelBusy(modelName: string): boolean {
+    const normalized = modelName.split(':')[0]
+    return Boolean(modelOperations.value[normalized])
+  }
+
+  function getModelOperationLabel(modelName: string): string | null {
+    const normalized = modelName.split(':')[0]
+    const operation = modelOperations.value[normalized]
+    if (operation === 'installing') return 'Instalando...'
+    if (operation === 'uninstalling') return 'Desinstalando...'
+    return null
   }
 
   // ── Cleanup ─────────────────────────────────────────────
@@ -225,9 +305,15 @@ export function useOllamaManagement() {
     ollamaStarting,
     modelDownloading,
     ollamaDownloadProgress,
+    modelOperations,
+    isModelBusy,
+    getModelOperationLabel,
     installOllama,
     startOllama,
     openOllamaDownload,
+    installModel,
+    uninstallModel,
+    downloadModel,
     downloadDefaultModel,
     cleanup,
   }

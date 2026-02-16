@@ -13,10 +13,10 @@ import type { Settings } from './useSettingsPersistence'
 // ── Constants ──────────────────────────────────────────────
 
 export const inferenceMethodOptions = [
-  { value: 'llama3.2', label: 'Llama 3.2 (3B)', description: 'R\u00E1pido, buena calidad general', speed: 'fast', quality: 'good' },
-  { value: 'mistral', label: 'Mistral (7B)', description: 'Mayor calidad, m\u00E1s lento', speed: 'medium', quality: 'high' },
-  { value: 'gemma2', label: 'Gemma 2 (9B)', description: 'Alta calidad, requiere m\u00E1s recursos', speed: 'slow', quality: 'very_high' },
-  { value: 'qwen2.5', label: 'Qwen 2.5 (7B)', description: 'Excelente para espa\u00F1ol', speed: 'medium', quality: 'high' },
+  { value: 'llama3.2', label: 'R\u00E1pido', subtitle: 'Llama 3.2', description: 'Buena calidad, respuestas inmediatas', speed: 'fast', quality: 'good' },
+  { value: 'qwen2.5', label: 'Espa\u00F1ol avanzado', subtitle: 'Qwen 2.5', description: 'Mejor comprensi\u00F3n del espa\u00F1ol', speed: 'medium', quality: 'high' },
+  { value: 'mistral', label: 'Alta calidad', subtitle: 'Mistral', description: 'An\u00E1lisis m\u00E1s profundo, m\u00E1s lento', speed: 'medium', quality: 'high' },
+  { value: 'gemma2', label: 'M\u00E1xima calidad', subtitle: 'Gemma 2', description: 'Mejor an\u00E1lisis, requiere m\u00E1s recursos', speed: 'slow', quality: 'very_high' },
 ]
 
 export type NLPCategory = 'coreference' | 'ner' | 'grammar' | 'spelling' | 'character_knowledge'
