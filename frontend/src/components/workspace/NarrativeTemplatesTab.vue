@@ -382,7 +382,7 @@ const sortedMatches = computed(() => {
   position: relative;
   height: 24px;
   background: var(--ds-surface-ground, var(--surface-ground));
-  border-radius: 12px;
+  border-radius: var(--app-radius-lg);
   margin-bottom: var(--ds-space-1, 0.25rem);
 }
 

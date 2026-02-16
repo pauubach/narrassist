@@ -1137,7 +1137,7 @@ watch(() => props.projectId, () => {
   text-align: left;
   background: var(--surface-50);
   padding: 1rem 1.5rem;
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   margin: 0.5rem 0;
   max-width: 500px;
 }
@@ -1166,7 +1166,7 @@ watch(() => props.projectId, () => {
   text-align: left;
   padding: 0.75rem 1rem;
   background: var(--blue-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   color: var(--blue-700);
   font-size: 0.875rem;
   margin: 0.5rem 0 1rem 0;
@@ -1186,7 +1186,7 @@ watch(() => props.projectId, () => {
   margin-bottom: 1rem;
   background: #fffbeb;
   border: 1px solid #fcd34d;
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   color: #92400e;
   font-size: 0.875rem;
 }
@@ -1211,7 +1211,7 @@ watch(() => props.projectId, () => {
   margin-bottom: 1.5rem;
   padding: 0.75rem 1rem;
   background: var(--surface-card);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   border: 1px solid var(--surface-200);
 }
 
@@ -1296,7 +1296,7 @@ watch(() => props.projectId, () => {
 /* Chapter Groups */
 .chapter-group {
   background: var(--surface-card);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   border: 1px solid var(--surface-200);
   overflow: hidden;
 }
@@ -1364,7 +1364,7 @@ watch(() => props.projectId, () => {
   font-weight: 500;
   white-space: nowrap;
   padding: 0.125rem 0.625rem;
-  border-radius: 10px;
+  border-radius: var(--app-radius-lg);
 }
 
 .time-gap .gap-label i {
@@ -1393,7 +1393,7 @@ watch(() => props.projectId, () => {
 .inconsistencies-panel {
   margin-top: 2rem;
   background: var(--surface-card);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   border: 1px solid var(--surface-200);
   overflow: hidden;
 }
@@ -1428,7 +1428,7 @@ watch(() => props.projectId, () => {
 
 .inconsistency-item {
   padding: 1rem;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   background: var(--surface-50);
   border-left: 4px solid;
 }
@@ -1479,7 +1479,7 @@ watch(() => props.projectId, () => {
   margin-bottom: 0.75rem;
   padding: 0.5rem;
   background: var(--p-surface-0, white);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 .inconsistency-details .detail-item {

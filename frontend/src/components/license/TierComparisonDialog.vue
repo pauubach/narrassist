@@ -132,7 +132,7 @@ const featureRows: FeatureRow[] = [
     corrector: true, profesional: true, editorial: true,
   },
   {
-    label: 'Gramatica y ortografia',
+    label: 'Gramática y ortografía',
     corrector: true, profesional: true, editorial: true,
   },
   {
@@ -148,23 +148,23 @@ const featureRows: FeatureRow[] = [
     corrector: false, profesional: true, editorial: true,
   },
   {
-    label: 'Analisis de relaciones',
+    label: 'Análisis de relaciones',
     corrector: false, profesional: true, editorial: true,
   },
   {
-    label: 'Deteccion de anacronismos',
+    label: 'Detección de anacronismos',
     corrector: false, profesional: true, editorial: true,
   },
   {
-    label: 'Deteccion fuera de caracter',
+    label: 'Detección fuera de carácter',
     corrector: false, profesional: true, editorial: true,
   },
   {
-    label: 'Espanol clasico',
+    label: 'Español clásico',
     corrector: false, profesional: true, editorial: true,
   },
   {
-    label: 'Multi-modelo (votacion)',
+    label: 'Multi-modelo (votación)',
     corrector: false, profesional: true, editorial: true,
   },
   {
@@ -184,7 +184,7 @@ const featureRows: FeatureRow[] = [
     corrector: '1', profesional: '1', editorial: '3+',
   },
   {
-    label: 'Manuscrito max',
+    label: 'Manuscrito máx.',
     corrector: '60k palabras', profesional: 'Ilimitado', editorial: 'Ilimitado',
   },
 ]

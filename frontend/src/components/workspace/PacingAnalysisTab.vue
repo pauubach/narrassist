@@ -336,7 +336,7 @@ const analysisError = ref<string | null>(null)
 const severityOptions = [
   { label: 'Todas', value: 'all' },
   { label: 'Problemas', value: 'issue' },
-  { label: 'Avisos', value: 'warning' },
+  { label: 'Advertencias', value: 'warning' },
   { label: 'Sugerencias', value: 'suggestion' },
   { label: 'Info', value: 'info' },
 ]
@@ -912,7 +912,7 @@ function selectChapter(chapter: any) {
 .percentile-bar-bg {
   position: relative;
   height: 16px;
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   background: var(--surface-200);
   border: 1px solid var(--surface-300);
   margin-top: 1.25rem;
@@ -920,7 +920,7 @@ function selectChapter(chapter: any) {
 
 .percentile-bar-fill {
   height: 100%;
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   transition: width 0.4s ease;
   min-width: 6px;
 }
@@ -941,7 +941,7 @@ function selectChapter(chapter: any) {
   color: var(--text-color);
   background: var(--surface-card);
   padding: 1px 4px;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   border: 1px solid var(--surface-300);
 }
 

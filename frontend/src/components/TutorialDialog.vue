@@ -583,7 +583,7 @@ const finish = () => {
   font-family: monospace;
   background: var(--p-surface-0);
   border: 1px solid var(--p-surface-300);
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
   box-shadow: 0 1px 0 var(--p-surface-300);
 }
 
@@ -645,7 +645,7 @@ const finish = () => {
   font-size: 0.7rem;
   padding: 0.125rem 0.375rem;
   background: var(--p-surface-100);
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
   color: var(--p-text-muted-color);
 }
 

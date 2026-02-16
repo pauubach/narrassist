@@ -212,7 +212,7 @@ const getTooltip = (chapter: { number: number; title?: string; highlight: Highli
 .chapter-timeline.compact .chapter-block {
   min-width: 16px;
   height: 16px;
-  border-radius: 2px;
+  border-radius: var(--app-radius-sm);
 }
 
 .chapter-block:hover {

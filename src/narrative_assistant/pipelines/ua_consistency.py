@@ -86,6 +86,9 @@ class PipelineConsistencyMixin:
             if self.config.run_character_profiling and context.entities and context.chapters:
                 self._run_shallow_character_detection(context)
 
+            if self.config.run_knowledge and context.entities and context.chapters:
+                self._run_knowledge_anachronisms(context)
+
             context.phase_times["consistency"] = (datetime.now() - phase_start).total_seconds()
             return Result.success(None)
 
@@ -937,3 +940,74 @@ class PipelineConsistencyMixin:
 
         except Exception as e:
             logger.warning(f"Shallow character detection failed: {e}")
+
+    def _run_knowledge_anachronisms(self, context: AnalysisContext) -> None:
+        """
+        Detectar anacronismos de conocimiento.
+
+        Un personaje demuestra conocimiento (pensamiento, referencia) sobre
+        otro personaje o hecho ANTES de haberlo aprendido (presentación,
+        revelación).
+        """
+        try:
+            from ..analysis.character_knowledge import (
+                CharacterKnowledgeAnalyzer,
+                KnowledgeExtractionMode,
+                detect_knowledge_anachronisms,
+            )
+
+            # Crear analyzer y registrar entidades
+            analyzer = CharacterKnowledgeAnalyzer(project_id=context.project_id)
+            entity_names = []
+            for entity in context.entities:
+                aliases = getattr(entity, "aliases", []) or []
+                etype = getattr(entity, "entity_type", None)
+                etype_str = etype.value if hasattr(etype, "value") else str(etype or "")
+                analyzer.register_entity(
+                    entity_id=entity.id,
+                    name=entity.canonical_name,
+                    aliases=aliases,
+                    entity_type=etype_str,
+                )
+                entity_names.append(entity.canonical_name)
+
+            logger.debug(
+                f"Knowledge: {len(entity_names)} entities ({len(analyzer._person_ids)} persons)"
+            )
+
+            # Extraer hechos de conocimiento por capítulo
+            all_facts = []
+            for ch in context.chapters:
+                content = ch.get("content", "") if isinstance(ch, dict) else getattr(ch, "content", "")
+                ch_num = ch.get("number", 0) if isinstance(ch, dict) else getattr(ch, "number", 0)
+                ch_start = ch.get("start_char", 0) if isinstance(ch, dict) else getattr(ch, "start_char", 0)
+
+                if not content:
+                    continue
+
+                facts = analyzer.extract_knowledge_facts(
+                    text=content,
+                    chapter=ch_num,
+                    start_char=ch_start,
+                    mode=KnowledgeExtractionMode.RULES,
+                )
+                if facts:
+                    logger.debug(f"Knowledge: chapter {ch_num} → {len(facts)} facts")
+                all_facts.extend(facts)
+
+            logger.debug(f"Knowledge: {len(all_facts)} facts from {len(context.chapters)} chapters")
+
+            if not all_facts:
+                return
+
+            # Detectar anacronismos
+            anachronisms = detect_knowledge_anachronisms(all_facts)
+            if anachronisms:
+                context.knowledge_anachronisms = anachronisms
+                context.stats["knowledge_anachronisms"] = len(anachronisms)
+                logger.info(f"Knowledge anachronisms: {len(anachronisms)} detected")
+
+        except ImportError as e:
+            logger.debug(f"Knowledge module not available: {e}")
+        except Exception as e:
+            logger.warning(f"Knowledge anachronism detection failed: {e}")

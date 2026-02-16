@@ -1474,7 +1474,7 @@ defineExpose({ focusSearch })
   gap: 0.25rem;
   cursor: pointer;
   padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   transition: background 0.2s;
 }
 
@@ -1494,7 +1494,7 @@ defineExpose({ focusSearch })
   align-items: center;
   gap: 0.625rem;
   padding: 0.5rem 0.75rem;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -1514,7 +1514,7 @@ defineExpose({ focusSearch })
   align-items: center;
   justify-content: center;
   background: var(--surface-100);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   flex-shrink: 0;
   align-self: flex-start;
   margin-top: 2px;
@@ -1551,7 +1551,7 @@ defineExpose({ focusSearch })
 
 .entity-type-badge {
   padding: 0.125rem 0.375rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   font-size: 0.6875rem;
   font-weight: 500;
   text-transform: capitalize;
@@ -1642,7 +1642,7 @@ defineExpose({ focusSearch })
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: var(--app-radius-lg);
   flex-shrink: 0;
 }
 
@@ -1712,7 +1712,7 @@ defineExpose({ focusSearch })
   padding: 0.75rem 1rem;
   background: var(--surface-card);
   border: 1px solid var(--surface-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
 }
 
 .stat-card-icon {
@@ -1722,7 +1722,7 @@ defineExpose({ focusSearch })
   align-items: center;
   justify-content: center;
   background: var(--primary-50);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
 }
 
 .stat-card-icon i {
@@ -1755,7 +1755,7 @@ defineExpose({ focusSearch })
   padding: 0.375rem 0.75rem;
   background: var(--surface-card);
   border: 1px solid var(--surface-border);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   font-size: 0.875rem;
 }
 
@@ -1780,7 +1780,7 @@ defineExpose({ focusSearch })
   padding: 0.5rem 0.75rem;
   background: var(--surface-card);
   border: 1px solid var(--surface-border);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .attribute-name {
@@ -1799,7 +1799,7 @@ defineExpose({ focusSearch })
   color: var(--text-color-secondary);
   background: var(--surface-100);
   padding: 0.125rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 .section-header-row {
@@ -1825,7 +1825,7 @@ defineExpose({ focusSearch })
   padding: 0.75rem;
   background: var(--surface-card);
   border: 1px solid var(--primary-200);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .attr-form-select {
@@ -1911,7 +1911,7 @@ defineExpose({ focusSearch })
 .merged-info-section {
   background: var(--blue-50);
   padding: 1rem;
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   border: 1px solid var(--blue-200);
 }
 
@@ -1953,7 +1953,7 @@ defineExpose({ focusSearch })
   gap: 0.5rem;
   background: #ffffff !important; /* Fondo blanco fijo en light mode */
   padding: 0.5rem;
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   border: 1px solid rgba(0, 0, 0, 0.1);
 }
@@ -1966,22 +1966,22 @@ defineExpose({ focusSearch })
 
 /* Botones dentro de floating-actions con color fijo para contraste */
 .floating-actions :deep(.p-button) {
-  color: #1e40af !important; /* blue-800: 8.5:1 on white */
+  color: var(--p-primary-800, #1e40af) !important;
 }
 
 .floating-actions :deep(.p-button:hover) {
-  color: #1d4ed8 !important;
-  background: rgba(59, 130, 246, 0.12) !important;
+  color: var(--p-primary-700, #1d4ed8) !important;
+  background: color-mix(in srgb, var(--p-primary-color, #3B82F6) 12%, transparent) !important;
 }
 
 /* Dark mode icon color */
 .dark .floating-actions :deep(.p-button) {
-  color: #93c5fd !important; /* blue-300: high contrast on dark */
+  color: var(--p-primary-300, #93c5fd) !important;
 }
 
 .dark .floating-actions :deep(.p-button:hover) {
-  color: #bfdbfe !important;
-  background: rgba(147, 197, 253, 0.15) !important;
+  color: var(--p-primary-200, #bfdbfe) !important;
+  background: color-mix(in srgb, var(--p-primary-300, #93c5fd) 15%, transparent) !important;
 }
 
 /* Relevancia */
@@ -2029,7 +2029,7 @@ defineExpose({ focusSearch })
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   font-size: 0.85rem;
 }
 .vital-dead {
@@ -2058,7 +2058,7 @@ defineExpose({ focusSearch })
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 0.75rem;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   cursor: pointer;
   transition: background 0.15s;
 }

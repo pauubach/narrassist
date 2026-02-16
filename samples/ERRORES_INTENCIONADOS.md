@@ -423,3 +423,92 @@ Documento de prueba que activa todos los detectores y paneles del sistema.
 | **Temporal** | 3 fechas de partida contradictorias: junio, agosto, septiembre |
 | **Duplicados** | Frase exacta copiada cap.2→cap.4, rutina repetida cap.6 |
 | **Personajes planos** | Pedro, Ana, Roberto, Isabel: sin arco, sin profundidad, sin funcion narrativa |
+
+---
+
+## ERRORES CAPITULO 7 (edge cases y stress tests)
+
+### PERSONAJES NUEVOS (cap. 7)
+
+| Personaje | Edad | Rol | Notas |
+|-----------|------|-----|-------|
+| Friedrich Ramirez | - | Dr. U. Zurich | Mencionado solo por email |
+
+### 62. CONOCIMIENTO FANTASMA — Lucía conoce a Weber (character_knowledge.py)
+- Cap. 7: Lucia menciona "la que nos recomendo Weber en la reunion de febrero"
+- Lucia NUNCA conocio a Weber en la narrativa
+  → Conocimiento sin fuente narrativa
+  → **ALERT**: knowledge_anachronism (CONSISTENCY)
+
+### 63. CONOCIMIENTO FANTASMA #2 — Lucía en congreso (character_knowledge.py)
+- Cap. 7: Lucia dice "cuando estabamos todos en el congreso de Madrid"
+- Cap. 3: Solo Elena y Martin estuvieron en el congreso
+  → Lucia afirma haber estado donde no estuvo
+  → **STRESS TEST**: Puede requerir cruce ubicacion+conocimiento
+
+### 64. ATRIBUTO CONTRADICTORIO — Pelo de Lucía (attribute_consistency.py)
+- Cap. 1: Lucia tiene "pelo rubio"
+- Cap. 7: "ahora tenia el pelo moreno"
+  → Cambio fisico sin explicacion (¿se tino? No se dice)
+  → **ALERT**: attribute_inconsistency (CONSISTENCY)
+
+### 65. REPETICION EXTREMA — "Todo era..." x7 (repetition + sentence_energy)
+- Cap. 7: "Todo era rutina. Todo era predecible. Todo era aburrido. Todo era repetitivo. Todo era monotono. Todo era gris. Todo era igual."
+  → 7 frases con misma estructura, inicio identico
+  → **ALERT**: repetition_subject_start, style_sentence_length_monotony (STYLE)
+
+### 66. REPETICION EXTREMA #2 — "Los datos no..." x5 (repetition)
+- Cap. 7: "Los numeros no coincidian. Los numeros eran diferentes. Los datos no eran iguales. Las cifras no cuadraban. Los valores no correspondian."
+  → 5 formas de decir lo mismo + repeticion lexica
+  → **ALERT**: repetition, semantic_duplicate (STYLE)
+
+### 67. VITAL STATUS — Padre mencionado como vivo #2 (vital_status.py)
+- Cap. 7: Madre escribe "tu padre y yo estamos preocupados"
+  → Podría ser figurativo (se aclara en dialogo)
+  → **STRESS TEST**: False positive potencial — la madre lo aclara despues
+
+### 68. PUBLICACION FANTASMA — Articulo no escrito (consistency)
+- Cap. 7: Articulo Rodriguez et al. (2024) publicado sin consentimiento de Elena
+  → Elena niega haberlo escrito → error narrativo intencional vs trama?
+  → **STRESS TEST**: El sistema deberia detectar la inconsistencia?
+
+### 69. CARLOS CONSISTENTE — Validacion positiva (out_of_character.py)
+- Cap. 7: Carlos descrito como "callado", "apenas dijo tres palabras"
+  → CONSISTENTE con su perfil de caps. 1-2 (parco, silencioso)
+  → NO deberia generar OOC alert (test de falso negativo correcto)
+
+### 70. OMNISCIENT LEAK #2 — Barcelona desde Munich (focalization.py)
+- Cap. 7: "Mientras tanto, en Barcelona, Carlos estaba en el laboratorio"
+  → Narracion focalizada en Elena (Munich) → salto a Barcelona
+  → **ALERT**: omniscient_leak (FOCALIZATION)
+
+### 71. STICKY + BAJA ENERGIA — Repeticion de estructura (sticky_sentences.py)
+- Cap. 7: "Tenia hambre. Tenia frio. Tenia sueno."
+  → Estructura repetitiva + verbos debiles (tenia x3)
+  → **ALERT**: sticky_sentence, weak_verb_usage (STYLE)
+
+### 72. SENSORY PROGRESSION — Del deficit a la descripcion (sensory_report.py)
+- Cap. 7 inicio: casi sin descripciones sensoriales (como cap. 4)
+- Cap. 7 final: "farolas", "acera mojada", "agua negra y brillante", "banco frio y humedo", "lluvia"
+  → Contraste deliberado dentro del mismo capitulo
+
+### 73. REGIONAL — "Coger" (regional.py)
+- Cap. 7: "Cogio su telefono" + "Cogio la bata" (variante peninsular)
+  → Consistente con cap. 1 ("cogio una silla") pero podria flaggearse
+  → **ALERT**: regional_variant (STYLE)
+
+### 74. BATA AZUL vs BATA BLANCA — Atributo contradictorio (attribute_consistency.py)
+- Cap. 1: Elena lleva "bata blanca"
+- Cap. 7: Carlos lleva "bata azul" → No es error, son personajes diferentes
+  → Pero la bata de CARLOS deberia ser consistente consigo misma
+  → **STRESS TEST**: Sin contradiccion si solo mencion unica
+
+### 75. PROLEPSIS CONFIRMADA — Weber investigado (non_linear_detector.py)
+- Cap. 6: Prolepsis anunciaba "Weber seria investigado por fraude"
+- Cap. 7: Se confirma el fraude → La prolepsis se cumple
+  → **INFO**: prolepsis confirmada, coherencia narrativa
+
+### 76. REFERENCIA BIBLIOGRAFICA FANTASMA (references.py)
+- Cap. 7: Rodriguez, E. et al. (2024) mencionado en texto narrativo
+  → No es una cita academica formal, pero parece una referencia
+  → **STRESS TEST**: El detector deberia ignorar referencias en dialogo/narración?

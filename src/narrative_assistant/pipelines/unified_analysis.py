@@ -437,6 +437,7 @@ class AnalysisContext:
     ooc_events: list = field(default_factory=list)  # Eventos fuera de personaje (OOC)
     chekhov_threads: list = field(default_factory=list)  # Hilos narrativos abandonados (Chekhov)
     shallow_characters: list = field(default_factory=list)  # Personajes planos
+    knowledge_anachronisms: list = field(default_factory=list)  # Anacronismos de conocimiento
 
     # Alertas
     alerts: list = field(default_factory=list)

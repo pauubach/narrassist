@@ -19,19 +19,22 @@
 
 :root {
   /* -------------------------------------------------------------------------
-     1.1 Paleta Primaria (default: Blue, seleccionable desde Settings)
+     1.1 Paleta Primaria (dinámica: sigue el color primario de Settings)
      ------------------------------------------------------------------------- */
-  --ds-primary-50: #EFF6FF;
-  --ds-primary-100: #DBEAFE;
-  --ds-primary-200: #BFDBFE;
-  --ds-primary-300: #93C5FD;
-  --ds-primary-400: #60A5FA;
-  --ds-primary-500: #3B82F6;
-  --ds-primary-600: #2563EB;
-  --ds-primary-700: #1D4ED8;
-  --ds-primary-800: #1E40AF;
-  --ds-primary-900: #1E3A8A;
-  --ds-primary-500-rgb: 59, 130, 246;
+  --ds-primary-50: var(--p-primary-50, #EFF6FF);
+  --ds-primary-100: var(--p-primary-100, #DBEAFE);
+  --ds-primary-200: var(--p-primary-200, #BFDBFE);
+  --ds-primary-300: var(--p-primary-300, #93C5FD);
+  --ds-primary-400: var(--p-primary-400, #60A5FA);
+  --ds-primary-500: var(--p-primary-500, #3B82F6);
+  --ds-primary-600: var(--p-primary-600, #2563EB);
+  --ds-primary-700: var(--p-primary-700, #1D4ED8);
+  --ds-primary-800: var(--p-primary-800, #1E40AF);
+  --ds-primary-900: var(--p-primary-900, #1E3A8A);
+
+  /* Variantes con alfa para fondos y bordes */
+  --ds-color-primary-soft: color-mix(in srgb, var(--p-primary-color, #3B82F6) 12%, transparent);
+  --ds-color-primary-subtle: color-mix(in srgb, var(--p-primary-color, #3B82F6) 30%, transparent);
 
   /* -------------------------------------------------------------------------
      1.2 Paleta de Grises/Neutros (Surface)
@@ -320,7 +323,7 @@
   /* -------------------------------------------------------------------------
      4.4 Focus Ring
      ------------------------------------------------------------------------- */
-  --ds-focus-ring: 0 0 0 3px rgba(var(--ds-primary-500-rgb), 0.25);
+  --ds-focus-ring: 0 0 0 3px color-mix(in srgb, var(--p-primary-color, #3B82F6) 25%, transparent);
   --ds-focus-ring-error: 0 0 0 3px rgba(239, 68, 68, 0.25);
   --ds-focus-ring-offset: 2px;
 
@@ -377,6 +380,10 @@
 
 .dark,
 [data-theme="dark"] {
+  /* Primary con alfa (dark) */
+  --ds-color-primary-soft: color-mix(in srgb, var(--p-primary-400, #60A5FA) 15%, transparent);
+  --ds-color-primary-subtle: color-mix(in srgb, var(--p-primary-400, #60A5FA) 30%, transparent);
+
   /* Surface colors */
   --ds-surface-0: #121212;
   --ds-surface-50: #1E1E1E;

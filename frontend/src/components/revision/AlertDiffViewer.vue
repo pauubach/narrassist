@@ -153,7 +153,7 @@ const confidenceLabel = computed(() => {
 .resolution-section {
   background: var(--surface-ground);
   padding: 12px;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .resolution-reason {
@@ -181,14 +181,14 @@ const confidenceLabel = computed(() => {
 .bar-track {
   height: 6px;
   background: var(--surface-200);
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
   margin-top: 4px;
   overflow: hidden;
 }
 
 .bar-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
   transition: width 0.3s ease;
 }
 

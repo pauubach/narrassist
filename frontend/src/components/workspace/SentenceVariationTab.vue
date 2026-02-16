@@ -607,7 +607,7 @@ function getSentenceTooltip(sent: any): string {
 .legend-item .dot {
   width: 10px;
   height: 10px;
-  border-radius: 2px;
+  border-radius: var(--app-radius-sm);
 }
 
 .legend-item .dot.very-short { background: #818cf8; }

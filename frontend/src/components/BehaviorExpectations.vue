@@ -918,7 +918,7 @@ const deleteExpectation = (index: number) => {
 <style scoped>
 .behavior-expectations {
   background: var(--surface-card);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   padding: 1.5rem;
 }
 
@@ -952,7 +952,7 @@ const deleteExpectation = (index: number) => {
   gap: 0.75rem;
   padding: 1rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   border-left: 4px solid var(--primary-color);
 }
 
@@ -1058,7 +1058,7 @@ const deleteExpectation = (index: number) => {
 .expectation-item {
   padding: 1rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   border-left: 4px solid var(--primary-color);
 }
 
@@ -1083,7 +1083,7 @@ const deleteExpectation = (index: number) => {
 .expectation-reasoning {
   padding: 0.5rem;
   background: var(--surface-100);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   margin-top: 0.5rem;
 }
 
@@ -1107,7 +1107,7 @@ const deleteExpectation = (index: number) => {
   gap: 0.5rem;
   padding: 1rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   margin-top: 0.5rem;
 }
 
@@ -1132,7 +1132,7 @@ const deleteExpectation = (index: number) => {
 .violation-item {
   padding: 1rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   border-left: 4px solid var(--red-500);
   margin-bottom: 0.75rem;
 }
@@ -1159,7 +1159,7 @@ const deleteExpectation = (index: number) => {
   gap: 0.5rem;
   padding: 0.75rem;
   background: var(--surface-100);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   font-style: italic;
   font-size: 0.875rem;
   line-height: 1.5;
@@ -1181,7 +1181,7 @@ const deleteExpectation = (index: number) => {
   margin-top: 0.75rem;
   padding: 0.75rem;
   background: var(--green-50);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   font-size: 0.8125rem;
 }
 
@@ -1210,7 +1210,7 @@ const deleteExpectation = (index: number) => {
 .methods-section {
   padding: 0.75rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .methods-list {
@@ -1232,7 +1232,7 @@ const deleteExpectation = (index: number) => {
 .basic-mode-text code {
   background: var(--surface-100);
   padding: 0.125rem 0.25rem;
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
   font-size: 0.8rem;
 }
 
@@ -1291,7 +1291,7 @@ const deleteExpectation = (index: number) => {
 .voice-metrics-section {
   background: var(--surface-50);
   padding: 1rem;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .voice-metrics-grid {
@@ -1307,7 +1307,7 @@ const deleteExpectation = (index: number) => {
   align-items: center;
   padding: 0.5rem;
   background: var(--surface-0);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   text-align: center;
 }
 

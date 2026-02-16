@@ -259,8 +259,8 @@ function clearSelectionContext() {
     <!-- Ollama warning banner -->
     <div v-if="!ollamaReady" class="ollama-warning">
       <i class="pi pi-exclamation-triangle"></i>
-      <span v-if="!ollamaAvailable">Ollama no está arrancado. Inícialo desde Ajustes.</span>
-      <span v-else>No hay modelos LLM. Descarga uno desde Ajustes.</span>
+      <span v-if="!ollamaAvailable">Ollama no está arrancado. Inícialo desde Configuración.</span>
+      <span v-else>No hay modelos LLM. Descarga uno desde Configuración.</span>
     </div>
 
     <!-- Messages area -->

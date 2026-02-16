@@ -290,7 +290,7 @@ function onShow() {
   gap: 1rem;
   padding: 0.75rem;
   border: 1px solid var(--surface-border);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   background: var(--surface-card);
 }
 
@@ -330,7 +330,7 @@ function onShow() {
   color: var(--text-color-secondary);
   background: var(--surface-100);
   padding: 0.125rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 .category-description {

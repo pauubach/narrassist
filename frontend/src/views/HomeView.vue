@@ -140,7 +140,7 @@ const goToSettings = () => {
   max-width: 600px;
   background: var(--surface-card);
   border: 1px solid var(--surface-border);
-  border-radius: 12px;
+  border-radius: var(--app-radius-lg);
   padding: 3rem;
   box-shadow: var(--shadow-lg);
 }
@@ -170,7 +170,7 @@ const goToSettings = () => {
   padding: 0.5rem 1rem;
   background: var(--green-50);
   border: 1px solid var(--green-200);
-  border-radius: 20px;
+  border-radius: var(--app-radius-lg);
   font-size: 0.875rem;
   color: var(--green-700);
 }
@@ -188,7 +188,7 @@ const goToSettings = () => {
 .status-card {
   background: var(--surface-50);
   border: 1px solid var(--surface-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   padding: 1.5rem;
   margin-bottom: 2rem;
 }
@@ -221,7 +221,7 @@ const goToSettings = () => {
 
 .status-value {
   padding: 0.25rem 0.75rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   font-size: 0.875rem;
   font-weight: 600;
   background: var(--red-50);
@@ -243,7 +243,7 @@ const goToSettings = () => {
   padding: 1rem;
   background: var(--yellow-50);
   border: 1px solid var(--yellow-500);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   display: flex;
   flex-direction: column;
   align-items: center;

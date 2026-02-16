@@ -204,7 +204,7 @@ watch(() => props.projectId, () => {
   font-size: 0.75rem;
   background: var(--primary-color);
   color: var(--primary-color-text);
-  border-radius: 10px;
+  border-radius: var(--app-radius-lg);
   padding: 0.125rem 0.5rem;
   min-width: 1.25rem;
   text-align: center;
@@ -306,7 +306,7 @@ watch(() => props.projectId, () => {
   flex-shrink: 0;
   background: none;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   cursor: pointer;
   padding: 0.25rem;
   color: var(--text-color-secondary);

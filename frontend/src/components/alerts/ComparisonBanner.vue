@@ -143,7 +143,7 @@ watch(() => props.analysisCompleted, (val) => {
   align-items: center;
   justify-content: space-between;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   margin-bottom: 8px;
   cursor: pointer;
   transition: background 0.2s;
@@ -203,7 +203,7 @@ watch(() => props.analysisCompleted, (val) => {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .detail-row.resolved {
@@ -238,7 +238,7 @@ watch(() => props.analysisCompleted, (val) => {
   padding: 8px 12px;
   background: var(--blue-50, #eff6ff);
   color: var(--blue-700, #1d4ed8);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   font-size: 0.85rem;
 }
 </style>

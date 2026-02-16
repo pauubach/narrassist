@@ -166,7 +166,7 @@ const sortedMethods = computed(() => {
   gap: 0.5rem;
   padding: 0.5rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   border-left: 3px solid var(--surface-300);
   transition: border-color 0.2s;
 }
@@ -212,7 +212,7 @@ const sortedMethods = computed(() => {
   width: 80px;
   height: 6px;
   background: var(--surface-200);
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -225,7 +225,7 @@ const sortedMethods = computed(() => {
 .method-fill {
   height: 100%;
   background: var(--surface-400);
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
   transition: width 0.3s ease;
 }
 

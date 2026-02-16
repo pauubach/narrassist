@@ -183,7 +183,7 @@ const hasTrend = computed(() => trend.value && trend.value.trend.length >= 2)
   font-size: 0.7rem;
   font-weight: 600;
   padding: 1px 4px;
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
   white-space: nowrap;
 }
 

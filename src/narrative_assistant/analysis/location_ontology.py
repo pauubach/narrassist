@@ -135,6 +135,15 @@ class LocationOntology:
 
         return None
 
+    def get_all_names(self) -> list[str]:
+        """Devuelve todos los nombres canónicos de ubicaciones conocidas."""
+        return [node.name for node in self._nodes.values()]
+
+    def get_type(self, name: str) -> "LocationType | None":
+        """Devuelve el LocationType de una ubicación, o None si no existe."""
+        node = self.resolve(name)
+        return node.location_type if node else None
+
     def get_ancestors(self, name: str) -> list[str]:
         """Devuelve la cadena de ancestros [padre, abuelo, ...]."""
         node = self.resolve(name)

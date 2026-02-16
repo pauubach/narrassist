@@ -136,7 +136,7 @@ defineExpose({ refresh: loadHistory })
   flex-direction: column;
   height: 100%;
   background: var(--surface-section);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
 }
 
 .panel-header {
@@ -194,7 +194,7 @@ defineExpose({ refresh: loadHistory })
 .history-entry {
   background: var(--surface-card);
   border: 1px solid var(--surface-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   padding: 1rem;
   transition: all 0.2s;
 }
@@ -312,6 +312,6 @@ defineExpose({ refresh: loadHistory })
 
 .history-list::-webkit-scrollbar-thumb {
   background: var(--surface-300);
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
 }
 </style>

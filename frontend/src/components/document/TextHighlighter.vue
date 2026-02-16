@@ -543,7 +543,7 @@ function handleMouseUp() {
 }
 
 .text-segment--grammar-error:hover {
-  background-color: rgba(59, 130, 246, 0.1) !important;
+  background-color: color-mix(in srgb, var(--error-grammar-color, #3b82f6) 10%, transparent) !important;
 }
 
 /* ==================== */
@@ -554,7 +554,7 @@ function handleMouseUp() {
   z-index: var(--ds-z-tooltip);
   background: var(--surface-0, white);
   border: 1px solid var(--surface-border, #e5e7eb);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   min-width: 280px;
   max-width: 400px;
@@ -587,11 +587,11 @@ function handleMouseUp() {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 .popup-type.grammar {
-  background: rgba(59, 130, 246, 0.1);
+  background: color-mix(in srgb, var(--error-grammar-color, #3b82f6) 10%, transparent);
   color: var(--error-grammar-color, #3b82f6);
 }
 
@@ -607,7 +607,7 @@ function handleMouseUp() {
   cursor: pointer;
   padding: 0.25rem;
   color: var(--text-color-secondary, #6b7280);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   transition: background-color 0.15s;
 }
 
@@ -633,7 +633,7 @@ function handleMouseUp() {
   align-items: baseline;
   padding: 0.75rem;
   background: var(--surface-50, #f9fafb);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .suggestion-label {
@@ -664,7 +664,7 @@ function handleMouseUp() {
   padding: 0.5rem 0.75rem;
   font-size: 0.8125rem;
   font-weight: 500;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   border: none;
   cursor: pointer;
   transition: background-color 0.15s, color 0.15s;

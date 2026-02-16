@@ -439,7 +439,7 @@ function toggleDetails() {
   gap: 0.35rem;
   font-size: 0.75rem;
   padding: 0.15rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   cursor: pointer;
   transition: filter 0.2s;
 }
@@ -504,7 +504,7 @@ function toggleDetails() {
   max-width: 400px;
   cursor: pointer;
   padding: 0.125rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   transition: background 0.2s;
   display: flex;
   align-items: center;
@@ -566,7 +566,7 @@ function toggleDetails() {
   width: 380px;
   background-color: var(--p-surface-ground, var(--surface-ground, #ffffff));
   border: 1px solid var(--p-surface-border, var(--surface-border, #e2e8f0));
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12);
   padding: 1rem;
   margin-bottom: 0.5rem;
@@ -599,7 +599,7 @@ function toggleDetails() {
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   font-size: 0.8125rem;
 }
 
@@ -638,14 +638,14 @@ function toggleDetails() {
   height: 4px;
   margin-top: 0.35rem;
   background: var(--p-surface-300, #e2e8f0);
-  border-radius: 2px;
+  border-radius: var(--app-radius-sm);
   overflow: hidden;
 }
 
 .step-progress-fill {
   height: 100%;
   background: var(--p-primary-500, #3b82f6);
-  border-radius: 2px;
+  border-radius: var(--app-radius-sm);
   transition: width 0.3s ease;
 }
 
@@ -658,7 +658,7 @@ function toggleDetails() {
   margin-bottom: 0.75rem;
   background: var(--p-primary-50, rgba(59, 130, 246, 0.1));
   border: 1px solid var(--p-primary-200, rgba(59, 130, 246, 0.3));
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   font-size: 0.8125rem;
   color: var(--p-primary-700, #1d4ed8);
 }
@@ -709,7 +709,7 @@ function toggleDetails() {
   background: var(--p-primary-50, rgba(59, 130, 246, 0.08));
   color: var(--p-primary-700, #1d4ed8);
   border-left: 3px solid var(--p-primary-500, #3b82f6);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   padding-left: calc(0.5rem + 3px);
 }
 
@@ -739,7 +739,7 @@ function toggleDetails() {
   padding: 0.75rem;
   background-color: var(--p-green-50, rgba(34, 197, 94, 0.08));
   border: 1px solid var(--p-green-300, #86efac);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--p-green-700, #15803d);
@@ -808,9 +808,9 @@ function toggleDetails() {
 }
 
 .dark .current-action {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(96, 165, 250, 0.4);
-  color: var(--primary-300, #93c5fd);
+  background: color-mix(in srgb, var(--p-primary-color, #3B82F6) 20%, transparent);
+  border-color: color-mix(in srgb, var(--p-primary-400, #60A5FA) 40%, transparent);
+  color: var(--p-primary-300, #93c5fd);
 }
 
 .dark .step-progress-bar {
@@ -818,20 +818,20 @@ function toggleDetails() {
 }
 
 .dark .step-percent {
-  color: var(--primary-300, #93c5fd);
+  color: var(--p-primary-300, #93c5fd);
 }
 
 .dark .step-active {
-  background: rgba(59, 130, 246, 0.15);
-  color: var(--primary-300, #93c5fd);
+  background: color-mix(in srgb, var(--p-primary-color, #3B82F6) 15%, transparent);
+  color: var(--p-primary-300, #93c5fd);
 }
 
 .dark .step-active .step-icon i {
-  color: var(--primary-400, #60a5fa);
+  color: var(--p-primary-400, #60a5fa);
 }
 
 .dark .step-active .step-name {
-  color: var(--primary-200, #bfdbfe);
+  color: var(--p-primary-200, #bfdbfe);
 }
 
 .dark .details-note {
@@ -865,12 +865,12 @@ function toggleDetails() {
 }
 
 .dark .status-queued-heavy {
-  background: rgba(59, 130, 246, 0.15);
-  color: var(--blue-300);
+  background: color-mix(in srgb, var(--p-primary-color, #3B82F6) 15%, transparent);
+  color: var(--p-primary-300, #93c5fd);
 }
 
 .dark .status-queued-heavy i {
-  color: var(--blue-400);
+  color: var(--p-primary-400, #60a5fa);
 }
 
 .dark .status-queued-heavy .queued-heavy-check {

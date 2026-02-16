@@ -1753,7 +1753,7 @@ onUnmounted(() => {
   flex-direction: column;
   height: 100%;
   background: var(--surface-card);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   overflow: hidden;
   position: relative;
 }
@@ -1892,14 +1892,14 @@ onUnmounted(() => {
 
 .filter-strength-line {
   width: 20px;
-  border-radius: 2px;
+  border-radius: var(--app-radius-sm);
   flex-shrink: 0;
 }
 
 .filter-valence-line {
   width: 20px;
   height: 3px;
-  border-radius: 2px;
+  border-radius: var(--app-radius-sm);
   flex-shrink: 0;
 }
 
@@ -2020,7 +2020,7 @@ onUnmounted(() => {
 .legend-line {
   width: 24px;
   height: 3px;
-  border-radius: 2px;
+  border-radius: var(--app-radius-sm);
 }
 
 .legend-line.positive { background: #10b981; }
@@ -2054,7 +2054,7 @@ onUnmounted(() => {
 .legend-line-strength {
   width: 24px;
   background: #6b7280;
-  border-radius: 2px;
+  border-radius: var(--app-radius-sm);
 }
 
 .strength-weak {
@@ -2097,7 +2097,7 @@ onUnmounted(() => {
   right: 1rem;
   width: 280px;
   background: var(--surface-card);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   z-index: 10;
   overflow: hidden;
@@ -2145,7 +2145,7 @@ onUnmounted(() => {
   align-items: center;
   padding: 0.5rem 0.75rem;
   background: var(--surface-50);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   border-left: 3px solid;
 }
 
@@ -2184,7 +2184,7 @@ onUnmounted(() => {
 .mention-item {
   padding: 0.5rem;
   background: var(--surface-50);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   margin-bottom: 0.5rem;
 }
 

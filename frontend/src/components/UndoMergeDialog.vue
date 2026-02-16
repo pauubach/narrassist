@@ -227,7 +227,7 @@ const getEntityIcon = (type: string): string => {
   gap: 1rem;
   padding: 1rem;
   background: var(--surface-50);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   border: 1px solid var(--surface-200);
 }
 
@@ -276,7 +276,7 @@ const getEntityIcon = (type: string): string => {
   gap: 0.75rem;
   padding: 0.75rem 1rem;
   background: var(--green-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   border: 1px solid var(--green-200);
 }
 
@@ -295,7 +295,7 @@ const getEntityIcon = (type: string): string => {
   gap: 0.5rem;
   padding: 0.75rem;
   background: var(--surface-100);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   font-size: 0.875rem;
   color: var(--text-color-secondary);
 }

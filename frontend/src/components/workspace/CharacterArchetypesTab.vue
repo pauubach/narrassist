@@ -410,7 +410,7 @@ function getConfidenceSeverity(c: number): 'success' | 'warn' | 'secondary' {
   gap: var(--ds-space-1, 0.25rem);
   padding: var(--ds-space-1, 0.25rem) var(--ds-space-3, 0.75rem);
   background: var(--ds-surface-ground, var(--surface-ground));
-  border-radius: 16px;
+  border-radius: var(--app-radius-lg);
   font-size: var(--ds-font-size-sm, 0.8125rem);
 }
 
@@ -530,13 +530,13 @@ function getConfidenceSeverity(c: number): 'success' | 'warn' | 'secondary' {
 .arch-bar-container {
   height: 12px;
   background: var(--ds-surface-ground, var(--surface-ground));
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   overflow: hidden;
 }
 
 .arch-bar {
   height: 100%;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   min-width: 2px;
   transition: width 0.3s ease;
 }

@@ -328,7 +328,7 @@ watch(
 <style scoped>
 .character-knowledge {
   background: var(--surface-card);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   padding: 1.5rem;
 }
 
@@ -425,7 +425,7 @@ watch(
 .fact-item {
   padding: 1rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   border-left: 4px solid var(--primary-color);
 }
 
@@ -485,7 +485,7 @@ watch(
 .fact-value {
   padding: 0.5rem;
   background: var(--surface-100);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   font-size: 0.875rem;
   margin-bottom: 0.5rem;
 }
@@ -513,7 +513,7 @@ watch(
 .stats-summary {
   padding: 1rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .stats-summary h4 {

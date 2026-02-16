@@ -1759,7 +1759,7 @@ watch(
   color: var(--text-color);
   padding: 0.5rem;
   background: var(--surface-0);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   border-left: 3px solid var(--primary-200);
 }
 

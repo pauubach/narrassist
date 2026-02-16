@@ -410,7 +410,7 @@ defineExpose({
 
 .types-list {
   border: 1px solid var(--surface-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   overflow: hidden;
 }
 
@@ -458,7 +458,7 @@ defineExpose({
   align-items: center;
   padding: 0.5rem 1rem;
   background: var(--surface-ground);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   margin: 0 0.5rem;
 }
 

@@ -1591,7 +1591,7 @@ defineExpose({
   height: 100%;
   /* Use theme-aware CSS variable with fallback */
   background: var(--app-document-bg, var(--p-surface-0, #ffffff));
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -1760,27 +1760,27 @@ defineExpose({
 
 /* Resaltado de entidades */
 .chapter-text :deep(mark.entity-highlight) {
-  background: rgba(59, 130, 246, 0.15);
+  background: color-mix(in srgb, var(--p-primary-color, #3B82F6) 15%, transparent);
   color: inherit;
   padding: 0.125rem 0.25rem;
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
   cursor: pointer;
   transition: background-color 0.2s;
 }
 
 .chapter-text :deep(mark.entity-highlight:hover) {
-  background: rgba(59, 130, 246, 0.3);
+  background: color-mix(in srgb, var(--p-primary-color, #3B82F6) 30%, transparent);
 }
 
 .chapter-text :deep(mark.entity-highlight-active) {
-  background: rgba(59, 130, 246, 0.4) !important;
+  background: color-mix(in srgb, var(--p-primary-color, #3B82F6) 40%, transparent) !important;
   font-weight: 600;
 }
 
 /* Highlight temporal para scroll to mention */
 .chapter-text :deep(.mention-highlight-active) {
   background: linear-gradient(90deg, rgba(251, 191, 36, 0.5), rgba(251, 191, 36, 0.3));
-  border-radius: 2px;
+  border-radius: var(--app-radius-sm);
   box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.3);
   animation: highlight-glow 1.5s ease-in-out infinite;
   transition: all 0.4s ease-out;
@@ -1845,8 +1845,8 @@ defineExpose({
 }
 
 .chapter-text :deep(.annotation.grammar-error) {
-  border-color: var(--blue-500);
-  background: rgba(59, 130, 246, 0.08);
+  border-color: var(--error-grammar-color, var(--blue-500));
+  background: color-mix(in srgb, var(--error-grammar-color, #3b82f6) 8%, transparent);
 }
 
 .chapter-text :deep(.annotation.spelling-error) {
@@ -1895,7 +1895,7 @@ defineExpose({
 .chapter-text :deep(.dialogue-highlight) {
   position: relative;
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: var(--app-radius-sm);
   padding: 0 2px;
   margin: 0 -2px;
   transition: background-color 0.2s, box-shadow 0.2s;
@@ -1989,7 +1989,7 @@ defineExpose({
   padding: 3rem;
   min-height: 200px;
   background: var(--surface-50);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   color: var(--text-color-secondary);
   font-size: 0.9rem;
 }
@@ -2015,7 +2015,7 @@ defineExpose({
   flex-direction: column;
   padding: 1rem;
   border: 2px solid var(--surface-200);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -2052,7 +2052,7 @@ defineExpose({
 /* Highlight temporal para navegación a alertas/menciones */
 .mention-highlight-active {
   background: rgba(251, 191, 36, 0.6) !important;
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
   box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.4);
   animation: mention-highlight-pulse 1.5s ease-in-out infinite;
   padding: 2px 4px;
@@ -2121,7 +2121,7 @@ defineExpose({
   font-weight: 600;
   background: inherit;
   padding: 1px 4px;
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
   white-space: nowrap;
   opacity: 0;
   transition: opacity 0.2s;

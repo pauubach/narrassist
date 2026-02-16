@@ -450,7 +450,7 @@ watch(selectedChapter, (newChapter) => {
   flex: 1;
   padding: 0.5rem;
   background: var(--surface-card);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .stat-item .stat-value {
@@ -513,7 +513,7 @@ watch(selectedChapter, (newChapter) => {
 .attribution-item {
   padding: 1rem;
   background: var(--surface-ground);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   border-left: 4px solid var(--primary-color);
   cursor: pointer;
   transition: background 0.2s, transform 0.1s;
@@ -575,7 +575,7 @@ watch(selectedChapter, (newChapter) => {
   gap: 0.5rem;
   padding: 0.75rem;
   background: var(--surface-card);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   margin-bottom: 0.5rem;
 }
 
@@ -655,7 +655,7 @@ watch(selectedChapter, (newChapter) => {
   margin-bottom: 0.5rem;
   background: var(--primary-50);
   border: 1px solid var(--primary-200);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   flex-wrap: wrap;
 }
 

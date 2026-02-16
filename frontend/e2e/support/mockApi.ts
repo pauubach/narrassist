@@ -655,7 +655,7 @@ function createMockState(options: MockApiOptions = {}): MockApiState {
   return state
 }
 
-function mockModelsStatus() {
+function mockModelsStatus(ollama: { installed: boolean; models: string[] }) {
   return {
     nlp_models: {
       spacy: { type: 'spacy', installed: true, display_name: 'SpaCy', size_mb: 540 },
@@ -663,8 +663,8 @@ function mockModelsStatus() {
       transformer_ner: { type: 'transformer_ner', installed: true, display_name: 'NER', size_mb: 500 },
     },
     ollama: {
-      installed: false,
-      models: [],
+      installed: ollama.installed,
+      models: ollama.models,
     },
     all_required_installed: true,
     backend_loaded: true,
@@ -678,7 +678,7 @@ function mockModelsStatus() {
   }
 }
 
-function mockCapabilities() {
+function mockCapabilities(ollama: { installed: boolean; available: boolean; models: string[] }) {
   return {
     hardware: {
       gpu: null,
@@ -690,9 +690,9 @@ function mockCapabilities() {
       cpu: { name: 'Mock CPU' },
     },
     ollama: {
-      installed: false,
-      available: false,
-      models: [],
+      installed: ollama.installed,
+      available: ollama.available,
+      models: ollama.models.map(name => ({ name, size: 2_100_000_000, modified: nowIso() })),
       recommended_models: ['llama3.2'],
     },
     languagetool: {
@@ -763,6 +763,11 @@ function mockLicenseStatus(): LicenseStatusPayload {
 
 export async function setupMockApi(page: Page, options: MockApiOptions = {}): Promise<MockApiState> {
   const state = createMockState(options)
+  let ollamaInstalled = false
+  let ollamaRunning = false
+  let ollamaModels: string[] = []
+  let ollamaIsDownloading = false
+  let ollamaDownloadProgress: { percentage: number; status: string; error?: string } | null = null
 
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url())
@@ -803,12 +808,19 @@ export async function setupMockApi(page: Page, options: MockApiOptions = {}): Pr
     }
 
     if (path === '/api/models/status' && method === 'GET') {
-      await fulfillJson(route, wrap(mockModelsStatus()))
+      await fulfillJson(route, wrap(mockModelsStatus({
+        installed: ollamaInstalled,
+        models: [...ollamaModels],
+      })))
       return
     }
 
     if (path === '/api/system/capabilities' && method === 'GET') {
-      await fulfillJson(route, wrap(mockCapabilities()))
+      await fulfillJson(route, wrap(mockCapabilities({
+        installed: ollamaInstalled,
+        available: ollamaRunning,
+        models: [...ollamaModels],
+      })))
       return
     }
 
@@ -1133,17 +1145,83 @@ export async function setupMockApi(page: Page, options: MockApiOptions = {}): Pr
     }
 
     if (path === '/api/ollama/status' && method === 'GET') {
-      await fulfillJson(route, { success: true, data: { running: false, installed: false, models: [] } })
+      await fulfillJson(route, {
+        success: true,
+        data: {
+          running: ollamaRunning,
+          installed: ollamaInstalled,
+          models: [...ollamaModels],
+          downloaded_models: [...ollamaModels],
+          is_downloading: ollamaIsDownloading,
+          download_progress: ollamaDownloadProgress,
+        },
+      })
       return
     }
 
     if (path === '/api/ollama/start' && method === 'POST') {
+      if (!ollamaInstalled) {
+        await fulfillJson(route, {
+          success: false,
+          error: 'Ollama no está instalado',
+          data: { action_required: 'install' },
+        })
+        return
+      }
+
+      ollamaRunning = true
+      await fulfillJson(route, { success: true })
+      return
+    }
+
+    if (path === '/api/ollama/install' && method === 'POST') {
+      ollamaInstalled = true
       await fulfillJson(route, { success: true })
       return
     }
 
     if (path.startsWith('/api/ollama/pull/') && method === 'POST') {
+      const modelName = decodeURIComponent(path.split('/').pop() || '').split(':')[0]
+      if (!modelName) {
+        await fulfillJson(route, { success: false, error: 'Modelo inválido' })
+        return
+      }
+
+      ollamaInstalled = true
+      ollamaRunning = true
+      ollamaIsDownloading = true
+      ollamaDownloadProgress = { percentage: 40, status: 'downloading' }
+
+      if (!ollamaModels.includes(modelName)) {
+        ollamaModels.push(modelName)
+      }
+
+      ollamaIsDownloading = false
+      ollamaDownloadProgress = { percentage: 100, status: 'complete' }
       await fulfillJson(route, { success: true })
+      return
+    }
+
+    if (path.startsWith('/api/ollama/model/') && method === 'DELETE') {
+      const modelName = decodeURIComponent(path.split('/').pop() || '').split(':')[0]
+      if (!ollamaModels.includes(modelName)) {
+        await fulfillJson(route, { success: false, error: `El modelo '${modelName}' no está instalado` })
+        return
+      }
+
+      if (ollamaModels.length <= 1) {
+        await fulfillJson(route, { success: false, error: 'Debe quedar al menos 1 modelo instalado' })
+        return
+      }
+
+      ollamaModels = ollamaModels.filter(model => model !== modelName)
+      await fulfillJson(route, {
+        success: true,
+        data: {
+          message: `Modelo '${modelName}' eliminado`,
+          remaining_models: [...ollamaModels],
+        },
+      })
       return
     }
 

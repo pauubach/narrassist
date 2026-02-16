@@ -469,6 +469,7 @@ class LocalLLMClient:
         system: str | None = None,
         max_tokens: int | None = None,
         temperature: float | None = None,
+        model_name: str | None = None,
     ) -> str | None:
         """
         Genera una respuesta usando el LLM local.
@@ -478,6 +479,7 @@ class LocalLLMClient:
             system: Mensaje de sistema opcional
             max_tokens: Override de max_tokens
             temperature: Override de temperature
+            model_name: Override opcional del modelo Ollama a usar
 
         Returns:
             Respuesta generada o None si hay error
@@ -490,7 +492,7 @@ class LocalLLMClient:
 
         with self._lock:
             if self._backend == "ollama":
-                return self._complete_ollama(prompt, system, max_tokens, temperature)
+                return self._complete_ollama(prompt, system, max_tokens, temperature, model_name)
             elif self._backend == "transformers":
                 return self._complete_transformers(prompt, system, max_tokens, temperature)
 
@@ -519,6 +521,7 @@ class LocalLLMClient:
         messages: list[dict[str, str]],
         options: dict[str, Any],
         timeout_config: Any,
+        model_name: str | None = None,
     ) -> tuple[str | None, int | None]:
         """
         Envía request a Ollama y retorna (content, status_code).
@@ -534,7 +537,7 @@ class LocalLLMClient:
             response = httpx.post(
                 f"{self._config.ollama_host}/api/chat",
                 json={
-                    "model": self._config.ollama_model,
+                    "model": model_name or self._config.ollama_model,
                     "messages": messages,
                     "stream": False,
                     "options": options,
@@ -559,6 +562,7 @@ class LocalLLMClient:
         system: str | None = None,
         max_tokens: int | None = None,
         temperature: float | None = None,
+        model_name: str | None = None,
     ) -> str | None:
         """Genera respuesta usando Ollama con fallback a CPU si hay crash de VRAM."""
         try:
@@ -587,7 +591,9 @@ class LocalLLMClient:
             options["num_gpu"] = self._ollama_num_gpu
 
         # Primer intento
-        content, status = self._send_ollama_request(messages, options, timeout_config)
+        content, status = self._send_ollama_request(
+            messages, options, timeout_config, model_name=model_name
+        )
 
         if status == 200 and content:
             return content
@@ -606,7 +612,7 @@ class LocalLLMClient:
             self._ollama_num_gpu = 0  # Persistir para futuras llamadas
 
             content, status = self._send_ollama_request(
-                messages, options, timeout_config
+                messages, options, timeout_config, model_name=model_name
             )
             if status == 200 and content:
                 logger.info("Ollama respondió en modo CPU. Futuras llamadas usarán CPU.")

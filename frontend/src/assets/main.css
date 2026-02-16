@@ -28,7 +28,8 @@
 
   /* Borders */
   --border-color: #e2e8f0;
-  --border-radius: 6px;
+  --border-radius: var(--app-radius, 6px);
+  --border-radius-xl: var(--app-radius-lg, 12px);
 
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);

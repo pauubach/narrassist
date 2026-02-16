@@ -611,7 +611,7 @@ async function recheckPython() {
 
 .models-list {
   background: var(--p-surface-100);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   padding: 0.75rem 1rem;
   margin-bottom: 1rem;
 }
@@ -704,7 +704,7 @@ async function recheckPython() {
   background: var(--p-red-50);
   color: var(--p-red-700);
   padding: 0.75rem 1rem;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   margin: 1rem 0;
   font-size: 0.875rem;
 }
@@ -723,7 +723,7 @@ async function recheckPython() {
   background: var(--p-primary-color);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   font-size: 0.875rem;
   cursor: pointer;
   transition: background 0.2s;
@@ -770,7 +770,7 @@ async function recheckPython() {
   background: var(--p-orange-50);
   color: var(--p-orange-700);
   padding: 0.5rem 0.75rem;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   margin: 0.75rem 0;
   font-size: 0.85rem;
   font-family: monospace;
@@ -779,7 +779,7 @@ async function recheckPython() {
 .python-instructions {
   text-align: left;
   background: var(--p-surface-100);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   padding: 1rem 1.25rem;
   margin: 1rem 0;
 }
@@ -829,7 +829,7 @@ async function recheckPython() {
   background: var(--p-primary-color);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   font-size: 0.875rem;
   text-decoration: none;
   cursor: pointer;

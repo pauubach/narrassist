@@ -169,6 +169,7 @@ class KnowledgeFact:
 
     # Cómo lo supo
     source_chapter: int = 0  # Capítulo donde lo aprendió
+    source_position: int = 0  # Posición en caracteres dentro del capítulo
     source_mention_id: int | None = None  # Mención donde se evidencia
     learned_how: str = ""  # "told", "observed", "deduced", "overheard"
 
@@ -373,6 +374,42 @@ class CharacterKnowledgeAnalyzer:
         r"para\s+(?P<name>\w+),?\s+(?P<target>\w+)\s+(era|parecía)",
     ]
 
+    # Patrones de pensamiento implícito: "A pensó en la X de B" (sin cláusula 'que')
+    # Capturan relaciones de conocimiento cuando un personaje reflexiona sobre
+    # algo que pertenece a o está asociado con otro personaje.
+    IMPLICIT_THOUGHT_PATTERNS = [
+        # "Name pensó/reflexionó en la oferta/propuesta/invitación de Target"
+        (
+            r"(?P<knower>\w+)\s+(?:pensó|pensaba|reflexionó|reflexionaba|meditó|meditaba|caviló|cavilaba)\s+(?:en|sobre)\s+(?:la|el|los|las)\s+(?P<fact>\w+(?:\s+\w+)?)\s+de\s+(?P<known>\w+)",
+            KnowledgeType.ATTRIBUTE,
+            "thought",
+        ),
+        # "Name consideraba/sopesaba la X de Target"
+        (
+            r"(?P<knower>\w+)\s+(?:consideraba|consideró|sopesaba|sopesó|evaluaba|evaluó|valoraba|valoró)\s+(?:la|el|los|las)\s+(?P<fact>\w+(?:\s+\w+)?)\s+de\s+(?P<known>\w+)",
+            KnowledgeType.ATTRIBUTE,
+            "thought",
+        ),
+        # "Name tenía en mente la X de Target"
+        (
+            r"(?P<knower>\w+)\s+(?:tenía\s+en\s+mente|no\s+podía\s+(?:dejar\s+de\s+pensar|olvidar))\s+(?:la|el|los|las)?\s*(?P<fact>\w+(?:\s+\w+)?)\s+de\s+(?P<known>\w+)",
+            KnowledgeType.ATTRIBUTE,
+            "thought",
+        ),
+        # "Name recordó/evocó la X de Target" (sin 'que')
+        (
+            r"(?P<knower>\w+)\s+(?:recordó|evocó|rememoró|recordaba|evocaba)\s+(?:la|el|los|las)\s+(?P<fact>\w+(?:\s+\w+)?)\s+de\s+(?P<known>\w+)",
+            KnowledgeType.HISTORY,
+            "remembered",
+        ),
+        # "Name sabía de la existencia/oferta de Target"
+        (
+            r"(?P<knower>\w+)\s+(?:sabía|conocía)\s+(?:de\s+)?(?:la|el|los|las)\s+(?P<fact>\w+(?:\s+\w+)?)\s+de\s+(?P<known>\w+)",
+            KnowledgeType.ATTRIBUTE,
+            "knew",
+        ),
+    ]
+
     # Patrones para detectar opinión
     OPINION_POSITIVE_PATTERNS = [
         r"(?P<name>\w+)\s+(admiraba|respetaba|quería|amaba|adoraba)\s+a\s+(?P<target>\w+)",
@@ -440,6 +477,7 @@ class CharacterKnowledgeAnalyzer:
         # Mapeo de nombres a IDs
         self._entity_names: dict[int, str] = {}
         self._name_to_id: dict[str, int] = {}
+        self._person_ids: set[int] = set()
 
         # Registrar entidades si se proporcionan
         if entities:
@@ -450,14 +488,45 @@ class CharacterKnowledgeAnalyzer:
                     entity.get("aliases", []),
                 )
 
-    def register_entity(self, entity_id: int, name: str, aliases: list[str] = None):  # type: ignore[assignment]
+    def register_entity(
+        self,
+        entity_id: int,
+        name: str,
+        aliases: list[str] = None,  # type: ignore[assignment]
+        entity_type: str = "",
+    ):
         """Registra una entidad para el análisis."""
         self._entity_names[entity_id] = name
         self._name_to_id[name.lower()] = entity_id
 
+        if entity_type.lower() in ("per", "person", "character"):
+            self._person_ids.add(entity_id)
+
+        # Registrar partes del nombre que parezcan nombres propios
+        original_parts = name.split()
+        if len(original_parts) > 1:
+            for part in original_parts:
+                # Solo registrar partes que empiezan con mayúscula (nombres propios)
+                if len(part) > 2 and part[0].isupper():
+                    self._name_to_id.setdefault(part.lower(), entity_id)
+
         if aliases:
             for alias in aliases:
                 self._name_to_id[alias.lower()] = entity_id
+
+    def _resolve_name(self, name: str) -> int | None:
+        """Resuelve un nombre a su entity_id, con fallback por substring."""
+        if not name:
+            return None
+        # Búsqueda exacta
+        eid = self._name_to_id.get(name)
+        if eid:
+            return eid
+        # Fallback: buscar si name es parte de un nombre registrado
+        for registered, rid in self._name_to_id.items():
+            if name in registered or registered in name:
+                return rid
+        return None
 
     def analyze_dialogue(
         self,
@@ -1178,6 +1247,7 @@ class CharacterKnowledgeAnalyzer:
 
         all_patterns = (
             self.KNOWLEDGE_PATTERNS
+            + self.IMPLICIT_THOUGHT_PATTERNS
             + self.LOCATION_PATTERNS
             + self.SECRET_PATTERNS
             + self.REVELATION_PATTERNS
@@ -1191,8 +1261,8 @@ class CharacterKnowledgeAnalyzer:
                 known_name = groups.get("known", "").lower()
                 fact_text = groups.get("fact", "") or groups.get("location", "")
 
-                knower_id = self._name_to_id.get(knower_name)
-                known_id = self._name_to_id.get(known_name)
+                knower_id = self._resolve_name(knower_name)
+                known_id = self._resolve_name(known_name)
 
                 if not knower_id or not known_id:
                     continue
@@ -1215,12 +1285,125 @@ class CharacterKnowledgeAnalyzer:
                     fact_description=match.group(0)[:200],
                     fact_value=fact_value if not is_negated else f"[NO SABE] {fact_value}",
                     source_chapter=chapter,
+                    source_position=start_char + match.start(),
                     learned_how=learned_how,
                     is_accurate=None,  # No podemos verificar sin más contexto
                     confidence=0.65 if not is_negated else 0.7,
                     created_at=datetime.now(),
                 )
 
+                facts.append(fact)
+
+        # Detectar presentaciones formales: "Este es [Name]" → adquisición
+        # Busca quién es presentado y a quién se le presenta
+        introduction_facts = self._extract_introductions(text, chapter, start_char)
+        facts.extend(introduction_facts)
+
+        return facts
+
+    def _extract_introductions(
+        self,
+        text: str,
+        chapter: int,
+        start_char: int,
+    ) -> list[KnowledgeFact]:
+        """
+        Detecta presentaciones formales donde un personaje conoce a otro.
+
+        Patrones: "Este/Esta es [título] Name", "quiero que conozcas a Name",
+        "te presento a Name", etc.
+
+        El 'knower' es quien RECIBE la presentación (la persona a quien se
+        le presenta alguien nuevo), no quien la hace.
+        """
+        facts = []
+        # Patrones de presentación
+        intro_patterns = [
+            re.compile(
+                r"[Ee]ste\s+es\s+(?:el\s+)?(?:profesor|doctor|señor|Dr\.)\s+"
+                r"(?P<known>[A-ZÁÉÍÓÚÑ]\w+(?:\s+[A-ZÁÉÍÓÚÑ]\w+)?)",
+            ),
+            re.compile(
+                r"(?:quiero|quisiera)\s+que\s+(?:conozcas|conozca)\s+"
+                r"(?:a\s+)?(?:el\s+|la\s+)?(?:\w+\s+)?(?P<known>[A-ZÁÉÍÓÚÑ]\w+)",
+            ),
+            re.compile(
+                r"(?:te|le|les)\s+presento\s+a\s+(?:el\s+|la\s+)?"
+                r"(?:\w+\s+)?(?P<known>[A-ZÁÉÍÓÚÑ]\w+)",
+            ),
+        ]
+
+        for pattern in intro_patterns:
+            for match in pattern.finditer(text):
+                known_name = match.group("known").lower()
+                known_id = self._name_to_id.get(known_name)
+                if not known_id:
+                    for name, eid in self._name_to_id.items():
+                        if known_name in name or name in known_name:
+                            known_id = eid
+                            known_name = name
+                            break
+                if not known_id:
+                    continue
+
+                # Buscar el presenter (quien habla la introducción):
+                # "—dijo Name" justo antes del match
+                presenter_id = None
+                dijo_pattern = re.compile(
+                    r"—\s*dijo\s+(?P<speaker>\w+)", re.IGNORECASE
+                )
+                # Buscar "dijo X" en las 200 chars antes del match
+                context_before = text[max(0, match.start() - 200): match.start()]
+                for dm in dijo_pattern.finditer(context_before):
+                    speaker_name = dm.group("speaker").lower()
+                    pid = self._name_to_id.get(speaker_name)
+                    if pid and pid != known_id:
+                        presenter_id = pid
+
+                # El knower es el personaje más cercano que NO sea
+                # el presentado NI el presentador
+                best_knower_id = None
+                best_dist = float("inf")
+                pos = match.start()
+
+                # Buscar en ventana de 500 chars antes de la presentación
+                search_window = text[max(0, pos - 500): pos]
+                window_offset = max(0, pos - 500)
+
+                # Usar nombre canónico (case-sensitive) para distinguir
+                # nombres propios de adjetivos homónimos
+                seen_eids = set()
+                for eid, canon_name in self._entity_names.items():
+                    if eid in seen_eids or eid == known_id or eid == presenter_id:
+                        continue
+                    seen_eids.add(eid)
+                    if self._person_ids and eid not in self._person_ids:
+                        continue
+                    # Case-sensitive: "Elena" sí, "brillante" no
+                    for m in re.finditer(rf"\b{re.escape(canon_name)}\b", search_window):
+                        dist = len(search_window) - m.end()
+                        if 0 < dist < best_dist:
+                            best_dist = dist
+                            best_knower_id = eid
+
+                if not best_knower_id:
+                    continue
+
+                fact = KnowledgeFact(
+                    project_id=self.project_id,
+                    knower_entity_id=best_knower_id,
+                    known_entity_id=known_id,
+                    knower_name=self._entity_names.get(best_knower_id, ""),
+                    known_name=self._entity_names.get(known_id, known_name),
+                    knowledge_type=KnowledgeType.IDENTITY,
+                    fact_description=text[max(0, match.start() - 30): match.end() + 30][:200],
+                    fact_value="identidad",
+                    source_chapter=chapter,
+                    source_position=start_char + match.start(),
+                    learned_how="told",
+                    confidence=0.75,
+                    created_at=datetime.now(),
+                )
                 facts.append(fact)
 
         return facts
@@ -1336,9 +1519,30 @@ Responde solo con el JSON, sin explicaciones."""
 # =============================================================================
 
 # Clasificación semántica de learned_how
-_REFERENCE_MODES = {"knew", "remembered", "assumed", "learned"}
+_REFERENCE_MODES = {"knew", "remembered", "assumed", "learned", "thought"}
 _ACQUISITION_MODES = {"discovered", "told", "shown", "overheard", "observed"}
 _IGNORANCE_MODES = {"unknown"}
+
+# Conocimiento público: atributos que una persona puede conocer sin contacto directo
+# (por leer su obra, ver sus películas, conocer su reputación, etc.)
+_PUBLIC_KNOWLEDGE_TERMS = {
+    "obra", "libro", "novela", "teoría", "teorema", "trabajo", "investigación",
+    "canción", "disco", "álbum", "película", "serie", "cuadro", "pintura",
+    "artículo", "ensayo", "poema", "sinfonía", "ley", "descubrimiento",
+    "reputación", "fama", "carrera", "trayectoria", "legado", "filosofía",
+}
+
+
+def _is_public_knowledge(fact_value: str) -> bool:
+    """
+    Determina si un hecho puede ser conocimiento público.
+
+    Conocimiento público es lo que alguien puede saber sin contacto directo:
+    la obra, el libro, la teoría, la fama de alguien. No necesita
+    presentación formal para saber esto.
+    """
+    words = set(fact_value.lower().split())
+    return bool(words & _PUBLIC_KNOWLEDGE_TERMS)
 
 
 def _extract_significant_words(text: str) -> set[str]:
@@ -1388,6 +1592,11 @@ def _facts_related(fact_a: KnowledgeFact, fact_b: KnowledgeFact) -> bool:
     comparten el mismo tipo.
     """
     same_type = fact_a.knowledge_type == fact_b.knowledge_type
+
+    # IDENTITY adquisición hace prematuros TODOS los hechos previos
+    # sobre la misma entidad (si no conoces a Weber, no puedes pensar en su oferta)
+    if KnowledgeType.IDENTITY in (fact_a.knowledge_type, fact_b.knowledge_type):
+        return True
 
     # Secretos y ubicación: un hecho por par de entidades
     if same_type and fact_a.knowledge_type in (KnowledgeType.SECRET, KnowledgeType.LOCATION):
@@ -1448,26 +1657,53 @@ def detect_knowledge_anachronisms(
         ignorances = [f for f in group_facts if f.learned_how in _IGNORANCE_MODES]
 
         # Caso 1: Referencia antes de adquisición explícita
+        # Compara primero por capítulo; si mismo capítulo, compara por posición
         for ref in references:
             for acq in acquisitions:
-                if acq.source_chapter > ref.source_chapter and _facts_related(ref, acq):
-                    gap = acq.source_chapter - ref.source_chapter
-                    anachronisms.append(
-                        {
-                            "knower_name": ref.knower_name,
-                            "known_name": ref.known_name,
-                            "fact_value": ref.fact_value,
-                            "fact_description": ref.fact_description,
-                            "used_chapter": ref.source_chapter,
-                            "learned_chapter": acq.source_chapter,
-                            "severity": "high" if gap > 3 else "medium",
-                            "description": (
-                                f"{ref.knower_name} referencia "
-                                f"'{ref.fact_value}' en capítulo {ref.source_chapter}, "
-                                f"pero lo aprende en capítulo {acq.source_chapter}"
-                            ),
-                        }
+                is_before = (
+                    acq.source_chapter > ref.source_chapter
+                    or (
+                        acq.source_chapter == ref.source_chapter
+                        and acq.source_position > ref.source_position > 0
                     )
+                )
+                if not (is_before and _facts_related(ref, acq)):
+                    continue
+
+                # Excluir conocimiento público: si alguien conoce la "obra"
+                # o "libro" de otro, no necesita presentación formal
+                if (
+                    acq.knowledge_type == KnowledgeType.IDENTITY
+                    and ref.knowledge_type == KnowledgeType.ATTRIBUTE
+                    and _is_public_knowledge(ref.fact_value)
+                ):
+                    continue
+
+                gap = acq.source_chapter - ref.source_chapter
+                if gap > 0:
+                    desc = (
+                        f"{ref.knower_name} referencia "
+                        f"'{ref.fact_value}' en capítulo {ref.source_chapter}, "
+                        f"pero lo aprende en capítulo {acq.source_chapter}"
+                    )
+                else:
+                    desc = (
+                        f"{ref.knower_name} referencia "
+                        f"'{ref.fact_value}' antes de aprenderlo "
+                        f"en el mismo capítulo {ref.source_chapter}"
+                    )
+                anachronisms.append(
+                    {
+                        "knower_name": ref.knower_name,
+                        "known_name": ref.known_name,
+                        "fact_value": ref.fact_value,
+                        "fact_description": ref.fact_description,
+                        "used_chapter": ref.source_chapter,
+                        "learned_chapter": acq.source_chapter,
+                        "severity": "high" if gap > 3 else "medium",
+                        "description": desc,
+                    }
+                )
 
         # Caso 2: Ignorancia → referencia sin adquisición intermedia
         for ign in ignorances:

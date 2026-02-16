@@ -439,7 +439,7 @@
           <h3>¿Dónde se guardan mis datos?</h3>
           <p>
             Los proyectos se almacenan localmente en tu ordenador. Puedes ver
-            y cambiar la ubicación en Ajustes → Privacidad y Datos.
+            y cambiar la ubicación en Configuración → Privacidad y Datos.
           </p>
 
           <h3>¿Qué conexión necesita la app?</h3>
@@ -523,7 +523,7 @@
             <h4>¿Qué significa "Analizador semántico no disponible"?</h4>
             <p>
               El análisis avanzado requiere un componente adicional (se instala automáticamente).
-              Ve a Ajustes → Métodos de Análisis y haz clic en
+              Ve a Configuración → Métodos de Análisis y haz clic en
               "Configurar analizador" para instalarlo.
             </p>
           </div>
@@ -702,7 +702,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0.5rem;
   padding: 0.6rem 0.75rem;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   cursor: pointer;
   font-size: 0.875rem;
   color: var(--p-text-muted-color);
@@ -795,7 +795,7 @@ onBeforeUnmount(() => {
   padding: 0.35rem 0.75rem;
   background: var(--p-surface-100);
   border: 1px solid var(--p-surface-border);
-  border-radius: 20px;
+  border-radius: var(--app-radius-lg);
   font-size: 0.8125rem;
   color: var(--p-text-secondary-color);
 }
@@ -817,7 +817,7 @@ onBeforeUnmount(() => {
   gap: 0.75rem;
   padding: 1rem;
   background: var(--p-surface-ground);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   border: 1px solid var(--p-surface-border);
 }
 
@@ -845,7 +845,7 @@ onBeforeUnmount(() => {
   margin: 1rem 0;
   padding: 0.75rem 1rem;
   background: var(--p-surface-ground);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .legend-item {
@@ -887,7 +887,7 @@ onBeforeUnmount(() => {
   gap: 1rem;
   padding: 0.75rem 1rem;
   background: var(--p-surface-ground);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .alert-type p {
@@ -899,7 +899,7 @@ onBeforeUnmount(() => {
   margin-top: 1rem;
   padding: 0.75rem 1rem;
   background: var(--p-surface-ground);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   font-size: 0.9rem;
   color: var(--p-text-secondary-color);
   border-left: 3px solid var(--p-primary-color);
@@ -912,7 +912,7 @@ onBeforeUnmount(() => {
   padding: 1.25rem;
   background: var(--green-50);
   border: 1px solid var(--green-200);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   margin: 1rem 0;
 }
 
@@ -947,7 +947,7 @@ onBeforeUnmount(() => {
   padding: 1rem 1.25rem;
   background: var(--p-surface-ground);
   border: 1px solid var(--p-surface-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
 }
 
 .ai-info-box h4 {
@@ -972,7 +972,7 @@ onBeforeUnmount(() => {
   margin-top: 1rem !important;
   padding: 0.75rem;
   background: var(--blue-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   font-size: 0.875rem;
   line-height: 1.8;
 }
@@ -1007,7 +1007,7 @@ onBeforeUnmount(() => {
   gap: 0.75rem;
   padding: 0.5rem 0.75rem;
   background: var(--p-surface-ground);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   font-size: 0.875rem;
 }
 
@@ -1016,7 +1016,7 @@ onBeforeUnmount(() => {
   padding: 0.2rem 0.5rem;
   background: var(--p-surface-100);
   border: 1px solid var(--p-surface-border);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   font-family: monospace;
   font-size: 0.8125rem;
 }

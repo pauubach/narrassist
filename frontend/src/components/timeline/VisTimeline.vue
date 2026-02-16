@@ -629,7 +629,7 @@ watch(groupBy, () => {
   padding: 0.75rem;
   background: var(--surface-card);
   border: 1px solid var(--surface-200);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   pointer-events: none;
 }
@@ -715,7 +715,7 @@ watch(groupBy, () => {
 }
 
 .vis-item {
-  border-radius: 4px !important;
+  border-radius: var(--app-radius) !important;
   font-size: 0.8125rem !important;
   color: white !important;
   border-width: 0 !important;

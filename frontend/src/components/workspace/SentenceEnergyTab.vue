@@ -612,13 +612,13 @@ const totalAnalyzed = computed(() => {
 .dist-bar-container {
   height: 16px;
   background: var(--ds-surface-ground, var(--surface-ground));
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   overflow: hidden;
 }
 
 .dist-bar {
   height: 100%;
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   min-width: 2px;
   transition: width 0.3s ease;
 }

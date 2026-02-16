@@ -461,9 +461,14 @@ export const useThemeStore = defineStore('theme', () => {
 
   function applyRadius() {
     const radius = UI_RADIUS[config.value.radius].value
+    const px = parseInt(radius) || 0
     // Set custom property that overrides PrimeVue's border radius
     document.documentElement.style.setProperty('--p-content-border-radius', radius)
     document.documentElement.style.setProperty('--p-form-field-border-radius', radius)
+    // Escala proporcional para componentes custom
+    document.documentElement.style.setProperty('--app-radius', radius)
+    document.documentElement.style.setProperty('--app-radius-sm', Math.max(0, Math.round(px * 0.5)) + 'px')
+    document.documentElement.style.setProperty('--app-radius-lg', Math.round(px * 1.5) + 'px')
     console.log('[Theme] Border radius:', radius)
   }
 

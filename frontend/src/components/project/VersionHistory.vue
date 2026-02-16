@@ -227,7 +227,7 @@ const comparisonVersions = computed(() => {
   font-size: 0.7rem;
   font-weight: 600;
   padding: 1px 4px;
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
   margin-left: 4px;
 }
 

@@ -146,7 +146,7 @@ watch(() => props.visible, (newValue) => {
   padding: 0.5rem 1rem;
   background: var(--green-50);
   border: 1px solid var(--green-200);
-  border-radius: 20px;
+  border-radius: var(--app-radius-lg);
   font-size: 0.8125rem;
   color: var(--green-700);
 }

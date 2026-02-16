@@ -991,7 +991,7 @@ watch(() => props.visible, (isVisible) => {
   overflow-y: auto;
   max-height: 300px;
   border: 1px solid var(--surface-border);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   padding: 0.5rem;
 }
 
@@ -1000,7 +1000,7 @@ watch(() => props.visible, (isVisible) => {
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   margin-bottom: 0.5rem;
   border: 1px solid transparent;
   transition: all 0.2s;
@@ -1108,7 +1108,7 @@ watch(() => props.visible, (isVisible) => {
   gap: 0.75rem;
   padding: 1rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .selected-summary strong {
@@ -1140,7 +1140,7 @@ watch(() => props.visible, (isVisible) => {
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   border: 2px solid;
 }
 
@@ -1163,7 +1163,7 @@ watch(() => props.visible, (isVisible) => {
 .merge-summary {
   background: var(--surface-50);
   padding: 1rem;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .summary-items {
@@ -1287,13 +1287,13 @@ watch(() => props.visible, (isVisible) => {
 
 .entities-selection::-webkit-scrollbar-thumb {
   background: var(--surface-300);
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
 }
 
 /* Source tags para nombres */
 .source-tag {
   padding: 0.125rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -1314,7 +1314,7 @@ watch(() => props.visible, (isVisible) => {
   margin-top: 1rem;
   padding: 0.75rem;
   background: var(--surface-100);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .result-aliases strong {
@@ -1335,7 +1335,7 @@ watch(() => props.visible, (isVisible) => {
   padding: 0.25rem 0.625rem;
   background: var(--p-surface-0, white);
   border: 1px solid var(--p-surface-300, #cbd5e1);
-  border-radius: 12px;
+  border-radius: var(--app-radius-lg);
   font-size: 0.8125rem;
   color: var(--p-text-color);
 }
@@ -1343,7 +1343,7 @@ watch(() => props.visible, (isVisible) => {
 /* Análisis de similitud */
 .similarity-analysis {
   background: var(--surface-50);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   padding: 1rem;
 }
 
@@ -1399,7 +1399,7 @@ watch(() => props.visible, (isVisible) => {
   gap: 0.25rem;
   padding: 0.75rem;
   background: var(--p-surface-0, white);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   border: 1px solid var(--p-surface-200, #e2e8f0);
 }
 
@@ -1427,7 +1427,7 @@ watch(() => props.visible, (isVisible) => {
   position: relative;
   height: 20px;
   background: var(--surface-100);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   overflow: hidden;
 }
 
@@ -1536,7 +1536,7 @@ watch(() => props.visible, (isVisible) => {
   gap: 0.375rem;
   padding: 0.5rem;
   background: var(--surface-50);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   margin-top: 0.5rem;
 }
 
@@ -1559,7 +1559,7 @@ watch(() => props.visible, (isVisible) => {
   gap: 0.5rem;
   height: 12px;
   background: var(--surface-200);
-  border-radius: 2px;
+  border-radius: var(--app-radius-sm);
   overflow: hidden;
   position: relative;
 }
@@ -1589,7 +1589,7 @@ watch(() => props.visible, (isVisible) => {
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   background: var(--surface-100);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   font-size: 0.8125rem;
   color: var(--text-color-secondary);
   margin-bottom: 1rem;
@@ -1602,7 +1602,7 @@ watch(() => props.visible, (isVisible) => {
 /* Conflicts section */
 .conflicts-section {
   background: var(--surface-50);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   padding: 1rem;
 }
 
@@ -1628,7 +1628,7 @@ watch(() => props.visible, (isVisible) => {
 .conflict-item {
   background: var(--p-surface-0, white);
   border: 1px solid var(--p-surface-200, #e2e8f0);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   padding: 0.75rem;
 }
 
@@ -1678,7 +1678,7 @@ watch(() => props.visible, (isVisible) => {
 .conflict-value-selectable {
   cursor: pointer;
   padding: 0.375rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   transition: background 0.15s;
 }
 

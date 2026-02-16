@@ -100,17 +100,17 @@ export function getSpeedLabel(speed: string): string {
   const labels: Record<string, string> = {
     instant: 'Instant\u00E1neo',
     fast: 'R\u00E1pido',
-    medium: 'Medio',
-    slow: 'Lento',
+    medium: 'Media',
+    slow: 'Lenta',
   }
   return labels[speed] || speed
 }
 
-export function getSpeedSeverity(speed: string): string {
-  const severities: Record<string, string> = {
+export function getSpeedSeverity(speed: string): PrimeSeverity {
+  const severities: Record<string, PrimeSeverity> = {
     instant: 'success',
     fast: 'success',
-    medium: 'warning',
+    medium: 'warn',
     slow: 'danger',
   }
   return severities[speed] || 'info'

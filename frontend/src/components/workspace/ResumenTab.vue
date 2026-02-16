@@ -572,7 +572,7 @@ const originalDocumentName = computed(() => {
   align-items: center;
   gap: 1rem;
   padding: 1.25rem;
-  border-radius: 12px;
+  border-radius: var(--app-radius-lg);
   border: 1px solid var(--surface-200);
   background: var(--surface-card);
   transition: box-shadow 0.2s;
@@ -585,7 +585,7 @@ const originalDocumentName = computed(() => {
 .stat-icon-bg {
   width: 44px;
   height: 44px;
-  border-radius: 10px;
+  border-radius: var(--app-radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -750,13 +750,13 @@ const originalDocumentName = computed(() => {
   flex: 1;
   height: 12px;
   background: var(--surface-100);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   overflow: hidden;
 }
 
 .entity-bar-fill {
   height: 100%;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   transition: width 0.4s ease;
   min-width: 6px;
 }
@@ -782,7 +782,7 @@ const originalDocumentName = computed(() => {
   margin-left: auto;
   font-size: 0.75rem;
   padding: 0.25rem 0.5rem;
-  border-radius: 12px;
+  border-radius: var(--app-radius-lg);
   display: flex;
   align-items: center;
   gap: 0.25rem;
@@ -822,7 +822,7 @@ const originalDocumentName = computed(() => {
   flex: 1;
   height: 16px;
   background: var(--surface-100);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   overflow: hidden;
 }
 
@@ -936,14 +936,14 @@ const originalDocumentName = computed(() => {
 .character-bar-track {
   height: 6px;
   background: var(--surface-100);
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
   overflow: hidden;
 }
 
 .character-bar-fill {
   height: 100%;
   background: var(--primary-color);
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
   transition: width 0.4s ease;
   min-width: 4px;
   opacity: 0.6;

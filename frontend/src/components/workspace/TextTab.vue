@@ -308,7 +308,7 @@ onMounted(async () => {
   left: 4px;
   right: 4px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: var(--app-radius-sm);
   cursor: pointer;
   transition: transform 0.15s, box-shadow 0.15s;
   display: flex;

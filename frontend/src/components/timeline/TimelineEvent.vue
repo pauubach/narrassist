@@ -230,7 +230,7 @@ const handleMouseLeave = () => {
   gap: 1rem;
   padding: 1rem;
   background: var(--surface-card);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   border: 1px solid var(--surface-200);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -348,7 +348,7 @@ const handleMouseLeave = () => {
 .discourse-pos {
   background: var(--surface-100);
   padding: 0.125rem 0.5rem;
-  border-radius: 10px;
+  border-radius: var(--app-radius-lg);
   font-weight: 600;
   font-size: 0.75rem;
   color: var(--text-color-secondary);

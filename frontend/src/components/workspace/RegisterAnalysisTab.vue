@@ -937,11 +937,11 @@ watch(() => props.projectId, (newId) => {
 .distribution-item :deep(.p-progressbar) {
   background: var(--surface-200, #e5e7eb);
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 .distribution-item :deep(.p-progressbar-value) {
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 /* Changes Section */
@@ -956,7 +956,7 @@ watch(() => props.projectId, (newId) => {
   margin-top: 0.5rem;
   padding: 0.75rem;
   background: var(--surface-100);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   border-left: 3px solid var(--primary-color);
   font-size: 0.8rem;
   line-height: 1.5;
@@ -976,7 +976,7 @@ watch(() => props.projectId, (newId) => {
 .change-item {
   padding: 1rem;
   background: var(--surface-50);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   border-left: 4px solid var(--primary-color);
 }
 
@@ -1070,7 +1070,7 @@ watch(() => props.projectId, (newId) => {
   padding: 0.625rem;
   background: var(--surface-card);
   border: 1px solid var(--surface-200);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   cursor: pointer;
   transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
@@ -1175,7 +1175,7 @@ watch(() => props.projectId, (newId) => {
   align-items: center;
   padding: 0.5rem 0.75rem;
   background: var(--surface-50);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 .segment-info {
@@ -1206,7 +1206,7 @@ watch(() => props.projectId, (newId) => {
 .timeline-section {
   padding: 1rem;
   background: var(--surface-card);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   border: 1px solid var(--surface-200);
 }
 

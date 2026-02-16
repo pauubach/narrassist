@@ -182,7 +182,7 @@ const dotStyle = computed(() => ({
   flex: 1;
   height: 6px;
   background: var(--surface-200);
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
   overflow: hidden;
   min-width: 60px;
 }
@@ -199,7 +199,7 @@ const dotStyle = computed(() => ({
 
 .bar-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
   transition: width 0.3s ease;
 }
 

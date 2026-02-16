@@ -485,7 +485,7 @@ function getDistributionWidth(chapter: any, type: string): string {
 .dist-bar {
   display: flex;
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   overflow: hidden;
   background: var(--ds-surface-hover);
 }

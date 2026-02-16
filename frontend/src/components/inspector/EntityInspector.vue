@@ -675,11 +675,11 @@ function onMentionNavKeydown(event: KeyboardEvent) {
 }
 
 .context-text mark {
-  background: rgba(59, 130, 246, 0.3);
+  background: var(--ds-color-primary-subtle, color-mix(in srgb, var(--p-primary-color, #3B82F6) 30%, transparent));
   color: var(--ds-color-primary);
   font-weight: var(--ds-font-weight-semibold);
   padding: 0.125rem 0.25rem;
-  border-radius: 2px;
+  border-radius: var(--app-radius-sm);
 }
 
 .context-before,

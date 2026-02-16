@@ -471,7 +471,7 @@ onMounted(() => {
   padding: 0.5rem 0.625rem;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   cursor: pointer;
   text-align: left;
   transition: background 0.15s;

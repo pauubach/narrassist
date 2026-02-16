@@ -177,11 +177,12 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   /** Configuración de pestañas */
   const tabs = computed(() => [
     { id: 'text' as WorkspaceTab, label: 'Texto', icon: 'pi pi-file-edit' },
-    { id: 'entities' as WorkspaceTab, label: 'Entidades', icon: 'pi pi-th-large' },
+    { id: 'entities' as WorkspaceTab, label: 'Entidades', icon: 'pi pi-users' },
     { id: 'relationships' as WorkspaceTab, label: 'Relaciones', icon: 'pi pi-share-alt' },
-    { id: 'alerts' as WorkspaceTab, label: 'Alertas', icon: 'pi pi-exclamation-triangle' },
-    { id: 'timeline' as WorkspaceTab, label: 'Línea temporal', icon: 'pi pi-clock' },
-    { id: 'style' as WorkspaceTab, label: 'Estilo', icon: 'pi pi-pencil' },
+    { id: 'alerts' as WorkspaceTab, label: 'Revisión', icon: 'pi pi-search' },
+    { id: 'timeline' as WorkspaceTab, label: 'Cronología', icon: 'pi pi-clock' },
+    { id: 'style' as WorkspaceTab, label: 'Escritura', icon: 'pi pi-pencil' },
+    { id: 'glossary' as WorkspaceTab, label: 'Glosario', icon: 'pi pi-book' },
     { id: 'summary' as WorkspaceTab, label: 'Resumen', icon: 'pi pi-chart-bar' }
   ])
 

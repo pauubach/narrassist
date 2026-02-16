@@ -2162,7 +2162,7 @@ async function onUninstallModel(modelName: string) {
   padding: 0.5rem 0.75rem;
   background: var(--green-50);
   border: 1px solid var(--green-200);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   margin-bottom: 1rem;
 }
 
@@ -2182,7 +2182,7 @@ async function onUninstallModel(modelName: string) {
 .ollama-action-card {
   background: var(--yellow-50);
   border: 1px solid var(--yellow-200);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   padding: 0.75rem 1rem;
   margin-top: 0.75rem;
 }
@@ -2668,7 +2668,7 @@ async function onUninstallModel(modelName: string) {
   color: var(--p-text-color);
   background: var(--p-surface-200);
   padding: 0.125rem 0.375rem;
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
 }
 
 :global(.dark) .pattern-text {

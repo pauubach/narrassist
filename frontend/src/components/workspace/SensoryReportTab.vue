@@ -445,7 +445,7 @@ async function analyze() {
 .balance-bar-container {
   display: flex;
   height: 24px;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   overflow: hidden;
   margin-bottom: 0.75rem;
 }
@@ -482,7 +482,7 @@ async function analyze() {
 .details-list { display: flex; flex-direction: column; gap: 0.5rem; }
 .detail-item {
   padding: 0.5rem 0.75rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   background: var(--surface-ground);
 }
 .detail-header {

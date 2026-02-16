@@ -1267,7 +1267,7 @@ function onWorkImported() {
 .style-preview {
   background: var(--surface-50);
   border: 1px solid var(--surface-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   padding: 1rem;
   margin-bottom: 1rem;
 }
@@ -1411,7 +1411,7 @@ function onWorkImported() {
   margin-bottom: 1rem;
   padding: 0.75rem;
   background: var(--surface-100);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .dark .filter-options {
@@ -1421,7 +1421,7 @@ function onWorkImported() {
 .document-preview {
   background: var(--surface-100);
   border: 1px solid var(--surface-border);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   padding: 0.75rem;
   margin-bottom: 1rem;
 }

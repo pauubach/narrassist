@@ -79,12 +79,12 @@ defineProps<{
 
 .ds-download-progress__bar {
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 .ds-download-progress__bar :deep(.p-progressbar-value) {
   background: var(--p-primary-color);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 .ds-download-progress__stats {

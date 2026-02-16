@@ -395,7 +395,7 @@ function closeAndReset() {
   gap: 0.5rem;
   padding: 0.75rem;
   background: var(--surface-100);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   font-size: 0.9rem;
 }
 
@@ -429,7 +429,7 @@ function closeAndReset() {
   padding: 0.5rem 0.75rem;
   background: var(--orange-50);
   border: 1px solid var(--orange-200);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   font-size: 0.85rem;
   color: var(--orange-700);
 }
@@ -444,7 +444,7 @@ function closeAndReset() {
 .preview-summary {
   background: var(--surface-50);
   border: 1px solid var(--surface-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   padding: 1rem;
 }
 
@@ -491,7 +491,7 @@ function closeAndReset() {
 /* Conflicts */
 .conflicts-section {
   border: 1px solid var(--red-200);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   overflow: hidden;
 }
 

@@ -699,7 +699,7 @@ onMounted(async () => {
   line-height: 1.6;
   padding: 1rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   border-left: 3px solid var(--blue-500);
 }
 
@@ -721,7 +721,7 @@ onMounted(async () => {
   gap: 0.75rem;
   padding: 1rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .location-item {
@@ -754,7 +754,7 @@ onMounted(async () => {
   align-items: center;
   padding: 0.75rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .metadata-label {

@@ -314,7 +314,7 @@ watch(
 <style scoped>
 .emotional-analysis {
   background: var(--surface-card);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   padding: 1rem;
 }
 
@@ -366,7 +366,7 @@ watch(
   margin-bottom: 1rem;
   padding: 0.75rem;
   background: var(--surface-ground);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .stat-item {
@@ -473,7 +473,7 @@ watch(
   gap: 0.5rem;
   padding: 0.5rem;
   background: var(--surface-ground);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   font-size: 0.85rem;
 }
 
@@ -511,7 +511,7 @@ watch(
 .incoherence-item {
   padding: 0.75rem;
   background: var(--surface-ground);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   border-left: 3px solid var(--orange-400);
 }
 
@@ -572,7 +572,7 @@ watch(
 .incoherence-excerpt {
   padding: 0.5rem;
   background: var(--surface-card);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   color: var(--text-color-secondary);
   font-style: italic;
   margin-bottom: 0.5rem;
@@ -584,7 +584,7 @@ watch(
   gap: 0.5rem;
   padding: 0.5rem;
   background: var(--green-50);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   color: var(--green-700);
 }
 
@@ -599,7 +599,7 @@ watch(
   gap: 0.5rem;
   padding: 1rem;
   background: var(--green-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   color: var(--green-700);
 }
 

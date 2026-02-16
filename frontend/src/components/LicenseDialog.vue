@@ -744,7 +744,7 @@ onMounted(() => {
 .usage-bar-container {
   height: 12px;
   background: var(--p-surface-200);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   overflow: hidden;
   margin-bottom: 0.5rem;
 }
@@ -752,7 +752,7 @@ onMounted(() => {
 .usage-bar {
   height: 100%;
   background: var(--p-green-500);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   transition: width 0.3s ease;
 }
 

@@ -673,7 +673,7 @@ const formatDate = (dateString: string): string => {
   flex-direction: column;
   height: 100%;
   background: var(--p-surface-0, white);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   overflow: hidden;
 }
 
@@ -778,7 +778,7 @@ const formatDate = (dateString: string): string => {
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   margin-bottom: 0.5rem;
   background: var(--p-surface-0, white);
   border: 1px solid var(--p-surface-200, #e2e8f0);
@@ -861,7 +861,7 @@ const formatDate = (dateString: string): string => {
   display: inline-block;
   padding: 0.125rem 0.5rem;
   background: var(--surface-100);
-  border-radius: 12px;
+  border-radius: var(--app-radius-lg);
   font-size: 0.75rem;
   color: var(--text-color-secondary);
 }
@@ -882,7 +882,7 @@ const formatDate = (dateString: string): string => {
   font-size: 0.75rem;
   font-weight: 600;
   padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 /* Asegurar contraste suficiente en los badges de importancia */
@@ -961,7 +961,7 @@ const formatDate = (dateString: string): string => {
 .entities-container::-webkit-scrollbar-thumb,
 .entities-virtual :deep(.p-virtualscroller-content)::-webkit-scrollbar-thumb {
   background: var(--surface-300);
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
 }
 
 .entities-container::-webkit-scrollbar-thumb:hover,
@@ -1000,7 +1000,7 @@ const formatDate = (dateString: string): string => {
   justify-content: space-between;
   padding: 1rem;
   background: var(--surface-50);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   border: 1px solid var(--surface-200);
   transition: all 0.2s;
 }

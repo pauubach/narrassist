@@ -459,7 +459,7 @@ const getRelationshipIcon = (type: string): string => {
   flex-direction: column;
   gap: 0;
   background: var(--p-surface-0, white);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   padding: 1.5rem;
 }
 
@@ -568,7 +568,7 @@ const getRelationshipIcon = (type: string): string => {
   gap: 1rem;
   padding: 1rem;
   background: var(--surface-50);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   border: 1px solid var(--surface-200);
 }
 
@@ -607,7 +607,7 @@ const getRelationshipIcon = (type: string): string => {
   gap: 1rem;
   padding: 0.75rem 1rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   border-left: 3px solid var(--primary-color);
 }
 
@@ -647,7 +647,7 @@ const getRelationshipIcon = (type: string): string => {
   gap: 1rem;
   padding: 0.75rem 1rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .relationship-icon {

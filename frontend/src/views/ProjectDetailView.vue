@@ -1297,7 +1297,7 @@ const startReanalysis = async () => {
   height: 2.5rem;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   cursor: pointer;
   color: var(--text-color-secondary);
   transition: all 0.15s;
@@ -1323,7 +1323,7 @@ const startReanalysis = async () => {
   font-weight: 600;
   background: var(--red-500);
   color: white;
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1354,7 +1354,7 @@ const startReanalysis = async () => {
 .mini-count {
   background: var(--surface-200);
   padding: 0.125rem 0.5rem;
-  border-radius: 10px;
+  border-radius: var(--app-radius-lg);
   font-size: 0.75rem;
   color: var(--text-color-secondary);
 }
@@ -1368,7 +1368,7 @@ const startReanalysis = async () => {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -1408,7 +1408,7 @@ const startReanalysis = async () => {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -1529,7 +1529,7 @@ const startReanalysis = async () => {
   gap: 0.75rem;
   padding: 0.75rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
 }
 
 .summary-stat i {
@@ -1598,7 +1598,7 @@ const startReanalysis = async () => {
 .alert-severity {
   display: inline-block;
   padding: 0.25rem 0.75rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   font-size: 0.75rem;
   font-weight: 600;
   width: fit-content;
@@ -1643,7 +1643,7 @@ const startReanalysis = async () => {
   gap: 0.75rem;
   padding: 1rem;
   background: var(--blue-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   border-left: 4px solid var(--blue-500);
   color: var(--blue-900);
   font-size: 0.9rem;

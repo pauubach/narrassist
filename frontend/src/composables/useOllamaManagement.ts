@@ -29,6 +29,9 @@ export function useOllamaManagement() {
   const modelOperations = ref<Record<string, 'installing' | 'uninstalling'>>({})
   let ollamaDownloadPollTimer: ReturnType<typeof setInterval> | null = null
 
+  // Download queue: backend only allows one download at a time
+  let downloadChain: Promise<void> = Promise.resolve()
+
   // ── State machine ───────────────────────────────────────
 
   const ollamaState = computed<OllamaState>(() => {
@@ -165,6 +168,19 @@ export function useOllamaManagement() {
 
   async function downloadModel(modelName: string): Promise<boolean> {
     const normalized = modelName.split(':')[0]
+    modelOperations.value[normalized] = 'installing'
+
+    // Chain downloads sequentially — backend only allows one at a time
+    let result = false
+    downloadChain = downloadChain.then(async () => {
+      result = await downloadModelNow(normalized)
+    })
+    await downloadChain
+    return result
+  }
+
+  /** Internal: actually starts the download (no queue check). */
+  async function downloadModelNow(normalized: string): Promise<boolean> {
     modelDownloading.value = true
     modelOperations.value[normalized] = 'installing'
     ollamaDownloadProgress.value = null
@@ -185,14 +201,11 @@ export function useOllamaManagement() {
       }
 
       let pollCount = 0
-      return await new Promise<boolean>((resolve) => {
+      const ok = await new Promise<boolean>((resolve) => {
         ollamaDownloadPollTimer = setInterval(async () => {
           pollCount++
           if (pollCount > 900) {
             stopOllamaDownloadPolling()
-            modelDownloading.value = false
-            ollamaDownloadProgress.value = null
-            delete modelOperations.value[normalized]
             toast.add({ severity: 'error', summary: 'Timeout', detail: 'La descarga tard\u00F3 demasiado', life: 5000 })
             resolve(false)
             return
@@ -208,9 +221,6 @@ export function useOllamaManagement() {
             const downloadedModels: string[] = statusResult.data?.downloaded_models || []
             if (dp?.status === 'complete' || (!statusResult.data?.is_downloading && downloadedModels.includes(normalized))) {
               stopOllamaDownloadPolling()
-              ollamaDownloadProgress.value = null
-              modelDownloading.value = false
-              delete modelOperations.value[normalized]
               await reloadCapabilities()
               toast.add({ severity: 'success', summary: 'Modelo descargado', detail: `${normalized} disponible`, life: 3000 })
               resolve(true)
@@ -219,9 +229,6 @@ export function useOllamaManagement() {
 
             if (dp?.status === 'error') {
               stopOllamaDownloadPolling()
-              ollamaDownloadProgress.value = null
-              modelDownloading.value = false
-              delete modelOperations.value[normalized]
               toast.add({ severity: 'error', summary: 'Error', detail: dp.error || 'Error descargando modelo', life: 5000 })
               resolve(false)
               return
@@ -231,6 +238,11 @@ export function useOllamaManagement() {
           }
         }, 1000)
       })
+
+      ollamaDownloadProgress.value = null
+      modelDownloading.value = false
+      delete modelOperations.value[normalized]
+      return ok
     } catch {
       toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo descargar el modelo de IA', life: 3000 })
       modelDownloading.value = false

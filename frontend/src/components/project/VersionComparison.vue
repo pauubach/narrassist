@@ -223,7 +223,7 @@ function goToRevision() {
   font-weight: 700;
   text-align: center;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 .metric-delta.improved {

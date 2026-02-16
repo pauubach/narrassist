@@ -541,7 +541,7 @@ function highlightWord(text: string, word: string): string {
   background: var(--p-yellow-200);
   color: var(--p-yellow-900);
   padding: 0 2px;
-  border-radius: 2px;
+  border-radius: var(--app-radius-sm);
 }
 
 .more-occurrences {

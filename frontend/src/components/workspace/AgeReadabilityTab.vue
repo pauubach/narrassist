@@ -548,13 +548,13 @@ function getScoreClass(score: number): string {
 .vocab-bar-container {
   height: 12px;
   background: var(--ds-surface-hover);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   overflow: hidden;
 }
 
 .vocab-bar {
   height: 100%;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   transition: width 0.3s ease;
 }
 

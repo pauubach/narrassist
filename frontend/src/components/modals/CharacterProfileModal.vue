@@ -243,13 +243,14 @@ const hasTemporalData = computed(() => sortedChapters.value.length >= 2)
 const presenceChartData = computed(() => {
   if (!profile.value || !hasTemporalData.value) return null
   const mpc = profile.value.presence.mentionsPerChapter
+  const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--p-primary-color').trim() || '#3B82F6'
   return {
     labels: sortedChapters.value.map(ch => `Cap ${ch}`),
     datasets: [{
       label: 'Menciones',
       data: sortedChapters.value.map(ch => mpc[ch] ?? 0),
-      borderColor: 'rgb(59, 130, 246)',
-      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+      borderColor: primaryColor,
+      backgroundColor: primaryColor + '1a',
       fill: true,
       tension: 0.3,
       pointRadius: 3,

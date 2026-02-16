@@ -67,7 +67,7 @@ function lineWidth(index: number): string {
   );
   background-size: 600px;
   animation: ds-shimmer 1.5s infinite;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 @keyframes ds-shimmer {
@@ -78,7 +78,7 @@ function lineWidth(index: number): string {
 /* Text variant */
 .ds-skeleton__line {
   height: 12px;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 .ds-skeleton__line--primary {
@@ -117,7 +117,7 @@ function lineWidth(index: number): string {
 /* Card variant */
 .ds-skeleton__card {
   border: 1px solid var(--surface-border, #e2e8f0);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   overflow: hidden;
 }
 

@@ -161,7 +161,7 @@ const selectSection = (chapterId: number, sectionId: number, startChar: number) 
   flex-direction: column;
   height: 100%;
   background: var(--p-surface-0, white);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -201,7 +201,7 @@ const selectSection = (chapterId: number, sectionId: number, startChar: number) 
 .chapter-item {
   padding: 0.75rem;
   margin-bottom: 0.5rem;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   cursor: pointer;
   transition: all 0.2s;
   border: 1px solid transparent;
@@ -304,7 +304,7 @@ const selectSection = (chapterId: number, sectionId: number, startChar: number) 
   gap: 0.5rem;
   padding: 0.35rem 0.5rem;
   margin: 0.15rem 0;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   cursor: pointer;
   transition: all 0.15s;
   font-size: 0.8rem;
@@ -392,7 +392,7 @@ const selectSection = (chapterId: number, sectionId: number, startChar: number) 
 
 .tree-content::-webkit-scrollbar-thumb {
   background: var(--surface-300);
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
 }
 
 .tree-content::-webkit-scrollbar-thumb:hover {

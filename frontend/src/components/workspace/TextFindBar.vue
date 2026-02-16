@@ -261,7 +261,7 @@ defineExpose({ focusInput })
   padding: 0.375rem 0.5rem;
   background: var(--surface-card);
   border: 1px solid var(--surface-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 

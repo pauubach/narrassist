@@ -226,7 +226,7 @@ watch(() => props.projectId, loadDetail)
 <style scoped>
 .revision-dashboard {
   background: var(--surface-card);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   padding: 16px;
 }
 
@@ -283,7 +283,7 @@ watch(() => props.projectId, loadDetail)
 
 .alert-diff-item {
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   cursor: pointer;
   transition: background 0.15s;
 }

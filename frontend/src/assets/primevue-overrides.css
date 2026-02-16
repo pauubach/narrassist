@@ -34,7 +34,7 @@
 /* Dropdown panel overlay */
 .p-dropdown-panel,
 .p-select-overlay {
-  border-radius: 6px !important;
+  border-radius: var(--p-content-border-radius, 6px) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
 }
 
@@ -85,7 +85,7 @@
 .p-contextmenu,
 .p-tieredmenu {
   min-width: 180px !important;
-  border-radius: 6px !important;
+  border-radius: var(--p-content-border-radius, 6px) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
 }
 
@@ -105,7 +105,7 @@
   padding: 0.25em 0.65em !important;
   font-size: 0.8125rem !important;
   font-weight: 500 !important;
-  border-radius: 4px !important;
+  border-radius: var(--p-content-border-radius, 4px) !important;
   line-height: 1 !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -211,7 +211,7 @@ html.dark .p-tag.p-tag-danger {
   padding: 0.25em 0.5em !important;
   font-size: 0.75rem !important;
   font-weight: 600 !important;
-  border-radius: 4px !important;
+  border-radius: var(--p-content-border-radius, 4px) !important;
   line-height: 1.2 !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -273,14 +273,14 @@ html.dark .p-tag.p-tag-danger {
 
 /* Panel del MultiSelect - se renderiza en el body via Teleport */
 .p-multiselect-panel {
-  border-radius: 6px !important;
+  border-radius: var(--p-content-border-radius, 6px) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
   overflow: hidden !important;
 }
 
 /* Items wrapper - asegurar redondeo en esquinas inferiores */
 .p-multiselect-items-wrapper {
-  border-radius: 0 0 6px 6px !important;
+  border-radius: 0 0 var(--p-content-border-radius, 6px) var(--p-content-border-radius, 6px) !important;
 }
 
 /* Lista de items - padding vertical */
@@ -435,7 +435,7 @@ html.dark .p-tag.p-tag-danger {
 .p-toast-message,
 .p-toast .p-toast-message {
   padding: 1rem 1.25rem !important;
-  border-radius: 8px !important;
+  border-radius: var(--p-content-border-radius, 8px) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
   margin-bottom: 0.75rem !important;
 }
@@ -518,7 +518,7 @@ html.dark .p-tag.p-tag-danger {
 .p-message,
 .p-inline-message {
   padding: 1rem 1.25rem !important;
-  border-radius: 8px !important;
+  border-radius: var(--p-content-border-radius, 8px) !important;
   margin: 0.5rem 0 !important;
 }
 
@@ -1230,24 +1230,24 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 
 /* Botones text deben tener color con buen contraste */
 .p-button-text {
-  color: var(--p-primary-600, #2563eb) !important;
+  color: var(--p-primary-700, #1d4ed8) !important;
 }
 
 .p-button-text:hover {
-  background: color-mix(in srgb, var(--p-primary-500, #3b82f6) 12%, transparent) !important;
-  color: var(--p-primary-700, #1d4ed8) !important;
+  background: color-mix(in srgb, var(--p-primary-color, #3b82f6) 12%, transparent) !important;
+  color: var(--p-primary-800, #1e40af) !important;
 }
 
 /* Dark mode: botones text más brillantes */
 .dark .p-button-text,
 html.dark .p-button-text {
-  color: var(--p-primary-400, #60a5fa) !important;
+  color: var(--p-primary-300, #93c5fd) !important;
 }
 
 .dark .p-button-text:hover,
 html.dark .p-button-text:hover {
   background: color-mix(in srgb, var(--p-primary-400, #60a5fa) 15%, transparent) !important;
-  color: var(--p-primary-300, #93c5fd) !important;
+  color: var(--p-primary-200, #bfdbfe) !important;
 }
 
 /* Botones text con severity */
@@ -1294,24 +1294,24 @@ html.dark .p-button-text.p-button-secondary {
 
 /* Botones icon-only (text + rounded) necesitan color oscuro fijo */
 .p-button-text.p-button-rounded:not(.p-button-success):not(.p-button-danger):not(.p-button-warning) {
-  color: #1d4ed8 !important; /* blue-700: 4.6:1 sobre blanco, 4.0:1 sobre sepia */
+  color: var(--p-primary-700, #1d4ed8) !important;
 }
 
 .p-button-text.p-button-rounded:hover {
-  background: rgba(59, 130, 246, 0.12) !important;
-  color: #1e40af !important; /* blue-800 */
+  background: color-mix(in srgb, var(--p-primary-color, #3b82f6) 12%, transparent) !important;
+  color: var(--p-primary-800, #1e40af) !important;
 }
 
 /* Dark mode icon buttons */
 .dark .p-button-text.p-button-rounded:not(.p-button-success):not(.p-button-danger):not(.p-button-warning),
 html.dark .p-button-text.p-button-rounded:not(.p-button-success):not(.p-button-danger):not(.p-button-warning) {
-  color: #93c5fd !important; /* blue-300: 8.5:1 sobre dark bg */
+  color: var(--p-primary-300, #93c5fd) !important;
 }
 
 .dark .p-button-text.p-button-rounded:hover,
 html.dark .p-button-text.p-button-rounded:hover {
-  background: rgba(147, 197, 253, 0.15) !important;
-  color: #bfdbfe !important; /* blue-200 */
+  background: color-mix(in srgb, var(--p-primary-400, #60a5fa) 15%, transparent) !important;
+  color: var(--p-primary-200, #bfdbfe) !important;
 }
 
 /* Botones outlined necesitan mejor contraste */
@@ -1379,24 +1379,24 @@ html.dark .floating-actions .p-button:hover {
 
 /* Light mode: all themes including Scrivener sepia */
 .p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]) {
-  color: #1e40af !important; /* blue-800: 8.5:1 on white, 7.2:1 on sepia */
+  color: var(--p-primary-800, #1e40af) !important;
 }
 
 .p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]):hover {
-  color: #1d4ed8 !important;
-  background: rgba(59, 130, 246, 0.1) !important;
+  color: var(--p-primary-700, #1d4ed8) !important;
+  background: color-mix(in srgb, var(--p-primary-color, #3b82f6) 10%, transparent) !important;
 }
 
 /* Dark mode text buttons */
 .dark .p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]),
 html.dark .p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]) {
-  color: #93c5fd !important; /* blue-300 */
+  color: var(--p-primary-300, #93c5fd) !important;
 }
 
 .dark .p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]):hover,
 html.dark .p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]):hover {
-  color: #bfdbfe !important;
-  background: rgba(147, 197, 253, 0.12) !important;
+  color: var(--p-primary-200, #bfdbfe) !important;
+  background: color-mix(in srgb, var(--p-primary-400, #60a5fa) 12%, transparent) !important;
 }
 
 /* ============================================================================
@@ -1684,15 +1684,15 @@ html.dark .p-dialog-footer .p-button-text:hover {
 /* --- BOTONES PRIMARY - Asegurar contraste del texto --- */
 .p-button-primary,
 .p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-secondary) {
-  background: #2563eb !important; /* blue-600 */
-  border-color: #2563eb !important;
-  color: #ffffff !important;
+  background: var(--p-primary-600, #2563eb) !important;
+  border-color: var(--p-primary-600, #2563eb) !important;
+  color: var(--p-primary-contrast-color, #ffffff) !important;
 }
 
 .p-button-primary:hover,
 .p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-secondary):hover {
-  background: #1d4ed8 !important; /* blue-700 */
-  border-color: #1d4ed8 !important;
+  background: var(--p-primary-700, #1d4ed8) !important;
+  border-color: var(--p-primary-700, #1d4ed8) !important;
 }
 
 /* ============================================================================
@@ -1783,7 +1783,7 @@ html.scrivener-theme.dark .p-accordion-content {
 /* --- Diálogos - Estilos completos --- */
 html.scrivener-theme.dark .p-dialog {
   border: 1px solid #504834 !important;
-  border-radius: 8px !important;
+  border-radius: var(--p-content-border-radius, 8px) !important;
   overflow: hidden !important;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3) !important;
 }
@@ -1792,7 +1792,7 @@ html.scrivener-theme.dark .p-dialog-header {
   background-color: #302A1C !important;
   border-bottom: 1px solid #504834 !important;
   color: #E8DCC8 !important;
-  border-radius: 8px 8px 0 0 !important;
+  border-radius: var(--p-content-border-radius, 8px) var(--p-content-border-radius, 8px) 0 0 !important;
 }
 
 html.scrivener-theme.dark .p-dialog-header .p-dialog-title {
@@ -1816,7 +1816,7 @@ html.scrivener-theme.dark .p-dialog-content {
 html.scrivener-theme.dark .p-dialog-footer {
   background-color: #252114 !important;
   border-top: 1px solid #504834 !important;
-  border-radius: 0 0 8px 8px !important;
+  border-radius: 0 0 var(--p-content-border-radius, 8px) var(--p-content-border-radius, 8px) !important;
 }
 
 /* Mask/Overlay del diálogo - evitar bordes raros */
@@ -3519,7 +3519,7 @@ html.scrivener-theme.dark [data-pc-section="token"] {
   background-color: #5A4A32 !important;
   color: #E8DCC8 !important;
   padding: 0.25rem 0.5rem !important;
-  border-radius: 4px !important;
+  border-radius: var(--p-content-border-radius, 4px) !important;
   border: none !important;
 }
 
@@ -3764,14 +3764,14 @@ html.scrivener-theme.dark .p-selectbutton .p-button-label {
 /* Better visual differentiation for all SelectButton options */
 html.scrivener-theme.dark .p-selectbutton {
   border: 1px solid #504834 !important;
-  border-radius: 6px !important;
+  border-radius: var(--p-content-border-radius, 6px) !important;
   padding: 2px !important;
   background-color: #1A170F !important;
 }
 
 html.scrivener-theme.dark .p-selectbutton .p-togglebutton,
 html.scrivener-theme.dark .p-selectbutton .p-button {
-  border-radius: 4px !important;
+  border-radius: var(--p-content-border-radius, 4px) !important;
   margin: 0 !important;
 }
 

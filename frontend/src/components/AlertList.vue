@@ -580,7 +580,7 @@ watch(() => props.alerts, () => {
   flex-direction: column;
   height: 100%;
   background: var(--surface-card);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   overflow: hidden;
 }
 
@@ -676,7 +676,7 @@ watch(() => props.alerts, () => {
   display: flex;
   position: relative;
   margin-bottom: 1rem;
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   background: var(--surface-ground);
   border: 1px solid var(--surface-border);
   overflow: hidden;
@@ -790,7 +790,7 @@ watch(() => props.alerts, () => {
   flex-wrap: wrap;
   padding: 0.5rem;
   background: var(--surface-50);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 .alert-entities i {
@@ -874,7 +874,7 @@ watch(() => props.alerts, () => {
 .alerts-container::-webkit-scrollbar-thumb,
 .alerts-virtual :deep(.p-virtualscroller-content)::-webkit-scrollbar-thumb {
   background: var(--surface-300);
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
 }
 
 .alerts-container::-webkit-scrollbar-thumb:hover,

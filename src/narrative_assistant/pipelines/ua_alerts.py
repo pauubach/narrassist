@@ -629,6 +629,40 @@ class PipelineAlertsMixin:
                 except Exception as e:
                     logger.debug(f"Shallow character alert failed: {e}")
 
+            # Alertas de anacronismo de conocimiento
+            for anach in context.knowledge_anachronisms:
+                try:
+                    knower = anach.get("knower_name", "Personaje")
+                    known = anach.get("known_name", "otro")
+                    fact = anach.get("fact_value", "")
+                    desc = anach.get("description", "")
+                    severity_str = anach.get("severity", "medium")
+
+                    result = engine.create_alert(
+                        project_id=context.project_id,
+                        alert_type="knowledge_anachronism",
+                        category=AlertCategory.CONSISTENCY,
+                        severity=AlertSeverity.WARNING
+                        if severity_str == "high"
+                        else AlertSeverity.INFO,
+                        title=f"Conocimiento prematuro: {knower} → {known}",
+                        description=desc,
+                        explanation=(
+                            f"{knower} demuestra conocimiento sobre '{fact}' de {known} "
+                            f"antes de haberlo aprendido en la narrativa."
+                        ),
+                        chapter_index=anach.get("used_chapter"),
+                        extra_data={
+                            "used_chapter": anach.get("used_chapter"),
+                            "learned_chapter": anach.get("learned_chapter"),
+                            "fact_value": fact,
+                        },
+                    )
+                    if result.is_success:
+                        context.alerts.append(result.value)
+                except Exception as e:
+                    logger.debug(f"Knowledge anachronism alert failed: {e}")
+
             # Alertas de oraciones de baja energía (voz pasiva, verbos débiles)
             for sent in context.sentence_energy_issues:
                 try:

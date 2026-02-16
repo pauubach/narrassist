@@ -134,7 +134,7 @@ const menus = computed<Menu[]>(() => {
         { divider: true, label: '' },
         { label: 'Exportar', action: 'export', icon: 'download', shortcut: 'Ctrl+E', disabled: !isInProject.value },
         { divider: true, label: '' },
-        { label: 'Preferencias', action: 'settings', icon: 'cog', shortcut: 'Ctrl+,' },
+        { label: 'Configuración', action: 'settings', icon: 'cog', shortcut: 'Ctrl+,' },
         { divider: true, label: '' },
         { label: 'Salir', action: 'exit', icon: 'sign-out', shortcut: 'Ctrl+Q' },
       ]
@@ -412,7 +412,7 @@ const handleMenuAction = (item: MenuItem) => {
   padding: 0.25rem 0.75rem;
   font-size: 0.875rem;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   color: var(--p-text-color);
   background: transparent;
   border: none;
@@ -435,7 +435,7 @@ const handleMenuAction = (item: MenuItem) => {
   min-width: 220px;
   background: var(--p-surface-0);
   border: 1px solid var(--p-surface-200);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   padding: 0.25rem 0;
   z-index: var(--ds-z-sticky);

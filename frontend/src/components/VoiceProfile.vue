@@ -282,7 +282,7 @@ watch(() => props.projectId, (newId) => {
 <style scoped>
 .voice-profile {
   background: var(--surface-card);
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   padding: 1.5rem;
 }
 
@@ -382,7 +382,7 @@ watch(() => props.projectId, (newId) => {
   align-items: center;
   padding: 0.75rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   text-align: center;
 }
 
@@ -459,7 +459,7 @@ watch(() => props.projectId, (newId) => {
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   background: var(--surface-50);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   font-size: 0.875rem;
 }
 

@@ -729,7 +729,7 @@ onUnmounted(() => {
   gap: 0.5rem;
   padding: 0.25rem 0.75rem;
   background: var(--surface-0);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-color-secondary);
@@ -825,7 +825,7 @@ onUnmounted(() => {
   gap: 0.5rem;
   padding: 0.75rem;
   background: var(--surface-50);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   margin-top: 0.5rem;
 }
 

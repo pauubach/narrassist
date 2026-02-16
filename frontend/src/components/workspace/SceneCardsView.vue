@@ -350,7 +350,7 @@ function isTagged(scene: SceneData): boolean {
   display: inline-flex;
   align-items: center;
   padding: 1px 8px;
-  border-radius: 10px;
+  border-radius: var(--app-radius-lg);
   font-size: 0.6875rem;
   font-weight: 600;
   line-height: 1.6;
@@ -401,7 +401,7 @@ function isTagged(scene: SceneData): boolean {
   display: inline-flex;
   align-items: center;
   padding: 0 6px;
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   font-size: 0.625rem;
   font-weight: 600;
   line-height: 1.8;

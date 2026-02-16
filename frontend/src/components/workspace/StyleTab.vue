@@ -324,7 +324,7 @@ async function loadFeatureAvailability() {
   min-width: 18px;
   height: 18px;
   padding: 0 4px;
-  border-radius: 9px;
+  border-radius: var(--app-radius-lg);
   background-color: var(--ds-surface-border, var(--surface-border));
   color: var(--ds-color-text-secondary, var(--text-color-secondary));
   font-size: 0.6875rem;
@@ -367,7 +367,7 @@ async function loadFeatureAvailability() {
 
 .subtabs-scroll::-webkit-scrollbar-thumb {
   background: var(--ds-color-text-tertiary, #ccc);
-  border-radius: 3px;
+  border-radius: var(--app-radius-sm);
 }
 
 .subtab {

@@ -677,7 +677,7 @@ defineExpose({ focusSearch })
 .stat-item {
   cursor: pointer;
   padding: 0.25rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   transition: background 0.15s;
 }
 
@@ -698,7 +698,7 @@ defineExpose({ focusSearch })
 
 .alert-item {
   padding: 0.75rem;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   border-left: 3px solid transparent;
   cursor: pointer;
   transition: background 0.15s;
@@ -747,7 +747,7 @@ defineExpose({ focusSearch })
   color: var(--text-color-secondary);
   background: var(--surface-100);
   padding: 0.125rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 .alert-description {
@@ -802,7 +802,7 @@ defineExpose({ focusSearch })
 
 /* Sequential mode dialog */
 :deep(.sequential-dialog) {
-  border-radius: 12px;
+  border-radius: var(--app-radius-lg);
   overflow: hidden;
 }
 

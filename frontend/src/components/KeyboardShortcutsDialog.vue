@@ -80,7 +80,7 @@ watch(visible, (newValue) => {
   margin: 0;
   padding: 0.75rem;
   background: var(--surface-100);
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   font-size: 0.9rem;
   color: var(--text-color-secondary);
 }
@@ -122,7 +122,7 @@ watch(visible, (newValue) => {
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem;
-  border-radius: 6px;
+  border-radius: var(--app-radius);
   transition: background-color 0.2s ease;
 }
 
@@ -142,7 +142,7 @@ watch(visible, (newValue) => {
   padding: 0.25rem 0.5rem;
   background: var(--surface-100);
   border: 1px solid var(--surface-border);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
   font-family: 'Courier New', monospace;
   font-size: 0.9rem;
   font-weight: 600;
@@ -170,12 +170,12 @@ watch(visible, (newValue) => {
 
 .shortcuts-container::-webkit-scrollbar-track {
   background: var(--surface-ground);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 .shortcuts-container::-webkit-scrollbar-thumb {
   background: var(--surface-300);
-  border-radius: 4px;
+  border-radius: var(--app-radius);
 }
 
 .shortcuts-container::-webkit-scrollbar-thumb:hover {

@@ -136,29 +136,56 @@ class CharacterLocationAnalyzer:
 
     # Patrones de llegada
     ARRIVAL_PATTERNS = [
-        r"(?P<name>\w+)\s+(?:llegó|arribó|entró)\s+(?:a|en)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
-        r"(?P<name>\w+)\s+(?:apareció|se\s+presentó)\s+en\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
+        r"(?P<name>\w+)\s+(?:llegó|arribó|entró|accedió|irrumpió)\s+(?:a|en)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
+        r"(?P<name>\w+)\s+(?:apareció|se\s+presentó|se\s+instaló)\s+en\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
         r"cuando\s+(?P<name>\w+)\s+(?:llegó|entró)\s+(?:a|en)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
     ]
 
     # Patrones de salida
     DEPARTURE_PATTERNS = [
-        r"(?P<name>\w+)\s+(?:salió|partió|se\s+fue|abandonó)\s+(?:de\s+)?(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
+        r"(?P<name>\w+)\s+(?:salió|partió|se\s+fue|abandonó|se\s+marchó|huyó)\s+(?:de\s+)?(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
         r"(?P<name>\w+)\s+(?:dejó)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
     ]
 
     # Patrones de presencia
     PRESENCE_PATTERNS = [
-        r"(?P<name>\w+)\s+(?:estaba|se\s+encontraba|permanecía)\s+en\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
-        r"en\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})[,\s]+(?P<name>\w+)\s+(?:esperaba|miraba|observaba)",
+        r"(?P<name>\w+)\s+(?:estaba|se\s+encontraba|permanecía|seguía|continuaba|aguardaba|residía|vivía)\s+en\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
+        r"en\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})[,\s]+(?P<name>\w+)\s+(?:esperaba|miraba|observaba|trabajaba|descansaba|dormía|leía)",
         r"en\s+(?P<loc>[A-ZÁÉÍÓÚÑ]\w+)[,]\s*(?P<name>[A-ZÁÉÍÓÚÑ]\w+)\s+(?:estaba|se\s+encontraba|permanecía)",
+        # "Name se quedó/se reunió en LOC"
+        r"(?P<name>\w+)\s+(?:se\s+quedó|se\s+reunió|se\s+hospedó|se\s+alojó)\s+en\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
     ]
 
     # Patrones de transición
     TRANSITION_PATTERNS = [
-        r"(?P<name>\w+)\s+(?:viajó|caminó|fue|se\s+dirigió)\s+(?:de\s+(?:la\s+|el\s+)?(?P<from>\w+(?:\s+\w+){0,3})\s+)?(?:a|hacia)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
-        r"(?P<name>\w+)\s+(?:cruzó|atravesó)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
+        r"(?P<name>\w+)\s+(?:viajó|caminó|fue|se\s+dirigió|corrió|condujo|voló|navegó|regresó|volvió)\s+(?:de\s+(?:la\s+|el\s+)?(?P<from>\w+(?:\s+\w+){0,3})\s+)?(?:a|hacia)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
+        r"(?P<name>\w+)\s+(?:cruzó|atravesó|recorrió)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
+        # "Name tomó un vuelo/tren/barco a LOC"
+        r"(?P<name>\w+)\s+(?:tomó|cogió)\s+(?:un\s+)?(?:vuelo|tren|barco|autobús|taxi|avión|coche)\s+(?:a|hacia|con\s+destino\s+a?)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
     ]
+
+    # Patrones de co-presencia: otro personaje acompaña/sigue/lleva a alguien
+    # Estos extraen <name> como personaje y <loc> como destino (puede ser evento)
+    COPRESENCE_PATTERNS = [
+        # "Name, que había acompañado al [evento/lugar]"
+        r"(?P<name>\w+)[,]\s+que\s+(?:lo|la|le|les|los|las)?\s*(?:había\s+)?(?:acompañado|acompañó|seguido|llevado)\s+(?:a|al|a\s+la)\s+(?P<loc>\w+(?:\s+\w+){0,3})",
+        # "Name acompañó a [persona] a/al [lugar]"
+        r"(?P<name>\w+)\s+(?:acompañó|acompañaba|siguió|seguía|llevó|llevaba|condujo)\s+a\s+\w+\s+(?:a|al|a\s+la|hasta)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
+        # "Name fue con [persona] a/al [lugar]"
+        r"(?P<name>\w+)\s+(?:fue|iba|vino|venía)\s+con\s+\w+\s+(?:a|al|a\s+la|hasta)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
+        # "[persona] y Name estaban/fueron a [lugar]"
+        r"\w+\s+y\s+(?P<name>\w+)\s+(?:estaban|fueron|llegaron|viajaron)\s+(?:a|en)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
+        # "Name recogió a [persona] en [lugar]"
+        r"(?P<name>\w+)\s+(?:recogió|dejó|esperó\s+a)\s+(?:a\s+)?\w+\s+en\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
+    ]
+
+    # Palabras clave que son eventos, no ubicaciones geográficas directas
+    _EVENT_KEYWORDS = {
+        "congreso", "conferencia", "seminario", "simposio", "coloquio",
+        "reunión", "cena", "almuerzo", "fiesta", "boda", "funeral",
+        "entierro", "juicio", "ceremonia", "gala", "exposición",
+        "presentación", "concierto", "espectáculo", "partido",
+    }
 
     def __init__(self, ontology: LocationOntology | None = None):
         self._ontology = ontology if ontology is not None else get_default_ontology()
@@ -177,6 +204,9 @@ class CharacterLocationAnalyzer:
         ]
         self.compiled_transition = [
             re.compile(p, re.IGNORECASE) for p in self.TRANSITION_PATTERNS
+        ]
+        self.compiled_copresence = [
+            re.compile(p, re.IGNORECASE) for p in self.COPRESENCE_PATTERNS
         ]
 
     def analyze(
@@ -338,7 +368,98 @@ class CharacterLocationAnalyzer:
                 if event:
                     events.append(event)
 
+        # Buscar co-presencias (acompañó, fue con, siguió a)
+        for pattern in self.compiled_copresence:
+            for match in pattern.finditer(text):
+                event = self._create_event(
+                    match,
+                    characters,
+                    locations,
+                    chapter,
+                    text,
+                    LocationChangeType.PRESENCE,
+                    confidence=0.70,
+                )
+                if event:
+                    # Si el "lugar" es un evento (congreso, cena...), resolver ubicación real
+                    resolved = self._resolve_event_location(
+                        event.location_name, text
+                    )
+                    if resolved:
+                        event = LocationEvent(
+                            entity_id=event.entity_id,
+                            entity_name=event.entity_name,
+                            location_id=event.location_id,
+                            location_name=resolved,
+                            chapter=event.chapter,
+                            start_char=event.start_char,
+                            end_char=event.end_char,
+                            excerpt=event.excerpt,
+                            change_type=event.change_type,
+                            confidence=0.70,
+                        )
+                    events.append(event)
+
         return events
+
+    def _resolve_event_location(
+        self, loc_name: str, text: str
+    ) -> str | None:
+        """
+        Resuelve un nombre de evento a una ubicación geográfica real.
+
+        Si loc_name es un evento (congreso, cena, etc.), busca en el texto
+        cercano una ubicación geográfica explícita asociada al evento.
+
+        Ejemplo: "congreso" + "Centro de Convenciones de Madrid" → "Madrid"
+        """
+        # Solo resolver si parece un evento, no una ubicación directa
+        loc_lower = loc_name.lower().split()[0]  # primera palabra
+        if loc_lower not in self._EVENT_KEYWORDS:
+            # Verificar si la ontología ya lo conoce como ubicación real
+            if self._ontology.resolve(loc_name):
+                return None  # Ya es una ubicación conocida, no resolver
+            # Si no es evento ni ubicación conocida, intentar resolver igual
+            # (podría ser un nombre de edificio, etc.)
+            return None
+
+        # Buscar ubicaciones geográficas cerca del nombre del evento en el texto
+        # Estrategia: buscar ciudades/regiones conocidas mencionadas en el mismo
+        # párrafo o dentro de 500 caracteres del evento
+        event_positions = [
+            m.start()
+            for m in re.finditer(re.escape(loc_lower), text, re.IGNORECASE)
+        ]
+
+        if not event_positions:
+            return None
+
+        # Buscar nombres de ciudades/regiones conocidas en el texto
+        known_locations = self._ontology.get_all_names()
+        best_match = None
+        best_distance = float("inf")
+
+        for known_loc in known_locations:
+            if len(known_loc) < 3:
+                continue
+            loc_type = self._ontology.get_type(known_loc)
+            if not loc_type:
+                continue
+            # Solo resolver a CITY, REGION, COUNTRY (no a ROOM/BUILDING)
+            from .location_ontology import LocationType
+            if loc_type.value < LocationType.CITY.value:
+                continue
+
+            for loc_match in re.finditer(
+                rf"\b{re.escape(known_loc)}\b", text, re.IGNORECASE
+            ):
+                for ev_pos in event_positions:
+                    dist = abs(loc_match.start() - ev_pos)
+                    if dist < best_distance and dist < 500:
+                        best_distance = dist
+                        best_match = known_loc
+
+        return best_match
 
     def _create_event(
         self,
@@ -348,6 +469,7 @@ class CharacterLocationAnalyzer:
         chapter: int,
         text: str,
         change_type: LocationChangeType,
+        confidence: float = 0.75,
     ) -> LocationEvent | None:
         """Crea un evento de ubicación a partir de un match."""
         try:
@@ -389,7 +511,7 @@ class CharacterLocationAnalyzer:
                 end_char=match.end(),
                 excerpt=excerpt,
                 change_type=change_type,
-                confidence=0.75,
+                confidence=confidence,
             )
         except Exception as e:
             logger.warning(f"Error creando evento de ubicación: {e}")
