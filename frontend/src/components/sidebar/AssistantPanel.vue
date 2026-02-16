@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onMounted } from 'vue'
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { useChat } from '@/composables/useChat'
 import type { ChatSelectionContext } from '@/composables/useChat'
 import { useAnalysisStore } from '@/stores/analysis'
 import { useSelectionStore } from '@/stores/selection'
+import { useSystemStore } from '@/stores/system'
 import type { ChatReference } from '@/types'
 import ChatMessageContent from './ChatMessageContent.vue'
 import Button from 'primevue/button'
@@ -46,6 +47,7 @@ const {
 
 const analysisStore = useAnalysisStore()
 const selectionStore = useSelectionStore()
+const systemStore = useSystemStore()
 const isProjectAnalyzing = computed(() => analysisStore.isProjectAnalyzing(props.projectId))
 
 const inputText = ref('')
@@ -64,6 +66,62 @@ const activeSelectionPreview = computed(() => {
   return sel.text.length > 50 ? sel.text.substring(0, 50) + '...' : sel.text
 })
 
+// --- Ollama status: adaptive polling (up: 15s, down: 5s) ---
+const ollamaAvailable = computed(() => systemStore.systemCapabilities?.ollama?.available ?? false)
+const ollamaHasModels = computed(() => (systemStore.systemCapabilities?.ollama?.models?.length ?? 0) > 0)
+const ollamaReady = computed(() => ollamaAvailable.value && ollamaHasModels.value)
+
+let ollamaTimer: ReturnType<typeof setInterval> | null = null
+
+function startOllamaPolling() {
+  stopOllamaPolling()
+  const interval = ollamaReady.value ? 15000 : 5000
+  ollamaTimer = setInterval(async () => {
+    await systemStore.refreshCapabilities()
+    // Adapt interval if state changed
+    const newInterval = ollamaReady.value ? 15000 : 5000
+    if (ollamaTimer && newInterval !== interval) {
+      startOllamaPolling()
+    }
+  }, interval)
+}
+
+function stopOllamaPolling() {
+  if (ollamaTimer) { clearInterval(ollamaTimer); ollamaTimer = null }
+}
+
+// --- Dynamic suggested questions based on entities ---
+const suggestedQuestions = ref<string[]>([])
+
+async function loadSuggestedQuestions() {
+  try {
+    const data = await (await import('@/services/apiClient')).api
+      .getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${props.projectId}/entities`)
+    if (!data.success || !data.data?.length) return
+    const names = data.data
+      .filter((e: any) => e.entity_type === 'PERSON' || e.entity_type === 'CHARACTER')
+      .slice(0, 10)
+      .map((e: any) => e.canonical_name as string)
+    if (names.length === 0) return
+
+    const questions: string[] = []
+    if (names.length >= 2) {
+      questions.push(`¿Qué relación tienen ${names[0]} y ${names[1]}?`)
+    }
+    if (names.length >= 1) {
+      questions.push(`¿Hay inconsistencias con ${names[0]}?`)
+    }
+    if (names.length >= 3) {
+      questions.push(`¿En qué capítulos aparece ${names[2]}?`)
+    }
+    suggestedQuestions.value = questions
+  } catch { /* silent — fallback to static hints */ }
+}
+
+function useSuggestedQuestion(q: string) {
+  inputText.value = q
+}
+
 // Rebuild input history from saved messages + auto-scroll on mount
 onMounted(() => {
   nextTick(() => {
@@ -74,6 +132,13 @@ onMounted(() => {
       messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
     }
   })
+  // Start Ollama polling + load entity suggestions
+  systemStore.refreshCapabilities().then(() => startOllamaPolling())
+  loadSuggestedQuestions()
+})
+
+onUnmounted(() => {
+  stopOllamaPolling()
 })
 
 // Auto-scroll on new messages (watch length, not deep — avoid recalc on every property mutation)
@@ -172,16 +237,30 @@ function clearSelectionContext() {
         <i class="pi pi-comments"></i>
         Asistente
       </span>
-      <Button
-        v-tooltip.left="'Limpiar historial'"
-        icon="pi pi-trash"
-        text
-        rounded
-        size="small"
-        :disabled="messages.length === 0"
-        class="clear-btn"
-        @click="clearHistory"
-      />
+      <div class="header-actions">
+        <span
+          v-tooltip.left="ollamaReady ? 'IA lista' : ollamaAvailable ? 'Sin modelos LLM' : 'Ollama no disponible'"
+          class="ollama-status-dot"
+          :class="ollamaReady ? 'status-ok' : 'status-down'"
+        />
+        <Button
+          v-tooltip.left="'Limpiar historial'"
+          icon="pi pi-trash"
+          text
+          rounded
+          size="small"
+          :disabled="messages.length === 0"
+          class="clear-btn"
+          @click="clearHistory"
+        />
+      </div>
+    </div>
+
+    <!-- Ollama warning banner -->
+    <div v-if="!ollamaReady" class="ollama-warning">
+      <i class="pi pi-exclamation-triangle"></i>
+      <span v-if="!ollamaAvailable">Ollama no está arrancado. Inícialo desde Ajustes.</span>
+      <span v-else>No hay modelos LLM. Descarga uno desde Ajustes.</span>
     </div>
 
     <!-- Messages area -->
@@ -190,7 +269,20 @@ function clearSelectionContext() {
       <div v-if="messages.length === 0 && !isLoading" class="empty-state">
         <i class="pi pi-comments"></i>
         <p>Pregunta sobre tu manuscrito</p>
-        <span class="hint">Ej: "¿De qué color tiene los ojos María?"</span>
+        <!-- Dynamic suggested questions (if entities available) -->
+        <template v-if="suggestedQuestions.length > 0">
+          <button
+            v-for="(q, i) in suggestedQuestions"
+            :key="i"
+            class="suggested-question"
+            @click="useSuggestedQuestion(q)"
+          >
+            {{ q }}
+          </button>
+        </template>
+        <template v-else>
+          <span class="hint">Ej: "¿De qué color tiene los ojos María?"</span>
+        </template>
         <span class="hint">Selecciona texto para dar contexto a la IA</span>
       </div>
 
@@ -364,6 +456,45 @@ function clearSelectionContext() {
   color: var(--ds-color-primary);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+}
+
+.ollama-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ollama-status-dot.status-ok {
+  background: var(--ds-color-success, #22c55e);
+  box-shadow: 0 0 4px var(--ds-color-success, #22c55e);
+}
+
+.ollama-status-dot.status-down {
+  background: var(--ds-color-warning, #f59e0b);
+  box-shadow: 0 0 4px var(--ds-color-warning, #f59e0b);
+}
+
+.ollama-warning {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  background: var(--ds-color-warning-subtle, rgba(245, 158, 11, 0.1));
+  border-bottom: 1px solid var(--ds-color-warning, #f59e0b);
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-warning, #f59e0b);
+  flex-shrink: 0;
+}
+
+.ollama-warning i {
+  flex-shrink: 0;
+}
+
 .clear-btn {
   width: 2rem;
   height: 2rem;
@@ -404,6 +535,28 @@ function clearSelectionContext() {
   font-size: var(--ds-font-size-xs);
   font-style: italic;
   opacity: 0.7;
+}
+
+.suggested-question {
+  display: block;
+  width: 100%;
+  padding: var(--ds-space-2) var(--ds-space-3);
+  margin: 2px 0;
+  background: var(--ds-surface-hover);
+  border: 1px solid var(--ds-surface-border);
+  border-radius: var(--ds-radius-md);
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-text);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.suggested-question:hover {
+  background: var(--ds-color-primary-soft, rgba(59, 130, 246, 0.08));
+  border-color: var(--ds-color-primary-subtle, rgba(59, 130, 246, 0.3));
+  color: var(--ds-color-primary);
 }
 
 .message {
