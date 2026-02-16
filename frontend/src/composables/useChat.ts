@@ -95,7 +95,7 @@ export function useChat(projectId: number) {
 
       return {
         enabledInferenceMethods: selected,
-        prioritizeSpeed: parsed.prioritizeSpeed ?? true,
+        prioritizeSpeed: parsed.prioritizeSpeed ?? false,
       }
     } catch {
       return undefined
@@ -190,7 +190,7 @@ export function useChat(projectId: number) {
 
       if (e instanceof Error) {
         if (e.message.includes('fetch') || e.message.includes('network')) {
-          errorMsg = 'La IA no está disponible. Revisa Ajustes → Análisis.'
+          errorMsg = 'La IA no está disponible. Revisa Configuración → Análisis.'
         } else if (e.message.includes('no respond')) {
           errorMsg = 'La IA tardó demasiado. Si hay un análisis en curso, espera a que termine.'
         } else {

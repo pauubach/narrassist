@@ -108,7 +108,7 @@ export function useSettingsPersistence() {
           inferenceMinConfidence: parsed.inferenceMinConfidence ?? 55,
           inferenceMinConsensus: parsed.inferenceMinConsensus ?? 60,
           enabledInferenceMethods: filteredMethods.length > 0 ? filteredMethods : ['llama3.2'],
-          prioritizeSpeed: parsed.prioritizeSpeed ?? true,
+          prioritizeSpeed: parsed.prioritizeSpeed ?? false,
           enabledNLPMethods: parsed.enabledNLPMethods ?? {
             coreference: ['embeddings', 'morpho', 'heuristics'],
             ner: ['spacy', 'gazetteer'],
