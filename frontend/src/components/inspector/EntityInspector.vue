@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import InputSwitch from 'primevue/inputswitch'
+import Slider from 'primevue/slider'
 import DsBadge from '@/components/ds/DsBadge.vue'
 import type { Entity, Alert } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
@@ -478,6 +479,31 @@ function onChapterClick(chapterNumber: number) {
         />
       </div>
 
+      <!-- Slider de Threshold de Confianza (Mejora 5) -->
+      <div class="confidence-threshold-filter">
+        <div class="threshold-header">
+          <label for="confidence-threshold" class="threshold-label">
+            <i class="pi pi-chart-line" style="font-size: 0.75rem"></i>
+            Confianza mínima
+          </label>
+          <span class="threshold-value">{{ (mentionNav.confidenceThreshold.value * 100).toFixed(0) }}%</span>
+        </div>
+        <Slider
+          id="confidence-threshold"
+          v-model="mentionNav.confidenceThreshold.value"
+          :min="0"
+          :max="1"
+          :step="0.05"
+          class="confidence-slider"
+          :aria-label="`Confianza mínima: ${(mentionNav.confidenceThreshold.value * 100).toFixed(0)}%`"
+        />
+        <div class="threshold-hints">
+          <span class="hint-low">0%</span>
+          <span class="hint-mid">50%</span>
+          <span class="hint-high">100%</span>
+        </div>
+      </div>
+
       <div class="nav-controls">
         <Button
           v-tooltip.bottom="'Anterior (←)'"
@@ -508,6 +534,32 @@ function onChapterClick(chapterNumber: number) {
           <mark>{{ mentionNav.currentMention.value.surfaceForm }}</mark>
           <span class="context-after">{{ mentionNav.currentMention.value.contextAfter }}</span>
         </p>
+
+        <!-- Badge diagnóstico (Mejora 1) - Solo para menciones de baja confianza -->
+        <div
+          v-if="mentionNav.currentMention.value.confidence < 0.75"
+          v-tooltip.bottom="mentionNav.currentMention.value.validationReasoning || 'Mención con baja confianza'"
+          class="mention-diagnostic-badge"
+          :class="{
+            'badge--warning': mentionNav.currentMention.value.confidence >= 0.60,
+            'badge--error': mentionNav.currentMention.value.confidence < 0.60
+          }"
+          role="status"
+          :aria-label="`Confianza: ${Math.round(mentionNav.currentMention.value.confidence * 100)}%. ${mentionNav.currentMention.value.validationReasoning || 'Mención dudosa'}`"
+        >
+          <i
+            :class="{
+              'pi pi-exclamation-triangle': mentionNav.currentMention.value.confidence >= 0.60,
+              'pi pi-times-circle': mentionNav.currentMention.value.confidence < 0.60
+            }"
+          ></i>
+          <span class="badge-label">
+            Confianza: {{ Math.round(mentionNav.currentMention.value.confidence * 100) }}%
+          </span>
+          <span v-if="mentionNav.currentMention.value.validationReasoning" class="badge-reason">
+            {{ mentionNav.currentMention.value.validationReasoning }}
+          </span>
+        </div>
       </div>
     </div>
 
@@ -787,6 +839,64 @@ function onChapterClick(chapterNumber: number) {
   color: var(--ds-color-text-secondary);
 }
 
+/* Confidence Threshold Slider (Mejora 5) */
+.confidence-threshold-filter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2);
+  background: var(--p-surface-50, #f9fafb);
+  border-radius: var(--ds-radius-sm);
+  margin-bottom: var(--ds-space-3);
+}
+
+.threshold-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.threshold-label {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+  font-size: var(--ds-font-size-sm);
+  color: var(--ds-color-text);
+  font-weight: var(--ds-font-weight-medium);
+}
+
+.threshold-label i {
+  color: var(--ds-color-text-secondary);
+}
+
+.threshold-value {
+  font-size: var(--ds-font-size-sm);
+  font-weight: var(--ds-font-weight-bold);
+  color: var(--ds-color-primary);
+}
+
+.confidence-slider {
+  width: 100%;
+}
+
+.threshold-hints {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-text-secondary);
+  margin-top: -4px;
+}
+
+.hint-low,
+.hint-mid,
+.hint-high {
+  user-select: none;
+}
+
+.dark .confidence-threshold-filter {
+  background: var(--ds-surface-section);
+}
+
 .nav-controls {
   display: flex;
   align-items: center;
@@ -837,6 +947,66 @@ function onChapterClick(chapterNumber: number) {
 .context-before,
 .context-after {
   color: var(--ds-color-text-secondary);
+}
+
+/* Diagnostic Badge (Mejora 1) */
+.mention-diagnostic-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2);
+  margin-top: var(--ds-space-2);
+  border-radius: var(--ds-radius-sm);
+  font-size: var(--ds-font-size-xs);
+  cursor: help;
+  transition: all 0.2s ease;
+}
+
+.mention-diagnostic-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.badge--warning {
+  background: var(--p-yellow-50, #fefce8);
+  border: 1px solid var(--p-yellow-200, #fde68a);
+  color: var(--p-yellow-700, #a16207);
+}
+
+.badge--error {
+  background: var(--p-red-50, #fef2f2);
+  border: 1px solid var(--p-red-200, #fecaca);
+  color: var(--p-red-700, #b91c1c);
+}
+
+.mention-diagnostic-badge i {
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.badge-label {
+  font-weight: var(--ds-font-weight-semibold);
+}
+
+.badge-reason {
+  font-size: var(--ds-font-size-xs);
+  opacity: 0.9;
+  margin-left: auto;
+  max-width: 60%;
+  text-align: right;
+  line-height: 1.3;
+}
+
+.dark .badge--warning {
+  background: rgba(234, 179, 8, 0.1);
+  border-color: rgba(234, 179, 8, 0.3);
+  color: var(--p-yellow-400, #facc15);
+}
+
+.dark .badge--error {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--p-red-400, #f87171);
 }
 
 /* Dark mode */

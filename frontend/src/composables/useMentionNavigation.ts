@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { apiUrl } from '@/config/api'
 
@@ -51,8 +51,24 @@ export function useMentionNavigation(projectId: () => number) {
     error: null,
   })
 
-  // Filtros (Mejora 2)
+  // Filtros (Mejora 2 + Mejora 5)
   const filterOnlyActive = ref(false)
+  const confidenceThreshold = ref(0.0) // Mejora 5: threshold ajustable (0.0 - 1.0)
+
+  // Cargar threshold desde localStorage
+  const STORAGE_KEY = 'narrassist_mention_confidence_threshold'
+  const savedThreshold = localStorage.getItem(STORAGE_KEY)
+  if (savedThreshold !== null) {
+    const parsed = parseFloat(savedThreshold)
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+      confidenceThreshold.value = parsed
+    }
+  }
+
+  // Guardar threshold en localStorage cuando cambie
+  watch(confidenceThreshold, (newValue) => {
+    localStorage.setItem(STORAGE_KEY, newValue.toString())
+  })
 
   // Computed
   const isActive = computed(() => state.value.entityId !== null && state.value.mentions.length > 0)
@@ -60,19 +76,22 @@ export function useMentionNavigation(projectId: () => number) {
   /**
    * Filtra menciones según criterios activos.
    *
-   * Menciones "activas" son aquellas donde la entidad es referente principal:
-   * - Sujeto, objeto, verbo comunicativo (confianza >= 0.80)
-   * - Excluye contextos posesivos (confianza < 0.70)
+   * Aplica dos filtros:
+   * 1. Threshold de confianza (Mejora 5): confianza >= confidenceThreshold
+   * 2. Filtro "Solo activas" (Mejora 2): excluye contextos posesivos
    */
   const filteredMentions = computed(() => {
+    let mentions = state.value.mentions
+
+    // Filtro 1: Threshold de confianza (Mejora 5)
+    mentions = mentions.filter(m => m.confidence >= confidenceThreshold.value)
+
+    // Filtro 2: Solo activas (Mejora 2)
     if (!filterOnlyActive.value) {
-      return state.value.mentions
+      return mentions
     }
 
-    return state.value.mentions.filter(m => {
-      // Filtro por confianza: >= 0.75 (umbral para "activa")
-      if (m.confidence < 0.75) return false
-
+    return mentions.filter(m => {
       // Verificar reasoning si está disponible
       const reasoning = m.validationReasoning?.toLowerCase() || ''
 
@@ -81,7 +100,7 @@ export function useMentionNavigation(projectId: () => number) {
         return false
       }
 
-      // Mantener roles activos
+      // Mantener roles activos o confianza muy alta
       const activeRoles = ['sujeto', 'objeto', 'verbo', 'comunicativo', 'gerundio', 'pasiva', 'vocativo', 'aposición']
       return activeRoles.some(role => reasoning.includes(role)) || m.confidence >= 0.85
     })
@@ -328,6 +347,7 @@ export function useMentionNavigation(projectId: () => number) {
     // Estado
     state,
     filterOnlyActive,  // Mejora 2: filtro de menciones activas
+    confidenceThreshold,  // Mejora 5: threshold ajustable de confianza
 
     // Computed
     isActive,
@@ -336,7 +356,7 @@ export function useMentionNavigation(projectId: () => number) {
     canGoPrevious,
     canGoNext,
     navigationLabel,
-    filteredMentions,  // Mejora 2: menciones filtradas
+    filteredMentions,  // Mejora 2 + 5: menciones filtradas por roles y confianza
 
     // Acciones
     loadMentions,
