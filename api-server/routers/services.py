@@ -3,6 +3,8 @@ Router: services
 """
 
 
+from collections.abc import Iterable
+
 import deps
 from deps import (
     ApiResponse,
@@ -15,6 +17,25 @@ from deps import (
 from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
+
+_MODEL_SPEED_ORDER = ["llama3.2", "qwen2.5", "mistral", "gemma2"]
+_MODEL_QUALITY_ORDER = ["gemma2", "mistral", "qwen2.5", "llama3.2"]
+
+
+def _normalize_model_name(model_name: str) -> str:
+    return (model_name or "").split(":")[0].strip().lower()
+
+
+def _sorted_models(
+    models: Iterable[str],
+    prioritize_speed: bool,
+) -> list[str]:
+    ranking = _MODEL_SPEED_ORDER if prioritize_speed else _MODEL_QUALITY_ORDER
+    order_map = {name: idx for idx, name in enumerate(ranking)}
+    return sorted(
+        {_normalize_model_name(m) for m in models if m},
+        key=lambda m: order_map.get(m, len(order_map)),
+    )
 
 @router.get("/api/llm/status", response_model=ApiResponse)
 def get_llm_status():
@@ -251,6 +272,53 @@ def pull_ollama_model(model_name: str):
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
+@router.delete("/api/ollama/model/{model_name}", response_model=ApiResponse)
+def delete_ollama_model(model_name: str):
+    """
+    Elimina un modelo de Ollama.
+
+    Regla de seguridad UX: debe quedar al menos 1 modelo instalado.
+    """
+    try:
+        from narrative_assistant.llm.ollama_manager import get_ollama_manager
+
+        manager = get_ollama_manager()
+        normalized = _normalize_model_name(model_name)
+
+        if not manager.is_installed:
+            return ApiResponse(success=False, error="Ollama no está instalado")
+
+        success, message = manager.ensure_running()
+        if not success:
+            return ApiResponse(success=False, error=f"No se pudo iniciar Ollama: {message}")
+
+        downloaded = {_normalize_model_name(m) for m in manager.downloaded_models}
+        if normalized not in downloaded:
+            return ApiResponse(success=False, error=f"El modelo '{normalized}' no está instalado")
+
+        if len(downloaded) <= 1:
+            return ApiResponse(
+                success=False,
+                error="Debe quedar al menos 1 modelo instalado",
+                data={"min_models_required": 1, "installed_models": sorted(downloaded)},
+            )
+
+        success, message = manager.delete_model(normalized)
+        if not success:
+            return ApiResponse(success=False, error=message)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "message": message,
+                "remaining_models": sorted({_normalize_model_name(m) for m in manager.downloaded_models}),
+            },
+        )
+    except Exception as e:
+        logger.error(f"Error deleting model {model_name}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
 @router.post("/api/ollama/install", response_model=ApiResponse)
 async def install_ollama_endpoint():
     """
@@ -466,17 +534,26 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
     """
     Chat con el asistente LLM usando el documento como contexto.
 
-    El asistente puede responder preguntas sobre el manuscrito usando RAG
-    (Retrieval-Augmented Generation) para incluir fragmentos relevantes
-    del documento como contexto.
+    Usa RAG exhaustivo: busca TODAS las ocurrencias relevantes en TODO el
+    manuscrito y devuelve referencias navegables [REF:N] en la respuesta.
 
     Args:
         project_id: ID del proyecto
-        request: Mensaje del usuario y historial opcional
+        request: Mensaje del usuario, historial, y texto seleccionado opcional
 
     Returns:
-        ApiResponse con la respuesta del LLM
+        ApiResponse con la respuesta del LLM y referencias navegables
     """
+    from ._chat_rag import (
+        build_chat_system_prompt,
+        build_numbered_context,
+        build_reference_index,
+        build_selection_context,
+        exhaustive_search,
+        extract_search_terms,
+        rank_and_select,
+    )
+
     try:
         if not deps.project_manager:
             return ApiResponse(success=False, error="Project manager not initialized")
@@ -524,92 +601,142 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
                 error=f"Error al verificar Ollama: {str(e)}"
             )
 
-        # Obtener capítulos del proyecto para contexto
-        chapters_content = []
+        # ================================================================
+        # RAG exhaustivo
+        # ================================================================
+
+        # 1. Obtener TODOS los capítulos (contenido completo)
+        chapters_data: list[dict] = []
         if deps.chapter_repository:
             chapters = deps.chapter_repository.get_by_project(project_id)
             for ch in chapters:
                 if ch.content:
-                    chapters_content.append({
+                    chapters_data.append({
+                        "number": ch.chapter_number,
                         "title": ch.title or f"Capítulo {ch.chapter_number}",
-                        "content": ch.content[:5000]  # Limitar para no sobrecargar contexto
+                        "content": ch.content,
+                        "start_char": ch.start_char,
+                        "end_char": ch.end_char,
+                        "id": ch.id,
                     })
 
-        # Construir contexto del documento (RAG básico por keywords)
-        user_message = request.message.lower()
-        relevant_context = []
+        # 2. Obtener entidades para keyword expansion
+        entities = []
+        if deps.entity_repository:
+            try:
+                entities = deps.entity_repository.get_entities_by_project(project_id)
+            except Exception as e:
+                logger.warning(f"Could not load entities for chat RAG: {e}")
 
-        # Buscar fragmentos relevantes (keywords simples)
-        keywords = [word for word in user_message.split() if len(word) > 3]
+        # 3. Extraer términos de búsqueda enriquecidos
+        search_terms = extract_search_terms(request.message, entities)
 
-        for chapter in chapters_content:
-            chapter_lower = chapter["content"].lower()
-            relevance_score = sum(1 for kw in keywords if kw in chapter_lower)
+        # 4. Búsqueda exhaustiva en todo el manuscrito
+        all_matches = exhaustive_search(search_terms, chapters_data)
 
-            if relevance_score > 0:
-                # Extraer fragmento relevante (primeros 1000 chars con keywords)
-                relevant_context.append({
-                    "source": chapter["title"],
-                    "content": chapter["content"][:1500],
-                    "score": relevance_score
-                })
+        # 5. Ranking y selección con budget de tokens
+        selected_excerpts = rank_and_select(all_matches, max_chars=2000, max_excerpts=8)
 
-        # Ordenar por relevancia y tomar los mejores
-        relevant_context.sort(key=lambda x: x["score"], reverse=True)
-        top_context = relevant_context[:3]  # Máximo 3 fragmentos
+        # 6. Construir contexto numerado
+        context_text, ref_map = build_numbered_context(selected_excerpts)
+        context_sources = list({e["chapter_title"] for e in selected_excerpts})
 
-        # Construir prompt con contexto
-        context_text = ""
-        context_sources = []
-        if top_context:
-            context_text = "\n\n### Contexto del documento:\n"
-            for ctx in top_context:
-                context_text += f"\n**{ctx['source']}:**\n{ctx['content'][:1000]}...\n"
-                context_sources.append(ctx["source"])
+        # 7. Contexto de texto seleccionado
+        selection_context = ""
+        if request.selected_text:
+            ch_title = None
+            if request.selected_text_chapter:
+                for cd in chapters_data:
+                    if cd["number"] == request.selected_text_chapter:
+                        ch_title = cd["title"]
+                        break
+            selection_context = build_selection_context(
+                request.selected_text, ch_title
+            )
 
-        # Construir historial de conversación
+        # 8. Historial de conversación
         history_text = ""
         if request.history:
             history_text = "\n\n### Conversación previa:\n"
-            for msg in request.history[-5:]:  # Últimos 5 mensajes
+            for msg in request.history[-5:]:
                 role = "Usuario" if msg.get("role") == "user" else "Asistente"
                 history_text += f"{role}: {msg.get('content', '')}\n"
 
-        # Prompt del sistema
-        system_prompt = f"""Eres un asistente experto en análisis literario y corrección de textos.
-Estás ayudando a analizar el manuscrito "{project.name}".
+        # 9. System prompt completo
+        system_prompt = build_chat_system_prompt(
+            project_name=project.name,
+            context_text=context_text,
+            selection_context=selection_context,
+            history_text=history_text,
+        )
 
-Tu rol es:
-- Responder preguntas sobre el contenido del documento
-- Ayudar a identificar personajes, lugares y eventos
-- Señalar posibles inconsistencias si se te pregunta
-- Dar sugerencias de mejora cuando sea apropiado
+        # ================================================================
+        # Selección de modelo (misma lógica existente)
+        # ================================================================
+        ctx = request.context if isinstance(request.context, dict) else {}
+        selected_models_raw = ctx.get("enabledInferenceMethods", [])
+        prioritize_speed = bool(ctx.get("prioritizeSpeed", True))
 
-Responde de forma concisa y profesional. Si no tienes información suficiente
-en el contexto proporcionado, indícalo claramente.
-{context_text}
-{history_text}"""
+        selected_models = []
+        if isinstance(selected_models_raw, list):
+            selected_models = [
+                _normalize_model_name(str(m))
+                for m in selected_models_raw
+                if isinstance(m, str) and m.strip()
+            ]
 
-        # Llamar al LLM (con prioridad sobre análisis batch)
+        installed_models: list[str] = []
+        try:
+            from narrative_assistant.llm.ollama_manager import get_ollama_manager
+            manager = get_ollama_manager()
+            installed_models = [_normalize_model_name(m) for m in manager.downloaded_models]
+        except Exception:
+            installed_models = []
+
+        selected_installed = [
+            m for m in selected_models if m in set(installed_models)
+        ]
+        default_model = _normalize_model_name(llm_client.model_name)
+        if selected_installed:
+            candidate_models = _sorted_models(selected_installed, prioritize_speed)
+        else:
+            candidate_models = _sorted_models([default_model], True)
+
+        # ================================================================
+        # Llamar al LLM
+        # ================================================================
         try:
             from narrative_assistant.llm.client import get_llm_scheduler
+            response = None
+            used_model = None
+
             with get_llm_scheduler().chat_priority():
-                response = llm_client.complete(
-                    prompt=request.message,
-                    system=system_prompt,
-                    max_tokens=1000,
-                    temperature=0.7
-                )
+                for model_name in candidate_models:
+                    response = llm_client.complete(
+                        prompt=request.message,
+                        system=system_prompt,
+                        max_tokens=1000,
+                        temperature=0.35,
+                        model_name=model_name,
+                    )
+                    if response and response.strip():
+                        used_model = model_name
+                        break
 
             if response and response.strip():
+                # Parsear referencias [REF:N]
+                references = build_reference_index(response, ref_map)
+
                 using_cpu = getattr(llm_client, '_ollama_num_gpu', None) == 0
                 return ApiResponse(
                     success=True,
                     data={
                         "response": response.strip(),
+                        "references": references,
                         "contextUsed": context_sources,
-                        "model": llm_client.model_name,
+                        "model": used_model or llm_client.model_name,
                         "usingCpu": using_cpu,
+                        "candidateModels": candidate_models,
                     }
                 )
             else:

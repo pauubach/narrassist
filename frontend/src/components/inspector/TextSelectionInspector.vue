@@ -33,6 +33,8 @@ const emit = defineEmits<{
   (e: 'search-similar', text: string): void
   /** Seleccionar entidad mencionada */
   (e: 'select-entity', entityId: number): void
+  /** Preguntar a la IA sobre el texto seleccionado */
+  (e: 'ask-ai', text: string): void
 }>()
 
 // Estadísticas del texto
@@ -159,19 +161,27 @@ function getEntityIcon(type: string): string {
     <!-- Acciones -->
     <div class="inspector-actions">
       <Button
-        label="Copiar"
-        icon="pi pi-copy"
+        label="Preguntar a la IA"
+        icon="pi pi-comments"
         size="small"
-        outlined
-        @click="copyToClipboard"
+        @click="emit('ask-ai', selection.text)"
       />
-      <Button
-        label="Buscar similar"
-        icon="pi pi-search"
-        size="small"
-        outlined
-        @click="emit('search-similar', selection.text)"
-      />
+      <div class="secondary-actions">
+        <Button
+          label="Copiar"
+          icon="pi pi-copy"
+          size="small"
+          outlined
+          @click="copyToClipboard"
+        />
+        <Button
+          label="Buscar similar"
+          icon="pi pi-search"
+          size="small"
+          outlined
+          @click="emit('search-similar', selection.text)"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -333,7 +343,16 @@ function getEntityIcon(type: string): string {
   border-top: 1px solid var(--surface-border);
 }
 
-.inspector-actions .p-button {
+.inspector-actions > .p-button {
+  width: 100%;
+}
+
+.secondary-actions {
+  display: flex;
+  gap: var(--ds-space-2);
+}
+
+.secondary-actions .p-button {
   flex: 1;
 }
 

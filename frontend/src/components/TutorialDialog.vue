@@ -83,6 +83,18 @@
               </p>
             </div>
           </div>
+
+          <div class="workflow-step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <h4><i class="pi pi-comments"></i> Preguntar a la IA</h4>
+              <p>
+                Usa el <strong>Asistente IA</strong> en el sidebar para hacer preguntas
+                sobre tu manuscrito. Selecciona texto y pregunta "¿qué pasa aquí?"
+                — las respuestas incluyen <strong>referencias navegables</strong> al texto.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div class="tip-box">

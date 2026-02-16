@@ -279,6 +279,67 @@
           </p>
         </section>
 
+        <!-- Asistente IA -->
+        <section id="asistente-ia" class="guide-section">
+          <h2><i class="pi pi-comments"></i> Asistente IA</h2>
+
+          <p>
+            El <strong>Asistente IA</strong> es un chat inteligente que conoce tu manuscrito
+            completo. Puedes hacerle preguntas y obtener respuestas con
+            <strong>referencias navegables</strong> al texto original.
+          </p>
+
+          <h3>Preguntas sobre el manuscrito</h3>
+          <p>
+            Escribe tu pregunta en el panel del asistente (sidebar izquierdo,
+            pestaña <i class="pi pi-comments"></i>). El asistente buscará
+            en <strong>todos los capítulos</strong> para encontrar la información relevante.
+          </p>
+
+          <div class="tip-box">
+            <i class="pi pi-lightbulb"></i>
+            <div>
+              <strong>Ejemplo:</strong> "¿De qué color son los ojos de María?"
+              — El asistente buscará todas las menciones en el manuscrito y
+              te indicará si hay inconsistencias entre capítulos.
+            </div>
+          </div>
+
+          <h3>Texto seleccionado como contexto</h3>
+          <p>
+            Selecciona texto en el visor de documento y haz clic en
+            <strong>"Preguntar a la IA"</strong> en el panel de selección.
+            El asistente usará ese fragmento como contexto para responder tu pregunta
+            con mayor precisión.
+          </p>
+          <p>
+            Cuando hay texto seleccionado, verás una barra azul sobre el campo
+            de entrada mostrando el fragmento. Puedes cerrarla con la ✕ si
+            prefieres preguntar sin contexto.
+          </p>
+
+          <h3>Referencias navegables</h3>
+          <p>
+            Las respuestas del asistente incluyen <strong>referencias clicables</strong>
+            al texto original. Haz clic en una referencia para navegar directamente
+            a esa parte del manuscrito, igual que con las alertas.
+          </p>
+          <p>
+            Si el asistente encuentra información contradictoria (por ejemplo,
+            "ojos azules" en un capítulo y "ojos verdes" en otro), citará
+            ambas ubicaciones para que puedas verificarlo tú mismo.
+          </p>
+
+          <h3>Preguntas sugeridas</h3>
+          <ul>
+            <li>"¿Cuántas veces aparece [personaje]?"</li>
+            <li>"¿Qué se dice sobre [lugar/objeto] en el manuscrito?"</li>
+            <li>"¿Hay inconsistencias con [atributo] de [personaje]?"</li>
+            <li>"Resúmeme lo que pasa en este fragmento" (con texto seleccionado)</li>
+            <li>"¿Quién habla en este diálogo?" (con texto seleccionado)</li>
+          </ul>
+        </section>
+
         <!-- Exportar -->
         <section id="exportar" class="guide-section">
           <h2><i class="pi pi-download"></i> Exportar</h2>
@@ -522,6 +583,7 @@ const sections = [
   { id: 'alertas', title: 'Alertas', icon: 'pi pi-bell' },
   { id: 'personajes', title: 'Entidades', icon: 'pi pi-tags' },
   { id: 'workspace', title: 'Áreas de Trabajo', icon: 'pi pi-th-large' },
+  { id: 'asistente-ia', title: 'Asistente IA', icon: 'pi pi-comments' },
   { id: 'exportar', title: 'Exportar', icon: 'pi pi-download' },
   { id: 'configuracion', title: 'Configuración', icon: 'pi pi-cog' },
   { id: 'privacidad', title: 'Privacidad', icon: 'pi pi-shield' },

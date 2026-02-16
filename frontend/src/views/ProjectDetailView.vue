@@ -176,6 +176,8 @@
                 <AssistantPanel
                   v-show="sidebarTab === 'assistant'"
                   :project-id="project.id"
+                  :selection-chapter-number="currentChapter?.chapterNumber ?? null"
+                  @navigate-to-reference="onChatReferenceNavigate"
                 />
 
                 <!-- Panel Historial -->
@@ -381,6 +383,7 @@
                   @close="selectionStore.setTextSelection(null)"
                   @select-entity="onEntityClick"
                   @search-similar="onSearchSimilarText"
+                  @ask-ai="onAskAiAboutSelection"
                 />
 
                 <!-- Capítulo visible en tab texto (contextual) -->
@@ -449,7 +452,7 @@ import ComparisonBanner from '@/components/alerts/ComparisonBanner.vue'
 import DocumentTypeChip from '@/components/DocumentTypeChip.vue'
 import CorrectionConfigModal from '@/components/workspace/CorrectionConfigModal.vue'
 import type { SidebarTab } from '@/stores/workspace'
-import type { Entity, Alert, AlertSource } from '@/types'
+import type { Entity, Alert, AlertSource, ChatReference } from '@/types'
 import { resetGlobalHighlight } from '@/composables/useHighlight'
 import { api } from '@/services/apiClient'
 import { useNotifications } from '@/composables/useNotifications'
@@ -998,12 +1001,23 @@ const onViewChapterAlerts = () => {
 
 // TextSelectionInspector handlers
 const onSearchSimilarText = (text: string) => {
-  // Por ahora solo limpiamos la selección y mostramos un mensaje en consola
-  // En el futuro podría abrir el asistente LLM con el texto seleccionado
   console.log('Search similar text:', text.substring(0, 50) + '...')
   selectionStore.setTextSelection(null)
-  // Podría activar el sidebar del asistente con el texto como contexto
   sidebarTab.value = 'assistant'
+}
+
+const onAskAiAboutSelection = (_text: string) => {
+  // Switch to assistant tab — the selection stays in selectionStore
+  // and AssistantPanel reads it from there
+  sidebarTab.value = 'assistant'
+}
+
+// Chat reference navigation (same pattern as alert navigation)
+const onChatReferenceNavigate = (ref: ChatReference) => {
+  const chapter = chapters.value.find(c => c.chapterNumber === ref.chapter)
+  const chapterId = chapter?.id ?? null
+  workspaceStore.clearAlertHighlights()
+  workspaceStore.navigateToTextPosition(ref.startChar, ref.excerpt, chapterId)
 }
 
 const handleExportStyleGuide = () => {

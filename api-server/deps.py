@@ -355,6 +355,10 @@ class ChatRequest(BaseModel):
     message: str
     context: Optional[dict] = None
     history: Optional[list] = None
+    selected_text: Optional[str] = None
+    selected_text_chapter: Optional[int] = None
+    selected_text_start: Optional[int] = None
+    selected_text_end: Optional[int] = None
 
 
 class GlossaryEntryRequest(BaseModel):

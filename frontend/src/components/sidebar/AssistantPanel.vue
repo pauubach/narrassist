@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { useChat } from '@/composables/useChat'
+import type { ChatSelectionContext } from '@/composables/useChat'
 import { useAnalysisStore } from '@/stores/analysis'
+import { useSelectionStore } from '@/stores/selection'
+import type { ChatReference } from '@/types'
+import ChatMessageContent from './ChatMessageContent.vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 
@@ -13,6 +17,8 @@ import InputText from 'primevue/inputtext'
  * entre iteraciones LLM (LLMScheduler), así que no se bloquea.
  *
  * Features:
+ * - Text selection context: sends selected text as context to the LLM
+ * - Navigable references: [REF:N] in responses become clickable badges
  * - Arrow up/down: navigate previous user messages (terminal-style)
  * - Escape: cancel current request + empty queue
  * - Message queue: send while waiting, shown as editable list
@@ -24,6 +30,13 @@ import InputText from 'primevue/inputtext'
 const props = defineProps<{
   /** ID del proyecto actual */
   projectId: number
+  /** Número de capítulo correspondiente a la selección (1-indexed) */
+  selectionChapterNumber?: number | null
+}>()
+
+const emit = defineEmits<{
+  /** Navegar a una referencia en el documento */
+  (e: 'navigate-to-reference', ref: ChatReference): void
 }>()
 
 const {
@@ -32,6 +45,7 @@ const {
 } = useChat(props.projectId)
 
 const analysisStore = useAnalysisStore()
+const selectionStore = useSelectionStore()
 const isProjectAnalyzing = computed(() => analysisStore.isProjectAnalyzing(props.projectId))
 
 const inputText = ref('')
@@ -41,6 +55,14 @@ const messagesContainer = ref<HTMLElement | null>(null)
 const inputHistory = ref<string[]>([])
 const historyIndex = ref(-1)
 const savedInput = ref('')
+
+// Text selection context
+const activeSelection = computed(() => selectionStore.textSelection)
+const activeSelectionPreview = computed(() => {
+  const sel = selectionStore.textSelection
+  if (!sel) return ''
+  return sel.text.length > 50 ? sel.text.substring(0, 50) + '...' : sel.text
+})
 
 // Rebuild input history from saved messages + auto-scroll on mount
 onMounted(() => {
@@ -54,9 +76,9 @@ onMounted(() => {
   })
 })
 
-// Auto-scroll on new messages
+// Auto-scroll on new messages (watch length, not deep — avoid recalc on every property mutation)
 watch(
-  messages,
+  () => messages.value.length,
   () => {
     nextTick(() => {
       if (messagesContainer.value) {
@@ -64,7 +86,6 @@ watch(
       }
     })
   },
-  { deep: true }
 )
 
 function handleSend() {
@@ -73,7 +94,20 @@ function handleSend() {
   inputText.value = ''
   inputHistory.value.push(message)
   historyIndex.value = -1
-  sendMessage(message)
+
+  // Build selection context if text is selected
+  let selection: ChatSelectionContext | undefined
+  const sel = selectionStore.textSelection
+  if (sel?.text) {
+    selection = {
+      text: sel.text,
+      chapter: props.selectionChapterNumber ?? undefined,
+      start: sel.start,
+      end: sel.end,
+    }
+  }
+
+  sendMessage(message, selection)
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -121,6 +155,14 @@ function navigateHistory(direction: 'up' | 'down') {
 function handleEditQueued(index: number) {
   inputText.value = editQueued(index)
 }
+
+function handleReferenceClick(ref: ChatReference) {
+  emit('navigate-to-reference', ref)
+}
+
+function clearSelectionContext() {
+  selectionStore.setTextSelection(null)
+}
 </script>
 
 <template>
@@ -148,7 +190,8 @@ function handleEditQueued(index: number) {
       <div v-if="messages.length === 0 && !isLoading" class="empty-state">
         <i class="pi pi-comments"></i>
         <p>Pregunta sobre tu manuscrito</p>
-        <span class="hint">Ej: "¿Cuántas veces aparece Ana?"</span>
+        <span class="hint">Ej: "¿De qué color tiene los ojos María?"</span>
+        <span class="hint">Selecciona texto para dar contexto a la IA</span>
       </div>
 
       <!-- Messages -->
@@ -159,7 +202,17 @@ function handleEditQueued(index: number) {
         :class="[`message-${msg.role}`, msg.status === 'error' ? 'message-error' : '']"
       >
         <div v-if="msg.status !== 'error'" class="message-content">
-          {{ msg.content }}
+          <!-- Assistant messages: use ChatMessageContent for reference support -->
+          <ChatMessageContent
+            v-if="msg.role === 'assistant'"
+            :content="msg.content"
+            :references="msg.references"
+            :context-used="msg.contextUsed"
+            @navigate-reference="handleReferenceClick"
+          />
+          <template v-else>
+            {{ msg.content }}
+          </template>
         </div>
         <div v-else class="message-error-content">
           <i class="pi pi-exclamation-triangle"></i>
@@ -204,7 +257,7 @@ function handleEditQueued(index: number) {
         <span class="queue-title">En cola ({{ pendingQueue.length }})</span>
       </div>
       <div v-for="(q, idx) in pendingQueue" :key="idx" class="queue-item">
-        <span class="queue-text">{{ q }}</span>
+        <span class="queue-text">{{ q.content }}</span>
         <div class="queue-actions">
           <Button
             v-tooltip.top="'Editar'"
@@ -227,11 +280,28 @@ function handleEditQueued(index: number) {
       </div>
     </div>
 
+    <!-- Selection context bar -->
+    <div v-if="activeSelection" class="selection-context-bar">
+      <i class="pi pi-text-select"></i>
+      <span class="selection-preview" :title="activeSelection.text">
+        "{{ activeSelectionPreview }}"
+      </span>
+      <Button
+        v-tooltip.top="'Quitar contexto'"
+        icon="pi pi-times"
+        text
+        rounded
+        size="small"
+        class="selection-clear-btn"
+        @click="clearSelectionContext"
+      />
+    </div>
+
     <!-- Input area -->
     <div class="input-area">
       <InputText
         v-model="inputText"
-        placeholder="Escribe tu pregunta..."
+        :placeholder="activeSelection ? 'Pregunta sobre la selección...' : 'Escribe tu pregunta...'"
         class="chat-input"
         @keydown="handleKeydown"
       />
@@ -479,6 +549,40 @@ function handleEditQueued(index: number) {
   display: flex;
   gap: 2px;
   flex-shrink: 0;
+}
+
+/* Selection context bar */
+.selection-context-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  background: var(--ds-color-primary-soft, rgba(59, 130, 246, 0.08));
+  border-top: 1px solid var(--ds-color-primary-subtle, rgba(59, 130, 246, 0.2));
+  flex-shrink: 0;
+}
+
+.selection-context-bar i.pi-text-select {
+  color: var(--ds-color-primary);
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.selection-preview {
+  flex: 1;
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-text-secondary);
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selection-clear-btn {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  color: var(--ds-color-text-muted) !important;
 }
 
 /* Input area */

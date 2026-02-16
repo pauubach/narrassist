@@ -2,20 +2,33 @@
  * useChat - Composable for LLM chat functionality
  *
  * Provides chat with LLM using the project document as context.
- * Supports cancellation (AbortController), message queue, and retry on connection errors.
+ * Supports text selection context, cancellation (AbortController),
+ * message queue, and retry on connection errors.
  */
 
 import { ref, watch, onMounted } from 'vue'
 import { api, backendDown } from '@/services/apiClient'
-import type { ChatMessage, ChatResponse } from '@/types'
+import type { ChatMessage, ChatRequest, ChatResponse } from '@/types'
 
+/** Text selection context to send with a message */
+export interface ChatSelectionContext {
+  text: string
+  chapter?: number   // chapter number (1-indexed)
+  start?: number     // start_char position
+  end?: number       // end_char position
+}
 
+/** Queued message preserving selection context */
+export interface QueuedMessage {
+  content: string
+  selection?: ChatSelectionContext
+}
 
 export function useChat(projectId: number) {
   const messages = ref<ChatMessage[]>([])
   const isLoading = ref(false)
   const error = ref<string | null>(null)
-  const pendingQueue = ref<string[]>([])
+  const pendingQueue = ref<QueuedMessage[]>([])
 
   let abortController: AbortController | null = null
 
@@ -66,10 +79,33 @@ export function useChat(projectId: number) {
     }
   }
 
-  async function sendMessage(content: string): Promise<void> {
-    // If already loading, queue the message
+  function getChatContextFromSettings(): ChatRequest['context'] {
+    try {
+      const raw = localStorage.getItem('narrative_assistant_settings')
+      if (!raw) return undefined
+
+      const parsed = JSON.parse(raw) as {
+        enabledInferenceMethods?: string[]
+        prioritizeSpeed?: boolean
+      }
+
+      const selected = Array.isArray(parsed.enabledInferenceMethods)
+        ? parsed.enabledInferenceMethods.filter((m): m is string => typeof m === 'string' && m.length > 0)
+        : []
+
+      return {
+        enabledInferenceMethods: selected,
+        prioritizeSpeed: parsed.prioritizeSpeed ?? true,
+      }
+    } catch {
+      return undefined
+    }
+  }
+
+  async function sendMessage(content: string, selection?: ChatSelectionContext): Promise<void> {
+    // If already loading, queue the message with its selection context
     if (isLoading.value) {
-      pendingQueue.value.push(content)
+      pendingQueue.value.push({ content, selection })
       return
     }
 
@@ -95,15 +131,27 @@ export function useChat(projectId: number) {
     isLoading.value = true
 
     try {
+      // Build request body
+      const body: Record<string, unknown> = {
+        message: content,
+        history: history.slice(0, -1), // Exclude current message
+        context: getChatContextFromSettings(),
+      }
+
+      // Include text selection context if present
+      if (selection?.text) {
+        body.selected_text = selection.text
+        if (selection.chapter != null) body.selected_text_chapter = selection.chapter
+        if (selection.start != null) body.selected_text_start = selection.start
+        if (selection.end != null) body.selected_text_end = selection.end
+      }
+
       // 300s timeout - CPU inference on low-end hardware can be very slow,
       // especially when analysis is running and chat has to wait for LLM scheduler.
       // retries: 3 → retry up to 3 times on connection error (backoff: 2s, 4s, 8s)
       const data = await api.postRaw<any>(
         `/api/projects/${projectId}/chat`,
-        {
-          message: content,
-          history: history.slice(0, -1) // Exclude current message
-        },
+        body,
         { timeout: 300000, signal: abortController.signal, retries: 3 }
       )
 
@@ -115,7 +163,8 @@ export function useChat(projectId: number) {
           content: chatResponse.response,
           timestamp: new Date(),
           status: 'complete',
-          contextUsed: chatResponse.contextUsed
+          contextUsed: chatResponse.contextUsed,
+          references: chatResponse.references,
         }
         messages.value.push(assistantMessage)
       } else {
@@ -165,7 +214,7 @@ export function useChat(projectId: number) {
       // Process queue — but only if backend is responding
       if (pendingQueue.value.length > 0 && !backendDown.value) {
         const next = pendingQueue.value.shift()!
-        await sendMessage(next)
+        await sendMessage(next.content, next.selection)
       }
     }
   }
@@ -193,7 +242,8 @@ export function useChat(projectId: number) {
   }
 
   function editQueued(index: number): string {
-    return pendingQueue.value.splice(index, 1)[0]
+    const item = pendingQueue.value.splice(index, 1)[0]
+    return item.content
   }
 
   function clearHistory(): void {
