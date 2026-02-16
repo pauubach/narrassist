@@ -429,21 +429,31 @@ class AlertEngine:
         value2_source: dict[str, Any],
         explanation: str,
         confidence: float = 0.9,
+        sources: list[dict[str, Any]] | None = None,
     ) -> Result[Alert]:
         """
         Crea alerta desde inconsistencia de atributo.
 
+        Soporta tanto inconsistencias de 2 valores (legacy) como N valores (multi-valor).
+
         IMPORTANTE: Incluye referencias a ubicaciones para mostrar:
-        "Capítulo X: 'valor1' vs Capítulo Y: 'valor2'"
+        "Capítulo X: 'valor1' vs Capítulo Y: 'valor2'" (2 valores)
+        "Cap. X: 'valor1', Cap. Y: 'valor2', Cap. Z: 'valor3'" (N valores)
 
         Args:
-            value1_source, value2_source: Deben incluir:
+            value1_source, value2_source: Deben incluir (legacy, solo 2 valores):
                 - chapter: int
                 - page: int (calculado con calculate_page_and_line)
                 - line: int (calculado con calculate_page_and_line)
                 - start_char: int
                 - end_char: int
                 - text/excerpt: str
+            sources: Lista de fuentes para multi-valor (preferido), cada una con:
+                - chapter: int
+                - start_char: int
+                - end_char: int
+                - excerpt/text: str
+                - value: str
 
         Example:
             value1_source = {
@@ -457,48 +467,69 @@ class AlertEngine:
         """
         severity = self.calculate_severity_from_confidence(confidence)
 
-        # Construir descripción con referencias mejoradas
-        ref1 = f"Cap. {value1_source.get('chapter', '?')}"
-        if "page" in value1_source:
-            ref1 += f", pág. {value1_source['page']}"
-        if "line" in value1_source:
-            ref1 += f", lín. {value1_source['line']}"
+        # Si se proporciona sources[], usarlo (multi-valor)
+        # Si no, construir desde value1_source/value2_source (legacy)
+        if sources is None or len(sources) == 0:
+            # Construir descripción legacy (2 valores)
+            ref1 = f"Cap. {value1_source.get('chapter', '?')}"
+            if "page" in value1_source:
+                ref1 += f", pág. {value1_source['page']}"
+            if "line" in value1_source:
+                ref1 += f", lín. {value1_source['line']}"
 
-        ref2 = f"Cap. {value2_source.get('chapter', '?')}"
-        if "page" in value2_source:
-            ref2 += f", pág. {value2_source['page']}"
-        if "line" in value2_source:
-            ref2 += f", lín. {value2_source['line']}"
+            ref2 = f"Cap. {value2_source.get('chapter', '?')}"
+            if "page" in value2_source:
+                ref2 += f", pág. {value2_source['page']}"
+            if "line" in value2_source:
+                ref2 += f", lín. {value2_source['line']}"
 
-        # Estructura sources[] para frontend
-        sources = [
-            {
-                "chapter": value1_source.get("chapter"),
-                "page": value1_source.get("page", 1),
-                "line": value1_source.get("line", 1),
-                "start_char": value1_source.get(
-                    "start_char", value1_source.get("position", 0)
-                ),
-                "end_char": value1_source.get(
-                    "end_char", value1_source.get("start_char", 0) + 100
-                ),
-                "excerpt": value1_source.get("text", value1_source.get("excerpt", "")),
-                "value": value1,
-            },
-            {
-                "chapter": value2_source.get("chapter"),
-                "page": value2_source.get("page", 1),
-                "line": value2_source.get("line", 1),
-                "start_char": value2_source.get(
-                    "start_char", value2_source.get("position", 0)
-                ),
-                "end_char": value2_source.get(
-                    "end_char", value2_source.get("start_char", 0) + 100
-                ),
-                "excerpt": value2_source.get("text", value2_source.get("excerpt", "")),
-                "value": value2,
-            },
-        ]
+            description = f"{ref1}: '{value1}' vs {ref2}: '{value2}'"
+
+            # Estructura sources[] para frontend
+            sources = [
+                {
+                    "chapter": value1_source.get("chapter"),
+                    "page": value1_source.get("page", 1),
+                    "line": value1_source.get("line", 1),
+                    "start_char": value1_source.get(
+                        "start_char", value1_source.get("position", 0)
+                    ),
+                    "end_char": value1_source.get(
+                        "end_char", value1_source.get("start_char", 0) + 100
+                    ),
+                    "excerpt": value1_source.get("text", value1_source.get("excerpt", "")),
+                    "value": value1,
+                },
+                {
+                    "chapter": value2_source.get("chapter"),
+                    "page": value2_source.get("page", 1),
+                    "line": value2_source.get("line", 1),
+                    "start_char": value2_source.get(
+                        "start_char", value2_source.get("position", 0)
+                    ),
+                    "end_char": value2_source.get(
+                        "end_char", value2_source.get("start_char", 0) + 100
+                    ),
+                    "excerpt": value2_source.get("text", value2_source.get("excerpt", "")),
+                    "value": value2,
+                },
+            ]
+        else:
+            # Multi-valor: construir descripción con N valores
+            value_refs = []
+            for src in sources:
+                ref = f"Cap. {src.get('chapter', '?')}"
+                if "page" in src:
+                    ref += f", pág. {src['page']}"
+                if "line" in src:
+                    ref += f", lín. {src['line']}"
+                value_refs.append(f"{ref}: '{src.get('value', '?')}'")
+
+            if len(value_refs) == 2:
+                description = f"{value_refs[0]} vs {value_refs[1]}"
+            else:
+                # N > 2: formato "valor1, valor2, ..., valorN"
+                description = ", ".join(value_refs[:-1]) + f", {value_refs[-1]}"
 
         # Traducir nombre del atributo para mostrar en español
         from ..nlp.attributes import AttributeKey
@@ -515,10 +546,10 @@ class AlertEngine:
             severity=severity,
             alert_type="attribute_inconsistency",
             title=f"Inconsistencia: {display_name} de {entity_name}",
-            description=f"{ref1}: '{value1}' vs {ref2}: '{value2}'",
+            description=description,
             explanation=explanation,
             suggestion=f"Verificar cuál es el valor correcto para {display_name}",
-            chapter=value1_source.get("chapter"),
+            chapter=sources[0].get("chapter") if sources else value1_source.get("chapter"),
             entity_ids=[entity_id],
             confidence=confidence,
             source_module="attribute_consistency",

@@ -1786,16 +1786,44 @@ def _create_alerts_from_inconsistencies(
                     continue
 
             # Construir fuentes con información de ubicación
-            value1_source = {
-                "chapter": incon.value1_chapter,
-                "position": incon.value1_position,
-                "text": incon.value1_excerpt,
-            }
-            value2_source = {
-                "chapter": incon.value2_chapter,
-                "position": incon.value2_position,
-                "text": incon.value2_excerpt,
-            }
+            # Soportar tanto multi-valor (conflicting_values) como legacy (value1/value2)
+            if incon.conflicting_values and len(incon.conflicting_values) > 0:
+                # Multi-valor: construir sources[] desde conflicting_values
+                sources = []
+                for cv in incon.conflicting_values:
+                    sources.append(
+                        {
+                            "chapter": cv.chapter,
+                            "position": cv.position,
+                            "start_char": cv.position,
+                            "end_char": cv.position + 100,  # Estimación
+                            "text": cv.excerpt,
+                            "value": cv.value,
+                        }
+                    )
+
+                # Legacy: usar primeros 2 valores para compatibilidad
+                value1_source = sources[0] if len(sources) >= 1 else {}
+                value2_source = sources[1] if len(sources) >= 2 else {}
+            else:
+                # Legacy: value1/value2
+                value1_source = {
+                    "chapter": incon.value1_chapter,
+                    "position": incon.value1_position,
+                    "start_char": incon.value1_position,
+                    "end_char": incon.value1_position + 100,
+                    "text": incon.value1_excerpt,
+                    "value": incon.value1,
+                }
+                value2_source = {
+                    "chapter": incon.value2_chapter,
+                    "position": incon.value2_position,
+                    "start_char": incon.value2_position,
+                    "end_char": incon.value2_position + 100,
+                    "text": incon.value2_excerpt,
+                    "value": incon.value2,
+                }
+                sources = [value1_source, value2_source]
 
             # Crear alerta
             alert_result = engine.create_from_attribute_inconsistency(
@@ -1809,6 +1837,7 @@ def _create_alerts_from_inconsistencies(
                 value2_source=value2_source,
                 explanation=incon.explanation,
                 confidence=incon.confidence,
+                sources=sources,  # Nueva lista de fuentes
             )
 
             if alert_result.is_success:

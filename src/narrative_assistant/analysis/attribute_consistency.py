@@ -14,7 +14,7 @@ Estrategias de detección:
 
 import logging
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 from ..core.errors import ErrorSeverity, NarrativeError
@@ -89,22 +89,43 @@ class InconsistencyType(Enum):
 
 
 @dataclass
+class ConflictingValue:
+    """
+    Representa un valor en un conflicto multi-valor.
+
+    Attributes:
+        value: Valor del atributo
+        chapter: Capítulo donde aparece
+        excerpt: Extracto del texto
+        position: Posición en caracteres
+    """
+
+    value: str
+    chapter: int | None
+    excerpt: str
+    position: int = 0
+
+
+@dataclass
 class AttributeInconsistency:
     """
     Representa una inconsistencia detectada entre atributos.
+
+    Soporta tanto inconsistencias de 2 valores (legacy) como N valores (multi-valor).
 
     Attributes:
         entity_name: Nombre de la entidad
         entity_id: ID de la entidad en la base de datos
         attribute_key: Clave del atributo inconsistente
-        value1: Primer valor encontrado
-        value1_chapter: Capítulo del primer valor
-        value1_excerpt: Extracto del texto
-        value1_position: Posición en caracteres del primer valor
-        value2: Segundo valor encontrado
-        value2_chapter: Capítulo del segundo valor
-        value2_excerpt: Extracto del texto
-        value2_position: Posición en caracteres del segundo valor
+        conflicting_values: Lista de valores conflictivos (para N valores)
+        value1: Primer valor encontrado (legacy, solo para 2 valores)
+        value1_chapter: Capítulo del primer valor (legacy)
+        value1_excerpt: Extracto del texto (legacy)
+        value1_position: Posición en caracteres del primer valor (legacy)
+        value2: Segundo valor encontrado (legacy, solo para 2 valores)
+        value2_chapter: Capítulo del segundo valor (legacy)
+        value2_excerpt: Extracto del texto (legacy)
+        value2_position: Posición en caracteres del segundo valor (legacy)
         inconsistency_type: Tipo de inconsistencia
         confidence: Confianza de que sea inconsistencia real (0.0-1.0)
         explanation: Explicación legible
@@ -113,17 +134,53 @@ class AttributeInconsistency:
     entity_name: str
     entity_id: int
     attribute_key: AttributeKey
-    value1: str
-    value1_chapter: int | None
-    value1_excerpt: str
-    value2: str
-    value2_chapter: int | None
-    value2_excerpt: str
+    # Multi-valor (preferido)
+    conflicting_values: list[ConflictingValue] = field(default_factory=list)
+    # Legacy (compatibilidad hacia atrás para tests existentes)
+    value1: str = ""
+    value1_chapter: int | None = None
+    value1_excerpt: str = ""
     value1_position: int = 0
+    value2: str = ""
+    value2_chapter: int | None = None
+    value2_excerpt: str = ""
     value2_position: int = 0
     inconsistency_type: InconsistencyType = InconsistencyType.VALUE_CHANGE
     confidence: float = 0.5
     explanation: str = ""
+
+    def __post_init__(self):
+        """Inicializa campos legacy si conflicting_values está vacío."""
+        # Si no hay conflicting_values pero sí value1/value2, construir desde legacy
+        if not self.conflicting_values and self.value1 and self.value2:
+            self.conflicting_values = [
+                ConflictingValue(
+                    value=self.value1,
+                    chapter=self.value1_chapter,
+                    excerpt=self.value1_excerpt,
+                    position=self.value1_position,
+                ),
+                ConflictingValue(
+                    value=self.value2,
+                    chapter=self.value2_chapter,
+                    excerpt=self.value2_excerpt,
+                    position=self.value2_position,
+                ),
+            ]
+        # Si hay conflicting_values pero no value1/value2, sincronizar legacy
+        elif self.conflicting_values and not self.value1:
+            if len(self.conflicting_values) >= 1:
+                first = self.conflicting_values[0]
+                self.value1 = first.value
+                self.value1_chapter = first.chapter
+                self.value1_excerpt = first.excerpt
+                self.value1_position = first.position
+            if len(self.conflicting_values) >= 2:
+                second = self.conflicting_values[1]
+                self.value2 = second.value
+                self.value2_chapter = second.chapter
+                self.value2_excerpt = second.excerpt
+                self.value2_position = second.position
 
     def to_dict(self) -> dict:
         """Convierte a diccionario para serialización."""
@@ -131,6 +188,15 @@ class AttributeInconsistency:
             "entity_name": self.entity_name,
             "entity_id": self.entity_id,
             "attribute_key": self.attribute_key.value,
+            "conflicting_values": [
+                {
+                    "value": cv.value,
+                    "chapter": cv.chapter,
+                    "excerpt": cv.excerpt,
+                    "position": cv.position,
+                }
+                for cv in self.conflicting_values
+            ],
             "value1": self.value1,
             "value1_chapter": self.value1_chapter,
             "value1_excerpt": self.value1_excerpt,
@@ -765,6 +831,127 @@ class AttributeConsistencyChecker:
                 self._embeddings_model = False
         return self._embeddings_model if self._embeddings_model else None
 
+    def _group_conflicting_values(
+        self,
+        attrs: list[ExtractedAttribute],
+        attr_key: AttributeKey,
+    ) -> list[list[ExtractedAttribute]]:
+        """
+        Agrupa atributos por valores equivalentes (después de normalización y sinónimos).
+
+        Atributos con valores idénticos o sinónimos se agrupan juntos.
+        Retorna lista de grupos, donde cada grupo representa un valor único.
+
+        Args:
+            attrs: Lista de atributos a agrupar
+            attr_key: Clave del atributo
+
+        Returns:
+            Lista de grupos de atributos equivalentes
+        """
+        groups: list[list[ExtractedAttribute]] = []
+
+        for attr in attrs:
+            # Saltar atributos negados
+            if attr.is_negated:
+                continue
+
+            # Saltar atributos temporales
+            if is_temporal_attribute(attr_key, attr.value):
+                continue
+
+            # Normalizar valor
+            normalized = _normalize_value(attr.value)
+
+            # Buscar grupo compatible (sinónimos o misma región corporal)
+            found_group = False
+            for group in groups:
+                representative = group[0]
+                rep_normalized = _normalize_value(representative.value)
+
+                # Mismo valor normalizado
+                if normalized == rep_normalized:
+                    group.append(attr)
+                    found_group = True
+                    break
+
+                # Sinónimos
+                if _are_synonyms(normalized, rep_normalized, attr_key):
+                    group.append(attr)
+                    found_group = True
+                    break
+
+                # DISTINCTIVE_FEATURE: diferentes regiones corporales → grupos separados
+                if attr_key == AttributeKey.DISTINCTIVE_FEATURE:
+                    if not _same_body_region(attr.value, representative.value):
+                        continue  # No agrupar, son regiones diferentes
+
+                # FACIAL_HAIR: diferentes dimensiones → grupos separados
+                if attr_key == AttributeKey.FACIAL_HAIR:
+                    if not _same_facial_hair_dimension(normalized, rep_normalized):
+                        continue
+
+            # Si no encontró grupo compatible, crear uno nuevo
+            if not found_group:
+                groups.append([attr])
+
+        return groups
+
+    def _generate_multi_value_explanation(
+        self,
+        attr_key: AttributeKey,
+        conflicting_values: list[ConflictingValue],
+        inc_type: InconsistencyType,
+        confidence: float,
+    ) -> str:
+        """
+        Genera explicación para inconsistencias multi-valor.
+
+        Args:
+            attr_key: Clave del atributo
+            conflicting_values: Lista de valores conflictivos
+            inc_type: Tipo de inconsistencia
+            confidence: Confianza de la inconsistencia
+
+        Returns:
+            Explicación legible
+        """
+        if len(conflicting_values) < 2:
+            return "Inconsistencia detectada"
+
+        key_name = get_attribute_display_name(attr_key)
+        gender = get_attribute_gender(attr_key)
+        entity = conflicting_values[0].value  # Usamos el primer valor para referencia
+
+        # Construir lista de valores con ubicaciones
+        values_list = []
+        for cv in conflicting_values:
+            loc = f"cap. {cv.chapter}" if cv.chapter else "texto"
+            values_list.append(f"'{cv.value}' ({loc})")
+
+        values_str = ", ".join(values_list[:-1]) + f" y {values_list[-1]}"
+
+        # Adjetivos con concordancia de género
+        adj_contradictorio = "contradictorias" if gender == "f" else "contradictorios"
+        adj_diferente = "diferentes"
+
+        if inc_type == InconsistencyType.ANTONYM:
+            return (
+                f"Se encontraron {len(conflicting_values)} descripciones de {key_name} {adj_contradictorio}: "
+                f"{values_str}. Son valores opuestos."
+            )
+
+        if inc_type == InconsistencyType.CONTRADICTORY:
+            return (
+                f"Se encontraron {len(conflicting_values)} descripciones de {key_name} muy {adj_diferente}: "
+                f"{values_str}. Posible error de continuidad."
+            )
+
+        return (
+            f"Se encontraron {len(conflicting_values)} descripciones de {key_name} {adj_diferente}: "
+            f"{values_str}. Verificar si es intencional."
+        )
+
     def _build_entity_name_mapping(
         self,
         attributes: list[ExtractedAttribute],
@@ -907,78 +1094,74 @@ class AttributeConsistencyChecker:
                     f"Checking {entity_name}.{attr_key.value}: {len(attrs)} values - {[a.value for a in attrs]}"
                 )
 
-                # Comparar cada par de atributos
-                for i, attr1 in enumerate(attrs):
-                    for attr2 in attrs[i + 1 :]:
-                        # Saltar si son el mismo valor
-                        if attr1.value.lower() == attr2.value.lower():
-                            logger.debug(f"  Skipping {attr1.value} == {attr2.value} (same value)")
-                            continue
+                # Agrupar valores únicos (normalizados) para detectar conflictos multi-valor
+                value_groups = self._group_conflicting_values(attrs, attr_key)
 
-                        # Saltar si ambos están negados (no son afirmaciones)
-                        if attr1.is_negated and attr2.is_negated:
-                            logger.debug(
-                                f"  Skipping {attr1.value} vs {attr2.value} (both negated)"
+                # Si hay múltiples grupos de valores conflictivos, crear 1 alerta
+                if len(value_groups) > 1:
+                    # Calcular confianza y tipo basándose en el par más conflictivo
+                    max_confidence = 0.0
+                    dominant_type = InconsistencyType.VALUE_CHANGE
+
+                    # Comparar todos los pares para encontrar la máxima confianza
+                    for i, group1 in enumerate(value_groups):
+                        for group2 in value_groups[i + 1 :]:
+                            # Usar el primer atributo de cada grupo para comparación
+                            attr1 = group1[0]
+                            attr2 = group2[0]
+                            confidence, inc_type = self._calculate_inconsistency(
+                                attr1, attr2, attr_key
                             )
-                            continue
+                            if confidence > max_confidence:
+                                max_confidence = confidence
+                                dominant_type = inc_type
 
-                        # Para DISTINCTIVE_FEATURE multi-value: solo comparar rasgos
-                        # del mismo tipo corporal (nariz vs nariz, no nariz vs cicatriz)
-                        if attr_key == AttributeKey.DISTINCTIVE_FEATURE:
-                            if not _same_body_region(attr1.value, attr2.value):
-                                logger.debug(
-                                    f"  Skipping {attr1.value} vs {attr2.value} (different body regions)"
+                    if max_confidence >= self.min_confidence:
+                        # Construir lista de valores conflictivos
+                        conflicting_values = []
+                        all_values_str = []
+                        for group in value_groups:
+                            # Usar el primer atributo de cada grupo (representante)
+                            attr = group[0]
+                            conflicting_values.append(
+                                ConflictingValue(
+                                    value=attr.value,
+                                    chapter=attr.chapter_id,
+                                    excerpt=attr.source_text,
+                                    position=attr.start_char,
                                 )
-                                continue
-
-                        # Saltar atributos temporales que pueden cambiar
-                        if is_temporal_attribute(attr_key, attr1.value) or is_temporal_attribute(
-                            attr_key, attr2.value
-                        ):
-                            logger.debug(
-                                f"  Skipping {attr1.value} vs {attr2.value} (temporal attribute)"
                             )
-                            continue
+                            all_values_str.append(f"'{attr.value}'")
 
-                        # Calcular confianza de inconsistencia
-                        confidence, inc_type = self._calculate_inconsistency(attr1, attr2, attr_key)
-
-                        logger.debug(
-                            f"  Comparing {attr1.value} vs {attr2.value}: confidence={confidence:.2f}, type={inc_type.value}"
+                        # Generar explicación multi-valor
+                        explanation = self._generate_multi_value_explanation(
+                            attr_key,
+                            conflicting_values,
+                            dominant_type,
+                            max_confidence,
                         )
 
-                        if confidence >= self.min_confidence:
-                            explanation = self._generate_explanation(
-                                attr_key, attr1, attr2, inc_type, confidence
-                            )
+                        logger.info(
+                            f"MULTI-VALUE INCONSISTENCY DETECTED: {entity_name}.{attr_key.value} "
+                            f"{', '.join(all_values_str)} (confidence: {max_confidence:.2f})"
+                        )
 
-                            logger.info(
-                                f"INCONSISTENCY DETECTED: {entity_name}.{attr_key.value} '{attr1.value}' vs '{attr2.value}' (confidence: {confidence:.2f})"
-                            )
+                        # Usar el nombre canónico
+                        canonical_name = self._get_canonical_name(
+                            entity_name, attrs[0].entity_name, attrs[0].entity_name
+                        )
 
-                            # Usar el nombre canónico para que coincida con entity_map
-                            # attr1.entity_name podría ser "María" pero entity_name es "maría sánchez"
-                            canonical_name = self._get_canonical_name(
-                                entity_name, attr1.entity_name, attr2.entity_name
+                        inconsistencies.append(
+                            AttributeInconsistency(
+                                entity_name=canonical_name,
+                                entity_id=0,
+                                attribute_key=attr_key,
+                                conflicting_values=conflicting_values,
+                                inconsistency_type=dominant_type,
+                                confidence=max_confidence,
+                                explanation=explanation,
                             )
-                            inconsistencies.append(
-                                AttributeInconsistency(
-                                    entity_name=canonical_name,
-                                    entity_id=0,  # Debe resolverse al crear alerta via EntityRepository
-                                    attribute_key=attr_key,
-                                    value1=attr1.value,
-                                    value1_chapter=attr1.chapter_id,
-                                    value1_excerpt=attr1.source_text,
-                                    value1_position=attr1.start_char,
-                                    value2=attr2.value,
-                                    value2_chapter=attr2.chapter_id,
-                                    value2_excerpt=attr2.source_text,
-                                    value2_position=attr2.start_char,
-                                    inconsistency_type=inc_type,
-                                    confidence=confidence,
-                                    explanation=explanation,
-                                )
-                            )
+                        )
 
             # Ordenar por confianza descendente
             inconsistencies.sort(key=lambda x: -x.confidence)
