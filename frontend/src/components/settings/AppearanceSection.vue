@@ -657,15 +657,18 @@ const onReducedMotionChange = (val: boolean) => {
 .compact-settings-grid .setting-item {
   border-bottom: none;
   border-right: 1px solid var(--p-surface-200);
+  padding-right: 1.25rem;
 }
 
 :global(.dark) .compact-settings-grid .setting-item {
   border-right-color: var(--p-surface-700);
 }
 
-/* Remove right border on last column items */
+/* Right column items: left padding from divider, no right border */
 .compact-settings-grid .setting-item:nth-child(2n) {
   border-right: none;
+  padding-left: 1.25rem;
+  padding-right: 0;
 }
 
 /* Single column: remove all right borders */
@@ -676,6 +679,8 @@ const onReducedMotionChange = (val: boolean) => {
   .compact-settings-grid .setting-item {
     border-right: none;
     border-bottom: 1px solid var(--p-surface-200);
+    padding-left: 0;
+    padding-right: 0;
   }
   :global(.dark) .compact-settings-grid .setting-item {
     border-bottom-color: var(--p-surface-700);

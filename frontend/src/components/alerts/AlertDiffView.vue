@@ -1,29 +1,49 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, toRef } from 'vue'
 import Button from 'primevue/button'
+import { useWordDiff } from '@/composables/useWordDiff'
 
 /**
- * AlertDiffView - Vista comparativa Original vs Propuesta
+ * AlertDiffView - Vista comparativa con diff a nivel de palabra (estilo GitHub)
  *
- * Muestra el texto original (excerpt) y la sugerencia de corrección
- * lado a lado o apilado según el espacio disponible.
+ * Modo default (inline): texto unificado donde las palabras eliminadas
+ * aparecen en rojo+tachado (<del>) y las añadidas en verde (<ins>).
  *
- * Usa CSS container queries para adaptar el layout:
- * - ≥700px: side-by-side (2 columnas)
- * - <700px: stacked (vertical)
- * - <500px: solo propuesta + botón "Ver original"
+ * Modo side-by-side: dos paneles con word-level highlighting.
+ *
+ * Usa CSS container queries para adaptar el layout automáticamente.
  */
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   /** Texto original del manuscrito */
   excerpt: string
   /** Sugerencia de corrección */
   suggestion: string
-  /** Forzar un layout específico (auto usa container queries) */
-  layout?: 'auto' | 'side-by-side' | 'stacked' | 'compact'
+  /** Layout: auto/inline (unificado), side-by-side, stacked, compact */
+  layout?: 'auto' | 'inline' | 'side-by-side' | 'stacked' | 'compact'
 }>(), {
   layout: 'auto'
 })
+
+const { segments } = useWordDiff(
+  toRef(props, 'excerpt'),
+  toRef(props, 'suggestion')
+)
+
+/** Para side-by-side: segmentos solo del original (unchanged + removed) */
+const originalSegments = computed(() =>
+  segments.value.filter(s => s.type !== 'added')
+)
+
+/** Para side-by-side: segmentos solo de la propuesta (unchanged + added) */
+const proposedSegments = computed(() =>
+  segments.value.filter(s => s.type !== 'removed')
+)
+
+/** Layout efectivo */
+const effectiveLayout = computed(() =>
+  props.layout === 'auto' ? 'inline' : props.layout
+)
 
 const showOriginal = ref(false)
 </script>
@@ -31,61 +51,129 @@ const showOriginal = ref(false)
 <template>
   <div
     class="alert-diff-view"
-    :class="[`layout-${layout}`]"
+    :class="[`layout-${effectiveLayout}`]"
   >
-    <!-- Original (excerpt) -->
-    <div class="diff-panel diff-original">
-      <div class="diff-label">
-        <i class="pi pi-file-edit"></i>
-        Original
+    <!-- ══════════ Inline (unified) ══════════ -->
+    <div v-if="effectiveLayout === 'inline'" class="diff-inline-panel">
+      <div class="diff-label diff-label--inline">
+        <i class="pi pi-arrows-h"></i>
+        Cambios
       </div>
-      <div class="diff-content diff-content--remove">
-        <p class="diff-text">"{{ excerpt }}"</p>
-      </div>
-    </div>
-
-    <!-- Propuesta (suggestion) -->
-    <div class="diff-panel diff-proposed">
-      <div class="diff-label">
-        <i class="pi pi-lightbulb"></i>
-        Propuesta
-      </div>
-      <div class="diff-content diff-content--add">
-        <p class="diff-text">{{ suggestion }}</p>
+      <div class="diff-content diff-content--inline">
+        <p class="diff-text-inline">
+          <template v-for="(seg, i) in segments" :key="i">
+            <del v-if="seg.type === 'removed'" class="diff-del">{{ seg.value }}</del>
+            <ins v-else-if="seg.type === 'added'" class="diff-ins">{{ seg.value }}</ins>
+            <span v-else>{{ seg.value }}</span>
+          </template>
+        </p>
       </div>
     </div>
 
-    <!-- Compact mode: toggle for original -->
-    <div class="diff-compact-toggle">
-      <Button
-        :label="showOriginal ? 'Ocultar original' : 'Ver original'"
-        :icon="showOriginal ? 'pi pi-eye-slash' : 'pi pi-eye'"
-        text
-        size="small"
-        @click="showOriginal = !showOriginal"
-      />
-      <div v-if="showOriginal" class="diff-compact-original">
+    <!-- ══════════ Side-by-side / Stacked ══════════ -->
+    <template v-else-if="effectiveLayout === 'side-by-side' || effectiveLayout === 'stacked'">
+      <!-- Original -->
+      <div class="diff-panel diff-original">
+        <div class="diff-label">
+          <i class="pi pi-file-edit"></i>
+          Original
+        </div>
         <div class="diff-content diff-content--remove">
-          <p class="diff-text">"{{ excerpt }}"</p>
+          <p class="diff-text">
+            <template v-for="(seg, i) in originalSegments" :key="i">
+              <del v-if="seg.type === 'removed'" class="diff-del">{{ seg.value }}</del>
+              <span v-else>{{ seg.value }}</span>
+            </template>
+          </p>
         </div>
       </div>
-    </div>
+
+      <!-- Propuesta -->
+      <div class="diff-panel diff-proposed">
+        <div class="diff-label">
+          <i class="pi pi-lightbulb"></i>
+          Propuesta
+        </div>
+        <div class="diff-content diff-content--add">
+          <p class="diff-text">
+            <template v-for="(seg, i) in proposedSegments" :key="i">
+              <ins v-if="seg.type === 'added'" class="diff-ins">{{ seg.value }}</ins>
+              <span v-else>{{ seg.value }}</span>
+            </template>
+          </p>
+        </div>
+      </div>
+    </template>
+
+    <!-- ══════════ Compact ══════════ -->
+    <template v-else>
+      <!-- Solo propuesta con diff inline -->
+      <div class="diff-panel diff-proposed">
+        <div class="diff-label">
+          <i class="pi pi-lightbulb"></i>
+          Propuesta
+        </div>
+        <div class="diff-content diff-content--add">
+          <p class="diff-text">{{ suggestion }}</p>
+        </div>
+      </div>
+      <div class="diff-compact-toggle">
+        <Button
+          :label="showOriginal ? 'Ocultar original' : 'Ver original'"
+          :icon="showOriginal ? 'pi pi-eye-slash' : 'pi pi-eye'"
+          text
+          size="small"
+          @click="showOriginal = !showOriginal"
+        />
+        <div v-if="showOriginal" class="diff-compact-original">
+          <div class="diff-content diff-content--remove">
+            <p class="diff-text">"{{ excerpt }}"</p>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
 <style scoped>
 .alert-diff-view {
   container-type: inline-size;
-  display: flex;
-  gap: var(--ds-space-3, 0.75rem);
   border-radius: var(--ds-radius-md, 6px);
   overflow: hidden;
+}
+
+/* ── Layout modes ── */
+.layout-inline {
+  display: flex;
+  flex-direction: column;
+}
+
+.layout-side-by-side {
+  display: flex;
+  flex-direction: row;
+  gap: var(--ds-space-3, 0.75rem);
+}
+
+.layout-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3, 0.75rem);
+}
+
+.layout-compact {
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Panels ── */
 .diff-panel {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.diff-inline-panel {
   display: flex;
   flex-direction: column;
 }
@@ -111,11 +199,23 @@ const showOriginal = ref(false)
   border-left: 3px solid;
 }
 
-.diff-text {
+.diff-text,
+.diff-text-inline {
   margin: 0;
   font-size: var(--ds-font-size-sm, 0.875rem);
   line-height: 1.6;
-  font-style: italic;
+}
+
+/* ── Inline panel styling ── */
+.diff-label--inline {
+  color: var(--surface-600);
+  background: var(--surface-100);
+}
+
+.diff-content--inline {
+  background: var(--surface-50);
+  border-color: var(--surface-300);
+  color: var(--surface-900);
 }
 
 /* ── Original (red) ── */
@@ -142,9 +242,30 @@ const showOriginal = ref(false)
   color: var(--green-900);
 }
 
-/* ── Compact toggle (hidden by default, visible <500px) ── */
+/* ═══════════════════════════════════════════
+   Word-level diff highlights (GitHub-style)
+   ═══════════════════════════════════════════ */
+.diff-del {
+  background: var(--red-200);
+  color: var(--red-900);
+  text-decoration: line-through;
+  text-decoration-color: var(--red-500);
+  border-radius: 3px;
+  padding: 1px 3px;
+}
+
+.diff-ins {
+  background: var(--green-200);
+  color: var(--green-900);
+  text-decoration: none;
+  border-radius: 3px;
+  padding: 1px 3px;
+  font-weight: 600;
+}
+
+/* ── Compact toggle ── */
 .diff-compact-toggle {
-  display: none;
+  display: flex;
   flex-direction: column;
   gap: var(--ds-space-2, 0.5rem);
   margin-top: var(--ds-space-2, 0.5rem);
@@ -155,69 +276,20 @@ const showOriginal = ref(false)
   overflow: hidden;
 }
 
-/* ═══════════════════════════════════════════════════
-   Layout: auto (container queries)
-   ═══════════════════════════════════════════════════ */
-.layout-auto {
-  flex-direction: row;
-}
-
-/* ≥700px: side-by-side */
-@container (min-width: 700px) {
-  .layout-auto {
-    flex-direction: row;
-  }
-  .layout-auto .diff-panel { display: flex; }
-  .layout-auto .diff-compact-toggle { display: none; }
-}
-
-/* <700px: stacked */
-@container (max-width: 699px) {
-  .layout-auto {
-    flex-direction: column;
-  }
-  .layout-auto .diff-panel { display: flex; }
-  .layout-auto .diff-compact-toggle { display: none; }
-}
-
-/* <500px: compact (only proposed + toggle for original) */
-@container (max-width: 499px) {
-  .layout-auto {
-    flex-direction: column;
-  }
-  .layout-auto .diff-original { display: none; }
-  .layout-auto .diff-proposed { display: flex; }
-  .layout-auto .diff-compact-toggle { display: flex; }
-}
-
-/* ═══════════════════════════════════════════════════
-   Layout: forced side-by-side
-   ═══════════════════════════════════════════════════ */
-.layout-side-by-side {
-  flex-direction: row;
-}
-.layout-side-by-side .diff-compact-toggle { display: none; }
-
-/* ═══════════════════════════════════════════════════
-   Layout: forced stacked
-   ═══════════════════════════════════════════════════ */
-.layout-stacked {
-  flex-direction: column;
-}
-.layout-stacked .diff-compact-toggle { display: none; }
-
-/* ═══════════════════════════════════════════════════
-   Layout: forced compact
-   ═══════════════════════════════════════════════════ */
-.layout-compact {
-  flex-direction: column;
-}
-.layout-compact .diff-original { display: none; }
-.layout-compact .diff-compact-toggle { display: flex; }
-
-/* ═══════════════════════════════════════════════════
+/* ═══════════════════════════════════════════
    Dark mode
-   ═══════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════ */
+:global(.dark) .diff-label--inline {
+  color: var(--surface-300);
+  background: var(--surface-800);
+}
+
+:global(.dark) .diff-content--inline {
+  background: var(--surface-900);
+  border-color: var(--surface-600);
+  color: var(--surface-100);
+}
+
 :global(.dark) .diff-original .diff-label {
   color: var(--red-300);
   background: var(--red-900);
@@ -237,6 +309,17 @@ const showOriginal = ref(false)
 :global(.dark) .diff-content--add {
   background: color-mix(in srgb, var(--green-900) 40%, transparent);
   border-color: var(--green-700);
+  color: var(--green-200);
+}
+
+:global(.dark) .diff-del {
+  background: color-mix(in srgb, var(--red-800) 60%, transparent);
+  color: var(--red-200);
+  text-decoration-color: var(--red-400);
+}
+
+:global(.dark) .diff-ins {
+  background: color-mix(in srgb, var(--green-800) 60%, transparent);
   color: var(--green-200);
 }
 </style>
