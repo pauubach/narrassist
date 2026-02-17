@@ -1414,8 +1414,8 @@ const handleMouseUp = () => {
   const textBeforeSelection = rangeToStart.toString()
   const offsetInChapter = textBeforeSelection.length
 
-  // Las posiciones globales se calculan sumando el start_char del capítulo
-  const globalStart = (chapter.startChar ?? 0) + offsetInChapter
+  // Las posiciones globales se calculan sumando el positionStart del capítulo
+  const globalStart = (chapter.positionStart ?? 0) + offsetInChapter
   const globalEnd = globalStart + selectedText.length
 
   // Guardar selección en el store

@@ -1263,7 +1263,6 @@ defineExpose({ focusSearch })
       :project-id="projectId"
       @update:visible="showProfileModal = $event"
     />
-
   </div>
 </template>
 

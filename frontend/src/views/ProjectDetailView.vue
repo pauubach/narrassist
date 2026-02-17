@@ -225,8 +225,8 @@
         <div class="center-panel">
           <!-- Tab Texto -->
           <TextTab
-            ref="textTabRef"
             v-if="workspaceStore.activeTab === 'text'"
+            ref="textTabRef"
             :project-id="project.id"
             :document-title="project.name"
             :alerts="alerts"
@@ -326,8 +326,8 @@
 
           <!-- Tab Glosario (siempre disponible) -->
           <GlossaryTab
-            ref="glossaryTabRef"
             v-else-if="workspaceStore.activeTab === 'glossary'"
+            ref="glossaryTabRef"
             :project-id="project.id"
           />
 
@@ -874,9 +874,16 @@ const onEntityClick = (entityId: number) => {
   }
 }
 
-const onEntitySelect = (entity: Entity) => {
-  highlightedEntityId.value = entity.id
-  selectionStore.selectEntity(entity)
+const onEntitySelect = (entityOrId: Entity | number) => {
+  const entityId = typeof entityOrId === 'number' ? entityOrId : entityOrId.id
+  const entity = typeof entityOrId === 'number'
+    ? entities.value.find(e => e.id === entityOrId)
+    : entityOrId
+
+  highlightedEntityId.value = entityId
+  if (entity) {
+    selectionStore.selectEntity(entity)
+  }
 }
 
 const onEntityEdit = (entity: Entity) => {
@@ -1073,7 +1080,7 @@ const onNavigateToEvent = (startChar: number, endChar: number) => {
 
   // Clear existing highlights and set new position
   workspaceStore.clearAlertHighlights()
-  workspaceStore.setScrollToPosition(chapterId, startChar, endChar)
+  workspaceStore.scrollToPosition = { chapterId, startChar, endChar }
 
   // Ensure we're in text tab
   if (workspaceStore.activeTab !== 'text') {

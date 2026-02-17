@@ -62,102 +62,100 @@
           <Tab value="1"><i class="pi pi-users"></i> Lo que otros saben ({{ knowledge.othersKnowAbout.length }})</Tab>
         </TabList>
         <TabPanels>
-        <!-- What this character knows -->
-        <TabPanel value="0">
-
-          <div v-if="knowledge.knowsAboutOthers.length > 0" class="facts-list">
-            <div
-              v-for="(fact, idx) in knowledge.knowsAboutOthers"
-              :key="`knows-${idx}`"
-              class="fact-item"
-              :class="getFactClass(fact)"
-            >
-              <div class="fact-header">
-                <div class="fact-about">
-                  <i class="pi pi-user"></i>
-                  <span class="about-name">{{ fact.knownName }}</span>
+          <!-- What this character knows -->
+          <TabPanel value="0">
+            <div v-if="knowledge.knowsAboutOthers.length > 0" class="facts-list">
+              <div
+                v-for="(fact, idx) in knowledge.knowsAboutOthers"
+                :key="`knows-${idx}`"
+                class="fact-item"
+                :class="getFactClass(fact)"
+              >
+                <div class="fact-header">
+                  <div class="fact-about">
+                    <i class="pi pi-user"></i>
+                    <span class="about-name">{{ fact.knownName }}</span>
+                  </div>
+                  <div class="fact-meta">
+                    <Tag :severity="getTypeSeverity(fact.knowledgeType)" size="small">
+                      {{ getTypeLabel(fact.knowledgeType) }}
+                    </Tag>
+                    <ConfidenceBadge
+                      :value="fact.confidence"
+                      variant="dot"
+                      size="sm"
+                      inline
+                    />
+                  </div>
                 </div>
-                <div class="fact-meta">
-                  <Tag :severity="getTypeSeverity(fact.knowledgeType)" size="small">
-                    {{ getTypeLabel(fact.knowledgeType) }}
+                <p class="fact-description">{{ fact.factDescription }}</p>
+                <div v-if="fact.factValue" class="fact-value">
+                  <strong>Valor:</strong> {{ fact.factValue }}
+                </div>
+                <div class="fact-footer">
+                  <span class="fact-chapter">
+                    <i class="pi pi-book"></i> Capítulo {{ fact.sourceChapter }}
+                  </span>
+                  <Tag
+                    v-if="fact.isAccurate !== null"
+                    :severity="fact.isAccurate ? 'success' : 'danger'"
+                    size="small"
+                  >
+                    {{ fact.isAccurate ? 'Correcto' : 'Incorrecto' }}
                   </Tag>
-                  <ConfidenceBadge
-                    :value="fact.confidence"
-                    variant="dot"
-                    size="sm"
-                    inline
-                  />
                 </div>
-              </div>
-              <p class="fact-description">{{ fact.factDescription }}</p>
-              <div v-if="fact.factValue" class="fact-value">
-                <strong>Valor:</strong> {{ fact.factValue }}
-              </div>
-              <div class="fact-footer">
-                <span class="fact-chapter">
-                  <i class="pi pi-book"></i> Capítulo {{ fact.sourceChapter }}
-                </span>
-                <Tag
-                  v-if="fact.isAccurate !== null"
-                  :severity="fact.isAccurate ? 'success' : 'danger'"
-                  size="small"
-                >
-                  {{ fact.isAccurate ? 'Correcto' : 'Incorrecto' }}
-                </Tag>
               </div>
             </div>
-          </div>
-          <p v-else class="empty-text">No se detectó conocimiento sobre otros personajes</p>
-        </TabPanel>
+            <p v-else class="empty-text">No se detectó conocimiento sobre otros personajes</p>
+          </TabPanel>
 
-        <!-- What others know about this character -->
-        <TabPanel value="1">
-
-          <div v-if="knowledge.othersKnowAbout.length > 0" class="facts-list">
-            <div
-              v-for="(fact, idx) in knowledge.othersKnowAbout"
-              :key="`known-${idx}`"
-              class="fact-item"
-              :class="getFactClass(fact)"
-            >
-              <div class="fact-header">
-                <div class="fact-about">
-                  <i class="pi pi-user"></i>
-                  <span class="about-name">{{ fact.knowerName }}</span>
-                  <span class="about-verb">sabe que</span>
+          <!-- What others know about this character -->
+          <TabPanel value="1">
+            <div v-if="knowledge.othersKnowAbout.length > 0" class="facts-list">
+              <div
+                v-for="(fact, idx) in knowledge.othersKnowAbout"
+                :key="`known-${idx}`"
+                class="fact-item"
+                :class="getFactClass(fact)"
+              >
+                <div class="fact-header">
+                  <div class="fact-about">
+                    <i class="pi pi-user"></i>
+                    <span class="about-name">{{ fact.knowerName }}</span>
+                    <span class="about-verb">sabe que</span>
+                  </div>
+                  <div class="fact-meta">
+                    <Tag :severity="getTypeSeverity(fact.knowledgeType)" size="small">
+                      {{ getTypeLabel(fact.knowledgeType) }}
+                    </Tag>
+                    <ConfidenceBadge
+                      :value="fact.confidence"
+                      variant="dot"
+                      size="sm"
+                      inline
+                    />
+                  </div>
                 </div>
-                <div class="fact-meta">
-                  <Tag :severity="getTypeSeverity(fact.knowledgeType)" size="small">
-                    {{ getTypeLabel(fact.knowledgeType) }}
+                <p class="fact-description">{{ fact.factDescription }}</p>
+                <div v-if="fact.factValue" class="fact-value">
+                  <strong>Valor:</strong> {{ fact.factValue }}
+                </div>
+                <div class="fact-footer">
+                  <span class="fact-chapter">
+                    <i class="pi pi-book"></i> Capítulo {{ fact.sourceChapter }}
+                  </span>
+                  <Tag
+                    v-if="fact.isAccurate !== null"
+                    :severity="fact.isAccurate ? 'success' : 'danger'"
+                    size="small"
+                  >
+                    {{ fact.isAccurate ? 'Correcto' : 'Incorrecto' }}
                   </Tag>
-                  <ConfidenceBadge
-                    :value="fact.confidence"
-                    variant="dot"
-                    size="sm"
-                    inline
-                  />
                 </div>
-              </div>
-              <p class="fact-description">{{ fact.factDescription }}</p>
-              <div v-if="fact.factValue" class="fact-value">
-                <strong>Valor:</strong> {{ fact.factValue }}
-              </div>
-              <div class="fact-footer">
-                <span class="fact-chapter">
-                  <i class="pi pi-book"></i> Capítulo {{ fact.sourceChapter }}
-                </span>
-                <Tag
-                  v-if="fact.isAccurate !== null"
-                  :severity="fact.isAccurate ? 'success' : 'danger'"
-                  size="small"
-                >
-                  {{ fact.isAccurate ? 'Correcto' : 'Incorrecto' }}
-                </Tag>
               </div>
             </div>
-          </div>
-          <p v-else class="empty-text">No se detectó que otros personajes sepan cosas sobre este</p>
-        </TabPanel>
+            <p v-else class="empty-text">No se detectó que otros personajes sepan cosas sobre este</p>
+          </TabPanel>
         </TabPanels>
       </Tabs>
 

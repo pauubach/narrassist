@@ -86,7 +86,7 @@
 
       <!-- Etiquetas de capítulo (cada 5) -->
       <text
-        v-for="(ch, idx) in labeledChapters"
+        v-for="ch in labeledChapters"
         :key="`label-${ch.chapter}`"
         :x="getChapterIndex(ch.chapter) * barWidth + barWidth / 2"
         :y="height + 15"

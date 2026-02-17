@@ -94,14 +94,8 @@ const alertsByChapter = computed(() => {
 // Computed: posiciones relativas de alertas para el gutter
 // Memoización de gutterMarkers con hash (performance optimization #6)
 const gutterMarkersCache = ref<{ hash: string; value: any[] } | null>(null)
-const gutterMarkers = computed(() => {
-  // Hash basado en chapters length y alerts length
-  const hash = `${props.chapters.length}-${props.alerts.length}`
 
-  if (gutterMarkersCache.value?.hash === hash) {
-    return gutterMarkersCache.value.value
-  }
-
+function computeGutterMarkers() {
   const markers: Array<{
     id: number
     top: number // porcentaje
@@ -111,7 +105,6 @@ const gutterMarkers = computed(() => {
   }> = []
 
   if (props.chapters.length === 0) {
-    gutterMarkersCache.value = { hash, value: markers }
     return markers
   }
 
@@ -141,7 +134,22 @@ const gutterMarkers = computed(() => {
     }
   })
 
-  gutterMarkersCache.value = { hash, value: markers }
+  return markers
+}
+
+const gutterMarkers = computed(() => {
+  // Hash basado en chapters length y alerts length
+  const hash = `${props.chapters.length}-${props.alerts.length}`
+
+  if (gutterMarkersCache.value?.hash === hash) {
+    return gutterMarkersCache.value.value
+  }
+
+  const markers = computeGutterMarkers()
+  // Side effect en nextTick para no violar regla de computed
+  nextTick(() => {
+    gutterMarkersCache.value = { hash, value: markers }
+  })
   return markers
 })
 

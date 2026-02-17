@@ -699,3 +699,131 @@ def get_version_trend(project_id: int, limit: int = Query(10, ge=2, le=50)):
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
+# ============================================================================
+# Dialogue Style Preferences
+# ============================================================================
+
+@router.get("/api/projects/{project_id}/dialogue-style-summary", response_model=ApiResponse)
+def get_dialogue_style_summary(project_id: int):
+    """
+    Obtiene resumen del estilo de diálogo en el proyecto.
+
+    Returns:
+        ApiResponse con:
+        - total_dialogues: int
+        - by_type: dict[str, int]  # Conteo por tipo
+        - predominant_style: str
+        - compliance_ratio: float  # 0.0-1.0
+        - non_compliant_count: int
+        - user_preference: str | None
+    """
+    try:
+        from narrative_assistant.nlp.dialogue_style_checker import get_dialogue_style_checker
+
+        checker = get_dialogue_style_checker()
+        result = checker.get_summary(project_id)
+
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.errors[0]))
+
+        summary = result.value
+        return ApiResponse(
+            success=True,
+            data={
+                "total_dialogues": summary.total_dialogues,
+                "by_type": summary.by_type,
+                "predominant_style": summary.predominant_style,
+                "compliance_ratio": summary.compliance_ratio,
+                "non_compliant_count": summary.non_compliant_count,
+                "user_preference": summary.user_preference,
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting dialogue style summary for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.post("/api/projects/{project_id}/dialogue-style-preference", response_model=ApiResponse)
+def update_dialogue_style_preference(
+    project_id: int,
+    preference: str = Body(..., embed=True),
+    min_severity: str = Body("info", embed=True),
+):
+    """
+    Actualiza la preferencia de estilo de diálogo y regenera alertas.
+
+    Args:
+        project_id: ID del proyecto
+        preference: Nueva preferencia (dash, guillemets, quotes, quotes_typographic, no_check)
+        min_severity: Severidad mínima para alertas (info, warning, error)
+
+    Returns:
+        ApiResponse con:
+        - preference: str
+        - alerts_created: int
+        - alerts_invalidated: int
+    """
+    try:
+        # Validar preferencia
+        valid_preferences = {"dash", "guillemets", "quotes", "quotes_typographic", "no_check"}
+        if preference not in valid_preferences:
+            return ApiResponse(
+                success=False,
+                error=f"Invalid preference. Must be one of: {', '.join(valid_preferences)}",
+            )
+
+        from narrative_assistant.nlp.dialogue_preference_manager import get_preference_manager
+
+        manager = get_preference_manager()
+        result = manager.update_preference(project_id, preference, min_severity)
+
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.errors[0]))
+
+        return ApiResponse(success=True, data=result.value)
+
+    except Exception as e:
+        logger.error(
+            f"Error updating dialogue style preference for project {project_id}: {e}",
+            exc_info=True,
+        )
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.post("/api/projects/{project_id}/validate-dialogue-style", response_model=ApiResponse)
+def validate_dialogue_style(
+    project_id: int,
+    min_severity: str = Body("info", embed=True),
+):
+    """
+    Valida estilo de diálogo y crea alertas (sin cambiar preferencia).
+
+    Útil para re-ejecutar validación después de ediciones.
+
+    Args:
+        project_id: ID del proyecto
+        min_severity: Severidad mínima para alertas
+
+    Returns:
+        ApiResponse con número de alertas creadas
+    """
+    try:
+        from narrative_assistant.nlp.dialogue_style_checker import get_dialogue_style_checker
+
+        checker = get_dialogue_style_checker()
+        result = checker.validate_and_create_alerts(project_id, min_severity)
+
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.errors[0]))
+
+        return ApiResponse(
+            success=True,
+            data={"alerts_created": result.value},
+        )
+
+    except Exception as e:
+        logger.error(f"Error validating dialogue style for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+

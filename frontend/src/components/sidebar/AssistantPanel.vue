@@ -305,8 +305,8 @@ function clearSelectionContext() {
             />
             <span
               v-if="msg.multiModel && msg.modelsUsed"
-              class="synthesis-badge"
               v-tooltip.top="'Respuesta combinada de: ' + msg.modelsUsed.join(', ')"
+              class="synthesis-badge"
             >
               <i class="pi pi-sparkles"></i>
               Síntesis &middot; {{ msg.modelsUsed.length }} modelos
@@ -385,7 +385,7 @@ function clearSelectionContext() {
     <!-- Selection context bar -->
     <div v-if="activeSelection" class="selection-context-bar">
       <i class="pi pi-text-select"></i>
-      <span class="selection-preview" :title="activeSelection.text" v-tooltip.top="'Texto seleccionado como contexto para tu pregunta'">
+      <span v-tooltip.top="'Texto seleccionado como contexto para tu pregunta'" class="selection-preview" :title="activeSelection.text">
         "{{ activeSelectionPreview }}"
       </span>
       <Button

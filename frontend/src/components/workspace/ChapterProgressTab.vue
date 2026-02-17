@@ -104,282 +104,280 @@
         <TabList>
           <Tab value="0"><i class="pi pi-list"></i> Por capítulo</Tab>
           <Tab value="1"><i class="pi pi-chart-line"></i> Arcos de personajes</Tab>
-          <Tab value="2"><i class="pi pi-bookmark"></i> Chekhov's Guns
+          <Tab value="2">
+            <i class="pi pi-bookmark"></i> Chekhov's Guns
             <Badge v-if="report.chekhov_elements?.length" :value="report.chekhov_elements.length" severity="warn" />
           </Tab>
-          <Tab v-if="report.abandoned_threads?.length" value="3"><i class="pi pi-exclamation-circle"></i> Tramas abandonadas
+          <Tab v-if="report.abandoned_threads?.length" value="3">
+            <i class="pi pi-exclamation-circle"></i> Tramas abandonadas
             <Badge :value="report.abandoned_threads.length" severity="danger" />
           </Tab>
         </TabList>
         <TabPanels>
-        <!-- Chapter Summaries Tab -->
-        <TabPanel value="0">
-
-          <Accordion :multiple="true" class="chapters-accordion">
-            <AccordionPanel
-              v-for="chapter in report.chapters"
-              :key="chapter.chapter_number"
-              :value="String(chapter.chapter_number)"
-            >
-              <AccordionHeader>
-                <div class="chapter-header">
-                  <span class="chapter-title">
-                    <i class="pi pi-book"></i>
-                    Capítulo {{ chapter.chapter_number }}
-                    <span v-if="chapter.chapter_title" class="chapter-subtitle">
-                      - {{ chapter.chapter_title }}
+          <!-- Chapter Summaries Tab -->
+          <TabPanel value="0">
+            <Accordion :multiple="true" class="chapters-accordion">
+              <AccordionPanel
+                v-for="chapter in report.chapters"
+                :key="chapter.chapter_number"
+                :value="String(chapter.chapter_number)"
+              >
+                <AccordionHeader>
+                  <div class="chapter-header">
+                    <span class="chapter-title">
+                      <i class="pi pi-book"></i>
+                      Capítulo {{ chapter.chapter_number }}
+                      <span v-if="chapter.chapter_title" class="chapter-subtitle">
+                        - {{ chapter.chapter_title }}
+                      </span>
                     </span>
-                  </span>
-                  <div class="chapter-badges">
-                    <Tag
-                      v-if="chapter.new_characters?.length"
-                      severity="success"
-                      :value="`+${chapter.new_characters.length} nuevo${chapter.new_characters.length > 1 ? 's' : ''}`"
-                    />
-                    <Tag
-                      v-if="chapter.returning_characters?.length"
-                      severity="info"
-                      :value="`${chapter.returning_characters.length} regresa${chapter.returning_characters.length > 1 ? 'n' : ''}`"
-                    />
-                    <Tag
-                      :severity="getToneSeverity(chapter.dominant_tone)"
-                      :value="getToneLabel(chapter.dominant_tone)"
-                    />
-                  </div>
-                </div>
-              </AccordionHeader>
-              <AccordionContent>
-                <div class="chapter-content">
-                  <!-- Summary -->
-                  <div class="chapter-summary">
-                    <p class="auto-summary">{{ chapter.llm_summary || chapter.auto_summary }}</p>
-                  </div>
-
-                  <!-- Characters Present -->
-                  <div v-if="chapter.characters_present?.length" class="section characters-section">
-                    <h4><i class="pi pi-users"></i> Personajes ({{ chapter.characters_present.length }})</h4>
-                    <div class="characters-grid">
-                      <div
-                        v-for="char in chapter.characters_present.slice(0, 8)"
-                        :key="char.entity_id"
-                        class="character-chip"
-                        :class="{
-                          'is-new': char.is_first_appearance,
-                          'is-return': char.is_return,
-                        }"
-                      >
-                        <span class="char-name">{{ char.name }}</span>
-                        <span class="char-mentions">{{ char.mention_count }}</span>
-                        <i v-if="char.is_first_appearance" v-tooltip.top="'Primera aparición'" class="pi pi-star"></i>
-                        <i v-if="char.is_return" v-tooltip.top="`Regresa después de ${char.chapters_absent} capítulos`" class="pi pi-replay"></i>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Key Events -->
-                  <div v-if="getAllEvents(chapter).length" class="section events-section">
-                    <h4><i class="pi pi-bolt"></i> Eventos clave</h4>
-                    <div class="events-list">
-                      <div
-                        v-for="(event, idx) in getAllEvents(chapter)"
-                        :key="idx"
-                        class="event-item"
-                        :class="event.event_type"
-                      >
-                        <Tag
-                          :severity="getEventSeverity(event.event_type)"
-                          :value="getEventLabel(event.event_type)"
-                          size="small"
-                        />
-                        <span class="event-description">{{ event.description }}</span>
-                        <span v-if="event.characters_involved?.length" class="event-characters">
-                          ({{ event.characters_involved.join(', ') }})
-                        </span>
-                        <Tag
-                          v-if="event.detected_by === 'llm'"
-                          severity="secondary"
-                          value="LLM"
-                          size="small"
-                          class="llm-tag"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Interactions Summary -->
-                  <div v-if="chapter.total_interactions > 0" class="section interactions-section">
-                    <h4><i class="pi pi-comments"></i> Interacciones</h4>
-                    <div class="interactions-stats">
-                      <span>{{ chapter.total_interactions }} totales</span>
-                      <span v-if="chapter.positive_interactions" class="positive">
-                        <i class="pi pi-heart"></i> {{ chapter.positive_interactions }} positivas
-                      </span>
-                      <span v-if="chapter.conflict_interactions" class="negative">
-                        <i class="pi pi-exclamation-triangle"></i> {{ chapter.conflict_interactions }} conflictivas
-                      </span>
-                    </div>
-                  </div>
-
-                  <!-- Locations -->
-                  <div v-if="chapter.locations_mentioned?.length" class="section locations-section">
-                    <h4><i class="pi pi-map-marker"></i> Ubicaciones</h4>
-                    <div class="locations-list">
+                    <div class="chapter-badges">
                       <Tag
-                        v-for="loc in chapter.locations_mentioned"
-                        :key="loc"
-                        :value="loc"
-                        severity="secondary"
+                        v-if="chapter.new_characters?.length"
+                        severity="success"
+                        :value="`+${chapter.new_characters.length} nuevo${chapter.new_characters.length > 1 ? 's' : ''}`"
+                      />
+                      <Tag
+                        v-if="chapter.returning_characters?.length"
+                        severity="info"
+                        :value="`${chapter.returning_characters.length} regresa${chapter.returning_characters.length > 1 ? 'n' : ''}`"
+                      />
+                      <Tag
+                        :severity="getToneSeverity(chapter.dominant_tone)"
+                        :value="getToneLabel(chapter.dominant_tone)"
                       />
                     </div>
                   </div>
+                </AccordionHeader>
+                <AccordionContent>
+                  <div class="chapter-content">
+                    <!-- Summary -->
+                    <div class="chapter-summary">
+                      <p class="auto-summary">{{ chapter.llm_summary || chapter.auto_summary }}</p>
+                    </div>
 
-                  <!-- Absent Characters -->
-                  <div v-if="chapter.absent_characters?.length" class="section absent-section">
-                    <h4><i class="pi pi-eye-slash"></i> Personajes ausentes</h4>
-                    <p class="absent-list">{{ chapter.absent_characters.join(', ') }}</p>
+                    <!-- Characters Present -->
+                    <div v-if="chapter.characters_present?.length" class="section characters-section">
+                      <h4><i class="pi pi-users"></i> Personajes ({{ chapter.characters_present.length }})</h4>
+                      <div class="characters-grid">
+                        <div
+                          v-for="char in chapter.characters_present.slice(0, 8)"
+                          :key="char.entity_id"
+                          class="character-chip"
+                          :class="{
+                            'is-new': char.is_first_appearance,
+                            'is-return': char.is_return,
+                          }"
+                        >
+                          <span class="char-name">{{ char.name }}</span>
+                          <span class="char-mentions">{{ char.mention_count }}</span>
+                          <i v-if="char.is_first_appearance" v-tooltip.top="'Primera aparición'" class="pi pi-star"></i>
+                          <i v-if="char.is_return" v-tooltip.top="`Regresa después de ${char.chapters_absent} capítulos`" class="pi pi-replay"></i>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Key Events -->
+                    <div v-if="getAllEvents(chapter).length" class="section events-section">
+                      <h4><i class="pi pi-bolt"></i> Eventos clave</h4>
+                      <div class="events-list">
+                        <div
+                          v-for="(event, idx) in getAllEvents(chapter)"
+                          :key="idx"
+                          class="event-item"
+                          :class="event.event_type"
+                        >
+                          <Tag
+                            :severity="getEventSeverity(event.event_type)"
+                            :value="getEventLabel(event.event_type)"
+                            size="small"
+                          />
+                          <span class="event-description">{{ event.description }}</span>
+                          <span v-if="event.characters_involved?.length" class="event-characters">
+                            ({{ event.characters_involved.join(', ') }})
+                          </span>
+                          <Tag
+                            v-if="event.detected_by === 'llm'"
+                            severity="secondary"
+                            value="LLM"
+                            size="small"
+                            class="llm-tag"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Interactions Summary -->
+                    <div v-if="chapter.total_interactions > 0" class="section interactions-section">
+                      <h4><i class="pi pi-comments"></i> Interacciones</h4>
+                      <div class="interactions-stats">
+                        <span>{{ chapter.total_interactions }} totales</span>
+                        <span v-if="chapter.positive_interactions" class="positive">
+                          <i class="pi pi-heart"></i> {{ chapter.positive_interactions }} positivas
+                        </span>
+                        <span v-if="chapter.conflict_interactions" class="negative">
+                          <i class="pi pi-exclamation-triangle"></i> {{ chapter.conflict_interactions }} conflictivas
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- Locations -->
+                    <div v-if="chapter.locations_mentioned?.length" class="section locations-section">
+                      <h4><i class="pi pi-map-marker"></i> Ubicaciones</h4>
+                      <div class="locations-list">
+                        <Tag
+                          v-for="loc in chapter.locations_mentioned"
+                          :key="loc"
+                          :value="loc"
+                          severity="secondary"
+                        />
+                      </div>
+                    </div>
+
+                    <!-- Absent Characters -->
+                    <div v-if="chapter.absent_characters?.length" class="section absent-section">
+                      <h4><i class="pi pi-eye-slash"></i> Personajes ausentes</h4>
+                      <p class="absent-list">{{ chapter.absent_characters.join(', ') }}</p>
+                    </div>
                   </div>
+                </AccordionContent>
+              </AccordionPanel>
+            </Accordion>
+          </TabPanel>
+
+          <!-- Character Arcs Tab -->
+          <TabPanel value="1">
+            <div v-if="report.character_arcs?.length" class="arcs-content">
+              <div
+                v-for="arc in report.character_arcs"
+                :key="arc.character_id"
+                class="arc-card"
+              >
+                <div class="arc-header">
+                  <span class="arc-character">{{ arc.character_name }}</span>
+                  <Tag
+                    :severity="getArcSeverity(arc.arc_type)"
+                    :value="getArcLabel(arc.arc_type)"
+                  />
+                  <Tag
+                    :severity="getTrajectoryColor(arc.trajectory)"
+                    :value="getTrajectoryLabel(arc.trajectory)"
+                    size="small"
+                  />
                 </div>
-              </AccordionContent>
-            </AccordionPanel>
-          </Accordion>
-        </TabPanel>
 
-        <!-- Character Arcs Tab -->
-        <TabPanel value="1">
-
-          <div v-if="report.character_arcs?.length" class="arcs-content">
-            <div
-              v-for="arc in report.character_arcs"
-              :key="arc.character_id"
-              class="arc-card"
-            >
-              <div class="arc-header">
-                <span class="arc-character">{{ arc.character_name }}</span>
-                <Tag
-                  :severity="getArcSeverity(arc.arc_type)"
-                  :value="getArcLabel(arc.arc_type)"
-                />
-                <Tag
-                  :severity="getTrajectoryColor(arc.trajectory)"
-                  :value="getTrajectoryLabel(arc.trajectory)"
-                  size="small"
-                />
-              </div>
-
-              <div class="arc-details">
-                <div v-if="arc.start_state || arc.end_state" class="arc-states">
-                  <div v-if="arc.start_state" class="state start">
-                    <label>Estado inicial:</label>
-                    <span>{{ arc.start_state }}</span>
+                <div class="arc-details">
+                  <div v-if="arc.start_state || arc.end_state" class="arc-states">
+                    <div v-if="arc.start_state" class="state start">
+                      <label>Estado inicial:</label>
+                      <span>{{ arc.start_state }}</span>
+                    </div>
+                    <i class="pi pi-arrow-right"></i>
+                    <div v-if="arc.end_state" class="state end">
+                      <label>Estado final:</label>
+                      <span>{{ arc.end_state }}</span>
+                    </div>
                   </div>
-                  <i class="pi pi-arrow-right"></i>
-                  <div v-if="arc.end_state" class="state end">
-                    <label>Estado final:</label>
-                    <span>{{ arc.end_state }}</span>
+
+                  <div class="arc-stats">
+                    <span><i class="pi pi-book"></i> {{ arc.chapters_present }} capítulos</span>
+                    <span><i class="pi pi-comment"></i> {{ arc.total_mentions }} menciones</span>
+                    <span v-if="arc.max_absence_gap > 0">
+                      <i class="pi pi-clock"></i> Max {{ arc.max_absence_gap }} caps ausente
+                    </span>
                   </div>
-                </div>
 
-                <div class="arc-stats">
-                  <span><i class="pi pi-book"></i> {{ arc.chapters_present }} capítulos</span>
-                  <span><i class="pi pi-comment"></i> {{ arc.total_mentions }} menciones</span>
-                  <span v-if="arc.max_absence_gap > 0">
-                    <i class="pi pi-clock"></i> Max {{ arc.max_absence_gap }} caps ausente
-                  </span>
-                </div>
+                  <div v-if="arc.key_turning_points?.length" class="turning-points">
+                    <h5>Puntos de giro:</h5>
+                    <ul>
+                      <li v-for="(point, idx) in arc.key_turning_points" :key="idx">
+                        <strong>Cap. {{ point.chapter }}:</strong> {{ point.event }}
+                      </li>
+                    </ul>
+                  </div>
 
-                <div v-if="arc.key_turning_points?.length" class="turning-points">
-                  <h5>Puntos de giro:</h5>
-                  <ul>
-                    <li v-for="(point, idx) in arc.key_turning_points" :key="idx">
-                      <strong>Cap. {{ point.chapter }}:</strong> {{ point.event }}
-                    </li>
-                  </ul>
-                </div>
-
-                <div v-if="arc.completeness > 0" class="arc-completeness">
-                  <label>Completitud del arco:</label>
-                  <ProgressBar :value="arc.completeness * 100" :show-value="true" />
+                  <div v-if="arc.completeness > 0" class="arc-completeness">
+                    <label>Completitud del arco:</label>
+                    <ProgressBar :value="arc.completeness * 100" :show-value="true" />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div v-else class="empty-tab">
-            <p>No hay arcos de personajes detectados.</p>
-            <small>Usa el modo "standard" o "deep" para análisis con LLM.</small>
-          </div>
-        </TabPanel>
+            <div v-else class="empty-tab">
+              <p>No hay arcos de personajes detectados.</p>
+              <small>Usa el modo "standard" o "deep" para análisis con LLM.</small>
+            </div>
+          </TabPanel>
 
-        <!-- Chekhov's Guns Tab -->
-        <TabPanel value="2">
+          <!-- Chekhov's Guns Tab -->
+          <TabPanel value="2">
+            <div v-if="report.chekhov_elements?.length" class="chekhov-content">
+              <Message severity="info" :closable="false" class="chekhov-info">
+                <strong>Chekhov's Gun:</strong> "Si en el primer acto hay un rifle colgado en la pared,
+                en el tercero debe dispararse." Estos son objetos introducidos temprano que podrían
+                necesitar un "payoff" narrativo.
+              </Message>
 
-          <div v-if="report.chekhov_elements?.length" class="chekhov-content">
-            <Message severity="info" :closable="false" class="chekhov-info">
-              <strong>Chekhov's Gun:</strong> "Si en el primer acto hay un rifle colgado en la pared,
-              en el tercero debe dispararse." Estos son objetos introducidos temprano que podrían
-              necesitar un "payoff" narrativo.
-            </Message>
-
-            <div
-              v-for="element in report.chekhov_elements"
-              :key="element.entity_id || element.name"
-              class="chekhov-card"
-              :class="{ 'is-fired': element.is_fired }"
-            >
-              <div class="chekhov-header">
-                <span class="chekhov-name">{{ element.name }}</span>
-                <Tag
-                  :severity="element.is_fired ? 'success' : 'warn'"
-                  :value="element.is_fired ? 'Con payoff' : 'Sin resolver'"
-                />
-              </div>
-              <div class="chekhov-details">
-                <p><strong>Introducido:</strong> Capítulo {{ element.setup_chapter }}</p>
-                <p v-if="element.setup_context" class="context">
-                  "{{ element.setup_context }}"
-                </p>
-                <p v-if="element.payoff_chapter">
-                  <strong>Payoff:</strong> Capítulo {{ element.payoff_chapter }}
-                </p>
-                <p v-if="element.llm_analysis" class="llm-analysis">
-                  <i class="pi pi-sparkles"></i> {{ element.llm_analysis }}
-                </p>
+              <div
+                v-for="element in report.chekhov_elements"
+                :key="element.entity_id || element.name"
+                class="chekhov-card"
+                :class="{ 'is-fired': element.is_fired }"
+              >
+                <div class="chekhov-header">
+                  <span class="chekhov-name">{{ element.name }}</span>
+                  <Tag
+                    :severity="element.is_fired ? 'success' : 'warn'"
+                    :value="element.is_fired ? 'Con payoff' : 'Sin resolver'"
+                  />
+                </div>
+                <div class="chekhov-details">
+                  <p><strong>Introducido:</strong> Capítulo {{ element.setup_chapter }}</p>
+                  <p v-if="element.setup_context" class="context">
+                    "{{ element.setup_context }}"
+                  </p>
+                  <p v-if="element.payoff_chapter">
+                    <strong>Payoff:</strong> Capítulo {{ element.payoff_chapter }}
+                  </p>
+                  <p v-if="element.llm_analysis" class="llm-analysis">
+                    <i class="pi pi-sparkles"></i> {{ element.llm_analysis }}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-          <div v-else class="empty-tab">
-            <i class="pi pi-check-circle"></i>
-            <p>No se detectaron objetos narrativos sin resolver.</p>
-          </div>
-        </TabPanel>
+            <div v-else class="empty-tab">
+              <i class="pi pi-check-circle"></i>
+              <p>No se detectaron objetos narrativos sin resolver.</p>
+            </div>
+          </TabPanel>
 
-        <!-- Abandoned Threads Tab -->
-        <TabPanel v-if="report.abandoned_threads?.length" value="3">
-
-          <div class="abandoned-content">
-            <div
-              v-for="(thread, idx) in report.abandoned_threads"
-              :key="idx"
-              class="thread-card"
-            >
-              <div class="thread-header">
-                <span class="thread-description">{{ thread.description }}</span>
-              </div>
-              <div class="thread-details">
-                <p>
-                  <strong>Introducida:</strong> Capítulo {{ thread.introduced_chapter }}
-                  <i class="pi pi-arrow-right"></i>
-                  <strong>Última mención:</strong> Capítulo {{ thread.last_mention_chapter }}
-                </p>
-                <p v-if="thread.characters_involved?.length">
-                  <strong>Personajes:</strong> {{ thread.characters_involved.join(', ') }}
-                </p>
-                <Message v-if="thread.suggestion" severity="info" :closable="false" class="suggestion">
-                  <strong>Sugerencia:</strong> {{ thread.suggestion }}
-                </Message>
+          <!-- Abandoned Threads Tab -->
+          <TabPanel v-if="report.abandoned_threads?.length" value="3">
+            <div class="abandoned-content">
+              <div
+                v-for="(thread, idx) in report.abandoned_threads"
+                :key="idx"
+                class="thread-card"
+              >
+                <div class="thread-header">
+                  <span class="thread-description">{{ thread.description }}</span>
+                </div>
+                <div class="thread-details">
+                  <p>
+                    <strong>Introducida:</strong> Capítulo {{ thread.introduced_chapter }}
+                    <i class="pi pi-arrow-right"></i>
+                    <strong>Última mención:</strong> Capítulo {{ thread.last_mention_chapter }}
+                  </p>
+                  <p v-if="thread.characters_involved?.length">
+                    <strong>Personajes:</strong> {{ thread.characters_involved.join(', ') }}
+                  </p>
+                  <Message v-if="thread.suggestion" severity="info" :closable="false" class="suggestion">
+                    <strong>Sugerencia:</strong> {{ thread.suggestion }}
+                  </Message>
+                </div>
               </div>
             </div>
-          </div>
-        </TabPanel>
+          </TabPanel>
         </TabPanels>
       </Tabs>
 

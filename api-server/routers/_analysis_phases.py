@@ -784,6 +784,49 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
     except Exception as e:
         logger.warning(f"Error computing chapter metrics (continuing): {e}")
 
+    # S16: Detect and persist dialogues
+    try:
+        from narrative_assistant.nlp.dialogue import detect_dialogues
+        from narrative_assistant.persistence.dialogue import DialogueData, get_dialogue_repository
+
+        dialogue_repo = get_dialogue_repository(db_session)
+        # Limpiar diálogos anteriores (en caso de re-análisis)
+        dialogue_repo.delete_by_project(project_id)
+
+        dialogues_total = 0
+        for ch_db in chapters_with_ids:
+            ch_data = next(
+                (c for c in chapters_data if c["chapter_number"] == ch_db.chapter_number),
+                None,
+            )
+            if ch_data and ch_data.get("content"):
+                dialogue_result = detect_dialogues(ch_data["content"])
+                if dialogue_result.is_success and dialogue_result.value.dialogues:
+                    # Convertir DialogueSpan a DialogueData
+                    dialogues_to_save = []
+                    for dlg_span in dialogue_result.value.dialogues:
+                        dialogue_data = DialogueData(
+                            id=None,
+                            project_id=project_id,
+                            chapter_id=ch_db.id,
+                            start_char=dlg_span.start_char,
+                            end_char=dlg_span.end_char,
+                            text=dlg_span.text,
+                            dialogue_type=dlg_span.dialogue_type.value,
+                            original_format=dlg_span.original_format,
+                            attribution_text=dlg_span.attribution_text,
+                            speaker_hint=dlg_span.speaker_hint,
+                            confidence=dlg_span.confidence,
+                        )
+                        dialogues_to_save.append(dialogue_data)
+
+                    dialogue_repo.create_batch(dialogues_to_save)
+                    dialogues_total += len(dialogues_to_save)
+
+        logger.info(f"Dialogues detected and persisted: {dialogues_total} dialogues across {chapters_count} chapters")
+    except Exception as e:
+        logger.warning(f"Error detecting/persisting dialogues (continuing): {e}")
+
     tracker.set_metric("chapters_found", chapters_count)
     tracker.end_phase("structure", 2)
 

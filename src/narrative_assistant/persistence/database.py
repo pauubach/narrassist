@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 27
+SCHEMA_VERSION = 28
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -101,6 +101,43 @@ CREATE TABLE IF NOT EXISTS chapters (
 );
 
 CREATE INDEX IF NOT EXISTS idx_chapters_project ON chapters(project_id);
+
+-- Diálogos detectados en el texto (versión 28)
+CREATE TABLE IF NOT EXISTS dialogues (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    chapter_id INTEGER,
+
+    -- Ubicación en el texto
+    start_char INTEGER NOT NULL,
+    end_char INTEGER NOT NULL,
+
+    -- Contenido y metadata
+    text TEXT NOT NULL,
+    dialogue_type TEXT NOT NULL,  -- dash, guillemets, quotes, quotes_typographic
+
+    -- Formato ORIGINAL detectado (antes de normalización)
+    -- Permite distinguir: minus (-), double_minus (--), en_dash (–), em_dash (—), etc.
+    original_format TEXT,
+
+    -- Atribución (speaker tracking)
+    attribution_text TEXT,
+    speaker_hint TEXT,
+    speaker_entity_id INTEGER,  -- FK a entities si se resuelve el hablante
+
+    -- Metadata de detección
+    confidence REAL DEFAULT 0.9,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE SET NULL,
+    FOREIGN KEY (speaker_entity_id) REFERENCES entities(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_dialogues_project ON dialogues(project_id);
+CREATE INDEX IF NOT EXISTS idx_dialogues_chapter ON dialogues(chapter_id);
+CREATE INDEX IF NOT EXISTS idx_dialogues_type ON dialogues(dialogue_type);
+CREATE INDEX IF NOT EXISTS idx_dialogues_position ON dialogues(chapter_id, start_char);
 
 -- Secciones dentro de capítulos (H2, H3, H4)
 CREATE TABLE IF NOT EXISTS sections (

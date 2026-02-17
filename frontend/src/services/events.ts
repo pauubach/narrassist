@@ -38,13 +38,13 @@ export async function getChapterEvents(
   projectId: number,
   chapterNumber: number
 ): Promise<ChapterEventsResponse> {
-  const response = await api.get(
+  const response = await api.getRaw<ChapterEventsResponse>(
     `/api/projects/${projectId}/chapters/${chapterNumber}/events`
   )
 
-  if (!response.data.success) {
-    throw new Error(response.data.error || 'Error obteniendo eventos del capítulo')
+  if (!response.success) {
+    throw new Error(response.error || 'Error obteniendo eventos del capítulo')
   }
 
-  return response.data.data as ChapterEventsResponse
+  return response.data as ChapterEventsResponse
 }

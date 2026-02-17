@@ -41,6 +41,7 @@ class DialogueSpan:
         start_char: Posición de inicio en el texto original (incluye marcador)
         end_char: Posición de fin en el texto original (incluye marcador)
         dialogue_type: Tipo de formato detectado
+        original_format: Formato original antes de normalización (minus, em_dash, etc.)
         attribution_text: Texto de atribución ("dijo Juan") si existe
         speaker_hint: Pista sobre el hablante extraída de la atribución
         confidence: Confianza de la detección (0.0-1.0)
@@ -50,6 +51,7 @@ class DialogueSpan:
     start_char: int
     end_char: int
     dialogue_type: DialogueType
+    original_format: str | None = None
     attribution_text: str | None = None
     speaker_hint: str | None = None
     confidence: float = 0.9
@@ -332,6 +334,63 @@ def _extract_speaker_hint(attribution: str) -> str | None:
     return None
 
 
+def _infer_original_format(
+    original_text: str,
+    start_char: int,
+    dialogue_type: DialogueType,
+) -> str:
+    """
+    Infiere el formato original del diálogo antes de normalización.
+
+    Detecta si el marcador original era un guión-menos (-), doble guión (--),
+    en-dash (–), em-dash (—), o diferentes tipos de comillas.
+
+    Args:
+        original_text: Texto original sin normalizar
+        start_char: Posición de inicio del diálogo en texto normalizado
+        dialogue_type: Tipo de diálogo detectado
+
+    Returns:
+        Formato original: minus, double_minus, en_dash, em_dash,
+        quotes_straight, quotes_typographic, guillemets, unknown
+    """
+    # Solo analizar formatos de raya (DASH), comillas ya no normalizan
+    if dialogue_type != DialogueType.DASH:
+        # Para comillas, el formato es el tipo mismo
+        if dialogue_type == DialogueType.GUILLEMETS:
+            return "guillemets"
+        elif dialogue_type == DialogueType.QUOTES:
+            return "quotes_straight"
+        elif dialogue_type == DialogueType.QUOTES_TYPOGRAPHIC:
+            return "quotes_typographic"
+        return "unknown"
+
+    # Buscar en ventana ±10 chars alrededor de start_char
+    window_start = max(0, start_char - 10)
+    window_end = min(len(original_text), start_char + 10)
+    window = original_text[window_start:window_end]
+
+    # Detectar formato de guión original
+    # Orden: más específico primero
+    if EM_DASH in window:
+        return "em_dash"
+    elif "--" in window:
+        return "double_minus"
+    elif EN_DASH in window:
+        return "en_dash"
+    elif "-" in window and not window.strip().startswith("-"):
+        # Guión-menos al inicio de línea (después de whitespace)
+        # Verificar contexto: ¿está al principio de línea?
+        lines_before = original_text[:start_char].split("\n")
+        if lines_before:
+            last_line = lines_before[-1]
+            if last_line.strip() == "" or last_line.lstrip().startswith("-"):
+                return "minus"
+
+    # Si no se pudo determinar, asumir minus (más común)
+    return "minus" if "-" in window else "unknown"
+
+
 def detect_dialogues(text: str) -> Result[DialogueResult]:
     """
     Detecta intervenciones de diálogo en el texto.
@@ -383,11 +442,15 @@ def detect_dialogues(text: str) -> Result[DialogueResult]:
                     continue
                 detected_spans.add(span_key)
 
+                # Inferir formato original antes de normalización
+                original_format = _infer_original_format(text, match.start(), dtype)
+
                 dialogue = DialogueSpan(
                     text=dialogue_text.strip(),
                     start_char=match.start(),
                     end_char=match.end(),
                     dialogue_type=dtype,
+                    original_format=original_format,
                     attribution_text=attribution.strip() if attribution else None,
                 )
                 result.dialogues.append(dialogue)

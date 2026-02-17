@@ -99,7 +99,7 @@
                 <span v-if="chapter.declaration.focalizer_ids?.length" class="focalizers">
                   {{ getFocalizerNames(chapter.declaration.focalizer_ids) }}
                 </span>
-                <Tag v-if="chapter.declaration.declared_by === 'system_suggestion'" severity="info" size="small" v-tooltip.top="'Sugerido por el sistema. Puedes editarlo.'">
+                <Tag v-if="chapter.declaration.declared_by === 'system_suggestion'" v-tooltip.top="'Sugerido por el sistema. Puedes editarlo.'" severity="info" size="small">
                   <i class="pi pi-sparkles" style="font-size: 0.7rem; margin-right: 2px"></i> Auto
                 </Tag>
                 <Tag v-if="chapter.violationsCount > 0" severity="danger" size="small">

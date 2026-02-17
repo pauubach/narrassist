@@ -319,7 +319,7 @@
               </div>
 
               <!-- Nivel de calidad (Rápida / Completa / Experta) -->
-              <div class="quality-level-section" v-if="ollamaState === 'ready'">
+              <div v-if="ollamaState === 'ready'" class="quality-level-section">
                 <div class="setting-info" style="margin-bottom: 0.75rem;">
                   <label class="setting-label">Nivel de análisis</label>
                   <p class="setting-description">
@@ -330,6 +330,7 @@
                   <div
                     v-for="level in qualityLevels"
                     :key="level.value"
+                    v-tooltip.top="level.reason || ''"
                     class="quality-level-card"
                     :class="{
                       selected: settings.qualityLevel === level.value,
@@ -337,7 +338,6 @@
                       recommended: level.recommended,
                     }"
                     @click="level.available ? selectQualityLevel(level.value) : undefined"
-                    v-tooltip.top="level.reason || ''"
                   >
                     <div class="quality-level-header">
                       <i :class="level.icon"></i>
@@ -351,7 +351,7 @@
               </div>
 
               <!-- Slider de sensibilidad -->
-              <div class="setting-item" v-if="ollamaState === 'ready'">
+              <div v-if="ollamaState === 'ready'" class="setting-item">
                 <div class="setting-info">
                   <label class="setting-label">Sensibilidad de detección</label>
                   <p class="setting-description">
@@ -371,8 +371,8 @@
               </div>
 
               <!-- Motores activos (colapsable) -->
-              <div class="setting-item motors-section" v-if="ollamaState === 'ready'">
-                <div class="setting-info" @click="showMotors = !showMotors" style="cursor: pointer;">
+              <div v-if="ollamaState === 'ready'" class="setting-item motors-section">
+                <div class="setting-info" style="cursor: pointer;" @click="showMotors = !showMotors">
                   <label class="setting-label">
                     <i :class="showMotors ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" style="font-size: 0.8em; margin-right: 0.3em;"></i>
                     Motores activos
@@ -391,7 +391,7 @@
                   </div>
                   <Tag value="Activo" severity="success" />
                 </div>
-                <div class="motor-item" v-if="settings.qualityLevel !== 'rapida'">
+                <div v-if="settings.qualityLevel !== 'rapida'" class="motor-item">
                   <i class="pi pi-users"></i>
                   <div>
                     <strong>Motor de personajes</strong>
@@ -399,7 +399,7 @@
                   </div>
                   <Tag value="Activo" severity="success" />
                 </div>
-                <div class="motor-item" v-if="settings.qualityLevel === 'experta'">
+                <div v-if="settings.qualityLevel === 'experta'" class="motor-item">
                   <i class="pi pi-cog"></i>
                   <div>
                     <strong>Motor de razonamiento</strong>
@@ -417,7 +417,6 @@
                 class="ollama-progress-wrapper"
                 style="margin-top: 0.5rem;"
               />
-
             </div>
           </template>
         </Card>

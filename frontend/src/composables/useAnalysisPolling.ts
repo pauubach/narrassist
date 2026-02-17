@@ -167,7 +167,8 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
   function adjustPollingRate() {
     if (!pollingInterval || !project.value) return
 
-    const progress = project.value.analysisProgress / 100
+    const currentProgress = analysisStore.currentAnalysis?.progress ?? 0
+    const progress = currentProgress / 100
     const newInterval = getAdaptiveInterval(progress)
 
     if (newInterval !== currentInterval) {

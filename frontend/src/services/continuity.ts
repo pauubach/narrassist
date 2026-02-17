@@ -46,11 +46,11 @@ export interface ContinuityResponse {
 export async function getProjectContinuity(
   projectId: number
 ): Promise<ContinuityResponse> {
-  const response = await api.get(`/api/projects/${projectId}/continuity`)
+  const response = await api.getRaw<ContinuityResponse>(`/api/projects/${projectId}/continuity`)
 
-  if (!response.data.success) {
-    throw new Error(response.data.error || 'Error obteniendo análisis de continuidad')
+  if (!response.success) {
+    throw new Error(response.error || 'Error obteniendo análisis de continuidad')
   }
 
-  return response.data.data as ContinuityResponse
+  return response.data as ContinuityResponse
 }

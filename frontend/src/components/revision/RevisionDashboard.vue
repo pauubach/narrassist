@@ -144,72 +144,72 @@ watch(() => props.projectId, loadDetail)
           </Tab>
         </TabList>
         <TabPanels>
-        <TabPanel value="resolved">
-          <div v-if="resolvedCount === 0" class="tab-empty">
-            No hay alertas resueltas en esta revisión.
-          </div>
-          <div v-else class="alert-diff-list">
-            <div
-              v-for="(alert, idx) in detail?.alertsResolved"
-              :key="idx"
-              class="alert-diff-item resolved"
-              @click="selectedAlert = alert"
-            >
-              <div class="diff-item-header">
-                <span class="diff-title">{{ alert.title }}</span>
-                <div class="diff-badges">
-                  <Tag
-                    v-if="alert.matchConfidence"
-                    :value="`${Math.round((alert.matchConfidence ?? 0) * 100)}%`"
-                    :severity="confidenceSeverity(alert.matchConfidence)"
-                    rounded
-                    class="confidence-badge"
-                  />
-                  <Tag
-                    v-if="alert.resolutionReason"
-                    :value="reasonLabel(alert.resolutionReason)"
-                    severity="info"
-                    rounded
-                    class="reason-badge"
-                  />
+          <TabPanel value="resolved">
+            <div v-if="resolvedCount === 0" class="tab-empty">
+              No hay alertas resueltas en esta revisión.
+            </div>
+            <div v-else class="alert-diff-list">
+              <div
+                v-for="(alert, idx) in detail?.alertsResolved"
+                :key="idx"
+                class="alert-diff-item resolved"
+                @click="selectedAlert = alert"
+              >
+                <div class="diff-item-header">
+                  <span class="diff-title">{{ alert.title }}</span>
+                  <div class="diff-badges">
+                    <Tag
+                      v-if="alert.matchConfidence"
+                      :value="`${Math.round((alert.matchConfidence ?? 0) * 100)}%`"
+                      :severity="confidenceSeverity(alert.matchConfidence)"
+                      rounded
+                      class="confidence-badge"
+                    />
+                    <Tag
+                      v-if="alert.resolutionReason"
+                      :value="reasonLabel(alert.resolutionReason)"
+                      severity="info"
+                      rounded
+                      class="reason-badge"
+                    />
+                  </div>
+                </div>
+                <div class="diff-item-meta">
+                  <span v-if="alert.chapter" class="meta-chapter">Cap. {{ alert.chapter }}</span>
+                  <span class="meta-type">{{ alert.alertType }}</span>
+                  <span class="meta-severity">{{ alert.severity }}</span>
                 </div>
               </div>
-              <div class="diff-item-meta">
-                <span v-if="alert.chapter" class="meta-chapter">Cap. {{ alert.chapter }}</span>
-                <span class="meta-type">{{ alert.alertType }}</span>
-                <span class="meta-severity">{{ alert.severity }}</span>
+            </div>
+          </TabPanel>
+
+          <TabPanel value="new">
+            <div v-if="newCount === 0" class="tab-empty">
+              No hay alertas nuevas en esta revisión.
+            </div>
+            <div v-else class="alert-diff-list">
+              <div
+                v-for="(alert, idx) in detail?.alertsNew"
+                :key="idx"
+                class="alert-diff-item new-alert"
+              >
+                <div class="diff-item-header">
+                  <span class="diff-title">{{ alert.title }}</span>
+                </div>
+                <div class="diff-item-meta">
+                  <span v-if="alert.chapter" class="meta-chapter">Cap. {{ alert.chapter }}</span>
+                  <span class="meta-type">{{ alert.alertType }}</span>
+                  <span class="meta-severity">{{ alert.severity }}</span>
+                </div>
               </div>
             </div>
-          </div>
-        </TabPanel>
+          </TabPanel>
 
-        <TabPanel value="new">
-          <div v-if="newCount === 0" class="tab-empty">
-            No hay alertas nuevas en esta revisión.
-          </div>
-          <div v-else class="alert-diff-list">
-            <div
-              v-for="(alert, idx) in detail?.alertsNew"
-              :key="idx"
-              class="alert-diff-item new-alert"
-            >
-              <div class="diff-item-header">
-                <span class="diff-title">{{ alert.title }}</span>
-              </div>
-              <div class="diff-item-meta">
-                <span v-if="alert.chapter" class="meta-chapter">Cap. {{ alert.chapter }}</span>
-                <span class="meta-type">{{ alert.alertType }}</span>
-                <span class="meta-severity">{{ alert.severity }}</span>
-              </div>
+          <TabPanel value="unchanged">
+            <div class="tab-empty">
+              {{ unchangedCount }} alertas permanecen sin cambios respecto al análisis anterior.
             </div>
-          </div>
-        </TabPanel>
-
-        <TabPanel value="unchanged">
-          <div class="tab-empty">
-            {{ unchangedCount }} alertas permanecen sin cambios respecto al análisis anterior.
-          </div>
-        </TabPanel>
+          </TabPanel>
         </TabPanels>
       </Tabs>
 
