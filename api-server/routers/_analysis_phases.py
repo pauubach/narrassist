@@ -1570,11 +1570,11 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
         except Exception as e:
             logger.warning(f"Error en resolución de correferencias: {e}")
 
+        # Marcar fin de fase (entities_found se marca más abajo, después de MentionFinder)
         _update_storage(
             project_id,
             progress=fusion_pct_end,
             current_action=f"Encontrados {len(entities)} personajes y elementos únicos",
-            metrics_update={"entities_found": len(entities)},
         )
         tracker.end_phase("fusion", 4)
 
@@ -1697,6 +1697,12 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             except Exception as e:
                 logger.warning(f"Error recalculando importancia de '{entity.canonical_name}': {e}")
 
+        # AHORA sí: marcar entities_found después de MentionFinder + recalcular importancia
+        _update_storage(
+            project_id,
+            metrics_update={"entities_found": len(entities)},
+        )
+
     except Exception as e:
         logger.warning(f"Error en fusión de entidades (continuando sin fusión): {e}")
         tracker.phase_durations["fusion"] = time.time() - tracker.phase_start_times.get(
@@ -1710,6 +1716,154 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
 
     ctx["entities"] = entities
     ctx["coref_result"] = coref_result
+
+
+# ============================================================================
+# Phase 4.5: Timeline Construction
+# ============================================================================
+
+
+def run_timeline(ctx: dict, tracker: ProgressTracker):
+    """
+    Fase 4.5: Construcción de Timeline Temporal.
+
+    Extrae marcadores temporales y construye la timeline.
+    Requiere: capítulos + entidades (disponibles después de fusion).
+    """
+    from narrative_assistant.persistence.timeline import TimelineRepository
+    from narrative_assistant.temporal import (
+        TemporalConsistencyChecker,
+        TemporalMarkerExtractor,
+        TimelineBuilder,
+    )
+    from narrative_assistant.temporal.entity_mentions import load_entity_mentions_by_chapter
+
+    project_id = ctx["project_id"]
+    chapters_with_ids = ctx["chapters_with_ids"]
+    entities = ctx["entities"]
+    entity_repo = ctx.get("entity_repo")
+
+    tracker.start_phase("timeline", 5, "Construyendo línea temporal...")
+
+    try:
+        timeline_repo = TimelineRepository()
+
+        # Extraer marcadores temporales
+        marker_extractor = TemporalMarkerExtractor()
+        all_markers = []
+
+        # Cargar menciones de personajes por capítulo para asociar edades
+        entity_mentions_by_chapter: dict[int, list[tuple[int, int, int]]] = {}
+        try:
+            if entity_repo:
+                entity_mentions_by_chapter = load_entity_mentions_by_chapter(
+                    entities, chapters_with_ids, entity_repo
+                )
+        except Exception as e:
+            logger.debug(f"Could not load entity mentions for temporal extraction: {e}")
+
+        # Extraer por capítulo
+        for chapter in chapters_with_ids:
+            chapter_mentions = entity_mentions_by_chapter.get(chapter.chapter_number, [])
+            if chapter_mentions:
+                chapter_markers = marker_extractor.extract_with_entities(
+                    text=chapter.content,
+                    entity_mentions=chapter_mentions,
+                    chapter=chapter.chapter_number,
+                )
+            else:
+                chapter_markers = marker_extractor.extract(
+                    text=chapter.content, chapter=chapter.chapter_number
+                )
+            all_markers.extend(chapter_markers)
+
+        logger.info(
+            f"Timeline: {len(chapters_with_ids)} chapters, {len(all_markers)} markers"
+        )
+
+        # Construir timeline
+        builder = TimelineBuilder()
+        chapter_data = [
+            {
+                "number": ch.chapter_number,
+                "title": ch.title or f"Capítulo {ch.chapter_number}",
+                "start_position": ch.start_char,
+                "content": ch.content,
+            }
+            for ch in chapters_with_ids
+        ]
+
+        timeline = builder.build_from_markers(all_markers, chapter_data)
+
+        # Verificar consistencia temporal
+        checker = TemporalConsistencyChecker()
+        inconsistencies = checker.check(timeline, all_markers)
+
+        logger.info(
+            f"Timeline built: {len(timeline.events)} events, "
+            f"{len(inconsistencies)} inconsistencies"
+        )
+
+        # Persistir timeline en BD
+        try:
+            # Limpiar timeline anterior si existe
+            timeline_repo.clear_timeline(project_id)
+
+            # Guardar marcadores
+            from narrative_assistant.temporal.models import TemporalMarker
+
+            markers_to_save = []
+            for m in all_markers:
+                if isinstance(m, dict):
+                    # Ya es dict
+                    markers_to_save.append(m)
+                elif isinstance(m, TemporalMarker):
+                    markers_to_save.append(m.to_dict())
+                elif hasattr(m, "to_dict"):
+                    markers_to_save.append(m.to_dict())
+                else:
+                    # Fallback: convertir a dict básico
+                    markers_to_save.append(
+                        {
+                            "text": getattr(m, "text", ""),
+                            "marker_type": getattr(m, "marker_type", "UNKNOWN"),
+                            "start_char": getattr(m, "start_char", 0),
+                            "end_char": getattr(m, "end_char", 0),
+                            "chapter": getattr(m, "chapter", 0),
+                        }
+                    )
+
+            timeline_repo.save_markers(project_id, markers_to_save)
+
+            # Guardar eventos
+            from narrative_assistant.temporal.models import TimelineEvent
+
+            events_saved = 0
+            for event in timeline.events:
+                event_dict = event.to_dict() if hasattr(event, "to_dict") else event
+                event_model = TimelineEvent.from_dict(event_dict)
+                event_model.project_id = project_id
+                timeline_repo.save_event(event_model)
+                events_saved += 1
+
+            logger.info(
+                f"Timeline persisted: {len(markers_to_save)} markers, {events_saved} events"
+            )
+
+        except Exception as persist_err:
+            logger.warning(f"Failed to persist timeline (non-critical): {persist_err}")
+
+        # Guardar en contexto para fases posteriores
+        ctx["timeline"] = timeline
+        ctx["temporal_markers"] = all_markers
+        ctx["temporal_inconsistencies"] = inconsistencies
+
+        tracker.end_phase("timeline", 5)
+
+    except Exception as e:
+        logger.warning(f"Timeline construction failed (non-critical): {e}")
+        # No bloquear el análisis si falla la timeline
+        tracker.end_phase("timeline", 5)
 
 
 # ============================================================================

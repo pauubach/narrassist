@@ -52,6 +52,7 @@ export interface ExecutedPhases {
   alerts: boolean          // todas las alertas emitidas (completo)
   // Análisis avanzado
   temporal: boolean
+  timeline: boolean  // Construcción de línea temporal
   emotional: boolean
   sentiment: boolean
   focalization: boolean
@@ -78,6 +79,7 @@ export const ANALYSIS_DEPENDENCIES: Record<keyof ExecutedPhases, (keyof Executed
   pacing: ['structure'],
   coherence: ['entities', 'structure'],
   temporal: ['parsing'],
+  timeline: ['entities', 'coreference'],  // Necesita entidades completas
   emotional: ['entities'],
   sentiment: ['parsing'],
   focalization: ['entities', 'structure'],
@@ -103,6 +105,7 @@ export const PHASE_LABELS: Record<keyof ExecutedPhases, string> = {
   pacing: 'Análisis de ritmo',
   coherence: 'Coherencia narrativa',
   temporal: 'Marcadores temporales',
+  timeline: 'Construcción de línea temporal',
   emotional: 'Análisis emocional',
   sentiment: 'Arcos de sentimiento',
   focalization: 'Focalización',
@@ -127,7 +130,7 @@ export const TAB_PHASE_GATES: Partial<Record<WorkspaceTab, {
   entities: { partial: 'entities', complete: 'attributes' },
   alerts: { partial: 'alerts_grammar', complete: 'alerts' },
   relationships: { partial: 'coreference', complete: 'coreference' },
-  timeline: { partial: 'coreference', complete: 'coreference' },
+  timeline: { partial: 'timeline', complete: 'timeline' },  // Ahora usa su propia fase
   style: { partial: 'grammar', complete: 'register' },
   glossary: { partial: 'coreference', complete: 'coreference' },
   summary: { partial: 'coreference', complete: 'coreference' },

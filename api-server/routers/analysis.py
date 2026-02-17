@@ -326,6 +326,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 run_reconciliation,
                 run_snapshot,
                 run_structure,
+                run_timeline,
             )
             from routers._enrichment_phases import (
                 capture_entity_fingerprint,
@@ -425,10 +426,11 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 run_ollama_healthcheck(ctx, tracker)
 
                 # Tier 2: Heavy phases (exclusive — one project at a time)
-                # NER → LLM validation → Fusion (sequential, each depends on previous)
+                # NER → LLM validation → Fusion → Timeline (sequential)
                 run_ner(ctx, tracker)
                 run_llm_entity_validation(ctx, tracker)
                 run_fusion(ctx, tracker)
+                run_timeline(ctx, tracker)  # Construir timeline con entidades listas
 
                 # Grammar is independent of attributes/consistency.
                 # Run in parallel: Thread 1 = grammar → grammar_alerts

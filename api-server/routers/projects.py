@@ -319,6 +319,17 @@ def get_analysis_status(project_id: int):
             except Exception:
                 has_temporal = False
 
+            # Verificar si hay timeline construida (verificar eventos temporales)
+            has_timeline = False
+            try:
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM timeline_events WHERE project_id = ?",
+                    (project_id,)
+                )
+                has_timeline = cursor.fetchone()[0] > 0
+            except Exception:
+                has_timeline = False
+
         # Construir estado de fases ejecutadas
         executed = {
             "parsing": has_chapters,  # Si hay capítulos, el parsing se ejecutó
@@ -329,12 +340,14 @@ def get_analysis_status(project_id: int):
             "relationships": relationship_count > 0,
             "interactions": False,  # Por implementar
             "alerts": has_alerts,
+            "alerts_grammar": has_alerts,  # Alertas de gramática (parcial)
             "spelling": has_alerts,  # Si hay alertas, asumimos que se ejecutó
             "grammar": has_alerts,
             "register": has_alerts,
             "pacing": has_chapters,
             "coherence": has_entities and has_chapters,
             "temporal": has_temporal,
+            "timeline": has_timeline,  # Timeline construida durante análisis
             "emotional": False,  # Por implementar
             "sentiment": False,  # Por implementar
             "focalization": False,  # Por implementar
