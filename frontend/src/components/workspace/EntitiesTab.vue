@@ -15,7 +15,6 @@ import DsBadge from '@/components/ds/DsBadge.vue'
 import DsEmptyState from '@/components/ds/DsEmptyState.vue'
 import MergeEntitiesDialog from '@/components/MergeEntitiesDialog.vue'
 import UndoMergeDialog from '@/components/UndoMergeDialog.vue'
-import MergeHistoryPanel from '@/components/MergeHistoryPanel.vue'
 import RejectEntityDialog from '@/components/RejectEntityDialog.vue'
 import { CharacterProfileModal } from '@/components/modals'
 import type { Entity, EntityAttribute } from '@/types'
@@ -35,8 +34,6 @@ import { useToast } from 'primevue/usetoast'
  * Muestra todas las entidades del proyecto con:
  * - Filtros por tipo, importancia, búsqueda
  * - Edición, fusión, eliminación
- * - Historial de fusiones
- * - Exportación
  */
 
 interface Props {
@@ -105,14 +102,12 @@ const loadingRichData = ref(false)
 const showEditDialog = ref(false)
 const showMergeDialog = ref(false)
 const showUndoMergeDialog = ref(false)
-const showMergeHistory = ref(false)
 const showRejectDialog = ref(false)
 const showProfileModal = ref(false)
 const entityToReject = ref<Entity | null>(null)
 const editingEntity = ref<Entity | null>(null)
 const entityToUndoMerge = ref<Entity | null>(null)
 const selectedEntitiesForMerge = ref<Entity[]>([])
-const mergeHistoryRef = ref<InstanceType<typeof MergeHistoryPanel> | null>(null)
 
 // ID de la última entidad seleccionada automáticamente
 const lastAutoSelectedId = ref<number | null>(null)
@@ -469,7 +464,6 @@ async function onMergeEntities(primaryEntityId: number, entityIdsToMerge: number
     if (data.success) {
       showMergeDialog.value = false
       emit('refresh')
-      mergeHistoryRef.value?.refresh()
       toast.add({ severity: 'success', summary: 'Fusionadas', detail: 'Entidades fusionadas correctamente', life: 3000 })
     } else {
       toast.add({ severity: 'error', summary: 'Error', detail: `Error al fusionar: ${data.error}`, life: 5000 })
@@ -485,7 +479,6 @@ async function onUndoMergeComplete(_restoredIds: number[]) {
     selectedEntity.value = null
   }
   emit('refresh')
-  mergeHistoryRef.value?.refresh()
   entityToUndoMerge.value = null
   toast.add({ severity: 'success', summary: 'Fusión deshecha', detail: 'Entidades restauradas correctamente', life: 3000 })
 }
@@ -495,44 +488,6 @@ function viewMentions(entity: Entity) {
   emit('entity-select', entity)
   // Navegar a la pestaña de texto mostrando las menciones de esta entidad
   workspaceStore.navigateToEntityMentions(entity.id)
-}
-
-function exportEntities() {
-  if (!props.entities || props.entities.length === 0) {
-    toast.add({ severity: 'warn', summary: 'Sin datos', detail: 'No hay entidades para exportar', life: 4000 })
-    return
-  }
-
-  try {
-    const content = {
-      projectId: props.projectId,
-      exportedAt: new Date().toISOString(),
-      totalEntities: props.entities.length,
-      entities: props.entities.map(e => ({
-        id: e.id,
-        name: e.name,
-        type: e.type,
-        importance: e.importance,
-        aliases: e.aliases,
-        mentionCount: e.mentionCount,
-      })),
-    }
-
-    const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `entidades_proyecto_${props.projectId}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-
-    toast.add({ severity: 'success', summary: 'Exportado', detail: 'Entidades exportadas correctamente', life: 3000 })
-  } catch (err) {
-    console.error('Error exporting entities:', err)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Error al exportar entidades', life: 5000 })
-  }
 }
 
 // Helpers para el sidebar (reservado para uso futuro)
@@ -1212,31 +1167,6 @@ defineExpose({ focusSearch })
           </div>
         </div>
       </div>
-
-      <!-- Acciones globales flotantes -->
-      <div class="floating-actions">
-        <Button
-          v-tooltip.left="'Historial de fusiones'"
-          icon="pi pi-history"
-          text
-          rounded
-          @click="showMergeHistory = true"
-        />
-        <Button
-          v-tooltip.left="'Exportar entidades'"
-          icon="pi pi-download"
-          text
-          rounded
-          @click="exportEntities"
-        />
-        <Button
-          v-tooltip.left="'Actualizar'"
-          icon="pi pi-refresh"
-          text
-          rounded
-          @click="emit('refresh')"
-        />
-      </div>
     </div>
 
     <!-- Diálogo de edición -->
@@ -1327,18 +1257,6 @@ defineExpose({ focusSearch })
       @update:visible="showProfileModal = $event"
     />
 
-    <!-- Panel de historial de fusiones -->
-    <Drawer
-      v-model:visible="showMergeHistory"
-      position="right"
-      :style="{ width: '400px' }"
-      header="Historial de Fusiones"
-    >
-      <MergeHistoryPanel
-        ref="mergeHistoryRef"
-        :project-id="projectId"
-      />
-    </Drawer>
   </div>
 </template>
 
@@ -1946,47 +1864,6 @@ defineExpose({ focusSearch })
   padding: 1rem 1.5rem;
   border-top: 1px solid var(--surface-border);
   background: var(--surface-card);
-}
-
-/* Acciones flotantes - WCAG compliant */
-.floating-actions {
-  position: absolute;
-  bottom: 1rem;
-  right: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  background: #ffffff !important; /* Fondo blanco fijo en light mode */
-  padding: 0.5rem;
-  border-radius: var(--app-radius);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-/* Dark mode: fondo oscuro fijo */
-.dark .floating-actions {
-  background: #1e293b !important; /* slate-800 fijo */
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-/* Botones dentro de floating-actions con color fijo para contraste */
-.floating-actions :deep(.p-button) {
-  color: var(--p-primary-800, #1e40af) !important;
-}
-
-.floating-actions :deep(.p-button:hover) {
-  color: var(--p-primary-700, #1d4ed8) !important;
-  background: color-mix(in srgb, var(--p-primary-color, #3B82F6) 12%, transparent) !important;
-}
-
-/* Dark mode icon color */
-.dark .floating-actions :deep(.p-button) {
-  color: var(--p-primary-300, #93c5fd) !important;
-}
-
-.dark .floating-actions :deep(.p-button:hover) {
-  color: var(--p-primary-200, #bfdbfe) !important;
-  background: color-mix(in srgb, var(--p-primary-300, #93c5fd) 15%, transparent) !important;
 }
 
 /* Relevancia */
