@@ -85,8 +85,8 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
 
       // Incremental loading: alerts (two-stage)
       // Stage 1: grammar alerts available (partial)
-      const alertsGrammarPhase = progressData.phases?.find((p: { id: string }) => p.id === 'alerts_grammar')
-      if (alertsGrammarPhase?.completed && !alertsPartialLoaded) {
+      const grammarAlertsPhase = progressData.phases?.find((p: { id: string }) => p.id === 'grammar_alerts')
+      if (grammarAlertsPhase?.completed && !alertsPartialLoaded) {
         alertsPartialLoaded = true
         loadAlerts(project.value!.id)
       }

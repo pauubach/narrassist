@@ -2973,6 +2973,9 @@ def _emit_consistency_alerts(ctx: dict, tracker: ProgressTracker):
             except Exception as e:
                 logger.warning(f"Error creating anachronism alert: {e}")
 
+    # Marcar fase parcial de alertas de coherencia como completada
+    tracker.mark_phase_completed("consistency_alerts")
+
     ctx.setdefault("alerts_created", 0)
     ctx["alerts_created"] += alerts_created
     ctx["_consistency_alerts_emitted"] = True

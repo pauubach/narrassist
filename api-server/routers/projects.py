@@ -343,7 +343,7 @@ def get_analysis_status(project_id: int):
             "relationships": relationship_count > 0,
             "interactions": False,  # Por implementar
             "alerts": has_alerts,
-            "alerts_grammar": has_alerts,  # Alertas de gramática (parcial)
+            "grammar_alerts": has_alerts,  # Alertas de gramática (parcial)
             "spelling": has_alerts,  # Si hay alertas, asumimos que se ejecutó
             "grammar": has_alerts,
             "register": has_alerts,
