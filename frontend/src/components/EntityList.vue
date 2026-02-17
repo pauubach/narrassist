@@ -357,13 +357,10 @@ import Menu from 'primevue/menu'
 import Dialog from 'primevue/dialog'
 import type { Entity } from '@/types'
 import { debounce } from '@/composables'
-import { useToast } from 'primevue/usetoast'
 import { api } from '@/services/apiClient'
 
 // Umbral para activar virtualización (más de 50 items)
 const VIRTUALIZATION_THRESHOLD = 50
-
-const _toast = useToast()
 
 const props = withDefaults(defineProps<{
   entities: Entity[]
