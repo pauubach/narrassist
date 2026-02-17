@@ -1149,7 +1149,9 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
     project_id = ctx["project_id"]
     full_text = ctx["full_text"]
     find_chapter_id_for_position = ctx["find_chapter_id_for_position"]
-    document_fingerprint = ctx.get("fingerprint", "")
+    # Obtener fingerprint del proyecto (campo de BD, NO de ctx)
+    _fp_project = ctx.get("project")
+    document_fingerprint = getattr(_fp_project, "document_fingerprint", "") if _fp_project else ""
     analysis_config = ctx.get("analysis_config")
 
     tracker.start_phase("ner", 3, "Buscando personajes, lugares y otros elementos...")
@@ -1159,6 +1161,12 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
     # ========================================================================
     cache = get_analysis_cache()
     config_hash = cache.compute_ner_config_hash(analysis_config) if analysis_config else "default"
+
+    logger.info(
+        f"[NER_CACHE] Checking: project={project_id}, "
+        f"fp={'...' + document_fingerprint[-16:] if document_fingerprint else 'EMPTY'}, "
+        f"config={config_hash}"
+    )
 
     cached_data = cache.get_ner_results(project_id, document_fingerprint, config_hash)
     if cached_data is not None:
@@ -2928,7 +2936,9 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
                     spacy_nlp = ctx.get("spacy_nlp")
 
                     # Obtener document fingerprint
-                    document_fingerprint = ctx.get("fingerprint", "")
+                    # Obtener fingerprint del proyecto (campo de BD, NO de ctx)
+    _fp_project = ctx.get("project")
+    document_fingerprint = getattr(_fp_project, "document_fingerprint", "") if _fp_project else ""
 
                     speech_alerts = tracker_speech.detect_changes(
                         character_id=entity.id,
