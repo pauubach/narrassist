@@ -98,6 +98,9 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
         loadAlerts(project.value!.id)
       }
 
+      // Ajustar rate de polling según progreso (adaptive polling)
+      adjustPollingRate()
+
       // Idle — no active analysis
       if (progressData.status === 'idle') {
         stopPolling()
@@ -139,14 +142,39 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
     }
   }
 
+  // Polling adaptativo (performance optimization #7)
+  // Intervalo ajustado según progreso: lento al inicio, rápido al final
+  function getAdaptiveInterval(progress: number): number {
+    if (progress < 0.3) return 3000  // Inicio lento (3s)
+    if (progress < 0.6) return 1500  // Medio normal (1.5s)
+    if (progress < 0.9) return 1000  // Avanzado rápido (1s)
+    return 500  // Final muy rápido (500ms)
+  }
+
+  let currentInterval = 1500
+
   function startPolling() {
     if (pollingInterval) return
     chaptersLoadedDuringAnalysis = false
     entitiesLoadedDuringAnalysis = false
     alertsPartialLoaded = false
     alertsFullLoaded = false
-    pollingInterval = setInterval(pollProgress, 1500)
+    currentInterval = 1500
+    pollingInterval = setInterval(pollProgress, currentInterval)
     pollProgress()
+  }
+
+  function adjustPollingRate() {
+    if (!pollingInterval || !project.value) return
+
+    const progress = project.value.analysisProgress / 100
+    const newInterval = getAdaptiveInterval(progress)
+
+    if (newInterval !== currentInterval) {
+      currentInterval = newInterval
+      clearInterval(pollingInterval)
+      pollingInterval = setInterval(pollProgress, currentInterval)
+    }
   }
 
   function stopPolling() {

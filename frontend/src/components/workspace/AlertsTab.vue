@@ -162,70 +162,86 @@ const confidenceOptions = [
 ]
 
 // Alertas filtradas
+// Filtrado optimizado: un solo pase sobre el array (performance optimization #3)
 const filteredAlerts = computed(() => {
-  let result = props.alerts
+  const query = searchQuery.value?.toLowerCase()
+  const hasSearch = !!query
+  const hasSeverityFilter = selectedSeverities.value.length > 0
+  const hasCategoryFilter = selectedCategories.value.length > 0
+  const hasStatusFilter = selectedStatuses.value.length > 0
+  const hasSingleChapter = selectedChapter.value !== null
+  const hasChapterRange = chapterRange.value.min != null || chapterRange.value.max != null
+  const hasConfidenceFilter = minConfidence.value !== null
+  const { min: chapterMin, max: chapterMax } = chapterRange.value
 
-  // Filtrar por búsqueda
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    result = result.filter(a =>
-      a.title.toLowerCase().includes(query) ||
-      a.description?.toLowerCase().includes(query)
-    )
-  }
+  // Filtrar en un solo pase
+  const result = props.alerts.filter(a => {
+    // Búsqueda
+    if (hasSearch && !(a.title.toLowerCase().includes(query!) || a.description?.toLowerCase().includes(query!))) {
+      return false
+    }
 
-  // Filtrar por severidad
-  if (selectedSeverities.value.length > 0) {
-    result = result.filter(a => selectedSeverities.value.includes(a.severity))
-  }
+    // Severidad
+    if (hasSeverityFilter && !selectedSeverities.value.includes(a.severity)) {
+      return false
+    }
 
-  // Filtrar por categoría
-  if (selectedCategories.value.length > 0) {
-    result = result.filter(a => a.category && selectedCategories.value.includes(a.category))
-  }
+    // Categoría
+    if (hasCategoryFilter && (!a.category || !selectedCategories.value.includes(a.category))) {
+      return false
+    }
 
-  // Filtrar por estado
-  if (selectedStatuses.value.length > 0) {
-    result = result.filter(a => selectedStatuses.value.includes(a.status))
-  }
+    // Estado
+    if (hasStatusFilter && !selectedStatuses.value.includes(a.status)) {
+      return false
+    }
 
-  // Filtrar por capítulo (single o rango)
-  if (selectedChapter.value !== null) {
-    result = result.filter(a => a.chapter === selectedChapter.value)
-  } else if (chapterRange.value.min != null || chapterRange.value.max != null) {
-    const { min, max } = chapterRange.value
-    result = result.filter(a => {
+    // Capítulo (single)
+    if (hasSingleChapter && a.chapter !== selectedChapter.value) {
+      return false
+    }
+
+    // Capítulo (rango)
+    if (hasChapterRange) {
       if (a.chapter == null) return false
-      if (min != null && a.chapter < min) return false
-      if (max != null && a.chapter > max) return false
-      return true
-    })
-  }
+      if (chapterMin != null && a.chapter < chapterMin) return false
+      if (chapterMax != null && a.chapter > chapterMax) return false
+    }
 
-  // Filtrar por confianza
-  if (minConfidence.value !== null) {
-    result = result.filter(a => (a.confidence ?? 0) >= minConfidence.value!)
-  }
+    // Confianza
+    if (hasConfidenceFilter && (a.confidence ?? 0) < minConfidence.value!) {
+      return false
+    }
+
+    return true
+  })
 
   // Ordenar por severidad y luego por capítulo
   const severityOrder = { critical: 0, high: 1, medium: 2, low: 3, info: 4 }
-  return [...result].sort((a, b) => {
+  return result.sort((a, b) => {
     const severityDiff = severityOrder[a.severity] - severityOrder[b.severity]
     if (severityDiff !== 0) return severityDiff
     return (a.chapter ?? 999) - (b.chapter ?? 999)
   })
 })
 
-// Estadísticas
-const stats = computed(() => ({
-  total: props.alerts.length,
-  filtered: filteredAlerts.value.length,
-  bySeverity: props.alerts.reduce((acc, a) => {
-    acc[a.severity] = (acc[a.severity] || 0) + 1
-    return acc
-  }, {} as Record<string, number>),
-  active: props.alerts.filter(a => a.status === 'active').length
-}))
+// Estadísticas (optimized #11: calcular en un solo pase)
+const stats = computed(() => {
+  const bySeverity: Record<string, number> = {}
+  let active = 0
+
+  for (const alert of props.alerts) {
+    bySeverity[alert.severity] = (bySeverity[alert.severity] || 0) + 1
+    if (alert.status === 'active') active++
+  }
+
+  return {
+    total: props.alerts.length,
+    filtered: filteredAlerts.value.length,
+    bySeverity,
+    active
+  }
+})
 
 // Helpers - usar composable centralizado
 function getCategoryLabel(category: string): string {

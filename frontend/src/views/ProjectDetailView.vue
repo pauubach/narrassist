@@ -497,15 +497,12 @@ const unresolvedAlertCount = computed(() =>
   alerts.value.filter(a => a.status === 'active').length
 )
 
+// Batch tab statuses (performance optimization #9)
 const tabStatuses = computed(() => {
   const pid = project.value?.id
   if (!pid) return {}
   const tabs: WorkspaceTab[] = ['text', 'entities', 'relationships', 'alerts', 'timeline', 'style', 'glossary', 'summary']
-  const result: Partial<Record<WorkspaceTab, ReturnType<typeof analysisStore.getTabStatus>>> = {}
-  for (const tab of tabs) {
-    result[tab] = analysisStore.getTabStatus(pid, tab)
-  }
-  return result
+  return analysisStore.getBatchTabStatuses(pid, tabs)
 })
 
 // ── Local UI state ─────────────────────────────────────────

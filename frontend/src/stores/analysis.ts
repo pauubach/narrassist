@@ -559,6 +559,15 @@ export const useAnalysisStore = defineStore('analysis', () => {
     return 'pending'
   }
 
+  // Batch getTabStatus (performance optimization #9)
+  function getBatchTabStatuses(projectId: number, tabs: WorkspaceTab[]): Record<WorkspaceTab, TabStatus> {
+    const result: Partial<Record<WorkspaceTab, TabStatus>> = {}
+    for (const tab of tabs) {
+      result[tab] = getTabStatus(projectId, tab)
+    }
+    return result as Record<WorkspaceTab, TabStatus>
+  }
+
   return {
     // State (computed: sigue el proyecto activo)
     currentAnalysis,
@@ -595,5 +604,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
     isPhaseRunning,
     getProjectPhases,
     getTabStatus,
+    getBatchTabStatuses,
   }
 })

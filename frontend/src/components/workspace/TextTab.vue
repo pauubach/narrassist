@@ -92,7 +92,16 @@ const alertsByChapter = computed(() => {
 })
 
 // Computed: posiciones relativas de alertas para el gutter
+// Memoización de gutterMarkers con hash (performance optimization #6)
+const gutterMarkersCache = ref<{ hash: string; value: any[] } | null>(null)
 const gutterMarkers = computed(() => {
+  // Hash basado en chapters length y alerts length
+  const hash = `${props.chapters.length}-${props.alerts.length}`
+
+  if (gutterMarkersCache.value?.hash === hash) {
+    return gutterMarkersCache.value.value
+  }
+
   const markers: Array<{
     id: number
     top: number // porcentaje
@@ -101,7 +110,10 @@ const gutterMarkers = computed(() => {
     alerts: Alert[]
   }> = []
 
-  if (props.chapters.length === 0) return markers
+  if (props.chapters.length === 0) {
+    gutterMarkersCache.value = { hash, value: markers }
+    return markers
+  }
 
   // Calcular posición de cada capítulo como porcentaje del documento total
   const totalChapters = props.chapters.length
@@ -129,6 +141,7 @@ const gutterMarkers = computed(() => {
     }
   })
 
+  gutterMarkersCache.value = { hash, value: markers }
   return markers
 })
 

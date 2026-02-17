@@ -309,6 +309,22 @@ const showGrammarErrors = ref(true)   // Toggle para mostrar/ocultar errores de 
 const showDialoguePanel = ref(false)  // Toggle para panel de atribución de diálogos
 const showDialogueHighlights = ref(true)  // Mostrar highlights de diálogos cuando el panel está abierto
 
+// Cache de contenido highlighted (performance optimization #1)
+interface HighlightedContentCache {
+  content: string
+  dependencies: {
+    chapterId: number
+    showSpelling: boolean
+    showGrammar: boolean
+    showDialogue: boolean
+    highlightDialogue: boolean
+    entitiesCount: number
+    annotationsCount: number
+    dialoguesCount: number
+  }
+}
+const highlightedContentCache = ref<Map<number, HighlightedContentCache>>(new Map())
+
 // Computed para mantener compatibilidad con showAnnotations (reservado para uso futuro)
 const _showAnnotations = computed(() => showSpellingErrors.value || showGrammarErrors.value)
 
@@ -359,6 +375,11 @@ const saveErrorPreferences = () => {
 
 // Watch para persistir los cambios
 watch([showSpellingErrors, showGrammarErrors], saveErrorPreferences)
+
+// Invalidar cache cuando cambien opciones de visualización (performance optimization #1)
+watch([showSpellingErrors, showGrammarErrors, showDialoguePanel, showDialogueHighlights], () => {
+  highlightedContentCache.value.clear()
+})
 
 // Computed para el estilo del contenido
 const contentStyle = computed(() => ({
@@ -441,6 +462,15 @@ const setupIntersectionObserver = () => {
             // Marcar como cargado y actualizar LRU
             loadedChapters.value.add(chapterId)
             touchChapter(chapterId)
+
+            // Cargar anotaciones y diálogos al entrar en viewport (performance optimization #10)
+            const chapter = chapters.value.find(ch => ch.id === chapterId)
+            if (chapter) {
+              loadChapterAnnotations(chapter.chapterNumber)
+              if (showDialoguePanel.value) {
+                loadChapterDialogues(chapter.chapterNumber)
+              }
+            }
           } else {
             visibleChapters.value.delete(chapterId)
           }
@@ -597,16 +627,29 @@ const removeLeadingTitle = (content: string, title: string): string => {
   return content
 }
 
-// Resaltar entidades en el contenido
+// Resaltar entidades en el contenido (memoized, performance optimization #1)
 const getHighlightedContent = (chapter: Chapter): string => {
   if (!chapter.content) return ''
 
-  // Cargar anotaciones de gramática/ortografía para este capítulo (async)
-  loadChapterAnnotations(chapter.chapterNumber)
+  // Verificar cache
+  const cached = highlightedContentCache.value.get(chapter.id)
+  const annotations = chapterAnnotations.value.get(chapter.chapterNumber) || []
+  const dialogues = chapterDialogues.value.get(chapter.chapterNumber) || []
 
-  // Cargar atribuciones de diálogo si el panel está abierto
-  if (showDialoguePanel.value) {
-    loadChapterDialogues(chapter.chapterNumber)
+  const currentDeps = {
+    chapterId: chapter.id,
+    showSpelling: showSpellingErrors.value,
+    showGrammar: showGrammarErrors.value,
+    showDialogue: showDialoguePanel.value,
+    highlightDialogue: showDialogueHighlights.value,
+    entitiesCount: entities.value.length,
+    annotationsCount: annotations.length,
+    dialoguesCount: dialogues.length
+  }
+
+  // Si el cache es válido, retornar inmediatamente
+  if (cached && JSON.stringify(cached.dependencies) === JSON.stringify(currentDeps)) {
+    return cached.content
   }
 
   // Primero remover el título si está duplicado al inicio del contenido
@@ -761,7 +804,15 @@ const getHighlightedContent = (chapter: Chapter): string => {
     .join('')
 
   // Defense-in-depth: sanitize final HTML to strip anything unexpected
-  return sanitizeHtml(html)
+  const finalHtml = sanitizeHtml(html)
+
+  // Guardar en cache (performance optimization #1)
+  highlightedContentCache.value.set(chapter.id, {
+    content: finalHtml,
+    dependencies: currentDeps
+  })
+
+  return finalHtml
 }
 
 /**
