@@ -538,6 +538,10 @@ try:
     from routers import history
     _early_logger.info("history router imported")
 
+    _early_logger.info("Importing events router...")
+    from routers import events
+    _early_logger.info("events router imported")
+
     _early_logger.info("All routers imported successfully")
 
 except Exception as e:
@@ -600,6 +604,9 @@ try:
 
     _early_logger.info("Registering history router...")
     app.include_router(history.router)
+
+    _early_logger.info("Registering events router...")
+    app.include_router(events.router)
 
     _early_logger.info("All routers registered successfully")
 
