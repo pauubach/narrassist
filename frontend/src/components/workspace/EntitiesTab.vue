@@ -833,9 +833,16 @@ defineExpose({ focusSearch })
                 <span v-if="entity.mentionCount" class="mention-count-compact">{{ entity.mentionCount }}</span>
               </span>
             </div>
-            <Tag v-if="entity.mergedFromIds && entity.mergedFromIds.length > 0" v-tooltip="'Fusionada'" severity="info" class="merged-dot">
+            <button
+              v-if="entity.mergedFromIds && entity.mergedFromIds.length > 0"
+              v-tooltip.left="{ value: `Fusionada (${entity.mergedFromIds.length} entidades)<br>Click para deshacer fusión`, escape: false }"
+              type="button"
+              class="merged-indicator"
+              @click.stop="onUndoMerge(entity)"
+            >
               <i class="pi pi-link"></i>
-            </Tag>
+              <span class="merged-count">{{ entity.mergedFromIds.length }}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1485,9 +1492,47 @@ defineExpose({ focusSearch })
   font-weight: 500;
 }
 
-.merged-dot {
-  font-size: 0.5rem;
-  padding: 0.125rem 0.25rem;
+/* Indicador de entidad fusionada */
+.merged-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--blue-50);
+  border: 1px solid var(--blue-200);
+  border-radius: var(--app-radius);
+  color: var(--blue-700);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.merged-indicator:hover {
+  background: var(--blue-100);
+  border-color: var(--blue-400);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.merged-indicator i {
+  font-size: 0.7rem;
+}
+
+.merged-count {
+  font-weight: 600;
+  font-size: 0.65rem;
+}
+
+.dark .merged-indicator {
+  background: var(--blue-900);
+  border-color: var(--blue-700);
+  color: var(--blue-300);
+}
+
+.dark .merged-indicator:hover {
+  background: var(--blue-800);
+  border-color: var(--blue-500);
 }
 
 /* Panel central - Contenido */

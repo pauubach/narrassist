@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useGlobalUndo } from '@/composables/useGlobalUndo'
 import type { HistoryEntry } from '@/composables/useGlobalUndo'
 import { useListKeyboardNav } from '@/composables/useListKeyboardNav'
+import SelectButton from 'primevue/selectbutton'
 
 /**
  * HistoryPanel - Panel de historial de acciones en el sidebar.
  *
  * Muestra las acciones recientes del proyecto con opción de deshacerlas.
  * 5ª pestaña del sidebar, colapsada por defecto.
+ * Incluye filtros por categoría de acción (entidades, alertas, atributos, relaciones).
  */
 
 const props = defineProps<{
@@ -22,6 +24,41 @@ const { setItemRef: setHistoryRef, getTabindex: getHistoryTabindex, onKeydown: o
 
 const entries = ref<HistoryEntry[]>([])
 const loading = ref(false)
+const selectedFilter = ref<string>('all')
+
+// Filtros disponibles
+const filterOptions = [
+  { label: 'Todas', value: 'all', icon: 'pi pi-list' },
+  { label: 'Entidades', value: 'entities', icon: 'pi pi-users' },
+  { label: 'Fusiones', value: 'merges', icon: 'pi pi-link' },
+  { label: 'Alertas', value: 'alerts', icon: 'pi pi-bell' },
+  { label: 'Atributos', value: 'attributes', icon: 'pi pi-tag' },
+  { label: 'Relaciones', value: 'relationships', icon: 'pi pi-sitemap' },
+]
+
+// Mapeo de tipos de acción a categorías
+function getActionCategory(actionType: string): string {
+  if (actionType === 'entity_merged') return 'merges'
+  if (actionType.startsWith('entity_')) return 'entities'
+  if (actionType.startsWith('alert_')) return 'alerts'
+  if (actionType.startsWith('attribute_')) return 'attributes'
+  if (actionType.startsWith('relationship_')) return 'relationships'
+  return 'other'
+}
+
+// Entradas filtradas
+const filteredEntries = computed(() => {
+  if (selectedFilter.value === 'all') {
+    return entries.value
+  }
+  return entries.value.filter(entry => {
+    const category = getActionCategory(entry.actionType)
+    return category === selectedFilter.value
+  })
+})
+
+// Contador para el badge del filtro activo
+const filteredCount = computed(() => filteredEntries.value.length)
 
 async function loadHistory() {
   loading.value = true
@@ -125,6 +162,29 @@ watch(() => props.projectId, () => {
       <span v-if="undoableCount > 0" class="panel-count">{{ undoableCount }}</span>
     </div>
 
+    <!-- Filtros por categoría -->
+    <div class="filter-section">
+      <SelectButton
+        v-model="selectedFilter"
+        :options="filterOptions"
+        option-label="label"
+        option-value="value"
+        class="filter-buttons"
+        :allow-empty="false"
+      >
+        <template #option="{ option }">
+          <div class="filter-option">
+            <i :class="option.icon"></i>
+            <span class="filter-label">{{ option.label }}</span>
+          </div>
+        </template>
+      </SelectButton>
+      <div v-if="selectedFilter !== 'all'" class="filter-info">
+        <span class="filter-count">{{ filteredCount }}</span>
+        <span class="filter-text">{{ filteredCount === 1 ? 'acción' : 'acciones' }}</span>
+      </div>
+    </div>
+
     <!-- Loading -->
     <div v-if="loading" class="loading-state">
       <i class="pi pi-spin pi-spinner"></i>
@@ -137,10 +197,16 @@ watch(() => props.projectId, () => {
       <span>Sin acciones recientes</span>
     </div>
 
+    <!-- Empty after filter -->
+    <div v-else-if="filteredEntries.length === 0" class="empty-state">
+      <i class="pi pi-filter-slash"></i>
+      <span>No hay {{ filterOptions.find(f => f.value === selectedFilter)?.label.toLowerCase() }}</span>
+    </div>
+
     <!-- List -->
     <div v-else class="history-list" role="list" aria-label="Historial de acciones" @keydown="onHistoryKeydown">
       <div
-        v-for="(entry, index) in entries"
+        v-for="(entry, index) in filteredEntries"
         :key="entry.id"
         :ref="el => setHistoryRef(el, index)"
         class="history-item"
@@ -208,6 +274,78 @@ watch(() => props.projectId, () => {
   padding: 0.125rem 0.5rem;
   min-width: 1.25rem;
   text-align: center;
+}
+
+/* Filtros */
+.filter-section {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--surface-border);
+  background: var(--surface-ground);
+}
+
+.filter-buttons {
+  width: 100%;
+}
+
+.filter-buttons :deep(.p-selectbutton) {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+}
+
+.filter-buttons :deep(.p-togglebutton) {
+  padding: 0.375rem 0.25rem;
+  font-size: 0.7rem;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-card);
+  justify-content: center;
+}
+
+.filter-buttons :deep(.p-togglebutton.p-highlight) {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
+}
+
+.filter-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.filter-option i {
+  font-size: 0.8rem;
+}
+
+.filter-label {
+  font-size: 0.65rem;
+  white-space: nowrap;
+}
+
+.filter-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--primary-50);
+  border-radius: var(--app-radius);
+  font-size: 0.75rem;
+}
+
+.filter-count {
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.filter-text {
+  color: var(--text-color-secondary);
+}
+
+.dark .filter-info {
+  background: var(--primary-900);
 }
 
 .loading-state,
