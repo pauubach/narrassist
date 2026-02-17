@@ -47,10 +47,8 @@ export interface ExecutedPhases {
   register: boolean
   pacing: boolean
   coherence: boolean
-  // Alertas (progresivas)
-  consistency_alerts: boolean  // alertas de coherencia emitidas (parcial)
-  grammar_alerts: boolean      // alertas de gramática emitidas (parcial)
-  alerts: boolean              // todas las alertas emitidas (completo)
+  // Alertas
+  alerts: boolean
   // Análisis avanzado
   temporal: boolean
   timeline: boolean  // Construcción de línea temporal
@@ -72,8 +70,6 @@ export const ANALYSIS_DEPENDENCIES: Record<keyof ExecutedPhases, (keyof Executed
   attributes: ['entities', 'coreference'],
   relationships: ['entities', 'coreference'],
   interactions: ['entities'],
-  consistency_alerts: ['coherence'],
-  grammar_alerts: ['grammar'],
   alerts: ['entities', 'coherence'],
   spelling: ['parsing'],
   grammar: ['parsing'],
@@ -99,8 +95,6 @@ export const PHASE_LABELS: Record<keyof ExecutedPhases, string> = {
   attributes: 'Extracción de atributos',
   relationships: 'Detección de relaciones',
   interactions: 'Detección de interacciones',
-  consistency_alerts: 'Alertas de coherencia',
-  grammar_alerts: 'Alertas de gramática',
   alerts: 'Generación de alertas',
   spelling: 'Ortografía',
   grammar: 'Gramática',
@@ -131,7 +125,7 @@ export const TAB_PHASE_GATES: Partial<Record<WorkspaceTab, {
   complete: keyof ExecutedPhases
 }>> = {
   entities: { partial: 'entities', complete: 'attributes' },
-  alerts: { partial: 'grammar_alerts', complete: 'alerts' },
+  alerts: { partial: 'grammar', complete: 'alerts' },
   relationships: { partial: 'coreference', complete: 'coreference' },
   timeline: { partial: 'timeline', complete: 'timeline' },  // Ahora usa su propia fase
   style: { partial: 'grammar', complete: 'register' },
@@ -185,9 +179,7 @@ const BACKEND_PHASE_TO_FRONTEND: Record<string, keyof ExecutedPhases | null> = {
   fusion: 'coreference',
   attributes: 'attributes',
   consistency: 'coherence',
-  consistency_alerts: 'consistency_alerts',
   grammar: 'grammar',
-  grammar_alerts: 'grammar_alerts',
   alerts: 'alerts',
   relationships: 'relationships',
   voice: 'voice_profiles',

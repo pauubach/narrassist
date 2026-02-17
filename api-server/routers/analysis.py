@@ -249,20 +249,8 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                         "current": False,
                     },
                     {
-                        "id": "consistency_alerts",
-                        "name": "Alertas de coherencia",
-                        "completed": False,
-                        "current": False,
-                    },
-                    {
                         "id": "grammar",
-                        "name": "Revisando gramática",
-                        "completed": False,
-                        "current": False,
-                    },
-                    {
-                        "id": "grammar_alerts",
-                        "name": "Alertas de gramática",
+                        "name": "Revisando gramática y ortografía",
                         "completed": False,
                         "current": False,
                     },

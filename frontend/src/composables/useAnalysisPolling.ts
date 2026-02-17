@@ -83,15 +83,15 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
         loadEntities(project.value!.id)
       }
 
-      // Incremental loading: alerts (two-stage)
-      // Stage 1: grammar alerts available (partial)
-      const grammarAlertsPhase = progressData.phases?.find((p: { id: string }) => p.id === 'grammar_alerts')
-      if (grammarAlertsPhase?.completed && !alertsPartialLoaded) {
+      // Incremental loading: alerts (two-stage via metrics)
+      // Stage 1: grammar phase complete → some alerts available
+      const grammarPhase = progressData.phases?.find((p: { id: string }) => p.id === 'grammar')
+      if (grammarPhase?.completed && !alertsPartialLoaded) {
         alertsPartialLoaded = true
         loadAlerts(project.value!.id)
       }
 
-      // Stage 2: all alerts available (consistency + grammar)
+      // Stage 2: all alerts phase complete → all alerts available
       const alertsPhase = progressData.phases?.find((p: { id: string }) => p.id === 'alerts')
       if (alertsPhase?.completed && !alertsFullLoaded) {
         alertsFullLoaded = true

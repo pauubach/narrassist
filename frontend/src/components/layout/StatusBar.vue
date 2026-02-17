@@ -83,7 +83,7 @@ interface PhaseDefinition {
   range: [number, number]
 }
 
-// Rangos alineados con los pesos del backend (15 fases):
+// Rangos alineados con los pesos del backend (13 fases):
 // Tier 1 (paralelo): parsing+classification+structure ~3%
 // Tier 2 (exclusivo): ner..alerts ~67%
 // Tier 3 (enriquecimiento): relationships..health ~30%
@@ -93,11 +93,9 @@ const allPhases: PhaseDefinition[] = [
   { id: 'structure', name: 'Identificando capítulos', range: [2, 3] },
   { id: 'ner', name: 'Buscando personajes y lugares', range: [3, 34] },
   { id: 'fusion', name: 'Unificando entidades', range: [34, 49] },
-  { id: 'attributes', name: 'Analizando características', range: [49, 55] },
-  { id: 'consistency', name: 'Verificando coherencia', range: [55, 58] },
-  { id: 'consistency_alerts', name: 'Alertas de coherencia', range: [58, 60] },
-  { id: 'grammar', name: 'Revisando gramática', range: [60, 63] },
-  { id: 'grammar_alerts', name: 'Alertas de gramática', range: [63, 66] },
+  { id: 'attributes', name: 'Analizando características', range: [49, 57] },
+  { id: 'consistency', name: 'Verificando coherencia', range: [57, 60] },
+  { id: 'grammar', name: 'Revisando gramática y ortografía', range: [60, 66] },
   { id: 'alerts', name: 'Preparando observaciones', range: [66, 70] },
   { id: 'relationships', name: 'Analizando relaciones', range: [70, 78] },
   { id: 'voice', name: 'Perfilando voces', range: [78, 86] },
