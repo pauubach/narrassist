@@ -407,13 +407,23 @@ def build_chat_system_prompt(
             'NUNCA respondas con información del manuscrito sin incluir [REF:N].',
         ])
 
-    # Texto seleccionado por el usuario
+    # Texto seleccionado por el usuario (prioridad máxima)
     if selection_context:
-        prompt_parts.extend(['', selection_context])
+        prompt_parts.extend([
+            '',
+            '═══════════════════════════════════════════════════════',
+            '⚠️  CONTEXTO PRIORITARIO - EL USUARIO SELECCIONÓ ESTE TEXTO',
+            '═══════════════════════════════════════════════════════',
+            selection_context,
+            '',
+            'La pregunta del usuario se refiere ESPECÍFICAMENTE a este fragmento seleccionado.',
+            'Responde basándote PRIMERO en este texto, y solo usa el contexto adicional si es necesario.',
+            '═══════════════════════════════════════════════════════',
+        ])
 
-    # Contexto del manuscrito
+    # Contexto adicional del manuscrito
     if context_text:
-        prompt_parts.extend(['', context_text])
+        prompt_parts.extend(['', '## Contexto adicional del manuscrito', context_text])
 
     # Historial de conversación
     if history_text:
@@ -438,20 +448,21 @@ def build_selection_context(
     Returns:
         Bloque de texto para inyectar en el system prompt
     """
-    parts = ['### Texto seleccionado por el usuario:']
+    parts = []
+
     if chapter_title:
-        parts.append(f'Capítulo: "{chapter_title}"')
+        parts.append(f'📍 Ubicación: {chapter_title}')
+        parts.append('')
 
     # Si hay contexto expandido, mostrarlo primero
     if expanded_context:
-        parts.append(f'Contexto: "{expanded_context}"')
+        parts.append('📖 Contexto completo (±200 caracteres):')
+        parts.append(f'"{expanded_context}"')
         parts.append('')
-        parts.append(f'Selección específica: "{selected_text}"')
+        parts.append(f'🎯 El usuario seleccionó específicamente: "{selected_text}"')
     else:
         # Truncar si es muy largo
         text = selected_text[:500] if len(selected_text) > 500 else selected_text
-        parts.append(f'Texto: "{text}"')
+        parts.append(f'🎯 Texto seleccionado: "{text}"')
 
-    parts.append('')
-    parts.append('El usuario pregunta sobre este fragmento específico.')
     return '\n'.join(parts)

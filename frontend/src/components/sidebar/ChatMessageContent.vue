@@ -117,17 +117,29 @@ function escapeAttr(s: string): string {
 
 /** Event delegation: captura clicks en .ref-badge dentro del contenido renderizado */
 function handleContentClick(event: MouseEvent) {
-  const badge = (event.target as HTMLElement).closest('.ref-badge') as HTMLElement | null
-  if (!badge) return
+  const target = event.target as HTMLElement
+  console.log('[ChatMessageContent] Click on:', target.tagName, target.className)
 
+  const badge = target.closest('.ref-badge') as HTMLElement | null
+  if (!badge) {
+    console.log('[ChatMessageContent] Not a ref-badge')
+    return
+  }
+
+  console.log('[ChatMessageContent] Ref badge clicked, dataset:', badge.dataset)
   const refId = parseInt(badge.dataset.refId || '', 10)
   const ref = refMap.value.get(refId)
+
   if (ref) {
+    console.log('[ChatMessageContent] Emitting navigate-reference:', ref)
     emit('navigate-reference', ref)
+  } else {
+    console.warn('[ChatMessageContent] No ref found for id:', refId)
   }
 }
 
 function handleRefClick(ref: ChatReference) {
+  console.log('[ChatMessageContent] handleRefClick (footer button):', ref)
   emit('navigate-reference', ref)
 }
 

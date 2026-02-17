@@ -1028,8 +1028,15 @@ const onAskAiAboutSelection = (_text: string) => {
 
 // Chat reference navigation (same pattern as alert navigation)
 const onChatReferenceNavigate = (ref: ChatReference) => {
+  console.log('[ProjectDetailView] onChatReferenceNavigate called with:', ref)
   const chapter = chapters.value.find(c => c.chapterNumber === ref.chapter)
+  console.log('[ProjectDetailView] Found chapter:', chapter)
   const chapterId = chapter?.id ?? null
+  console.log('[ProjectDetailView] Calling navigateToTextPosition with:', {
+    position: ref.startChar,
+    excerpt: ref.excerpt,
+    chapterId
+  })
   workspaceStore.clearAlertHighlights()
   workspaceStore.navigateToTextPosition(ref.startChar, ref.excerpt, chapterId)
 }

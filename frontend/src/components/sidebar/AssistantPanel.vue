@@ -222,6 +222,7 @@ function handleEditQueued(index: number) {
 }
 
 function handleReferenceClick(ref: ChatReference) {
+  console.log('[AssistantPanel] Reference clicked:', ref)
   emit('navigate-to-reference', ref)
 }
 
