@@ -82,6 +82,8 @@ const emit = defineEmits<{
   (e: 'select-entity', entityId: number): void
   /** Navegar a un evento en el texto */
   (e: 'navigate-to-event', startChar: number, endChar: number): void
+  /** Navegar a un capítulo por número */
+  (e: 'navigate-to-chapter', chapterNumber: number): void
 }>()
 
 // Chapter summary data
@@ -351,11 +353,9 @@ async function loadEventDensity() {
   }
 }
 
-/** Navegar a un capítulo específico */
+/** Navegar a un capítulo específico por número */
 function navigateToChapter(chapterNumber: number) {
-  // Emitir evento para que el componente padre maneje la navegación
-  console.log('Navigate to chapter:', chapterNumber)
-  // TODO: Implementar navegación entre capítulos en el inspector
+  emit('navigate-to-chapter', chapterNumber)
 }
 </script>
 

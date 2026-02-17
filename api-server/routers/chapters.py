@@ -1375,7 +1375,7 @@ def get_project_continuity(project_id: int):
 
         # Obtener todos los capítulos
         chapter_repo = get_chapter_repository()
-        chapters = chapter_repo.get_chapters_by_project(project_id)
+        chapters = chapter_repo.get_by_project(project_id)
 
         if not chapters:
             return ApiResponse(

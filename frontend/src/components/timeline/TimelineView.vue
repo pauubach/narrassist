@@ -544,6 +544,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   eventSelect: [event: TimelineEvent]
   navigateToText: [position: number]
+  navigateToChapter: [chapterNumber: number]
 }>()
 
 const workspaceStore = useWorkspaceStore()
@@ -1042,10 +1043,9 @@ async function loadEventDensity() {
   }
 }
 
-/** Navegar a un capítulo específico (placeholder) */
+/** Navegar a un capítulo específico por número */
 function navigateToChapter(chapterNumber: number) {
-  console.log('Navigate to chapter:', chapterNumber)
-  // TODO: Implementar navegación al capítulo en TimelineView
+  emit('navigateToChapter', chapterNumber)
 }
 
 // Lifecycle

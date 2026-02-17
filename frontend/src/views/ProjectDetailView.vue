@@ -313,6 +313,7 @@
               :project-id="project.id"
               :entities="entities"
               :chapters="chapters"
+              @navigate-to-chapter="onNavigateToChapter"
             />
           </AnalysisRequired>
 
@@ -421,6 +422,7 @@
                   @view-alerts="onViewChapterAlerts"
                   @select-entity="onEntityClick"
                   @navigate-to-event="onNavigateToEvent"
+                  @navigate-to-chapter="onNavigateToChapter"
                 />
 
                 <!-- Sin selección ni capítulo visible: resumen del proyecto -->
@@ -1050,6 +1052,17 @@ const onViewChapterAlerts = () => {
     workspaceStore.toggleLeftPanel()
   }
   // The AlertsPanel will show alerts, user can filter by chapter if needed
+}
+
+const onNavigateToChapter = (chapterNumber: number) => {
+  // Find chapter by number and navigate to it
+  const chapter = chapters.value.find(c => c.chapterNumber === chapterNumber)
+  if (chapter) {
+    scrollToChapterId.value = chapter.id
+    activeChapterId.value = chapter.id
+    workspaceStore.setActiveTab('text')
+    setTimeout(() => { scrollToChapterId.value = null }, 500)
+  }
 }
 
 const onNavigateToEvent = (startChar: number, endChar: number) => {
