@@ -242,6 +242,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   chapterVisible: [chapterId: number]
   entityClick: [entityId: number]
+  annotationClick: [annotationId: number]
 }>()
 
 // Estado
@@ -1397,7 +1398,7 @@ const handleMouseUp = () => {
   })
 }
 
-// Event delegation para clicks en entidades (evita onclick inline y window pollution)
+// Event delegation para clicks en entidades y alertas (evita onclick inline y window pollution)
 const handleDocumentClick = (event: MouseEvent) => {
   const target = event.target as HTMLElement
 
@@ -1407,6 +1408,16 @@ const handleDocumentClick = (event: MouseEvent) => {
     if (entityId) {
       emit('entityClick', parseInt(entityId, 10))
     }
+    return
+  }
+
+  // Verificar si el click fue en una alerta de ortografía/gramática
+  if (target.classList.contains('annotation')) {
+    const annotationId = target.dataset.annotationId
+    if (annotationId) {
+      emit('annotationClick', parseInt(annotationId, 10))
+    }
+    return
   }
 }
 
@@ -1936,8 +1947,13 @@ defineExpose({
 /* Anotaciones de gramática y ortografía */
 .chapter-text :deep(.annotation) {
   position: relative;
-  cursor: help;
+  cursor: pointer;
   border-bottom: 2px wavy;
+  transition: background-color 0.2s ease;
+}
+
+.chapter-text :deep(.annotation:hover) {
+  background: rgba(251, 191, 36, 0.25) !important;
 }
 
 .chapter-text :deep(.annotation.grammar-error) {
@@ -1958,10 +1974,6 @@ defineExpose({
 .chapter-text :deep(.annotation.severity-low),
 .chapter-text :deep(.annotation.severity-info) {
   border-style: dashed;
-}
-
-.chapter-text :deep(.annotation:hover) {
-  background: rgba(251, 191, 36, 0.2);
 }
 
 /* Toggle de anotaciones activo */
