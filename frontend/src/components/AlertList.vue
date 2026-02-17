@@ -151,6 +151,10 @@
                 <i class="pi pi-align-left"></i>
                 Inicio repetido
               </Tag>
+              <Tag v-else-if="alert.alertType === 'speech_change'" severity="warn" class="filler-type-tag">
+                <i class="pi pi-comments"></i>
+                Cambio de habla
+              </Tag>
 
               <span v-if="alert.chapter" class="alert-chapter">
                 <i class="pi pi-book"></i>
@@ -272,6 +276,10 @@
             <Tag v-else-if="alert.alertType === 'sentence_start'" severity="info" class="filler-type-tag">
               <i class="pi pi-align-left"></i>
               Inicio repetido
+            </Tag>
+            <Tag v-else-if="alert.alertType === 'speech_change'" severity="warn" class="filler-type-tag">
+              <i class="pi pi-comments"></i>
+              Cambio de habla
             </Tag>
 
             <span v-if="alert.chapter" class="alert-chapter">

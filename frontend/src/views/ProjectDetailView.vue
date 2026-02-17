@@ -1006,11 +1006,12 @@ const onGoToChapterStart = () => {
 }
 
 const onViewChapterAlerts = () => {
-  // Navigate to alerts tab - could filter by chapter if needed
-  if (currentChapter.value) {
-    workspaceStore.setActiveTab('alerts')
-    // The alerts tab will show all alerts, user can filter as needed
+  // Open left sidebar with alerts panel filtered by chapter
+  sidebarTab.value = 'alerts'
+  if (!workspaceStore.leftPanel.expanded) {
+    workspaceStore.toggleLeftPanel()
   }
+  // The AlertsPanel will show alerts, user can filter by chapter if needed
 }
 
 // TextSelectionInspector handlers

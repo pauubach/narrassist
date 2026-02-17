@@ -179,7 +179,7 @@ const keyEvents = computed(() => {
     if (seen.has(key)) return false
     seen.add(key)
     return true
-  }).slice(0, 5)
+  }) // Sin límite - mostrar todos con scroll
 })
 
 function getToneSeverity(tone: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
@@ -212,6 +212,57 @@ function getEventIcon(eventType: string): string {
     transformation: 'pi-sync',
   }
   return icons[eventType] || 'pi-circle'
+}
+
+function getEventTypeLabel(eventType: string): string {
+  const labels: Record<string, string> = {
+    first_appearance: 'Primera aparición',
+    return: 'Regreso',
+    death: 'Muerte',
+    conflict: 'Conflicto',
+    revelation: 'Revelación',
+    decision: 'Decisión',
+    transformation: 'Transformación',
+  }
+  return labels[eventType] || eventType
+}
+
+// ============================================================================
+// Event Type Filter
+// ============================================================================
+
+const selectedEventTypes = ref<Set<string>>(new Set())
+
+/** Tipos de eventos disponibles (dinámicamente detectados) */
+const availableEventTypes = computed(() => {
+  const types = new Set<string>()
+  keyEvents.value.forEach(e => types.add(e.event_type))
+  return Array.from(types).sort()
+})
+
+/** Eventos filtrados por tipo seleccionado */
+const filteredKeyEvents = computed(() => {
+  if (selectedEventTypes.value.size === 0) {
+    return keyEvents.value // Sin filtro, mostrar todos
+  }
+  return keyEvents.value.filter(e => selectedEventTypes.value.has(e.event_type))
+})
+
+/** Toggle de tipo de evento en el filtro */
+function toggleEventType(eventType: string) {
+  if (selectedEventTypes.value.has(eventType)) {
+    selectedEventTypes.value.delete(eventType)
+  } else {
+    selectedEventTypes.value.add(eventType)
+  }
+  // Force reactivity
+  selectedEventTypes.value = new Set(selectedEventTypes.value)
+}
+
+/** Limpiar todos los filtros */
+function clearEventFilters() {
+  selectedEventTypes.value.clear()
+  selectedEventTypes.value = new Set()
 }
 </script>
 
@@ -322,15 +373,50 @@ function getEventIcon(eventType: string): string {
           <AccordionHeader>
             <div class="accordion-header">
               <i class="pi pi-bolt"></i>
-              <span>Eventos ({{ keyEvents.length }})</span>
+              <span>Eventos ({{ filteredKeyEvents.length }}{{ selectedEventTypes.size > 0 ? ` / ${keyEvents.length}` : '' }})</span>
             </div>
           </AccordionHeader>
           <AccordionContent>
+            <!-- Filtro de tipos de eventos -->
+            <div v-if="availableEventTypes.length > 1" class="event-filter">
+              <div class="filter-header">
+                <span class="filter-label">Filtrar por tipo:</span>
+                <button
+                  v-if="selectedEventTypes.size > 0"
+                  type="button"
+                  class="clear-filter-btn"
+                  @click="clearEventFilters"
+                >
+                  <i class="pi pi-times"></i>
+                  Limpiar
+                </button>
+              </div>
+              <div class="event-type-chips">
+                <button
+                  v-for="type in availableEventTypes"
+                  :key="type"
+                  type="button"
+                  class="event-type-chip"
+                  :class="{ 'chip-active': selectedEventTypes.has(type) }"
+                  @click="toggleEventType(type)"
+                >
+                  <i :class="`pi ${getEventIcon(type)}`"></i>
+                  <span>{{ getEventTypeLabel(type) }}</span>
+                </button>
+              </div>
+            </div>
+
             <div class="events-list">
-              <div v-for="(event, idx) in keyEvents" :key="idx" class="event-item">
+              <div v-for="(event, idx) in filteredKeyEvents" :key="idx" class="event-item">
                 <i :class="`pi ${getEventIcon(event.event_type)}`"></i>
                 <span>{{ event.description }}</span>
               </div>
+            </div>
+
+            <!-- Mensaje si no hay eventos tras filtrar -->
+            <div v-if="filteredKeyEvents.length === 0 && selectedEventTypes.size > 0" class="no-events-filtered">
+              <i class="pi pi-filter-slash"></i>
+              <span>No hay eventos del tipo seleccionado</span>
             </div>
           </AccordionContent>
         </AccordionPanel>
@@ -599,6 +685,98 @@ function getEventIcon(eventType: string): string {
   color: var(--text-color-secondary);
 }
 
+/* Event Filter */
+.event-filter {
+  margin-bottom: var(--ds-space-3);
+  padding: var(--ds-space-2);
+  background: var(--surface-50);
+  border-radius: var(--border-radius);
+}
+
+.filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--ds-space-2);
+}
+
+.filter-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-color-secondary);
+}
+
+.clear-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius);
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.clear-filter-btn:hover {
+  background: var(--surface-100);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.clear-filter-btn i {
+  font-size: 0.7rem;
+}
+
+.event-type-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-1);
+}
+
+.event-type-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+  padding: 0.375rem 0.75rem;
+  background: var(--surface-0, white);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-xl);
+  font-size: 0.8rem;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.event-type-chip:hover {
+  background: var(--surface-100);
+  border-color: var(--primary-color);
+}
+
+.event-type-chip.chip-active {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
+}
+
+.event-type-chip i {
+  font-size: 0.75rem;
+}
+
+.dark .event-type-chip {
+  background: var(--surface-700);
+}
+
+.dark .event-type-chip:hover {
+  background: var(--surface-600);
+}
+
+.dark .event-filter {
+  background: var(--surface-800);
+}
+
 .events-list {
   display: flex;
   flex-direction: column;
@@ -615,6 +793,22 @@ function getEventIcon(eventType: string): string {
 .event-item i {
   color: var(--text-color-secondary);
   margin-top: 2px;
+}
+
+.no-events-filtered {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-3);
+  color: var(--text-color-secondary);
+  font-size: 0.85rem;
+  text-align: center;
+  justify-content: center;
+}
+
+.no-events-filtered i {
+  font-size: 1rem;
+  opacity: 0.5;
 }
 
 .alerts-summary {

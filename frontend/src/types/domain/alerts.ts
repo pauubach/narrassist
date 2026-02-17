@@ -80,6 +80,7 @@ export type AlertIssueType =
   | 'pov_shift'              // POVDetector: cambio de POV
   | 'sticky_sentence'        // StickySentenceDetector: oración pegajosa
   | 'low_energy_sentence'    // SentenceEnergyDetector: oración baja energía
+  | 'speech_change'          // SpeechTracker: cambio de habla por personaje (v0.10.13)
   | 'typo'                   // SpellingChecker: error tipográfico
   | 'misspelling'            // SpellingChecker: palabra mal escrita
   | 'accent'                 // SpellingChecker: falta/sobra tilde
