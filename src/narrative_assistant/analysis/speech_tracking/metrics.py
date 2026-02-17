@@ -33,7 +33,14 @@ class SpeechMetrics:
 
     @staticmethod
     def calculate(
-        dialogues: list[str], spacy_nlp=None, use_cache: bool = True
+        dialogues: list[str],
+        spacy_nlp=None,
+        use_cache: bool = True,
+        # Parámetros opcionales para DB cache (v0.10.14)
+        character_id: Optional[int] = None,
+        window_start_chapter: Optional[int] = None,
+        window_end_chapter: Optional[int] = None,
+        document_fingerprint: Optional[str] = None,
     ) -> dict[str, float]:
         """
         Calcula todas las métricas para una lista de diálogos.
@@ -41,7 +48,11 @@ class SpeechMetrics:
         Args:
             dialogues: Lista de diálogos del personaje
             spacy_nlp: Modelo spaCy (opcional, para ASL)
-            use_cache: Si True, usa cache en memoria (default: True)
+            use_cache: Si True, usa cache persistente en DB (default: True)
+            character_id: ID del personaje (requerido para cache)
+            window_start_chapter: Capítulo inicial de ventana (requerido para cache)
+            window_end_chapter: Capítulo final de ventana (requerido para cache)
+            document_fingerprint: SHA-256 del documento (requerido para cache)
 
         Returns:
             Dict con todas las métricas calculadas
@@ -50,17 +61,33 @@ class SpeechMetrics:
             return {metric: 0.0 for metric in TRACKED_METRICS}
 
         combined_text = " ".join(dialogues)
+        total_words = len(combined_text.split())
+        dialogue_count = len(dialogues)
 
-        # Intentar recuperar del cache
-        if use_cache:
-            from .cache import get_metrics_cache
+        # Intentar recuperar del cache persistente (DB)
+        if use_cache and all(
+            param is not None
+            for param in [
+                character_id,
+                window_start_chapter,
+                window_end_chapter,
+                document_fingerprint,
+            ]
+        ):
+            from .db_cache import get_db_cache
 
-            cache = get_metrics_cache()
-            cached_metrics = cache.get(combined_text)
+            cache = get_db_cache()
+            cached_metrics = cache.get(
+                character_id,
+                window_start_chapter,
+                window_end_chapter,
+                document_fingerprint,
+            )
 
             if cached_metrics is not None:
                 return cached_metrics
 
+        # Calcular métricas desde cero
         metrics = {
             "filler_rate": SpeechMetrics._calculate_filler_rate(combined_text),
             "formality_score": SpeechMetrics._calculate_formality(combined_text),
@@ -78,9 +105,25 @@ class SpeechMetrics:
 
         logger.debug(f"Calculated metrics: {metrics}")
 
-        # Guardar en cache
-        if use_cache:
-            cache.set(combined_text, metrics)
+        # Guardar en cache persistente
+        if use_cache and all(
+            param is not None
+            for param in [
+                character_id,
+                window_start_chapter,
+                window_end_chapter,
+                document_fingerprint,
+            ]
+        ):
+            cache.set(
+                character_id,
+                window_start_chapter,
+                window_end_chapter,
+                document_fingerprint,
+                metrics,
+                total_words,
+                dialogue_count,
+            )
 
         return metrics
 

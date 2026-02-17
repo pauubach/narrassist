@@ -53,6 +53,7 @@ class SpeechTracker:
         chapters: list,
         spacy_nlp=None,
         narrative_context_analyzer=None,
+        document_fingerprint: str | None = None,
     ) -> list[SpeechChangeAlert]:
         """
         Detecta cambios en el habla de un personaje.
@@ -62,7 +63,8 @@ class SpeechTracker:
             character_name: Nombre del personaje
             chapters: Lista de capítulos del manuscrito
             spacy_nlp: Modelo spaCy (opcional, para métricas)
-            narrative_context_analyzer: Analizador de contexto (opcional, v0.10.14)
+            narrative_context_analyzer: Analizador de contexto (opcional)
+            document_fingerprint: SHA-256 del documento (opcional, para cache DB v0.10.14)
 
         Returns:
             Lista de SpeechChangeAlert
@@ -86,10 +88,19 @@ class SpeechTracker:
             )
             return []
 
-        # 2. Calcular métricas para cada ventana
+        # 2. Calcular métricas para cada ventana (con cache DB v0.10.14)
         windows_with_metrics = []
         for window in windows:
-            metrics = SpeechMetrics.calculate(window.dialogues, spacy_nlp)
+            metrics = SpeechMetrics.calculate(
+                window.dialogues,
+                spacy_nlp=spacy_nlp,
+                use_cache=True,
+                # Parámetros para DB cache (v0.10.14)
+                character_id=character_id,
+                window_start_chapter=window.start_chapter,
+                window_end_chapter=window.end_chapter,
+                document_fingerprint=document_fingerprint,
+            )
             windows_with_metrics.append((window, metrics))
 
         # 3. Comparar ventanas adyacentes

@@ -1075,6 +1075,7 @@ class PipelineConsistencyMixin:
                         chapters=context.chapters,
                         spacy_nlp=spacy_nlp,
                         narrative_context_analyzer=context_analyzer,
+                        document_fingerprint=context.fingerprint,  # v0.10.14: DB cache
                     )
 
                     all_alerts.extend(alerts)

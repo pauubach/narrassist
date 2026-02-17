@@ -778,7 +778,7 @@ def analyze_character_behavior(project_id: int, character_id: int):
         if not is_llm_available():
             return ApiResponse(
                 success=False,
-                error="LLM no disponible. Instala Ollama y ejecuta: ollama serve"
+                error="El asistente de IA no está disponible. Configúralo desde Configuración → Análisis"
             )
 
         # Obtener entidad
@@ -908,7 +908,7 @@ def detect_character_violations(
         if not is_llm_available():
             return ApiResponse(
                 success=False,
-                error="LLM no disponible. Instala Ollama y ejecuta: ollama serve"
+                error="El asistente de IA no está disponible. Configúralo desde Configuración → Análisis"
             )
 
         # Verificar que existe perfil del personaje

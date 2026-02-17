@@ -20,7 +20,7 @@ from .speech_window import SpeechWindow, create_sliding_windows
 from .metrics import SpeechMetrics, TRACKED_METRICS
 from .change_detector import ChangeDetector, MetricChangeResult
 from .contextual_analyzer import ContextualAnalyzer
-from .cache import MetricsCache, get_metrics_cache, clear_metrics_cache
+from .db_cache import SpeechMetricsDBCache, get_db_cache, clear_db_cache
 from .types import SpeechChangeAlert, NarrativeContext
 
 __all__ = [
@@ -32,9 +32,9 @@ __all__ = [
     "ChangeDetector",
     "MetricChangeResult",
     "ContextualAnalyzer",
-    "MetricsCache",
-    "get_metrics_cache",
-    "clear_metrics_cache",
+    "SpeechMetricsDBCache",
+    "get_db_cache",
+    "clear_db_cache",
     "SpeechChangeAlert",
     "NarrativeContext",
 ]

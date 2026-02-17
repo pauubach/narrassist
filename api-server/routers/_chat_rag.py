@@ -295,15 +295,17 @@ def build_numbered_context(
 
     for i, excerpt in enumerate(excerpts, start=1):
         ch_title = excerpt.get("chapter_title", f"Capítulo {excerpt['chapter_number']}")
-        lines.append(f"\n[{i}] {ch_title}:")
-        lines.append(f'"{excerpt["excerpt"]}"')
+        lines.append(f"\n[REF:{i}] {ch_title}:")
+        # Usar excerpt_for_llm si existe (contexto expandido), sino el excerpt normal
+        llm_text = excerpt.get("excerpt_for_llm", excerpt["excerpt"])
+        lines.append(f'"{llm_text}"')
 
         ref_map[i] = {
             "chapter_number": excerpt["chapter_number"],
             "chapter_title": ch_title,
             "global_start": excerpt["global_start"],
             "global_end": excerpt["global_end"],
-            "excerpt": excerpt["excerpt"],
+            "excerpt": excerpt["excerpt"],  # Texto exacto para navegación
         }
 
     return "\n".join(lines), ref_map
@@ -413,17 +415,21 @@ def build_chat_system_prompt(
             '═══════════════════════════════════════════════════════',
         ])
 
-    # Texto seleccionado por el usuario (prioridad máxima)
+    # Texto seleccionado por el usuario (recomendación panel de expertos)
+    # System message dinámico con alto peso posicional - justo antes de la pregunta
     if selection_context:
         prompt_parts.extend([
             '',
             '═══════════════════════════════════════════════════════',
-            '⚠️  CONTEXTO PRIORITARIO - EL USUARIO SELECCIONÓ ESTE TEXTO',
+            '[CONTEXTO DE SELECCIÓN ACTIVA]',
             '═══════════════════════════════════════════════════════',
             selection_context,
             '',
-            'La pregunta del usuario se refiere ESPECÍFICAMENTE a este fragmento seleccionado.',
-            'Responde basándote PRIMERO en este texto, y solo usa el contexto adicional si es necesario.',
+            'COMPORTAMIENTO REQUERIDO:',
+            '• La pregunta del usuario se refiere a este fragmento seleccionado',
+            '• Responde explicando el fragmento en su contexto documental',
+            '• Usa el historial previo SOLO si la pregunta lo requiere explícitamente',
+            '• Incluye [REF:1] al citar el fragmento seleccionado',
             '═══════════════════════════════════════════════════════',
         ])
 

@@ -203,7 +203,7 @@ def start_ollama_service():
         if not manager.is_installed:
             return ApiResponse(
                 success=False,
-                error="Ollama no está instalado",
+                error="El asistente de IA no está instalado",
                 data={
                     "status": OllamaStatus.NOT_INSTALLED.value,
                     "action_required": "install",
@@ -325,7 +325,7 @@ def pull_ollama_model(model_name: str):
         if not manager.is_installed:
             return ApiResponse(
                 success=False,
-                error="Ollama no está instalado"
+                error="El asistente de IA no está instalado"
             )
 
         if not manager.is_running:
@@ -334,7 +334,7 @@ def pull_ollama_model(model_name: str):
             if not success:
                 return ApiResponse(
                     success=False,
-                    error=f"No se pudo iniciar Ollama: {msg}"
+                    error=f"No se pudo iniciar el asistente de IA: {msg}"
                 )
 
         # Iniciar descarga en segundo plano
@@ -370,11 +370,11 @@ def delete_ollama_model(model_name: str):
         normalized = _normalize_model_name(model_name)
 
         if not manager.is_installed:
-            return ApiResponse(success=False, error="Ollama no está instalado")
+            return ApiResponse(success=False, error="El asistente de IA no está instalado")
 
         success, message = manager.ensure_running()
         if not success:
-            return ApiResponse(success=False, error=f"No se pudo iniciar Ollama: {message}")
+            return ApiResponse(success=False, error=f"No se pudo iniciar el asistente de IA: {message}")
 
         downloaded = {_normalize_model_name(m) for m in manager.downloaded_models}
         if normalized not in downloaded:
@@ -657,20 +657,20 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
                 logger.warning("LLM not available - Ollama might not be running")
                 return ApiResponse(
                     success=False,
-                    error="El asistente necesita Ollama para funcionar. Inícialo desde Ajustes > LLM."
+                    error="El asistente de IA no está iniciado. Inícialo desde Configuración → Análisis."
                 )
 
             llm_client = get_llm_client()
             if not llm_client:
                 return ApiResponse(
                     success=False,
-                    error="No se pudo conectar con Ollama. Reinícialo desde Ajustes > LLM."
+                    error="No se pudo conectar con el asistente de IA. Reinícialo desde Configuración → Análisis."
                 )
 
             if not llm_client.is_available:
                 return ApiResponse(
                     success=False,
-                    error="Ollama está activo pero falta el modelo. Descárgalo desde Ajustes > LLM."
+                    error="El asistente está activo pero falta descargar modelos. Configúralo desde Configuración → Análisis."
                 )
         except ImportError as e:
             logger.error(f"LLM module import error: {e}")
@@ -682,7 +682,7 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
             logger.error(f"Error checking LLM availability: {e}")
             return ApiResponse(
                 success=False,
-                error=f"Error al verificar Ollama: {str(e)}"
+                error=f"Error al verificar el asistente de IA: {str(e)}"
             )
 
         # ================================================================
@@ -746,16 +746,20 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
                         global_context_start = chapter_start + context_start
                         global_context_end = chapter_start + context_end
 
-                        # Crear excerpt para inyectar como [REF:1] (FUERA del if para que sea accesible)
-                        # IMPORTANTE: Las posiciones apuntan al CONTEXTO EXPANDIDO, no a la selección
+                        # Crear excerpt para inyectar como [REF:1]
+                        # IMPORTANTE: Hay 2 usos del excerpt:
+                        # 1. Para el LLM: necesita contexto expandido (±200 chars)
+                        # 2. Para navegación: necesita el texto exacto en las posiciones
+                        # Almacenamos ambos: "excerpt_for_llm" y "excerpt"
                         selection_excerpt = {
-                            "excerpt": expanded_context[:500] if len(expanded_context) > 500 else expanded_context,
+                            "excerpt_for_llm": expanded_context[:500] if len(expanded_context) > 500 else expanded_context,
+                            "excerpt": request.selected_text,  # Texto exacto para navegación
                             "chapter_number": request.selected_text_chapter,
                             "chapter_title": ch_title,
-                            "global_start": global_context_start,
-                            "global_end": global_context_end,
+                            "global_start": request.selected_text_start,  # Posiciones originales
+                            "global_end": request.selected_text_end,
                         }
-                        logger.info(f"Created selection_excerpt: chapter={ch_title}, positions={global_context_start}-{global_context_end}")
+                        logger.info(f"Created selection_excerpt: chapter={ch_title}, nav_positions={request.selected_text_start}-{request.selected_text_end}, context={global_context_start}-{global_context_end}")
                         break
 
             # Debug: log selection context
@@ -784,6 +788,9 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
         # 8. Construir contexto numerado (ahora con selección como [1])
         context_text, ref_map = build_numbered_context(selected_excerpts)
         context_sources = list({e["chapter_title"] for e in selected_excerpts})
+
+        # Debug: log context_text to see if [REF:N] markers are there
+        logger.info(f"context_text preview (first 500 chars):\n{context_text[:500]}")
 
         # Debug: log first reference
         if ref_map:
@@ -846,6 +853,18 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
             candidate_models = _sorted_models([default_model], True)
 
         # ================================================================
+        # Preparar mensaje del usuario según recomendación del panel de expertos
+        # ================================================================
+        # Consenso: NO modificar el mensaje del usuario, dejar que el system message dinámico
+        # (inyectado antes de la pregunta) proporcione el contexto de selección
+        user_message = request.message
+
+        # Configuración de temperatura adaptativa (panel de expertos: IPLN)
+        # Cuando hay selección: temperatura baja (0.3) para reducir varianza
+        # Chat normal: temperatura estándar (0.35)
+        temperature = 0.3 if selection_excerpt else 0.35
+
+        # ================================================================
         # Llamar al LLM
         # ================================================================
         try:
@@ -862,15 +881,15 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
             with get_llm_scheduler().chat_priority():
                 if use_multi_model:
                     response, used_model, models_used = _multi_model_chat(
-                        llm_client, candidate_models, request.message, system_prompt,
+                        llm_client, candidate_models, user_message, system_prompt,
                     )
                 else:
                     for model_name in candidate_models:
                         response = llm_client.complete(
-                            prompt=request.message,
+                            prompt=user_message,
                             system=system_prompt,
                             max_tokens=1000,
-                            temperature=0.35,
+                            temperature=temperature,  # Temperatura adaptativa
                             model_name=model_name,
                         )
                         if response and response.strip():
@@ -879,6 +898,16 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
                             break
 
             if response and response.strip():
+                # Post-procesamiento: Si hay selección y el LLM no usó [REF:1], añadirlo
+                if selection_excerpt and "[REF:1]" not in response:
+                    # Añadir [REF:1] al final de la primera frase que mencione contenido relevante
+                    # Para simplificar, lo añadimos al final del primer párrafo
+                    paragraphs = response.split('\n\n')
+                    if paragraphs:
+                        paragraphs[0] = paragraphs[0].rstrip() + ' [REF:1]'
+                        response = '\n\n'.join(paragraphs)
+                        logger.info("Auto-injected [REF:1] into LLM response (model didn't follow format)")
+
                 # Parsear referencias [REF:N]
                 references = build_reference_index(response, ref_map)
 
@@ -900,7 +929,7 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
                 logger.warning(f"LLM returned empty response for project {project_id}")
                 return ApiResponse(
                     success=False,
-                    error="El modelo no generó respuesta. Reinicia Ollama desde Ajustes > LLM."
+                    error="El asistente no generó respuesta. Reinicia el servicio de IA desde Configuración → Análisis."
                 )
 
         except Exception as e:
@@ -909,7 +938,7 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
             if any(p in error_lower for p in ("terminated", "exit status", "memory", "allocate")):
                 return ApiResponse(
                     success=False,
-                    error="Ollama se quedó sin memoria GPU. Reinícialo desde Ajustes > LLM en modo CPU."
+                    error="El asistente se quedó sin memoria. Reinícialo desde Configuración → Análisis en modo CPU."
                 )
             return ApiResponse(
                 success=False,

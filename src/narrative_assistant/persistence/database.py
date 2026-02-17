@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 26
+SCHEMA_VERSION = 27
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -1126,8 +1126,55 @@ CREATE TABLE IF NOT EXISTS project_detector_weights (
 CREATE INDEX IF NOT EXISTS idx_proj_det_weights_project ON project_detector_weights(project_id);
 CREATE INDEX IF NOT EXISTS idx_proj_det_weights_entity ON project_detector_weights(project_id, alert_type, entity_canonical_name);
 
+-- ===================================================================
+-- Cache persistente de métricas de habla (v27, Speech Tracking)
+-- ===================================================================
+-- Almacena snapshots de métricas de habla por ventana temporal
+-- para acelerar re-análisis (3-5x speedup vs cálculo desde cero).
+-- Invalida por document_fingerprint cuando el documento cambia.
+
+CREATE TABLE IF NOT EXISTS character_speech_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    character_id INTEGER NOT NULL,
+    window_start_chapter INTEGER NOT NULL,
+    window_end_chapter INTEGER NOT NULL,
+
+    -- 6 métricas de habla (TRACKED_METRICS)
+    filler_rate REAL NOT NULL,
+    formality_score REAL NOT NULL,
+    avg_sentence_length REAL NOT NULL,
+    lexical_diversity REAL NOT NULL,
+    exclamation_rate REAL NOT NULL,
+    question_rate REAL NOT NULL,
+
+    -- Metadata de la ventana
+    total_words INTEGER NOT NULL,
+    dialogue_count INTEGER NOT NULL,
+    document_fingerprint TEXT NOT NULL,  -- SHA-256 (64 chars)
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+
+    FOREIGN KEY (character_id) REFERENCES entities(id) ON DELETE CASCADE,
+
+    -- Constraint: unique snapshot por (character, ventana, documento)
+    UNIQUE(character_id, window_start_chapter, window_end_chapter, document_fingerprint)
+);
+
+-- Índice principal (hot path: cache lookup durante análisis)
+CREATE INDEX IF NOT EXISTS idx_speech_cache_lookup ON character_speech_snapshots(
+    character_id,
+    window_start_chapter,
+    window_end_chapter,
+    document_fingerprint
+);
+
+-- Índice secundario (análisis histórico: evolución de personaje)
+CREATE INDEX IF NOT EXISTS idx_speech_by_character ON character_speech_snapshots(
+    character_id,
+    created_at DESC
+);
+
 -- Insertar versión del schema
-INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '24');
+INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '27');
 """
 
 
