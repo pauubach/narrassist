@@ -418,8 +418,17 @@ class PipelineQualityMixin:
             for ch in context.chapters:
                 ch_num = _ch_num(ch)
                 ch_content = _ch_content(ch)
+                ch_start_offset = _ch_val(ch, "start_char", 0)
+
                 result = detector.analyze(ch_content, chapter=ch_num)
                 if result.is_success and result.value is not None:
+                    # Ajustar posiciones: relativas al capítulo → absolutas al documento
+                    for sticky in result.value.sticky_sentences:
+                        if hasattr(sticky, 'start_char') and sticky.start_char is not None:
+                            sticky.start_char += ch_start_offset
+                        if hasattr(sticky, 'end_char') and sticky.end_char is not None:
+                            sticky.end_char += ch_start_offset
+
                     all_sticky.extend(result.value.sticky_sentences)
 
             context.sticky_sentences = all_sticky
@@ -442,8 +451,17 @@ class PipelineQualityMixin:
             for ch in context.chapters:
                 ch_num = _ch_num(ch)
                 ch_content = _ch_content(ch)
+                ch_start_offset = _ch_val(ch, "start_char", 0)
+
                 result = detector.analyze(ch_content, chapter=ch_num)
                 if result.is_success and result.value is not None:
+                    # Ajustar posiciones: relativas al capítulo → absolutas al documento
+                    for issue in result.value.low_energy_sentences:
+                        if hasattr(issue, 'start_char') and issue.start_char is not None:
+                            issue.start_char += ch_start_offset
+                        if hasattr(issue, 'end_char') and issue.end_char is not None:
+                            issue.end_char += ch_start_offset
+
                     all_issues.extend(result.value.low_energy_sentences)
 
             context.sentence_energy_issues = all_issues
