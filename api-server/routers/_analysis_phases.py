@@ -3666,11 +3666,21 @@ def run_completion(ctx: dict, tracker: ProgressTracker):
     proj_manager = ProjectManager(ctx["db_session"])
     proj_manager.update(project)
 
-    logger.info(f"Analysis completed for project {project_id} in {total_duration}s")
+    # Formatear duración en minutos si es > 60s
+    duration_str = f"{total_duration}s"
+    if total_duration >= 60:
+        minutes = int(total_duration // 60)
+        seconds = int(total_duration % 60)
+        duration_str = f"{minutes}m {seconds}s ({total_duration}s)"
+
+    logger.info("=" * 80)
+    logger.info(f"✓ ANÁLISIS COMPLETADO - Proyecto {project_id}")
+    logger.info(f"  Duración total: {duration_str}")
     logger.info(
-        f"Results: {word_count} words, {chapters_count} chapters, "
-        f"{len(entities)} entities, {alerts_created} alerts"
+        f"  Resultados: {word_count} palabras, {chapters_count} capítulos, "
+        f"{len(entities)} entidades, {alerts_created} alertas"
     )
+    logger.info("=" * 80)
 
     # Auto-sugerir focalizacion para capitulos sin declaracion
     try:

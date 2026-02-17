@@ -495,6 +495,15 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 "queue_mode": "full",
             }
 
+            # Log inicio con timestamp claro
+            from datetime import datetime
+            start_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            logger.info("=" * 80)
+            logger.info(f"▶ ANÁLISIS INICIADO - Proyecto {project_id}")
+            logger.info(f"  Inicio: {start_timestamp}")
+            logger.info(f"  Documento: {project.name}")
+            logger.info("=" * 80)
+
             try:
                 # Pre-analysis
                 run_snapshot(ctx, tracker)
