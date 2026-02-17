@@ -85,6 +85,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         "/reanalyze",
         "/analyze/partial",
     )
+    # Rutas explícitamente excluidas del rate limiting estricto
+    # (polling endpoints de solo lectura)
+    POLLING_PATHS = (
+        "/analysis/progress",
+        "/analysis/status",
+    )
 
     def __init__(
         self,
@@ -119,6 +125,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def _is_expensive_endpoint(self, path: str) -> bool:
         """Determina si la ruta corresponde a un endpoint costoso."""
+        # Excluir endpoints de polling (solo lectura, muy frecuentes)
+        if any(polling in path for polling in self.POLLING_PATHS):
+            return False
         # Solo rutas de análisis son consideradas costosas
         return any(path.endswith(suffix) for suffix in self.EXPENSIVE_SUFFIXES)
 
