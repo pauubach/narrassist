@@ -870,7 +870,63 @@ class PipelineAlertsMixin:
                 except Exception as e:
                     logger.debug(f"Filler alert failed: {e}")
 
+            # Alertas de cambios de habla por personaje (v0.10.13)
+            for speech_alert in context.speech_change_alerts:
+                try:
+                    # Convertir SpeechChangeAlert a Alert del sistema
+                    result = engine.create_alert(
+                        project_id=context.project_id,
+                        alert_type="speech_change",
+                        category=AlertCategory.STYLE,  # Cambio de habla es estilo
+                        severity=self._map_speech_severity(speech_alert.severity),
+                        title=f"Cambio de habla: {speech_alert.character_name}",
+                        description=speech_alert.description,
+                        explanation=speech_alert.suggestion,
+                        # No hay posición específica (es un cambio entre capítulos)
+                        start_char=None,
+                        end_char=None,
+                        confidence=speech_alert.confidence,
+                        extra_data={
+                            "character_id": speech_alert.character_id,
+                            "character_name": speech_alert.character_name,
+                            "window1_chapters": speech_alert.window1_chapters,
+                            "window2_chapters": speech_alert.window2_chapters,
+                            "changed_metrics": [
+                                {
+                                    "metric": m,
+                                    "value1": r.value1,
+                                    "value2": r.value2,
+                                    "relative_change": r.relative_change,
+                                    "p_value": r.p_value,
+                                }
+                                for m, r in speech_alert.changed_metrics.items()
+                            ],
+                            "has_narrative_context": speech_alert.narrative_context is not None,
+                            "narrative_event": (
+                                speech_alert.narrative_context.event_type
+                                if speech_alert.narrative_context
+                                else None
+                            ),
+                        },
+                    )
+                    if result.is_success:
+                        context.alerts.append(result.value)
+                except Exception as e:
+                    logger.debug(f"Speech change alert failed: {e}")
+
             context.stats["alerts_created"] = len(context.alerts)
 
         except Exception as e:
             logger.warning(f"Alert generation failed: {e}")
+
+    @staticmethod
+    def _map_speech_severity(severity_str: str) -> "AlertSeverity":
+        """Mapea severidad de speech alert a AlertSeverity del sistema."""
+        from ..alerts.types import AlertSeverity
+
+        severity_map = {
+            "low": AlertSeverity.INFO,
+            "medium": AlertSeverity.WARNING,
+            "high": AlertSeverity.CRITICAL,
+        }
+        return severity_map.get(severity_str, AlertSeverity.WARNING)

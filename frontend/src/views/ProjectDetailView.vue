@@ -1016,7 +1016,8 @@ const onViewChapterAlerts = () => {
 // TextSelectionInspector handlers
 const onSearchSimilarText = (text: string) => {
   console.log('Search similar text:', text.substring(0, 50) + '...')
-  selectionStore.setTextSelection(null)
+  // NO limpiar la selección - mantenerla para que el chat tenga contexto
+  // selectionStore.setTextSelection(null)
   sidebarTab.value = 'assistant'
 }
 

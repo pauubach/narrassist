@@ -19,6 +19,7 @@ from .speech_tracker import SpeechTracker
 from .speech_window import SpeechWindow, create_sliding_windows
 from .metrics import SpeechMetrics, TRACKED_METRICS
 from .change_detector import ChangeDetector, MetricChangeResult
+from .contextual_analyzer import ContextualAnalyzer
 from .types import SpeechChangeAlert, NarrativeContext
 
 __all__ = [
@@ -29,6 +30,7 @@ __all__ = [
     "TRACKED_METRICS",
     "ChangeDetector",
     "MetricChangeResult",
+    "ContextualAnalyzer",
     "SpeechChangeAlert",
     "NarrativeContext",
 ]

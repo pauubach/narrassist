@@ -439,6 +439,7 @@ class AnalysisContext:
     chekhov_threads: list = field(default_factory=list)  # Hilos narrativos abandonados (Chekhov)
     shallow_characters: list = field(default_factory=list)  # Personajes planos
     knowledge_anachronisms: list = field(default_factory=list)  # Anacronismos de conocimiento
+    speech_change_alerts: list = field(default_factory=list)  # Cambios de habla por personaje (v0.10.13)
 
     # Alertas
     alerts: list = field(default_factory=list)

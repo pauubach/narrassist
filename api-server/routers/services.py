@@ -772,12 +772,23 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
 
         # 7. Inyectar selección como [REF:1] si existe
         if selection_excerpt:
+            logger.info(f"Injecting selection as [REF:1]: positions {selection_excerpt['global_start']}-{selection_excerpt['global_end']}")
+            logger.info(f"Selection excerpt preview: {selection_excerpt['excerpt'][:100]}...")
             # Poner la selección primero, luego los resultados del RAG
             selected_excerpts = [selection_excerpt] + selected_excerpts[:7]  # Limitar a 8 total
+        else:
+            logger.info("No selection excerpt - using RAG results only")
 
         # 8. Construir contexto numerado (ahora con selección como [1])
         context_text, ref_map = build_numbered_context(selected_excerpts)
         context_sources = list({e["chapter_title"] for e in selected_excerpts})
+
+        # Debug: log first reference
+        if ref_map:
+            first_ref = ref_map.get(1)
+            if first_ref:
+                logger.info(f"[REF:1] final positions: {first_ref['global_start']}-{first_ref['global_end']}")
+                logger.info(f"[REF:1] excerpt: {first_ref['excerpt'][:100]}...")
 
         # 9. Historial de conversación
         history_text = ""

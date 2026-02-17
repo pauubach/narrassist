@@ -89,6 +89,10 @@ class PipelineConsistencyMixin:
             if self.config.run_knowledge and context.entities and context.chapters:
                 self._run_knowledge_anachronisms(context)
 
+            # Speech consistency tracking (v0.10.13)
+            if context.entities and context.chapters:
+                self._run_speech_consistency_tracking(context)
+
             context.phase_times["consistency"] = (datetime.now() - phase_start).total_seconds()
             return Result.success(None)
 
@@ -1011,3 +1015,92 @@ class PipelineConsistencyMixin:
             logger.debug(f"Knowledge module not available: {e}")
         except Exception as e:
             logger.warning(f"Knowledge anachronism detection failed: {e}")
+
+    def _run_speech_consistency_tracking(self, context: AnalysisContext) -> None:
+        """
+        Detecta cambios en el habla de personajes a lo largo del manuscrito.
+
+        Analiza consistencia de:
+        - Uso de muletillas (filler words)
+        - Registro lingüístico (formal/coloquial)
+        - Longitud de oraciones
+        - Riqueza léxica
+        - Patrones de puntuación
+
+        v0.10.13: Character Speech Consistency Tracking
+        """
+        try:
+            from ..analysis.speech_tracking import SpeechTracker, ContextualAnalyzer
+
+            tracker = SpeechTracker(
+                window_size=3,  # 3 capítulos por ventana
+                overlap=1,  # Solapamiento de 1 capítulo
+                min_words_per_window=200,  # Mínimo 200 palabras
+                min_confidence=0.6,  # Confianza mínima 60%
+            )
+
+            context_analyzer = ContextualAnalyzer()
+
+            # Filtrar solo personajes principales (>500 palabras de diálogo total)
+            main_characters = []
+            for entity in context.entities:
+                if entity.entity_type != "PERSON":
+                    continue
+
+                # Estimar palabras totales de diálogo (heurística simple)
+                # TODO: Calcular exacto cuando tengamos diálogos estructurados
+                total_mentions = entity.mention_count or 0
+                estimated_dialogue_words = total_mentions * 10  # ~10 palabras por mención
+
+                if estimated_dialogue_words >= 500:
+                    main_characters.append(entity)
+
+            logger.info(
+                f"Speech tracking: analyzing {len(main_characters)} main characters "
+                f"(of {len(context.entities)} total)"
+            )
+
+            # Analizar cada personaje
+            all_alerts = []
+            for entity in main_characters:
+                try:
+                    # Obtener spaCy NLP si está disponible
+                    spacy_nlp = None
+                    if hasattr(context, "spacy_nlp") and context.spacy_nlp:
+                        spacy_nlp = context.spacy_nlp
+
+                    alerts = tracker.detect_changes(
+                        character_id=entity.id,
+                        character_name=entity.canonical_name,
+                        chapters=context.chapters,
+                        spacy_nlp=spacy_nlp,
+                        narrative_context_analyzer=context_analyzer,
+                    )
+
+                    all_alerts.extend(alerts)
+
+                    if alerts:
+                        logger.info(
+                            f"Speech tracking: {entity.canonical_name} → "
+                            f"{len(alerts)} change(s) detected"
+                        )
+
+                except Exception as e:
+                    logger.warning(
+                        f"Speech tracking failed for {entity.canonical_name}: {e}"
+                    )
+                    continue
+
+            # Guardar alertas en contexto
+            context.speech_change_alerts = all_alerts
+            context.stats["speech_change_alerts"] = len(all_alerts)
+
+            logger.info(
+                f"Speech tracking: {len(all_alerts)} total changes detected "
+                f"across {len(main_characters)} characters"
+            )
+
+        except ImportError as e:
+            logger.debug(f"Speech tracking module not available: {e}")
+        except Exception as e:
+            logger.warning(f"Speech consistency tracking failed: {e}")
