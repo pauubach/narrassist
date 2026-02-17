@@ -93,14 +93,15 @@ class SpeechTracker:
 
         # DEBUG: Verificar si cache está habilitado
         if document_fingerprint:
-            logger.debug(
+            logger.info(
                 f"[CACHE] Using DB cache for {character_name}, "
                 f"fingerprint={document_fingerprint[:16]}..."
             )
         else:
             logger.warning(
-                f"[CACHE] NO fingerprint provided for {character_name}, "
-                f"cache will NOT work (re-analysis will be slow)"
+                f"[CACHE] NO fingerprint for {character_name} "
+                f"(got: {repr(document_fingerprint)}), "
+                f"cache DISABLED -> re-analysis will be SLOW (10-12 min)"
             )
 
         for window in windows:

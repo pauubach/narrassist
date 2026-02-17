@@ -65,14 +65,13 @@ class SpeechMetrics:
         dialogue_count = len(dialogues)
 
         # Intentar recuperar del cache persistente (DB)
-        if use_cache and all(
-            param is not None
-            for param in [
-                character_id,
-                window_start_chapter,
-                window_end_chapter,
-                document_fingerprint,
-            ]
+        # CRITICAL: document_fingerprint debe ser string NO vacío, no solo not None
+        if (
+            use_cache
+            and character_id is not None
+            and window_start_chapter is not None
+            and window_end_chapter is not None
+            and document_fingerprint  # Validar que no sea "" (string vacío)
         ):
             from .db_cache import get_db_cache
 
@@ -106,14 +105,13 @@ class SpeechMetrics:
         logger.debug(f"Calculated metrics: {metrics}")
 
         # Guardar en cache persistente
-        if use_cache and all(
-            param is not None
-            for param in [
-                character_id,
-                window_start_chapter,
-                window_end_chapter,
-                document_fingerprint,
-            ]
+        # CRITICAL: document_fingerprint debe ser string NO vacío, no solo not None
+        if (
+            use_cache
+            and character_id is not None
+            and window_start_chapter is not None
+            and window_end_chapter is not None
+            and document_fingerprint  # Validar que no sea "" (string vacío)
         ):
             cache.set(
                 character_id,
