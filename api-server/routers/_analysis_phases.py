@@ -540,6 +540,7 @@ def apply_license_and_settings(ctx: dict, tracker: ProgressTracker):
                 "spelling": "run_spelling",
                 "grammar": "run_grammar",
                 "consistency": "run_consistency",
+                "speech_tracking": "run_speech_tracking",
             }
             for feat_key, config_field in _SETTINGS_MAP.items():
                 if feat_key in analysis_features and hasattr(analysis_config, config_field):
@@ -1524,7 +1525,6 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                 use_chapter_boundaries=True,
                 quality_level=ctx.get("quality_level", "rapida"),
                 sensitivity=ctx.get("sensitivity", 5.0),
-                use_voting=True,
             )
 
             coref_result = resolve_coreferences_voting(
@@ -2650,6 +2650,95 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
 
         tracker.check_cancelled()
 
+    # Sub-fase 5.7: Speech consistency tracking (v0.10.14)
+    speech_change_count = 0
+    if analysis_config.run_speech_tracking:
+        _update_storage(project_id, current_action="Analizando consistencia del habla...")
+        try:
+            from narrative_assistant.analysis.speech_tracking import (
+                SpeechTracker,
+                ContextualAnalyzer,
+            )
+            from narrative_assistant.entities.models import EntityType
+
+            tracker_speech = SpeechTracker(
+                window_size=3,  # 3 capítulos por ventana
+                overlap=1,  # Solapamiento de 1 capítulo
+                min_words_per_window=200,  # Mínimo 200 palabras
+                min_confidence=0.6,  # Confianza mínima 60%
+            )
+
+            context_analyzer = ContextualAnalyzer()
+
+            # Filtrar solo personajes principales (>50 palabras de diálogo total)
+            main_characters = []
+            for entity in entities:
+                if entity.entity_type not in (
+                    EntityType.CHARACTER,
+                    EntityType.ANIMAL,
+                    EntityType.CREATURE,
+                ):
+                    continue
+
+                # Estimar palabras totales de diálogo
+                total_mentions = entity.mention_count or 0
+                estimated_dialogue_words = total_mentions * 10  # ~10 palabras por mención
+
+                if estimated_dialogue_words >= 50:
+                    main_characters.append(entity)
+
+            logger.info(
+                f"Speech tracking: analyzing {len(main_characters)} main characters "
+                f"(of {len(entities)} total)"
+            )
+
+            # Analizar cada personaje
+            all_speech_alerts = []
+            for entity in main_characters:
+                try:
+                    # Obtener spaCy NLP si está disponible
+                    spacy_nlp = ctx.get("spacy_nlp")
+
+                    # Obtener document fingerprint
+                    document_fingerprint = ctx.get("fingerprint", "")
+
+                    speech_alerts = tracker_speech.detect_changes(
+                        character_id=entity.id,
+                        character_name=entity.canonical_name,
+                        chapters=chapters_data,
+                        spacy_nlp=spacy_nlp,
+                        narrative_context_analyzer=context_analyzer,
+                        document_fingerprint=document_fingerprint,
+                    )
+
+                    all_speech_alerts.extend(speech_alerts)
+
+                    if speech_alerts:
+                        logger.info(
+                            f"Speech tracking: {entity.canonical_name} → "
+                            f"{len(speech_alerts)} change(s) detected"
+                        )
+
+                except Exception as e:
+                    logger.warning(f"Speech tracking failed for {entity.canonical_name}: {e}")
+                    continue
+
+            speech_change_count = len(all_speech_alerts)
+            logger.info(
+                f"Speech tracking: {speech_change_count} total changes detected "
+                f"across {len(main_characters)} characters"
+            )
+
+            # Guardar alertas en contexto
+            ctx["speech_change_alerts"] = all_speech_alerts
+
+        except ImportError as e:
+            logger.debug(f"Speech tracking module not available: {e}")
+        except Exception as e:
+            logger.warning(f"Speech consistency tracking failed: {e}", exc_info=True)
+
+        tracker.check_cancelled()
+
     # Guardar métricas
     _update_storage(
         project_id,
@@ -2664,6 +2753,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
                 if anachronism_report and anachronism_report.anachronisms
                 else 0
             ),
+            "speech_changes": speech_change_count,
         },
     )
 

@@ -139,6 +139,7 @@ class UnifiedConfig:
     run_vital_status: bool = True  # Detectar personajes fallecidos que reaparecen
     run_character_location: bool = True  # Detectar ubicaciones imposibles de personajes
     run_chekhov: bool = True  # Detectar personajes/elementos introducidos y olvidados
+    run_speech_tracking: bool = True  # Character Speech Consistency Tracking (v0.10.13)
     create_alerts: bool = True
 
     # Features avanzadas (gated por licencia)
