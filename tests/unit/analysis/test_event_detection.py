@@ -7,9 +7,14 @@ Valida detectores de Tier 1 (alta prioridad).
 import pytest
 
 from narrative_assistant.analysis.event_detection import (
+    ConfessionLieDetector,
+    DreamSequenceDetector,
     EventDetector,
     FlashbackDetector,
+    HealingDetector,
     InjuryDetector,
+    NarrativeIntrusionDetector,
+    POVChangeDetector,
     PromiseDetector,
     TimeSkipDetector,
 )
@@ -151,6 +156,116 @@ class TestTimeSkipDetector:
 
         assert len(events) > 0
         assert events[0].event_type == EventType.TIME_SKIP
+
+
+class TestConfessionLieDetector:
+    """Tests para detector de confesiones y mentiras."""
+
+    @pytest.fixture
+    def detector(self):
+        return ConfessionLieDetector()
+
+    def test_detect_confession(self, detector, shared_spacy_nlp):
+        """Detecta confesión."""
+        text = "Juan confesó que había robado el dinero."
+        doc = shared_spacy_nlp(text)
+
+        events = detector.detect(doc, text)
+
+        assert len(events) > 0
+        assert events[0].event_type == EventType.CONFESSION
+
+    def test_detect_lie(self, detector, shared_spacy_nlp):
+        """Detecta mentira."""
+        text = "María mintió sobre su paradero."
+        doc = shared_spacy_nlp(text)
+
+        events = detector.detect(doc, text)
+
+        assert len(events) > 0
+        assert events[0].event_type == EventType.LIE
+
+
+class TestHealingDetector:
+    """Tests para detector de curaciones."""
+
+    @pytest.fixture
+    def detector(self):
+        return HealingDetector()
+
+    def test_detect_healing(self, detector, shared_spacy_nlp):
+        """Detecta curación."""
+        text = "Pedro se curó de la herida en el brazo."
+        doc = shared_spacy_nlp(text)
+
+        events = detector.detect(doc, text)
+
+        assert len(events) > 0
+        assert events[0].event_type == EventType.HEALING
+        assert events[0].metadata.get("body_part") == "brazo"
+
+
+class TestDreamSequenceDetector:
+    """Tests para detector de sueños."""
+
+    @pytest.fixture
+    def detector(self):
+        return DreamSequenceDetector()
+
+    def test_detect_dream(self, detector):
+        """Detecta secuencia onírica."""
+        text = "Esa noche soñó con campos de flores."
+
+        events = detector.detect(text)
+
+        assert len(events) > 0
+        assert events[0].event_type == EventType.DREAM_SEQUENCE
+
+
+class TestPOVChangeDetector:
+    """Tests para detector de cambios de POV."""
+
+    @pytest.fixture
+    def detector(self):
+        return POVChangeDetector()
+
+    def test_detect_pov_change_first_to_third(self, detector):
+        """Detecta cambio de primera a tercera persona."""
+        prev_text = "Yo caminaba por la calle. Me sentía cansado."
+        current_text = "Él llegó a casa. Ella lo esperaba."
+
+        events = detector.detect(current_text, prev_text)
+
+        assert len(events) > 0
+        assert events[0].event_type == EventType.POV_CHANGE
+        assert events[0].metadata.get("previous_pov") == "first_person"
+        assert events[0].metadata.get("current_pov") == "third_person"
+
+    def test_no_pov_change(self, detector):
+        """No detecta cambio si POV es el mismo."""
+        prev_text = "Él caminaba. Ella hablaba."
+        current_text = "Él llegó. Ella esperaba."
+
+        events = detector.detect(current_text, prev_text)
+
+        assert len(events) == 0
+
+
+class TestNarrativeIntrusionDetector:
+    """Tests para detector de intrusiones narrativas."""
+
+    @pytest.fixture
+    def detector(self):
+        return NarrativeIntrusionDetector()
+
+    def test_detect_narrative_intrusion(self, detector):
+        """Detecta intrusión del narrador."""
+        text = "Querido lector, debo advertirte que lo que sigue es terrible."
+
+        events = detector.detect(text)
+
+        assert len(events) > 0
+        assert events[0].event_type == EventType.NARRATIVE_INTRUSION
 
 
 class TestEventDetector:

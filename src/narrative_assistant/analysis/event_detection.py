@@ -86,6 +86,19 @@ DREAM_PATTERNS = [
     r"\ben (el|su)? sueño\b",
     r"\bpesadilla\b",
     r"\bdespertó\b",
+    r"\bdormido\b.*\bsoñaba\b",
+    r"\bvisión onírica\b",
+]
+
+POV_PATTERNS = [
+    r"\b(yo|me|mi|mí|nosotros|nos)\b",  # Primera persona
+    r"\b(él|ella|ellos|ellas|le|les)\b",  # Tercera persona
+]
+
+NARRATIVE_INTRUSION_PATTERNS = [
+    r"\b(querido lector|estimado lector|como veremos|como ya mencioné)\b",
+    r"\b(es importante notar|cabe mencionar|debemos recordar)\b",
+    r"\b(el autor de estas líneas|quien escribe|este narrador)\b",
 ]
 
 # Grupo 3: Verbos para detección LLM (para pre-filtrado)
@@ -396,6 +409,224 @@ class TimeSkipDetector:
         return events
 
 
+class ConfessionLieDetector:
+    """Detecta confesiones y mentiras."""
+
+    def detect(self, doc: Doc, text: str) -> list[DetectedEvent]:
+        """Detecta confesiones/mentiras en el texto."""
+        events = []
+
+        for token in doc:
+            lemma = token.lemma_.lower()
+            event_type = None
+
+            if lemma in CONFESSION_VERBS:
+                event_type = EventType.CONFESSION
+            elif lemma in LIE_VERBS:
+                event_type = EventType.LIE
+
+            if not event_type:
+                continue
+
+            sent = token.sent
+            start_char = sent.start_char
+            end_char = sent.end_char
+
+            # Extraer sujeto
+            subject = self._extract_subject(token)
+
+            # Extraer complemento (qué se confiesa/miente)
+            complement = self._extract_complement(token, sent)
+
+            action = "confesó" if event_type == EventType.CONFESSION else "mintió sobre"
+            description = f"{subject or 'Alguien'} {action} {complement or 'algo'}"
+
+            events.append(DetectedEvent(
+                event_type=event_type,
+                description=description,
+                confidence=0.7,
+                start_char=start_char,
+                end_char=end_char,
+                metadata={
+                    "subject": subject,
+                    "content": complement,
+                }
+            ))
+
+        return events
+
+    def _extract_subject(self, token) -> str | None:
+        """Extrae el sujeto del verbo."""
+        for child in token.children:
+            if child.dep_ in ("nsubj", "nsubjpass"):
+                return child.text
+        return None
+
+    def _extract_complement(self, token, sent) -> str | None:
+        """Extrae el complemento del verbo."""
+        for child in token.children:
+            if child.dep_ in ("dobj", "xcomp", "ccomp"):
+                return sent.text[child.idx - sent.start_char:]
+        return None
+
+
+class HealingDetector:
+    """Detecta curación de heridas (complemento de InjuryDetector)."""
+
+    def detect(self, doc: Doc, text: str) -> list[DetectedEvent]:
+        """Detecta curaciones en el texto."""
+        events = []
+
+        for token in doc:
+            if token.lemma_.lower() in HEALING_VERBS:
+                sent = token.sent
+                start_char = sent.start_char
+                end_char = sent.end_char
+
+                # Buscar parte del cuerpo mencionada
+                body_part = self._find_body_part(sent)
+
+                # Buscar sujeto (quien se cura)
+                healed = self._extract_subject(token) or self._extract_object(token)
+
+                description = f"{healed or 'Alguien'} se recuperó"
+                if body_part:
+                    description += f" de herida en {body_part}"
+
+                events.append(DetectedEvent(
+                    event_type=EventType.HEALING,
+                    description=description,
+                    confidence=0.7,
+                    start_char=start_char,
+                    end_char=end_char,
+                    metadata={
+                        "body_part": body_part,
+                        "healed": healed,
+                    }
+                ))
+
+        return events
+
+    def _find_body_part(self, sent) -> str | None:
+        """Busca menciones de partes del cuerpo en la frase."""
+        sent_text_lower = sent.text.lower()
+        for part in BODY_PARTS:
+            if part in sent_text_lower:
+                return part
+        return None
+
+    def _extract_subject(self, token) -> str | None:
+        """Extrae el sujeto del verbo."""
+        for child in token.children:
+            if child.dep_ in ("nsubj", "nsubjpass"):
+                return child.text
+        return None
+
+    def _extract_object(self, token) -> str | None:
+        """Extrae el objeto directo."""
+        for child in token.children:
+            if child.dep_ in ("dobj", "iobj"):
+                return child.text
+        return None
+
+
+class DreamSequenceDetector:
+    """Detecta secuencias oníricas."""
+
+    def detect(self, text: str) -> list[DetectedEvent]:
+        """Detecta sueños mediante patrones."""
+        events = []
+
+        for pattern in DREAM_PATTERNS:
+            for match in re.finditer(pattern, text, re.IGNORECASE):
+                events.append(DetectedEvent(
+                    event_type=EventType.DREAM_SEQUENCE,
+                    description=f"Secuencia onírica: {match.group()}",
+                    confidence=0.6,
+                    start_char=match.start(),
+                    end_char=match.end(),
+                    metadata={"pattern": pattern}
+                ))
+
+        return events
+
+
+class POVChangeDetector:
+    """Detecta cambios de punto de vista narrativo."""
+
+    def detect(self, text: str, prev_chapter_text: str | None = None) -> list[DetectedEvent]:
+        """
+        Detecta cambios de POV.
+
+        Args:
+            text: Texto actual
+            prev_chapter_text: Texto del capítulo anterior (para comparación)
+
+        Returns:
+            Lista de eventos detectados
+        """
+        events = []
+
+        if not prev_chapter_text:
+            # Sin capítulo previo, no se puede detectar cambio
+            return events
+
+        # Contar pronombres por persona
+        prev_pov = self._detect_pov(prev_chapter_text)
+        current_pov = self._detect_pov(text)
+
+        if prev_pov != current_pov and current_pov != "unknown":
+            events.append(DetectedEvent(
+                event_type=EventType.POV_CHANGE,
+                description=f"Cambio de POV: {prev_pov} → {current_pov}",
+                confidence=0.65,
+                start_char=0,
+                end_char=min(200, len(text)),  # Primeros 200 chars
+                metadata={
+                    "previous_pov": prev_pov,
+                    "current_pov": current_pov,
+                }
+            ))
+
+        return events
+
+    def _detect_pov(self, text: str) -> str:
+        """Detecta el POV predominante en un texto."""
+        # Primera persona
+        first_person = len(re.findall(r"\b(yo|me|mi|mí|mis|nosotros|nos)\b", text, re.IGNORECASE))
+
+        # Tercera persona
+        third_person = len(re.findall(r"\b(él|ella|ellos|ellas)\b", text, re.IGNORECASE))
+
+        if first_person > third_person * 2:  # Al menos 2x más
+            return "first_person"
+        elif third_person > first_person * 2:
+            return "third_person"
+        else:
+            return "unknown"
+
+
+class NarrativeIntrusionDetector:
+    """Detecta intrusiones del narrador (metanarración)."""
+
+    def detect(self, text: str) -> list[DetectedEvent]:
+        """Detecta intrusiones narrativas mediante patrones."""
+        events = []
+
+        for pattern in NARRATIVE_INTRUSION_PATTERNS:
+            for match in re.finditer(pattern, text, re.IGNORECASE):
+                events.append(DetectedEvent(
+                    event_type=EventType.NARRATIVE_INTRUSION,
+                    description=f"Intrusión narrativa: {match.group()}",
+                    confidence=0.7,
+                    start_char=match.start(),
+                    end_char=match.end(),
+                    metadata={"pattern": pattern}
+                ))
+
+        return events
+
+
 # ============================================================================
 # Detector Principal (Orquestador)
 # ============================================================================
@@ -421,20 +652,33 @@ class EventDetector:
         self.nlp = nlp
         self.enable_llm = enable_llm
 
-        # Inicializar detectores Tier 1
+        # Inicializar detectores Tier 1 - Grupo 1 (NLP)
         self.promise_detector = PromiseDetector()
         self.injury_detector = InjuryDetector()
+        self.healing_detector = HealingDetector()
         self.acquisition_loss_detector = AcquisitionLossDetector()
+        self.confession_lie_detector = ConfessionLieDetector()
+
+        # Inicializar detectores Tier 1 - Grupo 2 (Heurísticos)
         self.flashback_detector = FlashbackDetector()
         self.time_skip_detector = TimeSkipDetector()
+        self.dream_detector = DreamSequenceDetector()
+        self.pov_detector = POVChangeDetector()
+        self.intrusion_detector = NarrativeIntrusionDetector()
 
-    def detect_events(self, text: str, chapter_number: int = 1) -> list[DetectedEvent]:
+    def detect_events(
+        self,
+        text: str,
+        chapter_number: int = 1,
+        prev_chapter_text: str | None = None
+    ) -> list[DetectedEvent]:
         """
         Detecta todos los eventos en un texto.
 
         Args:
             text: Texto a analizar
             chapter_number: Número de capítulo (para contexto)
+            prev_chapter_text: Texto del capítulo anterior (para POV change)
 
         Returns:
             Lista de eventos detectados, ordenados por posición
@@ -448,7 +692,9 @@ class EventDetector:
             # Tier 1 - Grupo 1: NLP Básico
             events.extend(self.promise_detector.detect(doc, text))
             events.extend(self.injury_detector.detect(doc, text))
+            events.extend(self.healing_detector.detect(doc, text))
             events.extend(self.acquisition_loss_detector.detect(doc, text))
+            events.extend(self.confession_lie_detector.detect(doc, text))
 
             logger.debug(f"Fase NLP: {len(events)} eventos detectados")
 
@@ -456,14 +702,23 @@ class EventDetector:
         heuristic_events = []
         heuristic_events.extend(self.flashback_detector.detect(text))
         heuristic_events.extend(self.time_skip_detector.detect(text))
+        heuristic_events.extend(self.dream_detector.detect(text))
+        heuristic_events.extend(self.pov_detector.detect(text, prev_chapter_text))
+        heuristic_events.extend(self.intrusion_detector.detect(text))
         events.extend(heuristic_events)
 
         logger.debug(f"Fase Heurística: {len(heuristic_events)} eventos detectados")
 
         # Fase 3: Detectores LLM (opcional, más lentos)
         if self.enable_llm:
-            # TODO: Implementar detectores LLM para BETRAYAL, ALLIANCE, etc.
-            pass
+            # TODO: Implementar detectores LLM para BETRAYAL, ALLIANCE, REVELATION, DECISION
+            llm_events = []
+            # llm_events.extend(self.betrayal_detector.detect(text))
+            # llm_events.extend(self.alliance_detector.detect(text))
+            # llm_events.extend(self.revelation_detector.detect(text))
+            # llm_events.extend(self.decision_detector.detect(text))
+            events.extend(llm_events)
+            logger.debug(f"Fase LLM: {len(llm_events)} eventos detectados")
 
         # Ordenar por posición
         events.sort(key=lambda e: e.start_char)
@@ -476,7 +731,8 @@ def detect_events_in_chapter(
     text: str,
     chapter_number: int,
     nlp=None,
-    enable_llm: bool = False
+    enable_llm: bool = False,
+    prev_chapter_text: str | None = None
 ) -> list[DetectedEvent]:
     """
     Función helper para detectar eventos en un capítulo.
@@ -486,9 +742,10 @@ def detect_events_in_chapter(
         chapter_number: Número de capítulo
         nlp: Modelo spaCy (opcional)
         enable_llm: Si habilitar detectores LLM
+        prev_chapter_text: Texto del capítulo anterior (para POV change)
 
     Returns:
         Lista de eventos detectados
     """
     detector = EventDetector(nlp=nlp, enable_llm=enable_llm)
-    return detector.detect_events(text, chapter_number)
+    return detector.detect_events(text, chapter_number, prev_chapter_text)
