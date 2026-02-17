@@ -229,6 +229,48 @@ def get_line_for_position(text: str, position: int) -> tuple[str, bool]:
 # Palabras y patrones comunes (para heurísticas)
 # =============================================================================
 
+# Marcadores discursivos temporales y conectores que NO son entidades
+# (integrado desde entity_validation.py)
+DISCOURSE_MARKERS = {
+    # Temporales
+    "acto seguido",
+    "poco después",
+    "al día siguiente",
+    "mientras tanto",
+    "de repente",
+    "al cabo de",
+    "en ese momento",
+    "al instante",
+    "seguidamente",
+    "a continuación",
+    "más tarde",
+    "más adelante",
+    "poco antes",
+    "justo después",
+    "inmediatamente después",
+    # Conectores discursivos
+    "por lo tanto",
+    "sin embargo",
+    "no obstante",
+    "en consecuencia",
+    "por consiguiente",
+    "así pues",
+    "de hecho",
+    "en efecto",
+    "por cierto",
+    # Expresiones fijas
+    "de todos modos",
+    "en cualquier caso",
+    "de todas formas",
+    "sea como sea",
+    "en todo caso",
+    # Cuantificadores temporales
+    "una vez más",
+    "otra vez",
+    "de nuevo",
+    "nuevamente",
+}
+
 # Palabras muy comunes en español que rara vez son entidades
 COMMON_SPANISH_WORDS = {
     # Artículos y determinantes
@@ -721,6 +763,16 @@ class EntityValidator:
         text = entity.text
         text_lower = text.lower().strip()
         words = text.split()
+
+        # ===== FILTRO 0: Marcadores discursivos temporales =====
+        if text_lower in DISCOURSE_MARKERS:
+            return EntityScore(
+                text=text,
+                total_score=0.0,
+                is_valid=False,
+                validation_method="discourse_marker",
+                rejection_reason=f"Marcador discursivo/temporal: '{text}'",
+            )
 
         # ===== NUEVO: Usar sistema híbrido de filtros de 3 niveles =====
         entity_type = entity.label.value if hasattr(entity, "label") else None
