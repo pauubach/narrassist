@@ -842,6 +842,34 @@ class PipelineAlertsMixin:
                 except Exception as e:
                     logger.debug(f"Acronym alert failed: {e}")
 
+            # Alertas de muletillas lingüísticas (FillerDetector)
+            for issue in context.filler_issues:
+                try:
+                    issue_type = (
+                        issue.issue_type.value
+                        if hasattr(issue, "issue_type")
+                        and hasattr(issue.issue_type, "value")
+                        else str(getattr(issue, "issue_type", "linguistic_filler"))
+                    )
+                    result = engine.create_alert(
+                        project_id=context.project_id,
+                        alert_type=issue_type,  # NO añadir prefijo, usar issue_type directo
+                        category=AlertCategory.REPETITION,  # CrutchWords y Filler comparten categoría
+                        severity=AlertSeverity.INFO,
+                        title=f"Muletilla: {getattr(issue, 'text', '')}",
+                        description=getattr(issue, "explanation", ""),
+                        explanation=getattr(issue, "explanation", ""),
+                        suggestion=getattr(issue, "suggestion", None),
+                        start_char=getattr(issue, "start_char", None),
+                        end_char=getattr(issue, "end_char", None),
+                        confidence=getattr(issue, "confidence", 0.7),
+                        extra_data=getattr(issue, "extra_data", {}),
+                    )
+                    if result.is_success:
+                        context.alerts.append(result.value)
+                except Exception as e:
+                    logger.debug(f"Filler alert failed: {e}")
+
             context.stats["alerts_created"] = len(context.alerts)
 
         except Exception as e:

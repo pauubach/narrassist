@@ -173,6 +173,7 @@ export function transformAlert(api: ApiAlert): Alert {
     category: transformAlertCategory(api.category),
     severity: transformAlertSeverity(api.severity),
     status: transformAlertStatus(api.status),
+    alertType: api.alert_type,
     title: api.title,
     description: api.description,
     explanation: api.explanation || undefined,

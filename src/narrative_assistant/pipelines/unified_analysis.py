@@ -419,6 +419,7 @@ class AnalysisContext:
     pov_issues: list = field(default_factory=list)  # Cambios de punto de vista
     reference_issues: list = field(default_factory=list)  # Problemas de referencias bibliográficas
     acronym_issues: list = field(default_factory=list)  # Siglas inconsistentes
+    filler_issues: list = field(default_factory=list)  # Muletillas lingüísticas (FillerDetector)
 
     # Marcadores temporales y focalización
     temporal_markers: list = field(default_factory=list)

@@ -133,6 +133,25 @@
               <Tag severity="secondary" class="category-tag">
                 {{ getCategoryLabel(alert.category) }}
               </Tag>
+
+              <!-- Badge específico para tipos de muletillas y repeticiones -->
+              <Tag v-if="alert.alertType === 'linguistic_filler'" severity="secondary" class="filler-type-tag">
+                <i class="pi pi-book"></i>
+                Muletilla lingüística
+              </Tag>
+              <Tag v-else-if="alert.alertType === 'overused_word'" severity="warn" class="filler-type-tag">
+                <i class="pi pi-chart-line"></i>
+                Sobreuso estadístico
+              </Tag>
+              <Tag v-else-if="alert.alertType === 'lexical_close'" severity="info" class="filler-type-tag">
+                <i class="pi pi-clone"></i>
+                Repetición cercana
+              </Tag>
+              <Tag v-else-if="alert.alertType === 'sentence_start'" severity="info" class="filler-type-tag">
+                <i class="pi pi-align-left"></i>
+                Inicio repetido
+              </Tag>
+
               <span v-if="alert.chapter" class="alert-chapter">
                 <i class="pi pi-book"></i>
                 Cap. {{ alert.chapter }}
@@ -236,6 +255,25 @@
             <Tag severity="secondary" class="category-tag">
               {{ getCategoryLabel(alert.category) }}
             </Tag>
+
+            <!-- Badge específico para tipos de muletillas y repeticiones -->
+            <Tag v-if="alert.alertType === 'linguistic_filler'" severity="secondary" class="filler-type-tag">
+              <i class="pi pi-book"></i>
+              Muletilla lingüística
+            </Tag>
+            <Tag v-else-if="alert.alertType === 'overused_word'" severity="warn" class="filler-type-tag">
+              <i class="pi pi-chart-line"></i>
+              Sobreuso estadístico
+            </Tag>
+            <Tag v-else-if="alert.alertType === 'lexical_close'" severity="info" class="filler-type-tag">
+              <i class="pi pi-clone"></i>
+              Repetición cercana
+            </Tag>
+            <Tag v-else-if="alert.alertType === 'sentence_start'" severity="info" class="filler-type-tag">
+              <i class="pi pi-align-left"></i>
+              Inicio repetido
+            </Tag>
+
             <span v-if="alert.chapter" class="alert-chapter">
               <i class="pi pi-book"></i>
               Cap. {{ alert.chapter }}
@@ -752,6 +790,13 @@ watch(() => props.alerts, () => {
   display: flex;
   align-items: center;
   gap: 0.25rem;
+}
+
+.filler-type-tag {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
 }
 
 .alert-chapter {

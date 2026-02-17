@@ -67,6 +67,24 @@ export type AlertCategory =
   | 'agreement'     // concordancia género/número
   | 'other'         // entity, other
 
+/** Tipo específico de alerta (issue_type del backend) */
+export type AlertIssueType =
+  | 'linguistic_filler'      // FillerDetector: muletillas catálogo prescriptivo
+  | 'overused_word'          // CrutchWordsDetector: muletillas análisis estadístico
+  | 'lexical_close'          // RepetitionDetector: repetición léxica cercana
+  | 'sentence_start'         // RepetitionDetector: inicio de oraciones repetido
+  | 'paragraph_start'        // RepetitionDetector: inicio de párrafos repetido
+  | 'gender_disagreement'    // AgreementDetector: discordancia género
+  | 'number_disagreement'    // AgreementDetector: discordancia número
+  | 'register_change'        // RegisterChangeDetector: cambio de registro
+  | 'pov_shift'              // POVDetector: cambio de POV
+  | 'sticky_sentence'        // StickySentenceDetector: oración pegajosa
+  | 'low_energy_sentence'    // SentenceEnergyDetector: oración baja energía
+  | 'typo'                   // SpellingChecker: error tipográfico
+  | 'misspelling'            // SpellingChecker: palabra mal escrita
+  | 'accent'                 // SpellingChecker: falta/sobra tilde
+  | string                   // Otros tipos no listados
+
 /** Alerta para uso en componentes */
 export interface Alert {
   id: number
@@ -74,6 +92,8 @@ export interface Alert {
   category: AlertCategory
   severity: AlertSeverity
   status: AlertStatus
+  /** Tipo específico de alerta (ej: linguistic_filler, overused_word) */
+  alertType: AlertIssueType
   title: string
   description: string
   explanation?: string
