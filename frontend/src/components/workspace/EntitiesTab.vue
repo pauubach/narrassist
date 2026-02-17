@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { watchDebounced } from '@vueuse/core'
 import { api } from '@/services/apiClient'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -131,41 +132,45 @@ watch(() => props.initialEntityId, async (entityId) => {
   }
 }, { immediate: true })
 
-// También cuando se cargan las entidades
-watch(() => props.entities, async (newEntities, oldEntities) => {
-  // Si hay una entidad seleccionada y las entidades cambiaron, refrescar atributos
-  // Esto es necesario después de un re-análisis
-  if (selectedEntity.value && newEntities.length > 0 && oldEntities && oldEntities.length > 0) {
-    const updatedEntity = newEntities.find(e => e.id === selectedEntity.value!.id)
-    if (updatedEntity) {
-      // Actualizar la referencia a la entidad con los nuevos datos
-      selectedEntity.value = updatedEntity
-      // Recargar atributos desde el backend
-      await loadEntityAttributes(updatedEntity.id)
-      // Recargar datos enriquecidos
-      await loadEntityRichData(updatedEntity.id)
-    } else {
-      // La entidad ya no existe, limpiar selección
-      selectedEntity.value = null
-      selectedEntityAttributes.value = []
-      entityRelationships.value = []
-      entityVitalStatus.value = null
-    }
-  }
-
-  // Selección inicial si viene de navegación
-  if (props.initialEntityId && props.initialEntityId !== lastAutoSelectedId.value && newEntities.length > 0 && !selectedEntity.value) {
-    const entity = newEntities.find(e => e.id === props.initialEntityId)
-    if (entity) {
-      lastAutoSelectedId.value = props.initialEntityId
-      await handleEntityClick(entity)
-      // Limpiar el query param de la URL si existe
-      if (route.query.entity) {
-        router.replace({ query: { ...route.query, entity: undefined } })
+// También cuando se cargan las entidades (con debounce para evitar cargas múltiples durante análisis)
+watchDebounced(
+  () => props.entities,
+  async (newEntities, oldEntities) => {
+    // Si hay una entidad seleccionada y las entidades cambiaron, refrescar atributos
+    // Esto es necesario después de un re-análisis
+    if (selectedEntity.value && newEntities.length > 0 && oldEntities && oldEntities.length > 0) {
+      const updatedEntity = newEntities.find(e => e.id === selectedEntity.value!.id)
+      if (updatedEntity) {
+        // Actualizar la referencia a la entidad con los nuevos datos
+        selectedEntity.value = updatedEntity
+        // Recargar atributos desde el backend
+        await loadEntityAttributes(updatedEntity.id)
+        // Recargar datos enriquecidos
+        await loadEntityRichData(updatedEntity.id)
+      } else {
+        // La entidad ya no existe, limpiar selección
+        selectedEntity.value = null
+        selectedEntityAttributes.value = []
+        entityRelationships.value = []
+        entityVitalStatus.value = null
       }
     }
-  }
-})
+
+    // Selección inicial si viene de navegación
+    if (props.initialEntityId && props.initialEntityId !== lastAutoSelectedId.value && newEntities.length > 0 && !selectedEntity.value) {
+      const entity = newEntities.find(e => e.id === props.initialEntityId)
+      if (entity) {
+        lastAutoSelectedId.value = props.initialEntityId
+        await handleEntityClick(entity)
+        // Limpiar el query param de la URL si existe
+        if (route.query.entity) {
+          router.replace({ query: { ...route.query, entity: undefined } })
+        }
+      }
+    }
+  },
+  { debounce: 500, maxWait: 2000 }
+)
 
 // Opciones de filtros
 const typeOptions = computed(() => {

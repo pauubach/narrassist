@@ -1,4 +1,5 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
+import { watchDebounced } from '@vueuse/core'
 import { defineStore } from 'pinia'
 
 /**
@@ -111,21 +112,27 @@ export const useRelationshipGraphStore = defineStore('relationshipGraph', () => 
   // Layout seleccionado
   const layoutType = ref<string>('forceAtlas2Based')
 
-  // Guardar filtros en localStorage cuando cambien (debounced)
-  let filterSaveTimer: ReturnType<typeof setTimeout> | null = null
-  watch(
+  // Guardar filtros en localStorage cuando cambien (debounced + requestIdleCallback)
+  // Performance optimization: evitar I/O síncrono que bloquea el hilo principal
+  watchDebounced(
     filters,
     (newFilters) => {
-      if (filterSaveTimer) clearTimeout(filterSaveTimer)
-      filterSaveTimer = setTimeout(() => {
+      const saveToStorage = () => {
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(newFilters))
         } catch (err) {
           console.warn('Error saving relationship graph filters to storage:', err)
         }
-      }, 300)
+      }
+
+      // Usar requestIdleCallback si está disponible (mejor performance)
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(saveToStorage, { timeout: 2000 })
+      } else {
+        saveToStorage()
+      }
     },
-    { deep: true }
+    { debounce: 500, maxWait: 2000, deep: true }
   )
 
   // Computed: verificar si hay filtros activos

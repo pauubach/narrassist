@@ -574,19 +574,32 @@ const originalDocumentName = computed(() => {
   return match ? match[1] : filename
 })
 
+// Map index para lookups O(1) (performance optimization)
+const entitiesById = computed(() =>
+  new Map(entities.value.map(e => [e.id, e]))
+)
+
+const alertsById = computed(() =>
+  new Map(alerts.value.map(a => [a.id, a]))
+)
+
+const chaptersById = computed(() =>
+  new Map(chapters.value.map(c => [c.id, c]))
+)
+
 const selectedEntity = computed(() => {
   if (selectionStore.primary?.type !== 'entity') return null
-  return entities.value.find(e => e.id === selectionStore.primary?.id) || null
+  return entitiesById.value.get(selectionStore.primary.id) || null
 })
 
 const selectedAlert = computed(() => {
   if (selectionStore.primary?.type !== 'alert') return null
-  return alerts.value.find(a => a.id === selectionStore.primary?.id) || null
+  return alertsById.value.get(selectionStore.primary.id) || null
 })
 
 const currentChapter = computed(() => {
   if (!activeChapterId.value) return null
-  return chapters.value.find(c => c.id === activeChapterId.value) || null
+  return chaptersById.value.get(activeChapterId.value) || null
 })
 
 const showChapterInspector = computed(() => {
@@ -1133,19 +1146,21 @@ watch(() => workspaceStore.activeTab, async (newTab) => {
   // Si navegamos a 'text' y hay un scroll pendiente, asegurar que los capítulos estén cargados
   if (newTab === 'text' && workspaceStore.scrollToPosition !== null) {
     console.log('[ProjectDetailView] Navigating to text with pending scroll, ensuring chapters loaded...')
-    await loadChapters(project.value.id, project.value)
+    await loadChapters(project.value.id, project.value)  // Usa cache si ya están cargados
   }
 
-  if (newTab === 'relationships' && (!relationships.value || relationships.value.length === 0)) {
-    await loadEntities(project.value.id)
-    await loadRelationships(project.value.id)
+  // Cargas lazy con cache para otros tabs
+  if (newTab === 'relationships') {
+    await loadEntities(project.value.id)  // Usa cache si ya están cargadas
+    await loadRelationships(project.value.id)  // Usa cache si ya están cargadas
   }
 })
 
 // Cachear stats de alertas para métricas globales (HomeView)
-watch(alerts, (newAlerts) => {
-  if (project.value && newAlerts.length > 0) {
-    updateProjectStats(project.value.id, project.value.name, newAlerts)
+// Guard: solo watch el length, no el array completo (performance optimization)
+watch(() => alerts.value.length, (newLength, oldLength) => {
+  if (project.value && newLength > 0 && newLength !== oldLength) {
+    updateProjectStats(project.value.id, project.value.name, alerts.value)
   }
 })
 
