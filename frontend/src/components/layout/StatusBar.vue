@@ -656,6 +656,15 @@ function toggleDetails() {
 .step-icon {
   width: 1.25rem;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Asegurar que el spinner esté perfectamente centrado */
+.step-icon i.pi-spinner {
+  display: inline-block;
+  transform-origin: center center;
 }
 
 .step-content {
