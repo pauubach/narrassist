@@ -709,7 +709,18 @@ class EventDetector:
 
         logger.debug(f"Fase Heurística: {len(heuristic_events)} eventos detectados")
 
-        # Fase 3: Detectores LLM (opcional, más lentos)
+        # Fase 3: Detectores Tier 2 (Enriquecimiento narrativo)
+        tier2_events = []
+        if self.nlp:
+            # Import lazy para evitar ciclo circular
+            from .event_detection_tier2 import detect_tier2_events
+
+            doc = self.nlp(text)
+            tier2_events = detect_tier2_events(doc, text)
+            events.extend(tier2_events)
+            logger.debug(f"Fase Tier 2: {len(tier2_events)} eventos detectados")
+
+        # Fase 4: Detectores LLM (opcional, más lentos)
         if self.enable_llm:
             # TODO: Implementar detectores LLM para BETRAYAL, ALLIANCE, REVELATION, DECISION
             llm_events = []

@@ -174,9 +174,10 @@ class SpeechMetricsDBCache:
 
             conn.commit()
 
-            logger.debug(
-                f"Cache SET: char={character_id}, "
-                f"window={window_start_chapter}-{window_end_chapter}"
+            logger.info(
+                f"[DB_CACHE] SET: char={character_id}, "
+                f"window={window_start_chapter}-{window_end_chapter}, "
+                f"fp={document_fingerprint[:16]}..."
             )
 
     def invalidate_by_fingerprint(self, old_fingerprint: str) -> int:

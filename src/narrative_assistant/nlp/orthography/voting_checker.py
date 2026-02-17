@@ -996,6 +996,41 @@ class PatternVoter(BaseVoter):
         # Redundancias y pleonasmos
         (r"\b(subir\s+arriba|bajar\s+abajo|salir\s+afuera|entrar\s+adentro)\b", "redundancy", []),
         (r"\b(mas\s+mejor|mas\s+peor|mas\s+mayor|mas\s+menor)\b", "redundancy", []),
+        (r"\b(volver\s+a\s+regresar)\b", "redundancy", ["volver", "regresar"]),
+
+        # ============================================================================
+        # NOTA: Detección semántica de "riegos vs riesgos" ahora se hace en
+        # semantic_checker.py con análisis contextual más robusto
+        # ============================================================================
+
+        # ============================================================================
+        # FASE 2 - Medio Plazo (Panel de Expertos 2026-02)
+        # ============================================================================
+
+        # Repetición de palabras no funcionales (casa casa, libro libro, etc.)
+        # Patrón: palabra de 4+ letras repetida inmediatamente
+        (r"\b([a-záéíóúüñ]{4,})\s+\1\b", "repetition", []),
+
+        # Dequeísmo: "de que" innecesario con verbos de pensamiento
+        (r"\b(pienso|creo|opino|considero|parece|supongo|imagino|entiendo)\s+de\s+que\b",
+         "dequeismo", []),
+
+        # Queísmo: falta "de" con verbos pronominales
+        (r"\b(me\s+acuerdo|te\s+acuerdas|se\s+acuerda|me\s+olvid[oóaé]|te\s+alegras?|se\s+alegr[aóaé])\s+que\b",
+         "queismo", ["de que"]),
+
+        # Números 1-10 en cifras (solo en contexto narrativo, no técnico)
+        # Este patrón es básico, idealmente requiere análisis de contexto
+        (r"\b([1-9])\s+(personas?|niños?|hombres?|mujeres?|amigos?|hijos?|días?|años?|veces)\b",
+         "style", []),
+
+        # Gerundios excesivos: 3+ gerundios en ventana de 30 palabras
+        # Patrón: detecta cadenas de gerundios
+        # NOTA: Este patrón es simplificado. La implementación completa requeriría
+        # análisis morfológico con spaCy para contar gerundios en ventana deslizante
+        (r"(\w+ndo)\s+\S+\s+\S+\s+(\w+ndo)\s+\S+\s+\S+\s+(\w+ndo)",
+         "style", []),
+
         # Palabras comúnmente mal escritas
         (r"\b(atravez|atraves)\b", "other", ["a través"]),
         (r"\b(enserio|encerio)\b", "other", ["en serio"]),

@@ -90,6 +90,19 @@ class SpeechTracker:
 
         # 2. Calcular métricas para cada ventana (con cache DB v0.10.14)
         windows_with_metrics = []
+
+        # DEBUG: Verificar si cache está habilitado
+        if document_fingerprint:
+            logger.debug(
+                f"[CACHE] Using DB cache for {character_name}, "
+                f"fingerprint={document_fingerprint[:16]}..."
+            )
+        else:
+            logger.warning(
+                f"[CACHE] NO fingerprint provided for {character_name}, "
+                f"cache will NOT work (re-analysis will be slow)"
+            )
+
         for window in windows:
             metrics = SpeechMetrics.calculate(
                 window.dialogues,

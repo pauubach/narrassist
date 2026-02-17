@@ -361,6 +361,27 @@ SPELLING_PATTERNS = [
     (r"([!?])\1+", SpellingErrorType.TYPO, "Puntuación duplicada"),
     # Coma o punto seguido de letra sin espacio
     (r"[,.](?=[a-záéíóúñ])", SpellingErrorType.TYPO, "Falta espacio después de puntuación"),
+
+    # ============================================================================
+    # QUICK WINS - Panel de Expertos (2026-02)
+    # ============================================================================
+
+    # 1. "etc..." - redundancia (etc. + puntos suspensivos)
+    # Consenso: Alta prioridad, 0% falsos positivos
+    (r'\b(etc|etcétera)\.{2,}', SpellingErrorType.TYPO, 'Redundancia: "etc." ya implica continuación (usar "etc." o "...")'),
+    (r'\b(etc|etcétera)\.\s*\.{2,}', SpellingErrorType.TYPO, 'Redundancia: "etc." ya implica continuación (usar "etc." o "...")'),
+
+    # 2. Espacio antes de puntuación (excepto apertura ¿ ¡)
+    # Consenso: Alta prioridad, <1% falsos positivos
+    (r'\s+([,;:!?)\]])', SpellingErrorType.TYPO, 'Espacio antes de puntuación (debe eliminarse)'),
+
+    # 3. Redundancias espaciales comunes
+    # Consenso: Alta prioridad, <2% falsos positivos
+    (r'\bsubir\s+arriba\b', SpellingErrorType.REDUNDANCY, 'Redundancia: "subir arriba" (usar solo "subir")'),
+    (r'\bbajar\s+abajo\b', SpellingErrorType.REDUNDANCY, 'Redundancia: "bajar abajo" (usar solo "bajar")'),
+    (r'\bsalir\s+(?:a\s+)?fuera\b', SpellingErrorType.REDUNDANCY, 'Redundancia: "salir fuera" (usar solo "salir")'),
+    (r'\bentrar\s+(?:a\s+)?dentro\b', SpellingErrorType.REDUNDANCY, 'Redundancia: "entrar dentro" (usar solo "entrar")'),
+    (r'\bvolver\s+a\s+regresar\b', SpellingErrorType.REDUNDANCY, 'Redundancia: "volver a regresar" (usar solo "volver" o "regresar")'),
 ]
 
 
@@ -455,12 +476,20 @@ class SpellingChecker:
             for issue in dict_issues:
                 report.add_issue(issue)
 
-            # Fase 2: Patrones regex (0.3 - 0.5)
+            # Fase 2: Patrones regex (0.3 - 0.4)
             if progress_callback:
                 progress_callback(0.3, "Buscando patrones de error...")
 
             pattern_issues = self._check_patterns(text)
             for issue in pattern_issues:
+                report.add_issue(issue)
+
+            # Fase 2.5: Errores semánticos (palabras correctas fuera de contexto) (0.4 - 0.5)
+            if progress_callback:
+                progress_callback(0.4, "Analizando contexto semántico...")
+
+            semantic_issues = self._check_semantic(text)
+            for issue in semantic_issues:
                 report.add_issue(issue)
 
             # Fase 3: Errores comunes en español (0.5 - 0.7)
@@ -597,6 +626,23 @@ class SpellingChecker:
                 )
 
         return issues
+
+    def _check_semantic(self, text: str) -> list[SpellingIssue]:
+        """
+        Detectar errores semánticos (palabras correctas fuera de contexto).
+
+        Usa semantic_checker para detectar confusiones como:
+        - "riegos de seguridad" (debería ser "riesgos")
+        - "actitud necesaria" (debería ser "aptitud")
+        - etc.
+        """
+        try:
+            from .semantic_checker import check_semantic_context
+
+            return check_semantic_context(text)
+        except Exception as e:
+            logger.warning(f"Error en verificación semántica: {e}")
+            return []
 
     def _check_common_errors(self, text: str, known_words: set[str]) -> list[SpellingIssue]:
         """Buscar errores comunes en español."""

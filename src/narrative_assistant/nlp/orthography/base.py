@@ -19,6 +19,12 @@ class SpellingErrorType(Enum):
     REPEATED_CHAR = "repeated_char"  # Caracteres repetidos (holaaa)
     FOREIGN_WORD = "foreign_word"  # Palabra extranjera sin marcar
     OCR_ERROR = "ocr_error"  # Error típico de OCR (rn→m, l→1)
+    REDUNDANCY = "redundancy"  # Redundancias (subir arriba, etc...)
+    REPETITION = "repetition"  # Repetición de palabras (casa casa)
+    SEMANTIC = "semantic"  # Error semántico (riegos de seguridad)
+    DEQUEISMO = "dequeismo"  # "pienso de que" (de que innecesario)
+    QUEISMO = "queismo"  # "me acuerdo que" (falta de)
+    STYLE = "style"  # Sugerencia de estilo (no error estricto)
 
 
 class SpellingSeverity(Enum):
