@@ -162,11 +162,14 @@ def get_project(project_id: int):
 
         project = result.value
 
-        # Verificar si el estado "analyzing" está atascado (no hay análisis real en progreso)
-        # Esto puede ocurrir si el servidor se reinició durante un análisis
+        # Verificar si el estado está atascado (no hay análisis real en progreso)
+        # Esto puede ocurrir si:
+        # - El servidor se reinició durante un análisis
+        # - El análisis fue cancelado pero el estado no se limpió correctamente
+        # - El análisis está en cola pero el proceso murió
         # NOTA: 'pending' NO se incluye aquí porque es el estado inicial legítimo
         # de un proyecto recién creado que aún no ha sido analizado.
-        if project.analysis_status in ['analyzing', 'in_progress']:
+        if project.analysis_status in ['analyzing', 'in_progress', 'queued', 'cancelled']:
             # Si no hay análisis activo en memoria, el estado está atascado
             with deps._progress_lock:
                 has_active = project_id in deps.analysis_progress_storage

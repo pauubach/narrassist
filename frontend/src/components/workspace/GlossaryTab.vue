@@ -154,13 +154,24 @@ const stats = computed(() => {
 })
 
 // Cargar entradas al montar
-onMounted(() => {
-  loadEntries()
+onMounted(async () => {
+  await loadEntries()
+
+  // Auto-cargar sugerencias si el glosario está vacío
+  // Las sugerencias se cargan desde cache (pre-construidas durante análisis)
+  if (entries.value.length === 0) {
+    await loadSuggestions()
+  }
 })
 
 // Recargar si cambia el proyecto
-watch(() => props.projectId, () => {
-  loadEntries()
+watch(() => props.projectId, async () => {
+  await loadEntries()
+
+  // Auto-cargar sugerencias si el glosario está vacío
+  if (entries.value.length === 0) {
+    await loadSuggestions()
+  }
 })
 
 async function loadEntries() {
@@ -572,17 +583,28 @@ defineExpose({ focusSearch })
     <!-- Lista de términos -->
     <div class="glossary-tab__content">
       <DsEmptyState
-        v-if="!loading && entries.length === 0"
-        icon="pi pi-book"
+        v-if="!loading && entries.length === 0 && !showSuggestions"
+        icon="pi pi-sparkles"
         title="Glosario vacío"
-        description="Añade términos propios de tu manuscrito: personajes, lugares inventados, términos técnicos, etc."
+        description="Puedes añadir términos manualmente o usar la detección automática para encontrar personajes, lugares inventados y términos técnicos."
       >
         <template #action>
-          <Button
-            label="Añadir primer término"
-            icon="pi pi-plus"
-            @click="openNewEntryDialog"
-          />
+          <div class="glossary-tab__empty-actions">
+            <Button
+              label="✨ Detectar términos automáticamente"
+              icon="pi pi-sparkles"
+              severity="help"
+              :loading="loadingSuggestions"
+              @click="loadSuggestions"
+            />
+            <Button
+              label="Añadir término manual"
+              icon="pi pi-plus"
+              severity="secondary"
+              outlined
+              @click="openNewEntryDialog"
+            />
+          </div>
         </template>
       </DsEmptyState>
 
@@ -906,6 +928,13 @@ defineExpose({ focusSearch })
 .glossary-tab__content {
   flex: 1;
   overflow: hidden;
+}
+
+.glossary-tab__empty-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+  align-items: center;
 }
 
 .glossary-tab__table {

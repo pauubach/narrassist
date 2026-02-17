@@ -10,7 +10,7 @@
 | **Alertas** | ✅ SÍ | `alerts` | ✅ OK |
 | **Timeline** | ✅ SÍ (con fix) | `timeline` | ✅ OK (con fix) |
 | **Estilo** | ⚠️ MIXTO | Varias fases | ⚠️ REVISAR |
-| **Glosario** | ⚠️ MANUAL | Usuario | ⚠️ N/A |
+| **Glosario** | ✅ SÍ (FIXED) | `glossary_suggestions` | ✅ OK (con fix) |
 | **Resumen** | ✅ SÍ | `completion` | ✅ OK |
 
 ---
@@ -110,16 +110,28 @@
 
 ---
 
-## 7. Tab GLOSARIO ⚠️
+## 7. Tab GLOSARIO ✅ (FIXED)
 
-**Endpoint**: `/api/projects/{id}/glossary`
+**Endpoint Principal**: `/api/projects/{id}/glossary` (entradas manuales)
 
-**Fuente de datos**: Tabla `glossary` (BD)
+**Endpoint de Sugerencias**: `/api/projects/{id}/glossary/suggestions`
 
-**Construcción**: ⚠️ **MANUAL por el usuario**
-- No se construye automáticamente durante análisis
-- El usuario crea entradas manualmente
-- ✅ **OK** - Es contenido editorial, no analítico
+**Fuente de datos**:
+- Tabla `glossary` (BD) - Entradas manuales del usuario
+- Cache `enrichment_cache` (type: `glossary_suggestions`) - Sugerencias automáticas
+
+**Construcción**: Fase `glossary_suggestions` (línea ~2075 en `_analysis_phases.py`)
+- Extrae términos candidatos automáticamente:
+  - Nombres propios no comunes (personajes, lugares inventados)
+  - Términos técnicos (acrónimos, terminología especializada)
+  - Neologismos (palabras inventadas para fantasía/ciencia ficción)
+  - Entidades del NER con frecuencia significativa
+- Persiste sugerencias en `enrichment_cache`
+- ✅ **Pre-construido durante análisis**
+- **UI mejorada**: Auto-carga sugerencias al abrir tab si el glosario está vacío
+- **Duración**: ~2-5 segundos
+
+**Fix aplicado**: Agregada fase `glossary_suggestions` al pipeline después de `relationships`
 
 ---
 
@@ -153,8 +165,9 @@
 
 1. ✅ **Entidades** - Fix aplicado (entities_found timing)
 2. ✅ **Timeline** - Fix aplicado (fase timeline agregada)
-3. ❌ **Relaciones** - **PENDIENTE**: Agregar fase al pipeline
-4. ⚠️ **Estilo** - **REVISAR**: Verificar análisis de registro/emociones
+3. ✅ **Relaciones** - Fix aplicado (fase relationships agregada)
+4. ✅ **Glosario** - Fix aplicado (fase glossary_suggestions agregada)
+5. ⚠️ **Estilo** - **REVISAR**: Verificar análisis de registro/emociones
 
 ---
 

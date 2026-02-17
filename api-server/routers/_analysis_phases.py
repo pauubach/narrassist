@@ -3333,11 +3333,14 @@ def handle_analysis_error(ctx: dict, error: Exception):
             storage["status"] = "cancelled"
             storage["current_phase"] = "Análisis cancelado por el usuario"
         try:
-            project.analysis_status = "cancelled"
+            # Resetear a 'pending' para permitir re-análisis inmediato
+            project.analysis_status = "pending"
+            project.analysis_progress = 0.0
             proj_manager = ProjectManager(ctx["db_session"])
             proj_manager.update(project)
+            logger.info(f"Project {project_id} status reset to 'pending' after cancellation")
         except Exception as db_error:
-            logger.error(f"Failed to update project status to cancelled: {db_error}")
+            logger.error(f"Failed to update project status after cancellation: {db_error}")
         return
 
     logger.exception(f"Error during analysis for project {project_id}: {error}")
