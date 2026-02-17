@@ -14,7 +14,6 @@ from narrative_assistant.nlp.dialogue_config_mapper import (
     map_dialogue_preference_to_correction_config,
 )
 
-
 # =============================================================================
 # Tests de mapeo correction_config → dialogue_preference
 # =============================================================================

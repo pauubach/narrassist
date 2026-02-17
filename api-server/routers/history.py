@@ -14,10 +14,8 @@ Endpoints:
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Query
-
-import deps
 from deps import ApiResponse
+from fastapi import APIRouter, Query
 
 logger = logging.getLogger(__name__)
 

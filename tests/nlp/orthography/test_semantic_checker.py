@@ -4,12 +4,12 @@ Tests para el corrector semántico genérico.
 
 import pytest
 
+from narrative_assistant.nlp.orthography.base import SpellingErrorType
 from narrative_assistant.nlp.orthography.semantic_checker import (
+    CONFUSION_PAIRS,
     SemanticChecker,
     check_semantic_context,
-    CONFUSION_PAIRS,
 )
-from narrative_assistant.nlp.orthography.base import SpellingErrorType
 
 
 class TestSemanticChecker:

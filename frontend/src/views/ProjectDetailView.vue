@@ -1078,14 +1078,9 @@ const onNavigateToEvent = (startChar: number, endChar: number) => {
 
   const chapterId = currentChapter.value.id
 
-  // Clear existing highlights and set new position
+  // Clear existing highlights and navigate to event position
   workspaceStore.clearAlertHighlights()
-  workspaceStore.scrollToPosition = { chapterId, startChar, endChar }
-
-  // Ensure we're in text tab
-  if (workspaceStore.activeTab !== 'text') {
-    workspaceStore.setActiveTab('text')
-  }
+  workspaceStore.navigateToTextPosition(startChar, undefined, chapterId)
 }
 
 // TextSelectionInspector handlers

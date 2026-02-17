@@ -38,13 +38,7 @@ export async function getChapterEvents(
   projectId: number,
   chapterNumber: number
 ): Promise<ChapterEventsResponse> {
-  const response = await api.getRaw<ChapterEventsResponse>(
+  return await api.getChecked<ChapterEventsResponse>(
     `/api/projects/${projectId}/chapters/${chapterNumber}/events`
   )
-
-  if (!response.success) {
-    throw new Error(response.error || 'Error obteniendo eventos del capítulo')
-  }
-
-  return response.data as ChapterEventsResponse
 }

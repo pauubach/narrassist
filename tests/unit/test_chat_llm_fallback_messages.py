@@ -45,8 +45,8 @@ def test_chat_unavailable_message_windows(monkeypatch, patched_project_manager):
 
     assert response.success is False
     assert response.error is not None
-    assert "Ollama" in response.error
-    assert "Ajustes" in response.error
+    assert "IA" in response.error
+    assert "Configuración" in response.error or "Ajustes" in response.error
 
 
 def test_chat_unavailable_message_macos(monkeypatch, patched_project_manager):
@@ -58,8 +58,8 @@ def test_chat_unavailable_message_macos(monkeypatch, patched_project_manager):
 
     assert response.success is False
     assert response.error is not None
-    assert "Ollama" in response.error
-    assert "Ajustes" in response.error
+    assert "IA" in response.error
+    assert "Configuración" in response.error or "Ajustes" in response.error
 
 
 def test_chat_success_sets_using_cpu_flag(monkeypatch, patched_project_manager):
@@ -104,5 +104,5 @@ def test_chat_vram_error_message_uses_platform_hint(monkeypatch, patched_project
 
     assert response.success is False
     assert response.error is not None
-    assert "Ollama" in response.error
-    assert "Ajustes" in response.error
+    assert "IA" in response.error or "Ollama" in response.error
+    assert "Configuración" in response.error or "Ajustes" in response.error

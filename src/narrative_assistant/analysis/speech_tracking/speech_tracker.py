@@ -5,9 +5,9 @@ SpeechTracker - Coordinador principal de detección de cambios de habla.
 import logging
 from typing import Optional
 
-from .speech_window import SpeechWindow, create_sliding_windows
-from .metrics import SpeechMetrics
 from .change_detector import ChangeDetector
+from .metrics import SpeechMetrics
+from .speech_window import SpeechWindow, create_sliding_windows
 from .types import SpeechChangeAlert
 
 logger = logging.getLogger(__name__)
@@ -172,7 +172,7 @@ class SpeechTracker:
         # Detectar cambios en cada métrica
         changes = {}
 
-        for metric_name in metrics1.keys():
+        for metric_name in metrics1:
             value1 = metrics1[metric_name]
             value2 = metrics2[metric_name]
 

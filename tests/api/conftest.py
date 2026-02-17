@@ -4,16 +4,18 @@ Fixtures para tests de API.
 Proporciona TestClient de FastAPI y fixtures de datos de prueba.
 """
 
-import pytest
-from fastapi.testclient import TestClient
+# Import the FastAPI app
+import sys
 from pathlib import Path
 from unittest.mock import Mock
 
-# Import the FastAPI app
-import sys
+import pytest
+from fastapi.testclient import TestClient
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "api-server"))
 
 from main import app
+
 from narrative_assistant.persistence.database import Database
 from narrative_assistant.persistence.project import Project, ProjectManager
 

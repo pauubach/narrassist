@@ -47,7 +47,7 @@ class DialogueStyleChecker:
             Preferencia (dash, guillemets, quotes, quotes_typographic, no_check) o None
         """
         with self.db.connection() as conn:
-            conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+            conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=False))
             row = conn.execute(
                 "SELECT settings_json FROM projects WHERE id = ?",
                 (project_id,),

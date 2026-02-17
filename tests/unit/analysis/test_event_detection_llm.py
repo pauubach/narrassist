@@ -10,14 +10,15 @@ Valida detección de eventos complejos usando Ollama:
 Usa mocks para no depender de Ollama en tests.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from narrative_assistant.analysis.event_detection_llm import (
-    BetrayalDetector,
     AllianceDetector,
-    RevelationDetector,
+    BetrayalDetector,
     DecisionDetector,
+    RevelationDetector,
     detect_llm_tier1_events,
 )
 from narrative_assistant.analysis.event_types import EventType

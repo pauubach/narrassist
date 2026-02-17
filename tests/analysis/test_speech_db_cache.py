@@ -8,17 +8,18 @@ Valida:
 - Migration desde v0.10.13
 """
 
-import pytest
+import sqlite3
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from narrative_assistant.analysis.speech_tracking.db_cache import (
     SpeechMetricsDBCache,
-    get_db_cache,
     clear_db_cache,
+    get_db_cache,
 )
 from narrative_assistant.persistence.database import Database
-
 
 # =============================================================================
 # Fixtures
@@ -389,7 +390,7 @@ def test_cache_with_null_fingerprint_fails_gracefully(cache, sample_metrics):
     """Fingerprint NULL falla (UNIQUE constraint)."""
     # Nota: SQLite permite NULL en UNIQUE, pero nuestro schema usa NOT NULL
     # Este test verifica que si se pasa None, falla
-    with pytest.raises(Exception):  # Debería ser IntegrityError
+    with pytest.raises(sqlite3.IntegrityError):
         cache.set(
             1,
             1,

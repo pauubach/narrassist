@@ -16,11 +16,10 @@ from collections import Counter
 from datetime import datetime
 from typing import Literal, Optional
 
-from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import StreamingResponse
-
 import deps
 from deps import ApiResponse
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +78,8 @@ def export_events(
             ]
 
         # Detectar eventos en todos los capítulos
-        from narrative_assistant.nlp.spacy_gpu import load_spacy_model
         from narrative_assistant.analysis.event_detection import detect_events_in_chapter
+        from narrative_assistant.nlp.spacy_gpu import load_spacy_model
 
         nlp = load_spacy_model()
         all_events = []
@@ -137,7 +136,7 @@ def export_events(
 
 def _apply_event_filters(events, tier_filter, event_types_str, critical_only):
     """Aplica filtros a lista de eventos."""
-    from narrative_assistant.analysis.event_types import EVENT_TIER_MAP, EventTier
+    from narrative_assistant.analysis.event_types import EVENT_TIER_MAP
 
     filtered = events
 
@@ -322,8 +321,8 @@ def get_event_stats(project_id: int):
             })
 
         # Detectar eventos
-        from narrative_assistant.nlp.spacy_gpu import load_spacy_model
         from narrative_assistant.analysis.event_detection import detect_events_in_chapter
+        from narrative_assistant.nlp.spacy_gpu import load_spacy_model
 
         nlp = load_spacy_model()
         events_by_chapter = {}

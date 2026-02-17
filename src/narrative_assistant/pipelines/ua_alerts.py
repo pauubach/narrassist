@@ -920,7 +920,7 @@ class PipelineAlertsMixin:
             logger.warning(f"Alert generation failed: {e}")
 
     @staticmethod
-    def _map_speech_severity(severity_str: str) -> "AlertSeverity":
+    def _map_speech_severity(severity_str: str) -> AlertSeverity:
         """Mapea severidad de speech alert a AlertSeverity del sistema."""
         from ..alerts.types import AlertSeverity
 

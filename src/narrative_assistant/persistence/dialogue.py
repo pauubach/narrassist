@@ -180,7 +180,7 @@ class DialogueRepository:
             Lista de diálogos ordenados por chapter_id, start_char
         """
         with self.db.connection() as conn:
-            conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+            conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=False))
             rows = conn.execute(
                 """
                 SELECT * FROM dialogues
@@ -204,7 +204,7 @@ class DialogueRepository:
             Lista de diálogos del tipo especificado
         """
         with self.db.connection() as conn:
-            conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+            conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=False))
             rows = conn.execute(
                 """
                 SELECT * FROM dialogues
@@ -231,7 +231,7 @@ class DialogueRepository:
             Lista de diálogos que no son del tipo especificado
         """
         with self.db.connection() as conn:
-            conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+            conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=False))
             rows = conn.execute(
                 """
                 SELECT * FROM dialogues

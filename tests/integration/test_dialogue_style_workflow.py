@@ -10,6 +10,7 @@ Cubre el flujo end-to-end:
 """
 
 import json
+
 import pytest
 
 from narrative_assistant.nlp.dialogue import detect_dialogues

@@ -991,7 +991,9 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
 
         # S16b: Inicializar dialogue_style_preference desde correction_config
         try:
-            from narrative_assistant.nlp.dialogue_config_mapper import map_correction_config_to_dialogue_preference
+            from narrative_assistant.nlp.dialogue_config_mapper import (
+                map_correction_config_to_dialogue_preference,
+            )
             from narrative_assistant.persistence.project import ProjectManager
 
             proj_manager = ProjectManager(db_session)
@@ -2882,8 +2884,8 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
         _update_storage(project_id, current_action="Analizando consistencia del habla...")
         try:
             from narrative_assistant.analysis.speech_tracking import (
-                SpeechTracker,
                 ContextualAnalyzer,
+                SpeechTracker,
             )
             from narrative_assistant.entities.models import EntityType
 

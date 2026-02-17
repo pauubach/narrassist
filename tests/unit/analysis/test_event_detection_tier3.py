@@ -27,26 +27,27 @@ Universal:
 Usa mocks para no depender de Ollama en tests.
 """
 
-import pytest
 from unittest.mock import patch
 
+import pytest
+
 from narrative_assistant.analysis.event_detection_tier3 import (
-    GenericLLMDetector,
-    detect_tier3_events,
-    detect_knowledge_transfer,
-    CLUE_DISCOVERY_PROMPT,
-    RED_HERRING_PROMPT,
-    DANGER_ESCALATION_PROMPT,
-    CHASE_START_PROMPT,
-    MAGIC_USE_PROMPT,
-    PROPHECY_PROMPT,
-    WORLD_BUILDING_PROMPT,
-    PORTAL_CROSSING_PROMPT,
-    ROMANTIC_TENSION_PROMPT,
-    LOVE_DECLARATION_PROMPT,
     BREAKUP_PROMPT,
-    RECONCILIATION_PROMPT,
+    CHASE_START_PROMPT,
+    CLUE_DISCOVERY_PROMPT,
+    DANGER_ESCALATION_PROMPT,
     KNOWLEDGE_TRANSFER_PROMPT,
+    LOVE_DECLARATION_PROMPT,
+    MAGIC_USE_PROMPT,
+    PORTAL_CROSSING_PROMPT,
+    PROPHECY_PROMPT,
+    RECONCILIATION_PROMPT,
+    RED_HERRING_PROMPT,
+    ROMANTIC_TENSION_PROMPT,
+    WORLD_BUILDING_PROMPT,
+    GenericLLMDetector,
+    detect_knowledge_transfer,
+    detect_tier3_events,
 )
 from narrative_assistant.analysis.event_types import EventType
 

@@ -2,9 +2,9 @@
 SpeechWindow - Ventana temporal de diálogos de un personaje.
 """
 
+import logging
 from dataclasses import dataclass
 from typing import Optional
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +131,7 @@ class SpeechWindow:
 
         # Fallback: Extracción básica basada en menciones
         if not dialogues and hasattr(chapter, "text"):
-            dialogues = cls._extract_dialogues_by_proximity(
+            dialogues = SpeechWindow._extract_dialogues_by_proximity(
                 chapter.text, character_name
             )
 

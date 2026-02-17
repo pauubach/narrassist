@@ -1034,7 +1034,7 @@ def search_similar_text(
 
         # Filtrar por umbral y ordenar
         matches = []
-        for i, (chunk, score) in enumerate(zip(chunks, similarities)):
+        for i, (chunk, score) in enumerate(zip(chunks, similarities, strict=False)):
             if score >= min_similarity:
                 matches.append({
                     "text": chunk.text,

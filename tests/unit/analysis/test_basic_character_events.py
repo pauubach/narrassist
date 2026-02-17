@@ -14,8 +14,8 @@ import pytest
 
 from narrative_assistant.analysis.event_detection_tier2 import (
     BasicCharacterEventsDetector,
-    PowerShiftDetector,
     ChapterBoundaryDetector,
+    PowerShiftDetector,
 )
 from narrative_assistant.analysis.event_types import EventType
 

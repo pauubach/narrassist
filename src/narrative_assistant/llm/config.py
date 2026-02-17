@@ -468,10 +468,6 @@ def estimate_analysis_time(
     Returns:
         Dict con min_seconds, max_seconds, description
     """
-    # Tokens estimados por palabra (prompt + respuesta)
-    tokens_per_word = 2.5
-    # total_tokens = word_count * tokens_per_word  # noqa: F841
-
     # Número de tareas LLM × slots por nivel
     num_tasks = len(AnalysisTask)
     slots_per_level = {QualityLevel.RAPIDA: 1, QualityLevel.COMPLETA: 2, QualityLevel.EXPERTA: 3}

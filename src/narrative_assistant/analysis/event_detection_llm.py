@@ -260,7 +260,6 @@ class BetrayalDetector(LLMEventDetector):
         """
         words = text.split()
         chunks = []
-        start = 0
 
         for i in range(0, len(words), max_words):
             chunk_words = words[i:i + max_words]

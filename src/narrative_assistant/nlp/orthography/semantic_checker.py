@@ -20,20 +20,19 @@ Ejemplos:
 - "Espero que allá gente" → "Espero que haya gente" (adverbio vs verbo haber)
 """
 
-import re
 import logging
+import re
 from dataclasses import dataclass
 from typing import Optional
 
 try:
-    from sentence_transformers import SentenceTransformer
     import numpy as np
+    from sentence_transformers import SentenceTransformer
     EMBEDDINGS_AVAILABLE = True
 except ImportError:
     EMBEDDINGS_AVAILABLE = False
 
-from .base import SpellingErrorType, SpellingIssue, SpellingSeverity, DetectionMethod
-
+from .base import DetectionMethod, SpellingErrorType, SpellingIssue, SpellingSeverity
 
 logger = logging.getLogger(__name__)
 

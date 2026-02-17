@@ -5,14 +5,14 @@ Cubre casos extremos, situaciones reales y escenarios complejos.
 """
 
 import pytest
+
 from narrative_assistant.analysis.speech_tracking import (
-    SpeechWindow,
+    ContextualAnalyzer,
     SpeechMetrics,
     SpeechTracker,
-    ContextualAnalyzer,
+    SpeechWindow,
     create_sliding_windows,
 )
-
 
 # =============================================================================
 # Fixtures Avanzados

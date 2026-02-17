@@ -20,7 +20,6 @@ from narrative_assistant.persistence.history import (  # noqa: E402
     UndoResult,
 )
 
-
 # ─── Helpers ──────────────────────────────────────────────────────────
 
 def _make_entry(**kwargs) -> HistoryEntry:

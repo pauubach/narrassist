@@ -17,13 +17,12 @@ import sqlite3
 import pytest
 
 from narrative_assistant.persistence.history import (  # noqa: E402
+    UNDOABLE_ACTIONS,
     ChangeType,
     HistoryEntry,
     HistoryManager,
-    UNDOABLE_ACTIONS,
     UndoResult,
 )
-
 
 # ─── Fixture: DB en memoria con schema completo ────────────────────────
 

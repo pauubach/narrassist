@@ -1030,7 +1030,7 @@ class PipelineConsistencyMixin:
         v0.10.13: Character Speech Consistency Tracking
         """
         try:
-            from ..analysis.speech_tracking import SpeechTracker, ContextualAnalyzer
+            from ..analysis.speech_tracking import ContextualAnalyzer, SpeechTracker
 
             tracker = SpeechTracker(
                 window_size=3,  # 3 capítulos por ventana

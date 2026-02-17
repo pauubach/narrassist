@@ -732,7 +732,7 @@ class EventDetector:
         # Fase 5: Detectores Tier 3 (especialización por género, LLM)
         tier3_events = []
         if self.enable_llm:
-            from .event_detection_tier3 import detect_tier3_events, detect_knowledge_transfer
+            from .event_detection_tier3 import detect_knowledge_transfer, detect_tier3_events
 
             doc_for_tier3 = self.nlp(text) if self.nlp else None
             tier3_events = detect_tier3_events(text, doc=doc_for_tier3)

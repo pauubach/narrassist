@@ -5,16 +5,16 @@ Valida funcionalidad básica sin dependencias pesadas.
 """
 
 import pytest
+
 from narrative_assistant.analysis.speech_tracking import (
-    SpeechWindow,
-    SpeechMetrics,
     ChangeDetector,
-    SpeechTracker,
     ContextualAnalyzer,
+    SpeechMetrics,
+    SpeechTracker,
+    SpeechWindow,
     create_sliding_windows,
 )
 from narrative_assistant.analysis.speech_tracking.types import MetricChangeResult
-
 
 # =============================================================================
 # Fixtures

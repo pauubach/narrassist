@@ -376,8 +376,12 @@ def update_project_correction_config(
         # S16: Sincronizar dialogue_style_preference con correction_config
         dialogue_alerts = 0
         try:
-            from narrative_assistant.nlp.dialogue_config_mapper import map_correction_config_to_dialogue_preference
-            from narrative_assistant.nlp.dialogue_preference_manager import get_dialogue_preference_manager
+            from narrative_assistant.nlp.dialogue_config_mapper import (
+                map_correction_config_to_dialogue_preference,
+            )
+            from narrative_assistant.nlp.dialogue_preference_manager import (
+                get_dialogue_preference_manager,
+            )
 
             # Extraer dialogue_dash y quote_style del effective_config
             dialogue_dash = effective_config.get("dialogue_dash")

@@ -40,7 +40,6 @@ from narrative_assistant.llm.config import (  # noqa: E402
     resolve_fallbacks,
 )
 
-
 # =============================================================================
 # 1. resolve_fallbacks edge cases
 # =============================================================================

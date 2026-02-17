@@ -15,7 +15,6 @@ from narrative_assistant.nlp.orthography.base import (
 from narrative_assistant.nlp.orthography.spelling_checker import SpellingChecker
 from narrative_assistant.nlp.orthography.voting_checker import VotingSpellingChecker
 
-
 # =============================================================================
 # QUICK WINS - Reglas de patrones simples (spelling_checker.py)
 # =============================================================================

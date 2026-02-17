@@ -15,8 +15,8 @@ from typing import Any
 
 from spacy.tokens import Doc
 
-from .event_detection_llm import LLMEventDetector
 from .event_detection import DetectedEvent
+from .event_detection_llm import LLMEventDetector
 from .event_types import EventType
 
 logger = logging.getLogger(__name__)

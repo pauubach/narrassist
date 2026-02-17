@@ -56,7 +56,7 @@ class DialogueStylePreferenceManager:
             with self.db.connection() as conn:
                 # Obtener settings actuales
                 conn.row_factory = lambda c, r: dict(
-                    zip([col[0] for col in c.description], r)
+                    zip([col[0] for col in c.description], r, strict=False)
                 )
                 row = conn.execute(
                     "SELECT settings_json FROM projects WHERE id = ?",

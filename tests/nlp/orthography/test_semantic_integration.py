@@ -4,8 +4,8 @@ Tests de integración del semantic checker con el spelling checker.
 
 import pytest
 
-from narrative_assistant.nlp.orthography.spelling_checker import SpellingChecker
 from narrative_assistant.nlp.orthography.base import SpellingErrorType
+from narrative_assistant.nlp.orthography.spelling_checker import SpellingChecker
 
 
 class TestSemanticIntegration:
