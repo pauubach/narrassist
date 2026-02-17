@@ -21,17 +21,49 @@ class CorrectionIssue:
     Representa un problema potencial encontrado en el texto que se
     presenta al corrector como sugerencia. NO se aplica automáticamente.
 
+    INVARIANTES CRÍTICOS (Sistema de Coordenadas):
+
+    1. start_char y end_char DEBEN ser posiciones ABSOLUTAS en el documento completo
+       - Rango válido: [0, len(documento)]
+       - Unidad: Unicode codepoints (NO bytes UTF-8, NO UTF-16 code units)
+       - Sistema de coordenadas: Absoluto desde inicio del documento (char 0)
+       - chapter_index es solo CONTEXTO, NO afecta interpretación de posiciones
+
+    2. Relación con texto:
+       - documento[start_char:end_char] DEBE extraer exactamente el texto del issue
+       - Invariante validado en tests: extracted_text == issue.text
+
+    3. Ordenación:
+       - SIEMPRE: 0 <= start_char <= end_char <= len(documento)
+       - Violación indica bug en detector que generó el issue
+
+    Ejemplo concreto:
+        Documento completo: "Cap 1 text\\nCap 2 text"  (20 chars)
+        Capítulos:
+          - Cap 1: chars [0, 11), start_char=0
+          - Cap 2: chars [11, 20), start_char=11
+
+        Issue en "Cap 2":
+            start_char = 11  # Posición ABSOLUTA (NO relativa a capítulo 2)
+            end_char = 16
+            text = "Cap 2"
+            chapter_index = 2  # Solo para contexto UI
+
+        Validación:
+            documento[11:16] == "Cap 2"  # ✓ Correcto
+            documento[0:5] != "Cap 2"    # ✗ Incorrecto (posición relativa)
+
     Attributes:
         category: Categoría principal (typography, repetition, etc.)
         issue_type: Tipo específico del problema
-        start_char: Posición inicial en el texto
-        end_char: Posición final en el texto
+        start_char: Posición ABSOLUTA inicial (Unicode codepoints, desde char 0 del documento)
+        end_char: Posición ABSOLUTA final (Unicode codepoints, desde char 0 del documento)
         text: Texto problemático encontrado
         explanation: Explicación del problema para el corrector
         suggestion: Texto sugerido como corrección (opcional)
         confidence: Confianza de la detección (0.0-1.0)
         context: Contexto alrededor del problema
-        chapter_index: Índice del capítulo (si aplica)
+        chapter_index: Índice del capítulo (solo contexto, NO afecta posiciones)
         rule_id: ID de la regla que detectó el problema
         extra_data: Datos adicionales específicos del tipo
     """
@@ -65,6 +97,67 @@ class CorrectionIssue:
             "rule_id": self.rule_id,
             "extra_data": self.extra_data,
         }
+
+
+def validate_issue_positions(
+    issue: CorrectionIssue,
+    doc_length: int,
+    strict: bool = True
+) -> bool:
+    """
+    Validar que posiciones de un issue sean coherentes con el invariante.
+
+    Verifica que:
+    1. start_char >= 0
+    2. end_char <= doc_length
+    3. start_char <= end_char
+
+    Args:
+        issue: Issue a validar
+        doc_length: Longitud del documento completo (len(full_text))
+        strict: Si True, lanza excepción. Si False, retorna bool + warning
+
+    Returns:
+        True si válido, False si inválido (solo si strict=False)
+
+    Raises:
+        ValueError: Si strict=True y posiciones inválidas
+
+    Example:
+        >>> doc = "Hello world"
+        >>> issue = CorrectionIssue(..., start_char=0, end_char=5, ...)
+        >>> validate_issue_positions(issue, len(doc), strict=True)
+        True
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    errors = []
+
+    if issue.start_char < 0:
+        errors.append(f"start_char {issue.start_char} < 0")
+
+    if issue.end_char > doc_length:
+        errors.append(
+            f"end_char {issue.end_char} > doc_length {doc_length}"
+        )
+
+    if issue.start_char > issue.end_char:
+        errors.append(
+            f"start_char {issue.start_char} > end_char {issue.end_char}"
+        )
+
+    if errors:
+        msg = (
+            f"Invalid issue positions in {issue.issue_type}: "
+            f"{', '.join(errors)}"
+        )
+        if strict:
+            raise ValueError(msg)
+        logger.warning(msg)
+        return False
+
+    return True
 
 
 class BaseDetector(ABC):
