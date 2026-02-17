@@ -157,7 +157,7 @@ coref_config = CorefConfig(
 - Error se captura silenciosamente con `except Exception` → logger.warning
 - Correferencias NO se ejecutan correctamente
 
-**Fix** (commit `PENDIENTE`):
+**Fix** (commit `8ae31a0`):
 ```python
 coref_config = CorefConfig(
     enabled_methods=[...],
@@ -204,7 +204,7 @@ coref_config = CorefConfig(
 - **NO hay llamada a `UAConsistencyPipeline` desde el API**
 - Speech tracking NUNCA se ejecuta
 
-**Fix** (commit `PENDIENTE`):
+**Fix** (commit `8ae31a0`):
 1. Agregar `run_speech_tracking: bool = True` a `UnifiedConfig`
 2. Agregar `"speech_tracking": "run_speech_tracking"` al `_SETTINGS_MAP`
 3. Agregar sub-fase 5.7 en `run_consistency`:
@@ -235,8 +235,8 @@ if analysis_config.run_speech_tracking:
 | `3f0482e` | fix(ui): z-index panel + debug cache logging | Logs mejorados |
 | `67bd97a` | fix(cache): validar fingerprint NO vacío | Evita cache con `fp=""` |
 | `e52ebc8` | **fix(speech): CRITICAL - enum comparison** | **Speech tracking FUNCIONA (en pipeline)** |
-| `PENDIENTE` | **fix(coref): remove use_voting param** | **Correferencias funcionan** |
-| `PENDIENTE` | **fix(speech): integrate into API run_consistency** | **Speech tracking SE EJECUTA en API** |
+| `8ae31a0` | **fix(coref): remove use_voting param** | **Correferencias funcionan** |
+| `8ae31a0` | **fix(speech): integrate into API run_consistency** | **Speech tracking SE EJECUTA en API** |
 
 ### Archivos modificados
 
