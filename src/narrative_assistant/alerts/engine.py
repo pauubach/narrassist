@@ -540,6 +540,16 @@ class AlertEngine:
         except (ValueError, KeyError):
             display_name = attribute_key.replace("_", " ")
 
+        # Generar sugerencia basada en los valores encontrados
+        if len(sources) == 2:
+            suggestion = f"Revisar si {display_name} es '{sources[0].get('value')}' o '{sources[1].get('value')}' y corregir el valor incorrecto."
+        elif len(sources) > 2:
+            # Multi-valor: sugerir revisar todos los valores
+            suggestion = f"Se encontraron {len(sources)} valores diferentes para {display_name}. Revisar cada aparición y corregir los valores incorrectos."
+        else:
+            # Fallback genérico
+            suggestion = f"Verificar cuál es el valor correcto para {display_name}."
+
         return self.create_alert(
             project_id=project_id,
             category=AlertCategory.CONSISTENCY,
@@ -548,7 +558,7 @@ class AlertEngine:
             title=f"Inconsistencia: {display_name} de {entity_name}",
             description=description,
             explanation=explanation,
-            suggestion=f"Verificar cuál es el valor correcto para {display_name}",
+            suggestion=suggestion,
             chapter=sources[0].get("chapter") if sources else value1_source.get("chapter"),
             entity_ids=[entity_id],
             confidence=confidence,

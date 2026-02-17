@@ -1788,7 +1788,7 @@ def _create_alerts_from_inconsistencies(
             # Construir fuentes con información de ubicación
             # Soportar tanto multi-valor (conflicting_values) como legacy (value1/value2)
             if incon.conflicting_values and len(incon.conflicting_values) > 0:
-                # Multi-valor: construir sources[] desde conflicting_values
+                # Multi-valor: construir sources[] COMPLETO desde conflicting_values
                 sources = []
                 for cv in incon.conflicting_values:
                     sources.append(
@@ -1802,7 +1802,8 @@ def _create_alerts_from_inconsistencies(
                         }
                     )
 
-                # Legacy: usar primeros 2 valores para compatibilidad
+                # Legacy: usar primeros 2 valores para compatibilidad con campos value1/value2
+                # NOTA: sources[] contiene TODOS los valores, no solo 2
                 value1_source = sources[0] if len(sources) >= 1 else {}
                 value2_source = sources[1] if len(sources) >= 2 else {}
             else:

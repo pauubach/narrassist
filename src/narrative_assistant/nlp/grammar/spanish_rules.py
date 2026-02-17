@@ -982,9 +982,11 @@ def check_gender_agreement(doc: Doc) -> list[GrammarIssue]:
                 # Inferir del texto
                 det_gender = "Masc" if det_lower in ("el", "un") else "Fem"  # type: ignore[assignment]
 
-            # Buscar el sustantivo que sigue (saltando adjetivos)
+            # Buscar el sustantivo que sigue (verificando si hay adjetivos interpuestos)
             j = i + 1
+            has_interposed_adjective = False
             while j < len(doc) and doc[j].pos_ == "ADJ":
+                has_interposed_adjective = True
                 j += 1
 
             # Aceptar NOUN o PROPN (spaCy a veces marca sustantivos como PROPN en contexto erróneo)
@@ -993,7 +995,11 @@ def check_gender_agreement(doc: Doc) -> list[GrammarIssue]:
                 noun_lower = noun.lower_
 
                 # Caso especial: sustantivos femeninos con "a/ha" tónica
-                # Regla: En SINGULAR llevan "el"/"un" (por eufonía)
+                # Regla RAE: En SINGULAR llevan "el"/"un" (por eufonía)
+                # IMPORTANTE: Solo si NO hay adjetivo interpuesto
+                # ✓ "el ama" (sin adjetivo)
+                # ✓ "la antigua ama" (con adjetivo → usa artículo femenino)
+                # ✗ "la ama" (sin adjetivo → debe ser "el ama")
                 # En PLURAL llevan "las"/"unas" (normal)
 
                 # S15: Usar detector híbrido (lista + automático)
@@ -1006,12 +1012,16 @@ def check_gender_agreement(doc: Doc) -> list[GrammarIssue]:
                     noun_is_plural = noun_lower.endswith("s")
 
                 # Usar detector híbrido para verificar si requiere "el"
-                needs_masculine = requires_masculine_article(
-                    word=noun_lower,
-                    is_feminine=True,  # Asumimos que es femenino si llegamos aquí
-                    is_plural=noun_is_plural,
-                    use_static_list=True,  # Siempre usar lista estática (fast path)
-                    use_automatic_detection=STRESS_DETECTOR_AVAILABLE,  # Auto solo si disponible
+                # PERO SOLO si no hay adjetivo interpuesto
+                needs_masculine = (
+                    not has_interposed_adjective
+                    and requires_masculine_article(
+                        word=noun_lower,
+                        is_feminine=True,  # Asumimos que es femenino si llegamos aquí
+                        is_plural=noun_is_plural,
+                        use_static_list=True,  # Siempre usar lista estática (fast path)
+                        use_automatic_detection=STRESS_DETECTOR_AVAILABLE,  # Auto solo si disponible
+                    )
                 )
 
                 if needs_masculine:

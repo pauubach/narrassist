@@ -150,15 +150,16 @@ class ClarityDetector(BaseDetector):
                         issue_type=ClarityIssueType.SENTENCE_TOO_LONG,
                         start_char=start,
                         end_char=end,
-                        text=sentence_text[:100] + "..."
-                        if len(sentence_text) > 100
+                        text=sentence_text[:300] + "..."
+                        if len(sentence_text) > 300
                         else sentence_text,
                         explanation=(
                             f"Oración muy larga: {word_count} palabras, "
                             f"{char_count} caracteres. Considere dividirla en oraciones "
-                            f"más cortas para mejorar la legibilidad."
+                            f"más cortas para mejorar la legibilidad. "
+                            f"Divida la oración en oraciones más cortas usando punto seguido."
                         ),
-                        suggestion="Divida la oración en oraciones más cortas usando punto seguido.",
+                        suggestion=None,  # No hay corrección automática, solo recomendación
                         confidence=confidence,
                         context=self._extract_context(text, start, end),
                         chapter_index=chapter_index,
@@ -179,8 +180,8 @@ class ClarityDetector(BaseDetector):
                         issue_type=ClarityIssueType.SENTENCE_LONG_WARNING,
                         start_char=start,
                         end_char=end,
-                        text=sentence_text[:100] + "..."
-                        if len(sentence_text) > 100
+                        text=sentence_text[:300] + "..."
+                        if len(sentence_text) > 300
                         else sentence_text,
                         explanation=(
                             f"Oración larga: {word_count} palabras. "
@@ -217,15 +218,16 @@ class ClarityDetector(BaseDetector):
                         issue_type=ClarityIssueType.TOO_MANY_SUBORDINATES,
                         start_char=start,
                         end_char=end,
-                        text=sentence_text[:100] + "..."
-                        if len(sentence_text) > 100
+                        text=sentence_text[:300] + "..."
+                        if len(sentence_text) > 300
                         else sentence_text,
                         explanation=(
                             f"Demasiadas subordinadas encadenadas: {count} conectores "
                             f"({', '.join({s.lower() for s in subordinates})}). "
-                            f"Esto puede dificultar la lectura."
+                            f"Esto puede dificultar la lectura. "
+                            f"Divida la oración en oraciones independientes más simples."
                         ),
-                        suggestion="Divida la oración en oraciones independientes más simples.",
+                        suggestion=None,  # No hay corrección automática, solo recomendación
                         confidence=min(0.9, 0.7 + (count - self.config.max_subordinates) * 0.1),
                         context=self._extract_context(text, start, end),
                         chapter_index=chapter_index,
@@ -277,12 +279,13 @@ class ClarityDetector(BaseDetector):
                         issue_type=ClarityIssueType.PARAGRAPH_NO_PAUSES,
                         start_char=start,
                         end_char=end,
-                        text=paragraph[:150] + "..." if len(paragraph) > 150 else paragraph,
+                        text=paragraph[:300] + "..." if len(paragraph) > 300 else paragraph,
                         explanation=(
                             f"Párrafo con pocas pausas: {pause_count} comas/punto y coma "
-                            f"en {word_count} palabras. Puede resultar denso de leer."
+                            f"en {word_count} palabras. Puede resultar denso de leer. "
+                            f"Considere añadir pausas (comas) o dividir en oraciones más cortas."
                         ),
-                        suggestion="Considere añadir pausas (comas) o dividir en oraciones más cortas.",
+                        suggestion=None,  # No hay corrección automática, solo recomendación
                         confidence=0.75,
                         context=self._extract_context(text, start, min(end, start + 200)),
                         chapter_index=chapter_index,
@@ -343,7 +346,7 @@ class ClarityDetector(BaseDetector):
                         issue_type=ClarityIssueType.PARAGRAPH_TOO_SHORT,
                         start_char=start,
                         end_char=end,
-                        text=paragraph[:150] + "..." if len(paragraph) > 150 else paragraph,
+                        text=paragraph[:300] + "..." if len(paragraph) > 300 else paragraph,
                         explanation=(
                             f"Párrafo con solo {sentence_count} oración(es). "
                             f"Considere fusionarlo con el párrafo anterior o siguiente."
@@ -365,13 +368,14 @@ class ClarityDetector(BaseDetector):
                         issue_type=ClarityIssueType.PARAGRAPH_TOO_LONG,
                         start_char=start,
                         end_char=end,
-                        text=paragraph[:150] + "..." if len(paragraph) > 150 else paragraph,
+                        text=paragraph[:300] + "..." if len(paragraph) > 300 else paragraph,
                         explanation=(
                             f"Párrafo con {sentence_count} oraciones. "
                             f"Los párrafos de más de {self.config.max_paragraph_sentences} "
-                            f"oraciones pueden dificultar la lectura."
+                            f"oraciones pueden dificultar la lectura. "
+                            f"Divida este párrafo en bloques temáticos más pequeños."
                         ),
-                        suggestion="Divida este párrafo en bloques temáticos más pequeños.",
+                        suggestion=None,  # No hay corrección automática, solo recomendación
                         confidence=min(
                             0.92,
                             0.78 + (sentence_count - self.config.max_paragraph_sentences) * 0.03,

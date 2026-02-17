@@ -294,9 +294,10 @@ class CoherenceDetector(BaseDetector):
                         text=para_text[:150],
                         explanation=(
                             f"Este párrafo tiene una similitud muy alta ({sim:.0%}) "
-                            f"con el párrafo anterior. Podrían ser redundantes."
+                            f"con el párrafo anterior. Podrían ser redundantes. "
+                            f"Considere fusionar estos párrafos o eliminar la información duplicada."
                         ),
-                        suggestion="Considere fusionar estos párrafos o eliminar la información duplicada.",
+                        suggestion=None,  # No hay corrección automática, solo recomendación
                         confidence=min(0.90, 0.70 + (sim - _EMBEDDING_REDUNDANCY_THRESHOLD) * 2),
                         context=self._extract_context(full_text, para_pos, para_pos + len(para_text)),
                         chapter_index=chapter_index,
@@ -343,9 +344,10 @@ class CoherenceDetector(BaseDetector):
                         text=para_text[:150],
                         explanation=(
                             f"Este párrafo comparte mucho vocabulario ({jaccard:.0%}) "
-                            f"con el anterior. Podría ser redundante."
+                            f"con el anterior. Podría ser redundante. "
+                            f"Considere fusionar estos párrafos o eliminar la información duplicada."
                         ),
-                        suggestion="Considere fusionar estos párrafos o eliminar la información duplicada.",
+                        suggestion=None,  # No hay corrección automática, solo recomendación
                         confidence=min(0.85, 0.65 + (jaccard - _JACCARD_REDUNDANCY_THRESHOLD) * 0.5),
                         context=self._extract_context(full_text, para_pos, para_pos + len(para_text)),
                         chapter_index=chapter_index,
