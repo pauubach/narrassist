@@ -158,6 +158,33 @@ def _restore_entities_from_cache(
 # ============================================================================
 
 
+def _ensure_storage_exists(project_id: int) -> None:
+    """
+    Asegura que existe progress storage para el proyecto.
+
+    Si no existe (por reinicio de servidor o limpieza), lo crea con valores por defecto.
+    Esto previene que las fases heavy pierdan feedback visual.
+    """
+    import time
+
+    with deps._progress_lock:
+        if project_id in deps.analysis_progress_storage:
+            return  # Ya existe
+
+        # Crear storage mínimo para fases heavy
+        deps.analysis_progress_storage[project_id] = {
+            "project_id": project_id,
+            "status": "running",
+            "progress": 0,
+            "current_phase": "Procesando análisis profundo...",
+            "current_action": "",
+            "last_update": time.time(),
+            "phases": [],
+            "metrics": {},
+        }
+        logger.info(f"[STORAGE] Created missing progress storage for project {project_id}")
+
+
 def _update_storage(
     project_id: int, *, metrics_update: dict[str, Any] | None = None, **updates
 ) -> None:
@@ -1103,6 +1130,10 @@ def _filter_overlapping_entities(raw_entities: list) -> list:
 
 def run_ner(ctx: dict, tracker: ProgressTracker):
     """Fase 4: Extracción de entidades con NER."""
+    # Asegurar que existe progress storage (puede haberse perdido tras reinicio)
+    project_id = ctx["project_id"]
+    _ensure_storage_exists(project_id)
+
     from narrative_assistant.entities.models import (
         Entity,
         EntityImportance,
@@ -1510,6 +1541,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
     from narrative_assistant.entities.repository import get_entity_repository
 
     project_id = ctx["project_id"]
+    _ensure_storage_exists(project_id)
     full_text = ctx["full_text"]
     chapters_data = ctx["chapters_data"]
     entities = ctx["entities"]
@@ -2139,6 +2171,9 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
 
 def run_attributes(ctx: dict, tracker: ProgressTracker):
     """Fase 5: Extracción de atributos de personajes."""
+    project_id = ctx["project_id"]
+    _ensure_storage_exists(project_id)
+
     from narrative_assistant.core.result import Result
     from narrative_assistant.entities.repository import get_entity_repository
     from narrative_assistant.nlp.attributes import AttributeExtractor
