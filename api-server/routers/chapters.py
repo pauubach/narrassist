@@ -1458,6 +1458,12 @@ def get_project_continuity(project_id: int):
         )
     except HTTPException:
         raise
+    except ImportError as e:
+        logger.error(f"Import error in continuity analysis: {e}", exc_info=True)
+        return ApiResponse(success=False, error=f"Error de configuración: {str(e)}")
+    except AttributeError as e:
+        logger.error(f"Attribute error in continuity analysis: {e}", exc_info=True)
+        return ApiResponse(success=False, error=f"Error de implementación: {str(e)}")
     except Exception as e:
         logger.error(f"Error analyzing project continuity: {e}", exc_info=True)
-        return ApiResponse(success=False, error="Error interno del servidor")
+        return ApiResponse(success=False, error=f"Error interno: {type(e).__name__}: {str(e)}")
