@@ -199,6 +199,8 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
         now = time_module.time()
         with deps._progress_lock:
+            # Clear any old cancellation flag for this project
+            deps.analysis_cancellation_flags.pop(project_id, None)
             deps.analysis_progress_storage[project_id] = {
                 "project_id": project_id,
                 "status": "running",
@@ -826,13 +828,14 @@ def cancel_analysis(project_id: int):
                     success=False, error=f"El análisis ya ha terminado con estado: {current_status}"
                 )
 
-            # Marcar como cancelado
+            # Marcar como cancelado (usando flag dedicado + status)
+            deps.analysis_cancellation_flags[project_id] = True
             deps.analysis_progress_storage[project_id]["status"] = "cancelled"
             deps.analysis_progress_storage[project_id]["current_phase"] = (
-                "Análisis cancelado por el usuario"
+                "Cancelando análisis..."
             )
 
-        logger.info(f"Analysis cancelled for project {project_id}")
+        logger.info(f"Analysis cancellation requested for project {project_id}")
 
         return ApiResponse(
             success=True,

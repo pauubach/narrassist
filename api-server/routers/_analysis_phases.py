@@ -265,8 +265,10 @@ class ProgressTracker:
     def check_cancelled(self):
         """Verifica si el análisis fue cancelado por el usuario."""
         with deps._progress_lock:
+            # Check dedicated cancellation flag (primary) or status (fallback)
             cancelled = (
-                deps.analysis_progress_storage.get(self.project_id, {}).get("status") == "cancelled"
+                deps.analysis_cancellation_flags.get(self.project_id, False)
+                or deps.analysis_progress_storage.get(self.project_id, {}).get("status") == "cancelled"
             )
         if cancelled:
             raise AnalysisCancelledError("Análisis cancelado por el usuario")
@@ -1062,6 +1064,8 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
         total_entities_to_create = len(entity_mentions)
         entities_created = 0
         for key, mentions_list in entity_mentions.items():
+            # Check for cancellation every entity
+            tracker.check_cancelled()
             first_mention = mentions_list[0]
             mention_count = len(mentions_list)
 
@@ -1391,6 +1395,10 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             )
 
         for idx, (keep_entity, merge_entity) in enumerate(fusion_pairs):
+            # Check for cancellation every 10 pairs
+            if idx % 10 == 0:
+                tracker.check_cancelled()
+
             if merge_entity.id in merged_entity_ids:
                 continue
 
@@ -3409,13 +3417,15 @@ def handle_analysis_error(ctx: dict, error: Exception):
             storage = deps.analysis_progress_storage.get(project_id, {})
             storage["status"] = "cancelled"
             storage["current_phase"] = "Análisis cancelado por el usuario"
+            # Clear cancellation flag
+            deps.analysis_cancellation_flags.pop(project_id, None)
         try:
-            # Resetear a 'pending' para permitir re-análisis inmediato
-            project.analysis_status = "pending"
+            # Resetear a 'cancelled' en DB para que el frontend sepa que fue cancelado
+            project.analysis_status = "cancelled"
             project.analysis_progress = 0.0
             proj_manager = ProjectManager(ctx["db_session"])
             proj_manager.update(project)
-            logger.info(f"Project {project_id} status reset to 'pending' after cancellation")
+            logger.info(f"Project {project_id} status set to 'cancelled'")
         except Exception as db_error:
             logger.error(f"Failed to update project status after cancellation: {db_error}")
         return

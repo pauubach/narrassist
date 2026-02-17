@@ -24,6 +24,12 @@ def map_correction_config_to_dialogue_preference(
     Returns:
         Preferencia de diálogo: dash, guillemets, quotes, quotes_typographic, no_check
     """
+    # Caso especial: ambos "none" → no validar
+    if (dialogue_dash == "none" or not dialogue_dash) and (quote_style == "none" or not quote_style):
+        # Si ambos son explícitamente "none", asumimos que el usuario NO quiere validación
+        if dialogue_dash == "none" and quote_style == "none":
+            return "no_check"
+
     # Prioridad 1: Si usa guiones (cualquier tipo)
     if dialogue_dash and dialogue_dash != "none":
         return "dash"

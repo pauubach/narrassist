@@ -7,7 +7,7 @@
 import type { AlertSeverity } from './alerts'
 
 /** Estado del análisis */
-export type AnalysisStatus = 'pending' | 'in_progress' | 'analyzing' | 'queued' | 'completed' | 'error' | 'failed'
+export type AnalysisStatus = 'pending' | 'in_progress' | 'analyzing' | 'queued' | 'completed' | 'error' | 'failed' | 'cancelled'
 
 /** Tipos de documento detectados */
 export type DocumentType =

@@ -59,6 +59,10 @@ INSTALLING_DEPENDENCIES = False
 analysis_progress_storage: dict[int, dict] = {}
 _progress_lock = threading.Lock()
 
+# Analysis cancellation flags (protected by _progress_lock)
+# Key: project_id, Value: True if cancellation requested
+analysis_cancellation_flags: dict[int, bool] = {}
+
 # Analysis queue: only one analysis at a time (protected by _progress_lock)
 # Stores the project_id of the currently running analysis, or None
 _active_analysis_project_id: int | None = None
