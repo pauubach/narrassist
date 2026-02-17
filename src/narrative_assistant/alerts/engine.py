@@ -1065,13 +1065,26 @@ class AlertEngine:
         }
         severity = severity_map.get(severity_level, AlertSeverity.INFO)
 
+        # Traducir nombres de registros al español
+        register_translations = {
+            "colloquial": "coloquial",
+            "formal": "formal",
+            "neutral": "neutral",
+            "formal_literary": "formal literario",
+            "technical": "técnico",
+            "poetic": "poético",
+            "vulgar": "vulgar",
+        }
+        from_register_es = register_translations.get(from_register, from_register)
+        to_register_es = register_translations.get(to_register, to_register)
+
         return self.create_alert(
             project_id=project_id,
             category=AlertCategory.STYLE,
             severity=severity,
             alert_type="register_change",
-            title=f"Cambio de registro: {from_register} → {to_register}",
-            description=f"Transición de registro {from_register} a {to_register}",
+            title=f"Cambio de registro: {from_register_es} → {to_register_es}",
+            description=f"Transición de registro {from_register_es} a {to_register_es}",
             explanation=explanation,
             suggestion="Verificar si el cambio de registro es intencional",
             chapter=chapter,
