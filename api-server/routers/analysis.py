@@ -851,6 +851,92 @@ def cancel_analysis(project_id: int):
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
+@router.post("/api/projects/{project_id}/analysis/force-clear", response_model=ApiResponse)
+def force_clear_stuck_analysis(project_id: int):
+    """
+    Limpia forzosamente un análisis bloqueado/colgado.
+
+    Útil cuando:
+    - Análisis bloqueado esperando Ollama
+    - Backend colgado sin responder
+    - Flag de cancelación atascada
+
+    Acciones:
+    1. Limpia flags de cancelación en memoria
+    2. Limpia storage de progreso
+    3. Actualiza DB: analysis_status → 'completed'
+    4. Permite re-análisis inmediato
+
+    Args:
+        project_id: ID del proyecto bloqueado
+
+    Returns:
+        ApiResponse con estado final
+    """
+    try:
+        from narrative_assistant.persistence.project import ProjectManager
+
+        with deps._progress_lock:
+            # 1. Limpiar flags de cancelación
+            if project_id in deps.analysis_cancellation_flags:
+                del deps.analysis_cancellation_flags[project_id]
+                logger.info(f"[FORCE-CLEAR] Removed cancellation flag for project {project_id}")
+
+            # 2. Limpiar storage de progreso
+            if project_id in deps.analysis_progress_storage:
+                del deps.analysis_progress_storage[project_id]
+                logger.info(f"[FORCE-CLEAR] Removed progress storage for project {project_id}")
+
+            # 3. Remover de colas si está
+            deps._heavy_analysis_queue[:] = [
+                q for q in deps._heavy_analysis_queue if q["project_id"] != project_id
+            ]
+            deps._analysis_queue[:] = [
+                q for q in deps._analysis_queue if q["project_id"] != project_id
+            ]
+
+        # 4. Actualizar DB: status → completed
+        project_manager = ProjectManager()
+        result = project_manager.get(project_id)
+
+        if result.is_failure:
+            return ApiResponse(
+                success=False,
+                error=f"Proyecto {project_id} no encontrado"
+            )
+
+        project = result.value
+        old_status = project.analysis_status
+
+        project.analysis_status = "completed"
+        project_manager.update(project)
+
+        logger.info(
+            f"[FORCE-CLEAR] Project {project_id} cleared: "
+            f"{old_status} → completed"
+        )
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "old_status": old_status,
+                "new_status": "completed",
+                "message": "Análisis bloqueado limpiado exitosamente. Puedes re-analizar ahora.",
+            },
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Error force-clearing stuck analysis for project {project_id}: {e}",
+            exc_info=True
+        )
+        return ApiResponse(
+            success=False,
+            error=f"Error al limpiar análisis: {str(e)}"
+        )
+
+
 @router.get("/api/projects/{project_id}/analysis/stream")
 async def stream_analysis_progress(project_id: int):
     """
