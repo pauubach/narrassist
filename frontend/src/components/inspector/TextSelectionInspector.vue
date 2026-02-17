@@ -164,6 +164,7 @@ function getEntityIcon(type: string): string {
         label="Preguntar a la IA"
         icon="pi pi-comments"
         size="small"
+        class="primary-action"
         @click="emit('ask-ai', selection.text)"
       />
       <div class="secondary-actions">
@@ -338,12 +339,13 @@ function getEntityIcon(type: string): string {
 
 .inspector-actions {
   display: flex;
+  flex-direction: column;
   gap: var(--ds-space-2);
   padding: var(--ds-space-3) var(--ds-space-4);
   border-top: 1px solid var(--surface-border);
 }
 
-.inspector-actions > .p-button {
+.inspector-actions .primary-action {
   width: 100%;
 }
 

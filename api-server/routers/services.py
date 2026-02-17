@@ -718,15 +718,9 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
         # 4. Búsqueda exhaustiva en todo el manuscrito
         all_matches = exhaustive_search(search_terms, chapters_data)
 
-        # 5. Ranking y selección con budget de tokens
-        selected_excerpts = rank_and_select(all_matches, max_chars=2000, max_excerpts=8)
-
-        # 6. Construir contexto numerado
-        context_text, ref_map = build_numbered_context(selected_excerpts)
-        context_sources = list({e["chapter_title"] for e in selected_excerpts})
-
-        # 7. Contexto de texto seleccionado
+        # 5. Contexto de texto seleccionado (PRIMERO - para inyectar como [REF:1])
         selection_context = ""
+        selection_excerpt = None
         if request.selected_text:
             ch_title = None
             expanded_context = None
@@ -747,6 +741,15 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
                         context_start = max(0, rel_start - 200)
                         context_end = min(len(chapter_content), rel_end + 200)
                         expanded_context = chapter_content[context_start:context_end]
+
+                        # Crear excerpt para inyectar como [REF:1]
+                        selection_excerpt = {
+                            "excerpt": expanded_context[:500] if len(expanded_context) > 500 else expanded_context,
+                            "chapter_number": request.selected_text_chapter,
+                            "chapter_title": ch_title,
+                            "global_start": request.selected_text_start,
+                            "global_end": request.selected_text_end or request.selected_text_start + len(request.selected_text),
+                        }
                         break
 
             # Debug: log selection context
@@ -759,7 +762,19 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
                 request.selected_text, ch_title, expanded_context
             )
 
-        # 8. Historial de conversación
+        # 6. Ranking y selección con budget de tokens
+        selected_excerpts = rank_and_select(all_matches, max_chars=2000, max_excerpts=8)
+
+        # 7. Inyectar selección como [REF:1] si existe
+        if selection_excerpt:
+            # Poner la selección primero, luego los resultados del RAG
+            selected_excerpts = [selection_excerpt] + selected_excerpts[:7]  # Limitar a 8 total
+
+        # 8. Construir contexto numerado (ahora con selección como [1])
+        context_text, ref_map = build_numbered_context(selected_excerpts)
+        context_sources = list({e["chapter_title"] for e in selected_excerpts})
+
+        # 9. Historial de conversación
         history_text = ""
         if request.history:
             history_text = "\n\n### Conversación previa:\n"
@@ -767,7 +782,7 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
                 role = "Usuario" if msg.get("role") == "user" else "Asistente"
                 history_text += f"{role}: {msg.get('content', '')}\n"
 
-        # 9. System prompt completo
+        # 10. System prompt completo
         system_prompt = build_chat_system_prompt(
             project_name=project.name,
             context_text=context_text,
