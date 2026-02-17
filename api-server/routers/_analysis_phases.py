@@ -24,6 +24,136 @@ class AnalysisCancelledError(Exception):
 
 
 # ============================================================================
+# Cache Serialization/Deserialization Helpers (v0.10.15)
+# ============================================================================
+
+
+def _serialize_entities_for_cache(entities: list, entity_repo) -> str:
+    """
+    Serializa entidades + menciones a JSON para cache.
+
+    Args:
+        entities: Lista de Entity objects
+        entity_repo: Repositorio de entidades para obtener menciones
+
+    Returns:
+        JSON string con [{entity_data, mentions: [...]}]
+    """
+    cache_data = []
+
+    for entity in entities:
+        # Obtener menciones de DB
+        mentions = entity_repo.get_mentions_for_entity(entity.id)
+
+        entity_dict = {
+            "id": entity.id,
+            "canonical_name": entity.canonical_name,
+            "entity_type": entity.entity_type.value if hasattr(entity.entity_type, "value") else str(entity.entity_type),
+            "aliases": entity.aliases if entity.aliases else [],
+            "importance": entity.importance.value if hasattr(entity.importance, "value") else str(entity.importance),
+            "first_appearance_char": entity.first_appearance_char,
+            "mention_count": entity.mention_count,
+            "mentions": [
+                {
+                    "surface_form": m.surface_form,
+                    "start_char": m.start_char,
+                    "end_char": m.end_char,
+                    "chapter_id": m.chapter_id,
+                    "confidence": m.confidence,
+                    "source": m.source,
+                }
+                for m in mentions
+            ],
+        }
+
+        cache_data.append(entity_dict)
+
+    return json.dumps(cache_data, ensure_ascii=False)
+
+
+def _restore_entities_from_cache(
+    entities_json: str,
+    project_id: int,
+    find_chapter_id_for_position,
+) -> list:
+    """
+    Restaura entidades + menciones desde JSON de cache.
+
+    Args:
+        entities_json: JSON string de entidades serializadas
+        project_id: ID del proyecto
+        find_chapter_id_for_position: Función para mapear char → chapter_id
+
+    Returns:
+        Lista de Entity objects con menciones creadas en DB
+    """
+    from narrative_assistant.entities.models import (
+        Entity,
+        EntityImportance,
+        EntityMention,
+        EntityType,
+    )
+    from narrative_assistant.entities.repository import get_entity_repository
+
+    cache_data = json.loads(entities_json)
+    entity_repo = get_entity_repository()
+    entities = []
+
+    for entity_dict in cache_data:
+        # Restaurar entity
+        entity_type_str = entity_dict["entity_type"]
+        try:
+            entity_type = EntityType(entity_type_str)
+        except ValueError:
+            entity_type = EntityType.CONCEPT  # Fallback
+
+        importance_str = entity_dict["importance"]
+        try:
+            importance = EntityImportance(importance_str)
+        except ValueError:
+            importance = EntityImportance.MINIMAL
+
+        entity = Entity(
+            id=None,  # Will be assigned by DB
+            project_id=project_id,
+            canonical_name=entity_dict["canonical_name"],
+            entity_type=entity_type,
+            aliases=entity_dict.get("aliases", []),
+            importance=importance,
+            first_appearance_char=entity_dict.get("first_appearance_char", 0),
+            mention_count=entity_dict.get("mention_count", 0),
+            description=None,
+            merged_from_ids=[],
+            is_active=True,
+        )
+
+        # Crear en DB
+        entity_id = entity_repo.create_entity(entity)
+        entity.id = entity_id
+
+        # Restaurar menciones
+        mentions_to_create = []
+        for mention_dict in entity_dict.get("mentions", []):
+            mention = EntityMention(
+                entity_id=entity_id,
+                surface_form=mention_dict["surface_form"],
+                start_char=mention_dict["start_char"],
+                end_char=mention_dict["end_char"],
+                chapter_id=mention_dict.get("chapter_id"),
+                confidence=mention_dict.get("confidence", 0.9),
+                source=mention_dict.get("source", "cache"),
+            )
+            mentions_to_create.append(mention)
+
+        if mentions_to_create:
+            entity_repo.create_mentions_batch(mentions_to_create)
+
+        entities.append(entity)
+
+    return entities
+
+
+# ============================================================================
 # Thread-safe progress helper (F-006)
 # ============================================================================
 
@@ -977,12 +1107,48 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
     )
     from narrative_assistant.entities.repository import get_entity_repository
     from narrative_assistant.nlp.ner import EntityLabel, NERExtractor
+    from narrative_assistant.persistence.analysis_cache import get_analysis_cache
 
     project_id = ctx["project_id"]
     full_text = ctx["full_text"]
     find_chapter_id_for_position = ctx["find_chapter_id_for_position"]
+    document_fingerprint = ctx.get("fingerprint", "")
+    analysis_config = ctx.get("analysis_config")
 
     tracker.start_phase("ner", 3, "Buscando personajes, lugares y otros elementos...")
+
+    # ========================================================================
+    # Cache Check: Skip expensive NER if document unchanged
+    # ========================================================================
+    cache = get_analysis_cache()
+    config_hash = cache.compute_ner_config_hash(analysis_config) if analysis_config else "default"
+
+    cached_data = cache.get_ner_results(project_id, document_fingerprint, config_hash)
+    if cached_data is not None:
+        logger.info(
+            f"[NER] Using cached results: {cached_data['entity_count']} entities, "
+            f"{cached_data['mention_count']} mentions (SKIP NER)"
+        )
+
+        # Deserialize entities from cache
+        try:
+            entities = _restore_entities_from_cache(
+                cached_data["entities_json"],
+                project_id,
+                find_chapter_id_for_position,
+            )
+
+            ctx["entities"] = entities
+            tracker.set_metric("entities_found", len(entities))
+            tracker.end_phase("ner", 3)
+
+            logger.info(f"[NER] Cache restore complete: {len(entities)} entities")
+            return  # Skip NER computation
+
+        except Exception as e:
+            logger.warning(f"[NER] Cache restore failed, re-running NER: {e}")
+            # Continue to normal NER execution
+    # ========================================================================
 
     ner_pct_start, ner_pct_end = tracker.get_phase_progress_range("ner")
 
@@ -1191,6 +1357,27 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
 
     ctx["entities"] = entities
     ctx["entity_repo"] = entity_repo
+
+    # ========================================================================
+    # Cache Write: Save NER results for future re-analysis
+    # ========================================================================
+    try:
+        if document_fingerprint and entities:
+            entities_json = _serialize_entities_for_cache(entities, entity_repo)
+            total_mentions = sum(e.mention_count or 0 for e in entities)
+
+            cache.set_ner_results(
+                project_id=project_id,
+                document_fingerprint=document_fingerprint,
+                config_hash=config_hash,
+                entities_json=entities_json,
+                entity_count=len(entities),
+                mention_count=total_mentions,
+                processed_chars=len(full_text),
+            )
+    except Exception as cache_err:
+        logger.warning(f"[NER] Cache write failed (continuing): {cache_err}")
+    # ========================================================================
 
 
 # ============================================================================
