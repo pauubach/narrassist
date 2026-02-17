@@ -303,7 +303,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 "progress": 0,
                 "current_phase": "Iniciando análisis...",
                 "current_action": "Preparando documento",
-                "last_update": time.time(),  # Para detección de análisis bloqueado
+                "last_update": time_module.time(),  # Para detección de análisis bloqueado
                 "phases": [
                     {
                         "id": "parsing",
@@ -731,7 +731,7 @@ def start_partial_analysis(project_id: int, request: PartialAnalysisRequest):
                 "estimated_seconds_remaining": 30,
                 "_start_time": now,
                 "_last_progress_update": now,
-                "last_update": time.time(),  # Para detección de análisis bloqueado
+                "last_update": time_module.time(),  # Para detección de análisis bloqueado
             }
 
         logger.info(
