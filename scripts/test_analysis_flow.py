@@ -96,6 +96,24 @@ class AnalysisFlowTester:
             print(f"✗ Error HTTP {response.status_code}: {response.text}")
             return None
 
+    def start_analysis(self, project_id: int) -> bool:
+        """Inicia el análisis de un proyecto."""
+        print(f"\n▶️  Iniciando análisis del proyecto {project_id}...")
+
+        response = self.session.post(f"{API_BASE}/projects/{project_id}/analyze")
+
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                print(f"✓ Análisis iniciado")
+                return True
+            else:
+                print(f"✗ Error: {data.get('error')}")
+                return False
+        else:
+            print(f"✗ Error HTTP {response.status_code}: {response.text}")
+            return False
+
     def get_progress(self, project_id: int) -> Optional[dict]:
         """Obtiene el progreso del análisis."""
         response = self.session.get(f"{API_BASE}/projects/{project_id}/analysis/progress")
@@ -246,6 +264,9 @@ def main():
     tester.project_id = project_id
 
     try:
+        # 3. Iniciar análisis
+        if not tester.start_analysis(project_id):
+            return 1
 
         # 4. Monitorear análisis
         success = tester.monitor_analysis(project_id, max_wait=300)
