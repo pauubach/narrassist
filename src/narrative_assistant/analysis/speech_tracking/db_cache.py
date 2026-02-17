@@ -135,50 +135,59 @@ class SpeechMetricsDBCache:
             total_words: Total de palabras en la ventana
             dialogue_count: Número de diálogos en la ventana
         """
-        with self._db.connection() as conn:
-            cursor = conn.cursor()
+        try:
+            with self._db.connection() as conn:
+                cursor = conn.cursor()
 
-            # INSERT OR REPLACE (upsert)
-            cursor.execute(
-                """
-                INSERT OR REPLACE INTO character_speech_snapshots (
-                    character_id,
-                    window_start_chapter,
-                    window_end_chapter,
-                    filler_rate,
-                    formality_score,
-                    avg_sentence_length,
-                    lexical_diversity,
-                    exclamation_rate,
-                    question_rate,
-                    total_words,
-                    dialogue_count,
-                    document_fingerprint
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    character_id,
-                    window_start_chapter,
-                    window_end_chapter,
-                    metrics["filler_rate"],
-                    metrics["formality_score"],
-                    metrics["avg_sentence_length"],
-                    metrics["lexical_diversity"],
-                    metrics["exclamation_rate"],
-                    metrics["question_rate"],
-                    total_words,
-                    dialogue_count,
-                    document_fingerprint,
-                ),
-            )
+                # INSERT OR REPLACE (upsert)
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO character_speech_snapshots (
+                        character_id,
+                        window_start_chapter,
+                        window_end_chapter,
+                        filler_rate,
+                        formality_score,
+                        avg_sentence_length,
+                        lexical_diversity,
+                        exclamation_rate,
+                        question_rate,
+                        total_words,
+                        dialogue_count,
+                        document_fingerprint
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        character_id,
+                        window_start_chapter,
+                        window_end_chapter,
+                        metrics["filler_rate"],
+                        metrics["formality_score"],
+                        metrics["avg_sentence_length"],
+                        metrics["lexical_diversity"],
+                        metrics["exclamation_rate"],
+                        metrics["question_rate"],
+                        total_words,
+                        dialogue_count,
+                        document_fingerprint,
+                    ),
+                )
 
-            conn.commit()
+                conn.commit()
 
-            logger.info(
-                f"[DB_CACHE] SET: char={character_id}, "
+                logger.info(
+                    f"[DB_CACHE] SET SUCCESS: char={character_id}, "
+                    f"window={window_start_chapter}-{window_end_chapter}, "
+                    f"fp={document_fingerprint[:16]}..."
+                )
+        except Exception as e:
+            logger.error(
+                f"[DB_CACHE] SET FAILED: char={character_id}, "
                 f"window={window_start_chapter}-{window_end_chapter}, "
-                f"fp={document_fingerprint[:16]}..."
+                f"error={type(e).__name__}: {e}"
             )
+            # Re-raise para que el caller pueda manejar el error
+            raise
 
     def invalidate_by_fingerprint(self, old_fingerprint: str) -> int:
         """
