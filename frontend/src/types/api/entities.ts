@@ -95,6 +95,9 @@ export interface ApiEntityMention {
   span_start: number
   span_end: number
   confidence: number
+  // Campos de validación adaptativa (Mejora 1+3)
+  validation_method?: string | null
+  validation_reasoning?: string | null
 }
 
 /** Relación entre entidades de la API */

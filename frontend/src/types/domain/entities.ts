@@ -84,6 +84,9 @@ export interface EntityMention {
   spanStart: number
   spanEnd: number
   confidence: number
+  // Metadatos de validación adaptativa (Mejora 1+3)
+  validationMethod?: string | null
+  validationReasoning?: string | null
 }
 
 /** Relación entre entidades */

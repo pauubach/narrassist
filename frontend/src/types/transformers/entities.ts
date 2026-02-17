@@ -146,6 +146,9 @@ export function transformEntityMention(api: ApiEntityMention): EntityMention {
     spanStart: api.span_start,
     spanEnd: api.span_end,
     confidence: api.confidence,
+    // Mapear metadata de validación (Mejora 1+3)
+    validationMethod: api.validation_method ?? undefined,
+    validationReasoning: api.validation_reasoning ?? undefined,
   }
 }
 

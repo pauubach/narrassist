@@ -1149,6 +1149,9 @@ def get_entity_mentions(
                 if not mention_in_chapter:
                     continue
 
+            # Deserializar metadata usando property existente (Mejora 1)
+            metadata = mention.metadata_dict or {}
+
             mentions_data.append(
                 {
                     "id": mention.id,
@@ -1163,6 +1166,9 @@ def get_entity_mentions(
                     "contextAfter": mention.context_after,
                     "confidence": mention.confidence,
                     "source": mention.source,
+                    # Campos de validación adaptativa (Mejora 1)
+                    "validationMethod": metadata.get("validation_method"),
+                    "validationReasoning": metadata.get("validation_reasoning"),
                 }
             )
 
