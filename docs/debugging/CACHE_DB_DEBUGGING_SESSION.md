@@ -29,7 +29,7 @@
 
 ---
 
-## 🐛 Bugs encontrados (3 bugs críticos)
+## 🐛 Bugs encontrados (5 bugs críticos)
 
 ### Bug #1: Validación incorrecta de `document_fingerprint` vacío
 
@@ -133,6 +133,99 @@ RESULTADO: 2 personajes filtrados correctamente
 
 ---
 
+### Bug #4: `CorefConfig` con parámetro inexistente `use_voting`
+
+**Archivo**: `api-server/routers/_analysis_phases.py`
+**Línea**: 1527
+
+**Código incorrecto**:
+```python
+coref_config = CorefConfig(
+    enabled_methods=[...],
+    min_confidence=0.5,
+    consensus_threshold=0.6,
+    use_chapter_boundaries=True,
+    quality_level=ctx.get("quality_level", "rapida"),
+    sensitivity=ctx.get("sensitivity", 5.0),
+    use_voting=True,  # ❌ CorefConfig NO tiene este parámetro
+)
+```
+
+**Problema**:
+- `CorefConfig.__init__()` no acepta `use_voting` como parámetro
+- Error: `CorefConfig.__init__() got an unexpected keyword argument 'use_voting'`
+- Error se captura silenciosamente con `except Exception` → logger.warning
+- Correferencias NO se ejecutan correctamente
+
+**Fix** (commit `PENDIENTE`):
+```python
+coref_config = CorefConfig(
+    enabled_methods=[...],
+    min_confidence=0.5,
+    consensus_threshold=0.6,
+    use_chapter_boundaries=True,
+    quality_level=ctx.get("quality_level", "rapida"),
+    sensitivity=ctx.get("sensitivity", 5.0),
+    # use_voting ELIMINADO - no existe en CorefConfig
+)
+```
+
+---
+
+### Bug #5: Speech tracking NO integrado en API (BUG RAÍZ DE CACHE)
+
+**Archivos afectados**:
+- `api-server/routers/_analysis_phases.py` - Función `run_consistency`
+- `src/narrative_assistant/pipelines/ua_consistency.py` - Tiene `_run_speech_consistency_tracking` pero NO se llama desde API
+
+**Problema**:
+```python
+# _analysis_phases.py run_consistency() hace:
+# - Attribute consistency ✅
+# - Vital status ✅
+# - Character location ✅
+# - OOC detection ✅
+# - Anachronisms ✅
+# - Classical Spanish ✅
+
+# PERO NO LLAMA:
+# - UAConsistencyPipeline._run_speech_consistency_tracking ❌
+```
+
+**Síntoma**:
+- Logs NO muestran "Speech tracking: analyzing X main characters"
+- Cache DB queda con 0 snapshots
+- Re-análisis tarda lo mismo que análisis inicial
+- Usuario reporta: "Reanalisis sigue tardando lo mismo. No parece que funcione el cacheo."
+
+**Causa raíz**:
+- `UAConsistencyPipeline` tiene el código de speech tracking
+- Pero `run_consistency` en `_analysis_phases.py` es una implementación diferente
+- **NO hay llamada a `UAConsistencyPipeline` desde el API**
+- Speech tracking NUNCA se ejecuta
+
+**Fix** (commit `PENDIENTE`):
+1. Agregar `run_speech_tracking: bool = True` a `UnifiedConfig`
+2. Agregar `"speech_tracking": "run_speech_tracking"` al `_SETTINGS_MAP`
+3. Agregar sub-fase 5.7 en `run_consistency`:
+```python
+# Sub-fase 5.7: Speech consistency tracking (v0.10.14)
+speech_change_count = 0
+if analysis_config.run_speech_tracking:
+    _update_storage(project_id, current_action="Analizando consistencia del habla...")
+    try:
+        from narrative_assistant.analysis.speech_tracking import (
+            SpeechTracker,
+            ContextualAnalyzer,
+        )
+        from narrative_assistant.entities.models import EntityType
+
+        tracker_speech = SpeechTracker(...)
+        # ... código de análisis speech tracking
+```
+
+---
+
 ## ✅ Solución aplicada
 
 ### Commits
@@ -141,15 +234,19 @@ RESULTADO: 2 personajes filtrados correctamente
 |--------|-------------|---------|
 | `3f0482e` | fix(ui): z-index panel + debug cache logging | Logs mejorados |
 | `67bd97a` | fix(cache): validar fingerprint NO vacío | Evita cache con `fp=""` |
-| `e52ebc8` | **fix(speech): CRITICAL - enum comparison** | **Speech tracking FUNCIONA** |
+| `e52ebc8` | **fix(speech): CRITICAL - enum comparison** | **Speech tracking FUNCIONA (en pipeline)** |
+| `PENDIENTE` | **fix(coref): remove use_voting param** | **Correferencias funcionan** |
+| `PENDIENTE` | **fix(speech): integrate into API run_consistency** | **Speech tracking SE EJECUTA en API** |
 
 ### Archivos modificados
 
-- `src/narrative_assistant/analysis/speech_tracking/db_cache.py`
-- `src/narrative_assistant/analysis/speech_tracking/metrics.py`
-- `src/narrative_assistant/analysis/speech_tracking/speech_tracker.py`
-- `src/narrative_assistant/pipelines/ua_consistency.py`
-- `frontend/src/components/layout/StatusBar.vue`
+- `src/narrative_assistant/analysis/speech_tracking/db_cache.py` - Error logging mejorado
+- `src/narrative_assistant/analysis/speech_tracking/metrics.py` - Fix validación fingerprint vacío
+- `src/narrative_assistant/analysis/speech_tracking/speech_tracker.py` - Threshold reducido 500→50
+- `src/narrative_assistant/pipelines/ua_consistency.py` - Fix enum comparison EntityType
+- `api-server/routers/_analysis_phases.py` - Fix CorefConfig use_voting + Integración speech tracking
+- `src/narrative_assistant/pipelines/unified_analysis.py` - Add run_speech_tracking config
+- `frontend/src/components/layout/StatusBar.vue` - Fix z-index panel progreso
 
 ---
 
