@@ -162,6 +162,8 @@ def _update_storage(
     project_id: int, *, metrics_update: dict[str, Any] | None = None, **updates
 ) -> None:
     """Thread-safe update de progress storage para código sin tracker."""
+    import time
+
     with deps._progress_lock:
         storage = deps.analysis_progress_storage.get(project_id)
         if not storage:
@@ -170,6 +172,8 @@ def _update_storage(
             storage.setdefault("metrics", {}).update(metrics_update)
         if updates:
             storage.update(updates)
+        # Actualizar timestamp para detección de análisis bloqueado
+        storage["last_update"] = time.time()
 
 
 # ============================================================================

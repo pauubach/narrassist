@@ -2,6 +2,7 @@
 Router: analysis
 """
 
+import time
 from typing import Optional
 
 import deps
@@ -11,6 +12,88 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from routers._partial_analysis import PartialAnalysisRequest
 
 router = APIRouter()
+
+
+def _is_analysis_stuck(project_id: int) -> bool:
+    """
+    Detecta si un análisis está bloqueado/colgado vs ejecutándose.
+
+    Criterios de bloqueo:
+    1. No hay progreso en storage (análisis murió sin limpiar DB)
+    2. Progreso sin cambios durante >5 minutos
+    3. Status "analyzing" en DB pero no hay thread activo
+
+    Returns:
+        True si está bloqueado, False si está ejecutándose normalmente
+    """
+    import time
+
+    with deps._progress_lock:
+        # Criterio 1: No hay progreso en memoria → análisis murió
+        if project_id not in deps.analysis_progress_storage:
+            logger.debug(f"[STUCK-CHECK] Project {project_id}: No progress in storage → STUCK")
+            return True
+
+        storage = deps.analysis_progress_storage[project_id]
+
+        # Criterio 2: Progreso sin cambios durante mucho tiempo
+        last_update = storage.get("last_update", 0)
+        time_since_update = time.time() - last_update
+
+        # 5 minutos sin actualización → probablemente bloqueado
+        STUCK_TIMEOUT_SECONDS = 5 * 60
+
+        if time_since_update > STUCK_TIMEOUT_SECONDS:
+            logger.debug(
+                f"[STUCK-CHECK] Project {project_id}: No update for {time_since_update:.0f}s → STUCK"
+            )
+            return True
+
+        # Criterio 3: Status "cancelled" en storage pero DB sigue "analyzing"
+        if storage.get("status") == "cancelled":
+            logger.debug(f"[STUCK-CHECK] Project {project_id}: Marked cancelled → STUCK")
+            return True
+
+        logger.debug(
+            f"[STUCK-CHECK] Project {project_id}: Active "
+            f"(updated {time_since_update:.0f}s ago) → OK"
+        )
+        return False
+
+
+def _force_clear_analysis(project_id: int):
+    """
+    Limpia forzosamente análisis bloqueado (versión interna).
+
+    Ejecuta las mismas acciones que el endpoint /force-clear
+    pero sin retornar ApiResponse.
+    """
+    from narrative_assistant.persistence.project import ProjectManager
+
+    with deps._progress_lock:
+        # Limpiar flags
+        deps.analysis_cancellation_flags.pop(project_id, None)
+        deps.analysis_progress_storage.pop(project_id, None)
+
+        # Limpiar colas
+        deps._heavy_analysis_queue[:] = [
+            q for q in deps._heavy_analysis_queue if q["project_id"] != project_id
+        ]
+        deps._analysis_queue[:] = [
+            q for q in deps._analysis_queue if q["project_id"] != project_id
+        ]
+
+    # Actualizar DB
+    try:
+        project_manager = ProjectManager()
+        result = project_manager.get(project_id)
+        if result.is_success:
+            project = result.value
+            project.analysis_status = "completed"
+            project_manager.update(project)
+            logger.info(f"[AUTO-RECOVERY] Project {project_id} cleared successfully")
+    except Exception as e:
+        logger.error(f"[AUTO-RECOVERY] Error clearing project {project_id}: {e}")
 
 
 def _start_queued_analysis(queued_entry: dict):
@@ -141,12 +224,25 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
         project = result.value
 
-        # Guard de concurrencia: no permitir doble análisis del mismo proyecto
+        # Guard de concurrencia con detección de análisis bloqueado
         if project.analysis_status in ("analyzing", "queued"):
-            return ApiResponse(
-                success=False,
-                error="Ya hay un análisis en curso para este proyecto. Espera a que termine.",
-            )
+            # Verificar si está realmente ejecutándose o solo bloqueado
+            is_stuck = _is_analysis_stuck(project_id)
+
+            if is_stuck:
+                logger.warning(
+                    f"[AUTO-RECOVERY] Analysis for project {project_id} appears stuck. "
+                    f"Auto-clearing and allowing restart."
+                )
+                # Auto-limpiar análisis bloqueado
+                _force_clear_analysis(project_id)
+                # Continuar con el nuevo análisis
+            else:
+                # Análisis realmente en curso
+                return ApiResponse(
+                    success=False,
+                    error="Ya hay un análisis en curso para este proyecto. Espera a que termine.",
+                )
 
         # Determinar el archivo a usar
         tmp_path: Path
@@ -207,6 +303,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 "progress": 0,
                 "current_phase": "Iniciando análisis...",
                 "current_action": "Preparando documento",
+                "last_update": time.time(),  # Para detección de análisis bloqueado
                 "phases": [
                     {
                         "id": "parsing",
@@ -634,6 +731,7 @@ def start_partial_analysis(project_id: int, request: PartialAnalysisRequest):
                 "estimated_seconds_remaining": 30,
                 "_start_time": now,
                 "_last_progress_update": now,
+                "last_update": time.time(),  # Para detección de análisis bloqueado
             }
 
         logger.info(
