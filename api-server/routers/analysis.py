@@ -2,7 +2,6 @@
 Router: analysis
 """
 
-import time
 from typing import Optional
 
 import deps

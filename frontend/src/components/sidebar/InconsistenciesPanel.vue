@@ -216,7 +216,7 @@ function getCategoryLabel(category: string): string {
     <!-- Empty state -->
     <DsEmptyState
       v-if="!loading && !continuityLoading && stats.total === 0 && (!continuityData || continuityData.total_issues === 0)"
-      icon="pi-check-circle"
+      icon="pi pi-check-circle"
       title="Sin inconsistencias"
       description="No se detectaron inconsistencias críticas en el manuscrito"
     />

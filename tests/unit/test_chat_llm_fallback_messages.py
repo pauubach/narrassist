@@ -104,5 +104,5 @@ def test_chat_vram_error_message_uses_platform_hint(monkeypatch, patched_project
 
     assert response.success is False
     assert response.error is not None
-    assert "IA" in response.error or "Ollama" in response.error
+    assert "asistente" in response.error or "Ollama" in response.error
     assert "Configuración" in response.error or "Ajustes" in response.error

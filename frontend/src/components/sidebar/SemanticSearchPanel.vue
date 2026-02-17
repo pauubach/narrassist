@@ -150,7 +150,7 @@ const hasSearched = computed(() => results.value.length > 0 || errorMessage.valu
     <!-- Error state -->
     <DsEmptyState
       v-if="errorMessage && !loading"
-      icon="pi-info-circle"
+      icon="pi pi-info-circle"
       title="Sin resultados"
       :description="errorMessage"
     />
@@ -158,7 +158,7 @@ const hasSearched = computed(() => results.value.length > 0 || errorMessage.valu
     <!-- Empty state (before search) -->
     <DsEmptyState
       v-if="!hasSearched && !loading"
-      icon="pi-search"
+      icon="pi pi-search"
       title="Búsqueda semántica"
       description="Ingresa un fragmento de texto para encontrar pasajes similares en el manuscrito"
     />
