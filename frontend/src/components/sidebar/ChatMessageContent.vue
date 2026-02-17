@@ -97,7 +97,7 @@ const renderedHtml = computed(() => {
           ref.excerpt.length > 80 ? ref.excerpt.substring(0, 80) + '...' : ref.excerpt
         )
         const tooltip = `${title}: &quot;${excerpt}&quot;`
-        return `<button class="ref-badge" data-ref-id="${id}" title="${tooltip}">`
+        return `<button type="button" class="ref-badge" data-ref-id="${id}" title="${tooltip}">`
           + `<i class="pi pi-map-marker"></i>`
           + `<span>${title}</span>`
           + `<i class="pi pi-arrow-right ref-arrow"></i>`
@@ -117,12 +117,24 @@ function escapeAttr(s: string): string {
 
 /** Event delegation: captura clicks en .ref-badge dentro del contenido renderizado */
 function handleContentClick(event: MouseEvent) {
-  const badge = (event.target as HTMLElement).closest('.ref-badge') as HTMLElement | null
-  if (!badge) return
+  const target = event.target as HTMLElement
+  console.log('[ChatMessageContent] Click detected on:', target.tagName, target.className)
+
+  const badge = target.closest('.ref-badge') as HTMLElement | null
+  if (!badge) {
+    console.log('[ChatMessageContent] Not a ref-badge click')
+    return
+  }
+
   const refId = parseInt(badge.dataset.refId || '', 10)
+  console.log('[ChatMessageContent] Ref badge clicked, id:', refId)
+
   const ref = refMap.value.get(refId)
   if (ref) {
+    console.log('[ChatMessageContent] Emitting navigate-reference for:', ref)
     emit('navigate-reference', ref)
+  } else {
+    console.warn('[ChatMessageContent] No reference found for id:', refId)
   }
 }
 
