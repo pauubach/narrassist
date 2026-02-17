@@ -1963,6 +1963,13 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
             batch_size = 10
 
             for batch_start in range(0, total_chars, batch_size):
+                # Ceder turno al chat interactivo si hay uno esperando
+                try:
+                    from narrative_assistant.llm.client import get_llm_scheduler
+                    get_llm_scheduler().yield_to_chat()
+                except Exception:
+                    pass
+
                 batch_end = min(batch_start + batch_size, total_chars)
                 batch_chars = character_entities[batch_start:batch_end]
 
