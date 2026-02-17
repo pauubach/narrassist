@@ -5,6 +5,8 @@ import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Dialog from 'primevue/dialog'
+import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
 import DsBadge from '@/components/ds/DsBadge.vue'
 import DsEmptyState from '@/components/ds/DsEmptyState.vue'
 import ChapterRangeSelector from '@/components/alerts/ChapterRangeSelector.vue'
@@ -81,6 +83,25 @@ const sequentialMode = useSequentialMode(
 
 // Estado para diálogos
 const showResolveAllDialog = ref(false)
+const exportMenuRef = ref<InstanceType<typeof Menu> | null>(null)
+
+// Menú de export
+const exportMenuItems: MenuItem[] = [
+  {
+    label: 'Exportar CSV',
+    icon: 'pi pi-file',
+    command: () => exportAlerts('csv')
+  },
+  {
+    label: 'Exportar JSON',
+    icon: 'pi pi-code',
+    command: () => exportAlerts('json')
+  }
+]
+
+function toggleExportMenu(event: Event) {
+  exportMenuRef.value?.toggle(event)
+}
 
 // Meta-categorías
 const selectedMetaCategory = ref<MetaCategoryKey | null>(null)
@@ -277,53 +298,87 @@ function _handleReopen(alert: Alert) {
   emit('alert-reopen', alert)
 }
 
-function exportAlerts() {
+function exportAlerts(format: 'json' | 'csv' = 'csv') {
   if (!props.alerts || props.alerts.length === 0) {
     toast.add({ severity: 'warn', summary: 'Sin datos', detail: 'No hay alertas para exportar', life: 4000 })
     return
   }
 
   try {
-    const content = {
-      projectId: props.projectId,
-      exportedAt: new Date().toISOString(),
-      totalAlerts: props.alerts.length,
-      bySeverity: {
-        critical: props.alerts.filter(a => a.severity === 'critical').length,
-        high: props.alerts.filter(a => a.severity === 'high').length,
-        medium: props.alerts.filter(a => a.severity === 'medium').length,
-        low: props.alerts.filter(a => a.severity === 'low').length,
-        info: props.alerts.filter(a => a.severity === 'info').length,
-      },
-      byStatus: {
-        active: props.alerts.filter(a => a.status === 'active').length,
-        resolved: props.alerts.filter(a => a.status === 'resolved').length,
-        dismissed: props.alerts.filter(a => a.status === 'dismissed').length,
-      },
-      alerts: props.alerts.map(a => ({
-        id: a.id,
-        title: a.title,
-        description: a.description,
-        severity: a.severity,
-        category: a.category,
-        status: a.status,
-        chapter: a.chapter,
-        confidence: a.confidence,
-        createdAt: a.createdAt,
-      })),
+    if (format === 'csv') {
+      // Export CSV
+      const headers = ['ID', 'Severidad', 'Categoría', 'Estado', 'Capítulo', 'Título', 'Descripción', 'Confianza', 'Fecha']
+      const rows = props.alerts.map(a => [
+        a.id,
+        a.severity,
+        a.category || '',
+        a.status,
+        a.chapter || '',
+        `"${(a.title || '').replace(/"/g, '""')}"`,
+        `"${(a.description || '').replace(/"/g, '""')}"`,
+        a.confidence ? (a.confidence * 100).toFixed(0) + '%' : '',
+        a.createdAt || ''
+      ])
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(','))
+      ].join('\n')
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `alertas_proyecto_${props.projectId}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      toast.add({ severity: 'success', summary: 'Exportado', detail: `${props.alerts.length} alertas exportadas (CSV)`, life: 3000 })
+    } else {
+      // Export JSON (original)
+      const content = {
+        projectId: props.projectId,
+        exportedAt: new Date().toISOString(),
+        totalAlerts: props.alerts.length,
+        bySeverity: {
+          critical: props.alerts.filter(a => a.severity === 'critical').length,
+          high: props.alerts.filter(a => a.severity === 'high').length,
+          medium: props.alerts.filter(a => a.severity === 'medium').length,
+          low: props.alerts.filter(a => a.severity === 'low').length,
+          info: props.alerts.filter(a => a.severity === 'info').length,
+        },
+        byStatus: {
+          active: props.alerts.filter(a => a.status === 'active').length,
+          resolved: props.alerts.filter(a => a.status === 'resolved').length,
+          dismissed: props.alerts.filter(a => a.status === 'dismissed').length,
+        },
+        alerts: props.alerts.map(a => ({
+          id: a.id,
+          title: a.title,
+          description: a.description,
+          severity: a.severity,
+          category: a.category,
+          status: a.status,
+          chapter: a.chapter,
+          confidence: a.confidence,
+          createdAt: a.createdAt,
+        })),
+      }
+
+      const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `alertas_proyecto_${props.projectId}.json`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      toast.add({ severity: 'success', summary: 'Exportado', detail: `${props.alerts.length} alertas exportadas (JSON)`, life: 3000 })
     }
-
-    const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `alertas_proyecto_${props.projectId}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-
-    toast.add({ severity: 'success', summary: 'Exportado', detail: `${props.alerts.length} alertas exportadas`, life: 3000 })
   } catch (err) {
     console.error('Error exporting alerts:', err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'Error al exportar alertas', life: 5000 })
@@ -454,13 +509,14 @@ defineExpose({ focusSearch })
         />
 
         <Button
-          v-tooltip="'Exportar alertas'"
+          v-tooltip="'Exportar alertas (CSV o JSON)'"
           icon="pi pi-download"
           text
           rounded
           :disabled="alerts.length === 0"
-          @click="exportAlerts"
+          @click="toggleExportMenu"
         />
+        <Menu ref="exportMenuRef" :model="exportMenuItems" :popup="true" />
 
         <Button
           v-tooltip="'Resolver todas las activas'"
@@ -533,6 +589,11 @@ defineExpose({ focusSearch })
           {{ stats.bySeverity[severity] || 0 }}
         </DsBadge>
       </div>
+    </div>
+
+    <!-- Analytics visuales (Tier 1) -->
+    <div v-if="stats.active > 0" class="alerts-analytics-wrapper">
+      <AlertsAnalytics :alerts="alerts" :chapter-count="props.chapters?.length || 0" />
     </div>
 
     <!-- Lista de alertas -->
@@ -755,6 +816,13 @@ defineExpose({ focusSearch })
   background: var(--surface-50);
   border-bottom: 1px solid var(--surface-border);
   overflow: visible; /* Asegurar que los badges no se corten */
+}
+
+/* Analytics wrapper */
+.alerts-analytics-wrapper {
+  padding: 0.75rem 1rem;
+  background: var(--surface-50);
+  border-bottom: 1px solid var(--surface-border);
 }
 
 .stat-item {
