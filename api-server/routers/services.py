@@ -742,13 +742,18 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
                         context_end = min(len(chapter_content), rel_end + 200)
                         expanded_context = chapter_content[context_start:context_end]
 
+                        # Calcular posiciones globales del contexto expandido
+                        global_context_start = chapter_start + context_start
+                        global_context_end = chapter_start + context_end
+
                         # Crear excerpt para inyectar como [REF:1]
+                        # IMPORTANTE: Las posiciones apuntan al CONTEXTO EXPANDIDO, no a la selección
                         selection_excerpt = {
                             "excerpt": expanded_context[:500] if len(expanded_context) > 500 else expanded_context,
                             "chapter_number": request.selected_text_chapter,
                             "chapter_title": ch_title,
-                            "global_start": request.selected_text_start,
-                            "global_end": request.selected_text_end or request.selected_text_start + len(request.selected_text),
+                            "global_start": global_context_start,
+                            "global_end": global_context_end,
                         }
                         break
 

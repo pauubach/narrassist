@@ -176,7 +176,7 @@ function getEntityIcon(type: string): string {
           @click="copyToClipboard"
         />
         <Button
-          label="Buscar similar"
+          label="Similar"
           icon="pi pi-search"
           size="small"
           outlined
