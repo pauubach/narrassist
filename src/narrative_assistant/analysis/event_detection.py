@@ -720,14 +720,26 @@ class EventDetector:
             events.extend(tier2_events)
             logger.debug(f"Fase Tier 2: {len(tier2_events)} eventos detectados")
 
-        # Fase 4: Detectores LLM (opcional, más lentos)
+        # Fase 4: Detectores LLM Tier 1 (opcional, más lentos)
         if self.enable_llm:
             # Import lazy para evitar dependencias pesadas
             from .event_detection_llm import detect_llm_tier1_events
 
             llm_events = detect_llm_tier1_events(text, doc=self.nlp(text) if self.nlp else None)
             events.extend(llm_events)
-            logger.debug(f"Fase LLM: {len(llm_events)} eventos detectados")
+            logger.debug(f"Fase LLM Tier 1: {len(llm_events)} eventos detectados")
+
+        # Fase 5: Detectores Tier 3 (especialización por género, LLM)
+        tier3_events = []
+        if self.enable_llm:
+            from .event_detection_tier3 import detect_tier3_events, detect_knowledge_transfer
+
+            doc_for_tier3 = self.nlp(text) if self.nlp else None
+            tier3_events = detect_tier3_events(text, doc=doc_for_tier3)
+            knowledge_events = detect_knowledge_transfer(text, doc=doc_for_tier3)
+            tier3_events.extend(knowledge_events)
+            events.extend(tier3_events)
+            logger.debug(f"Fase Tier 3: {len(tier3_events)} eventos detectados")
 
         # Ordenar por posición
         events.sort(key=lambda e: e.start_char)

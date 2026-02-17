@@ -100,6 +100,9 @@ class EventType(Enum):
     BREAKUP = "breakup"  # Ruptura de relación
     RECONCILIATION = "reconciliation"  # Reconciliación romántica
 
+    # Universal (aplicable a todos los géneros)
+    KNOWLEDGE_TRANSFER = "knowledge_transfer"  # Transmisión o descubrimiento de conocimiento
+
     # ========================================================================
     # Eventos Básicos Preexistentes (mantener compatibilidad)
     # ========================================================================
@@ -158,6 +161,7 @@ EVENT_TIER_MAP: dict[EventType, EventTier] = {
     EventType.LOVE_DECLARATION: EventTier.TIER_3,
     EventType.BREAKUP: EventTier.TIER_3,
     EventType.RECONCILIATION: EventTier.TIER_3,
+    EventType.KNOWLEDGE_TRANSFER: EventTier.TIER_3,
     # Preexistentes (asignar a Tier 1 por importancia)
     EventType.FIRST_APPEARANCE: EventTier.TIER_1,
     EventType.RETURN: EventTier.TIER_1,
