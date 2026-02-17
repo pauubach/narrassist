@@ -180,6 +180,7 @@ watch(
     if (props.chapter) {
       loadChapterSummary()
       loadChapterEvents()
+      loadEventDensity()
     }
   },
   { immediate: true }

@@ -2825,7 +2825,7 @@ def _emit_grammar_alerts(ctx: dict, tracker: ProgressTracker):
                 logger.warning(f"Error creating correction alert: {e}")
 
     # Marcar fase parcial de alertas como completada
-    tracker.mark_phase_completed("alerts_grammar")
+    tracker.mark_phase_completed("grammar_alerts")
     _update_storage(project_id, metrics_update={"alerts_generated": alerts_created})
     logger.info(f"Grammar alerts emitted: {alerts_created} alerts")
 
