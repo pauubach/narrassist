@@ -729,13 +729,28 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
         selection_context = ""
         if request.selected_text:
             ch_title = None
-            if request.selected_text_chapter:
+            expanded_context = None
+
+            # Si tenemos posiciones, extraer contexto expandido
+            if request.selected_text_start is not None and request.selected_text_chapter:
                 for cd in chapters_data:
                     if cd["number"] == request.selected_text_chapter:
                         ch_title = cd["title"]
+                        chapter_content = cd.get("content", "")
+                        chapter_start = cd.get("start_char", 0)
+
+                        # Calcular offset relativo dentro del capítulo
+                        rel_start = request.selected_text_start - chapter_start
+                        rel_end = request.selected_text_end - chapter_start if request.selected_text_end else rel_start + len(request.selected_text)
+
+                        # Expandir contexto ±200 caracteres
+                        context_start = max(0, rel_start - 200)
+                        context_end = min(len(chapter_content), rel_end + 200)
+                        expanded_context = chapter_content[context_start:context_end]
                         break
+
             selection_context = build_selection_context(
-                request.selected_text, ch_title
+                request.selected_text, ch_title, expanded_context
             )
 
         # 8. Historial de conversación

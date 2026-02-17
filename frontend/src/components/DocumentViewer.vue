@@ -1370,11 +1370,11 @@ const handleMouseUp = () => {
     return
   }
 
-  // Calcular posiciones aproximadas
+  // Calcular posiciones
   const range = selection.getRangeAt(0)
   const container = range.commonAncestorContainer
 
-  // Intentar encontrar el capítulo
+  // Encontrar el capítulo y calcular offset
   let chapterElement: HTMLElement | null = null
   let node: Node | null = container
   while (node && node !== viewerContainer.value) {
@@ -1385,16 +1385,46 @@ const handleMouseUp = () => {
     node = node.parentNode
   }
 
-  const chapterTitle = chapterElement?.dataset.chapterId
-    ? chapters.value.find(c => c.id === parseInt(chapterElement!.dataset.chapterId!))?.title
-    : undefined
+  if (!chapterElement) {
+    // No se pudo determinar el capítulo
+    selectionStore.setTextSelection(null)
+    return
+  }
+
+  const chapterId = parseInt(chapterElement.dataset.chapterId || '0')
+  const chapter = chapters.value.find(c => c.id === chapterId)
+
+  if (!chapter) {
+    selectionStore.setTextSelection(null)
+    return
+  }
+
+  // Calcular offset desde el inicio del capítulo
+  // Crear un rango desde el inicio del capítulo hasta el inicio de la selección
+  const chapterTextElement = chapterElement.querySelector('.chapter-text')
+  if (!chapterTextElement) {
+    selectionStore.setTextSelection(null)
+    return
+  }
+
+  const rangeToStart = document.createRange()
+  rangeToStart.setStart(chapterTextElement, 0)
+  rangeToStart.setEnd(range.startContainer, range.startOffset)
+
+  const textBeforeSelection = rangeToStart.toString()
+  const offsetInChapter = textBeforeSelection.length
+
+  // Las posiciones globales se calculan sumando el start_char del capítulo
+  const globalStart = (chapter.startChar ?? 0) + offsetInChapter
+  const globalEnd = globalStart + selectedText.length
 
   // Guardar selección en el store
   selectionStore.setTextSelection({
-    start: 0, // Posiciones aproximadas - se pueden calcular más precisamente si es necesario
-    end: selectedText.length,
+    start: globalStart,
+    end: globalEnd,
     text: selectedText,
-    chapter: chapterTitle
+    chapter: chapter.title,
+    chapterNumber: chapter.chapterNumber
   })
 }
 

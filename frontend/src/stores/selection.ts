@@ -22,6 +22,7 @@ export interface TextSelection {
   end: number
   text: string
   chapter?: string
+  chapterNumber?: number
 }
 
 export const useSelectionStore = defineStore('selection', () => {

@@ -416,6 +416,7 @@ def build_chat_system_prompt(
 def build_selection_context(
     selected_text: str,
     chapter_title: Optional[str] = None,
+    expanded_context: Optional[str] = None,
 ) -> str:
     """
     Construye el bloque de contexto para el texto seleccionado.
@@ -423,6 +424,7 @@ def build_selection_context(
     Args:
         selected_text: Texto seleccionado por el usuario
         chapter_title: Título del capítulo (opcional)
+        expanded_context: Contexto expandido alrededor de la selección (opcional)
 
     Returns:
         Bloque de texto para inyectar en el system prompt
@@ -430,9 +432,17 @@ def build_selection_context(
     parts = ['### Texto seleccionado por el usuario:']
     if chapter_title:
         parts.append(f'Capítulo: "{chapter_title}"')
-    # Truncar si es muy largo
-    text = selected_text[:500] if len(selected_text) > 500 else selected_text
-    parts.append(f'Texto: "{text}"')
+
+    # Si hay contexto expandido, mostrarlo primero
+    if expanded_context:
+        parts.append(f'Contexto: "{expanded_context}"')
+        parts.append('')
+        parts.append(f'Selección específica: "{selected_text}"')
+    else:
+        # Truncar si es muy largo
+        text = selected_text[:500] if len(selected_text) > 500 else selected_text
+        parts.append(f'Texto: "{text}"')
+
     parts.append('')
     parts.append('El usuario pregunta sobre este fragmento específico.')
     return '\n'.join(parts)

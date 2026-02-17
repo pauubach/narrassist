@@ -166,7 +166,7 @@ function handleSend() {
   if (sel?.text) {
     selection = {
       text: sel.text,
-      chapter: props.selectionChapterNumber ?? undefined,
+      chapter: sel.chapterNumber ?? props.selectionChapterNumber ?? undefined,
       start: sel.start,
       end: sel.end,
     }
