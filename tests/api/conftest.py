@@ -15,12 +15,27 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "api-server"))
 
 from main import app
 from narrative_assistant.persistence.database import Database
-from narrative_assistant.persistence.project import Project
+from narrative_assistant.persistence.project import Project, ProjectManager
 
 
 @pytest.fixture
-def test_client():
-    """Fixture que proporciona un TestClient de FastAPI."""
+def test_client(temp_db, monkeypatch):
+    """
+    Fixture que proporciona un TestClient de FastAPI.
+
+    Configura la DB del test para que el app use la misma base de datos.
+    """
+    # Parchear get_database para que devuelva la DB del test
+    test_db = Database(temp_db)
+    monkeypatch.setattr("narrative_assistant.persistence.database.get_database", lambda: test_db)
+
+    # Inicializar deps globals con test_db
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "api-server"))
+    import deps
+    deps.project_manager = ProjectManager(test_db)
+    deps.get_database = lambda: test_db
+
     return TestClient(app)
 
 
@@ -30,44 +45,32 @@ def sample_project(temp_db):
     Fixture que crea un proyecto de ejemplo con capítulos.
 
     Retorna un objeto Project con:
-    - ID = 1
+    - ID asignado automáticamente
     - Nombre = "Sample Project"
     - 5 capítulos con texto de ejemplo
     """
     db = Database(temp_db)
+    manager = ProjectManager(db)
 
-    # Crear proyecto
-    result = db.create_project(
+    # Crear texto de ejemplo con 5 capítulos
+    text = ""
+    for i in range(1, 6):
+        text += f"\n# Capítulo {i}\n\n"
+        text += f"Este es el texto del capítulo {i}. " * 50  # ~250 palabras por capítulo
+        text += "\n\n"
+
+    # Crear proyecto usando ProjectManager
+    result = manager.create_from_document(
+        text=text,
         name="Sample Project",
-        document_path="/tmp/sample.docx"
+        document_format="txt",
+        check_existing=False
     )
 
     if result.is_failure:
         pytest.fail(f"Failed to create project: {result.error}")
 
-    project_id = result.value
-
-    # Obtener el proyecto
-    project_result = db.get_project(project_id)
-    if project_result.is_failure:
-        pytest.fail(f"Failed to get project: {project_result.error}")
-
-    project = project_result.value
-
-    # Crear algunos capítulos de ejemplo
-    for i in range(1, 6):
-        chapter_result = db.create_chapter(
-            project_id=project_id,
-            chapter_number=i,
-            title=f"Capítulo {i}",
-            text=f"Este es el texto del capítulo {i}. " * 50,  # ~250 palabras
-            word_count=250
-        )
-
-        if chapter_result.is_failure:
-            pytest.fail(f"Failed to create chapter {i}: {chapter_result.error}")
-
-    return project
+    return result.value
 
 
 @pytest.fixture
@@ -78,21 +81,17 @@ def empty_project(temp_db):
     Retorna un objeto Project vacío para tests de edge cases.
     """
     db = Database(temp_db)
+    manager = ProjectManager(db)
 
-    # Crear proyecto
-    result = db.create_project(
+    # Crear proyecto vacío (sin texto)
+    result = manager.create_from_document(
+        text="",
         name="Empty Project",
-        document_path="/tmp/empty.docx"
+        document_format="txt",
+        check_existing=False
     )
 
     if result.is_failure:
         pytest.fail(f"Failed to create project: {result.error}")
 
-    project_id = result.value
-
-    # Obtener el proyecto
-    project_result = db.get_project(project_id)
-    if project_result.is_failure:
-        pytest.fail(f"Failed to get project: {project_result.error}")
-
-    return project_result.value
+    return result.value

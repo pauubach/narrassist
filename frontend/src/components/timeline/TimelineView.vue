@@ -75,11 +75,26 @@
           @click="loadTimeline"
         />
         <Button
-          v-tooltip.bottom="'Exportar timeline'"
+          v-tooltip.bottom="'Exportar timeline temporal'"
           icon="pi pi-download"
           text
           rounded
           @click="exportTimeline"
+        />
+        <Divider layout="vertical" />
+        <Button
+          v-tooltip.bottom="'Exportar eventos narrativos'"
+          icon="pi pi-file-export"
+          text
+          rounded
+          @click="showEventsExportDialog = true"
+        />
+        <Button
+          v-tooltip.bottom="'Estadísticas de eventos'"
+          icon="pi pi-chart-bar"
+          text
+          rounded
+          @click="showEventsStats = !showEventsStats"
         />
       </div>
     </div>
@@ -464,6 +479,30 @@
         />
       </template>
     </Dialog>
+
+    <!-- Event density visualization -->
+    <EventDensityStrip
+      v-if="eventDensityData.length > 0"
+      :density-data="eventDensityData"
+      :width="800"
+      :height="60"
+      @navigate-to-chapter="navigateToChapter"
+    />
+
+    <!-- Narrative events export dialog -->
+    <EventsExportDialog
+      :visible="showEventsExportDialog"
+      :project-id="projectId"
+      @update:visible="showEventsExportDialog = $event"
+    />
+
+    <!-- Events stats card -->
+    <EventStatsCard
+      :visible="showEventsStats"
+      :project-id="projectId"
+      @close="showEventsStats = false"
+      @navigate-to-chapter="navigateToChapter"
+    />
   </div>
 </template>
 
@@ -480,6 +519,9 @@ import Chip from 'primevue/chip'
 import VirtualScroller from 'primevue/virtualscroller'
 import TimelineEventVue from './TimelineEvent.vue'
 import VisTimeline from './VisTimeline.vue'
+import EventsExportDialog from '@/components/events/EventsExportDialog.vue'
+import EventDensityStrip from '@/components/events/EventDensityStrip.vue'
+import EventStatsCard from '@/components/events/EventStatsCard.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { transformTimeline } from '@/types/transformers'
 import { useAlertUtils } from '@/composables/useAlertUtils'
@@ -514,6 +556,20 @@ const timeline = ref<Timeline | null>(null)
 const selectedEvent = ref<TimelineEvent | null>(null)
 const hoveredEvent = ref<TimelineEvent | null>(null)
 const showEventDetail = ref(false)
+
+// Event export/stats UI state
+const showEventsExportDialog = ref(false)
+const showEventsStats = ref(false)
+
+// Density data for narrative events
+interface ChapterDensity {
+  chapter: number
+  tier1: number
+  tier2: number
+  tier3: number
+  total: number
+}
+const eventDensityData = ref<ChapterDensity[]>([])
 
 // Anacronismos de conocimiento
 interface KnowledgeAnachronism {
@@ -966,10 +1022,37 @@ const exportTimeline = () => {
   URL.revokeObjectURL(url)
 }
 
+/** Cargar datos de densidad de eventos narrativos */
+async function loadEventDensity() {
+  try {
+    const response = await fetch(`/api/projects/${props.projectId}/events/stats`)
+    const data = await response.json()
+
+    if (data.success) {
+      eventDensityData.value = data.data.density_by_chapter.map((ch: any) => ({
+        chapter: ch.chapter,
+        tier1: ch.tier1,
+        tier2: ch.tier2,
+        tier3: ch.tier3,
+        total: ch.total
+      }))
+    }
+  } catch (error) {
+    console.error('Error loading event density:', error)
+  }
+}
+
+/** Navegar a un capítulo específico (placeholder) */
+function navigateToChapter(chapterNumber: number) {
+  console.log('Navigate to chapter:', chapterNumber)
+  // TODO: Implementar navegación al capítulo en TimelineView
+}
+
 // Lifecycle
 onMounted(() => {
   loadTimeline()
   loadAnachronisms()
+  loadEventDensity()
 })
 
 // Watch para recargar cuando cambie el proyecto
