@@ -746,7 +746,7 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
                         global_context_start = chapter_start + context_start
                         global_context_end = chapter_start + context_end
 
-                        # Crear excerpt para inyectar como [REF:1]
+                        # Crear excerpt para inyectar como [REF:1] (FUERA del if para que sea accesible)
                         # IMPORTANTE: Las posiciones apuntan al CONTEXTO EXPANDIDO, no a la selección
                         selection_excerpt = {
                             "excerpt": expanded_context[:500] if len(expanded_context) > 500 else expanded_context,
@@ -755,6 +755,7 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
                             "global_start": global_context_start,
                             "global_end": global_context_end,
                         }
+                        logger.info(f"Created selection_excerpt: chapter={ch_title}, positions={global_context_start}-{global_context_end}")
                         break
 
             # Debug: log selection context
@@ -762,6 +763,7 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
             logger.info(f"Selection context - chapter: {request.selected_text_chapter}")
             logger.info(f"Selection context - positions: {request.selected_text_start} - {request.selected_text_end}")
             logger.info(f"Selection context - expanded: {len(expanded_context) if expanded_context else 0} chars")
+            logger.info(f"selection_excerpt after loop: {selection_excerpt is not None}")
 
             selection_context = build_selection_context(
                 request.selected_text, ch_title, expanded_context

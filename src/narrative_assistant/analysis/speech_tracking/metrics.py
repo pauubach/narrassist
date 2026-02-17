@@ -33,7 +33,7 @@ class SpeechMetrics:
 
     @staticmethod
     def calculate(
-        dialogues: list[str], spacy_nlp=None
+        dialogues: list[str], spacy_nlp=None, use_cache: bool = True
     ) -> dict[str, float]:
         """
         Calcula todas las métricas para una lista de diálogos.
@@ -41,6 +41,7 @@ class SpeechMetrics:
         Args:
             dialogues: Lista de diálogos del personaje
             spacy_nlp: Modelo spaCy (opcional, para ASL)
+            use_cache: Si True, usa cache en memoria (default: True)
 
         Returns:
             Dict con todas las métricas calculadas
@@ -49,6 +50,16 @@ class SpeechMetrics:
             return {metric: 0.0 for metric in TRACKED_METRICS}
 
         combined_text = " ".join(dialogues)
+
+        # Intentar recuperar del cache
+        if use_cache:
+            from .cache import get_metrics_cache
+
+            cache = get_metrics_cache()
+            cached_metrics = cache.get(combined_text)
+
+            if cached_metrics is not None:
+                return cached_metrics
 
         metrics = {
             "filler_rate": SpeechMetrics._calculate_filler_rate(combined_text),
@@ -66,6 +77,11 @@ class SpeechMetrics:
         }
 
         logger.debug(f"Calculated metrics: {metrics}")
+
+        # Guardar en cache
+        if use_cache:
+            cache.set(combined_text, metrics)
+
         return metrics
 
     @staticmethod
