@@ -281,3 +281,53 @@ class TestHomophoneDetection:
         result = checker.check(text)
         assert result.is_success
         # La detección real depende de la implementación
+
+
+class TestMiVsMiAccent:
+    """Tests para verificar la detección correcta de 'mi' vs 'mí'."""
+
+    @pytest.fixture
+    def checker(self):
+        """Checker para tests."""
+        from narrative_assistant.nlp.orthography import get_spelling_checker, reset_spelling_checker
+
+        reset_spelling_checker()
+        return get_spelling_checker()
+
+    @pytest.mark.parametrize(
+        "text,should_detect_error",
+        [
+            # Casos donde NO debe detectar error (posesivo, sin tilde)
+            ("Mi sobrina Isabel ha desaparecido hace tres días.", False),
+            ("Mi hermana vive en Madrid.", False),
+            ("Mi casa está lejos.", False),
+            ("Mi libro favorito es Don Quijote.", False),
+            # Casos donde SÍ debe detectar error (pronombre preposicional, necesita tilde)
+            ("Es un honor para mi recibirla.", True),  # para mí
+            ("Esto es importante para mi.", True),     # para mí
+            ("Ven a mi cuando quieras.", True),        # a mí
+            ("Habló de mi con respeto.", True),        # de mí
+        ],
+    )
+    def test_mi_accent_detection(self, checker, text, should_detect_error):
+        """
+        Verifica que 'mi' solo se marca como error cuando realmente necesita tilde.
+
+        'mi' (sin tilde) = posesivo → correcto
+        'mí' (con tilde) = pronombre preposicional → solo tras preposición
+        """
+        result = checker.check(text)
+        assert result.is_success
+
+        report = result.value
+        mi_issues = [
+            i for i in report.issues
+            if i.word.lower() == "mi" and "mí" in i.suggestions
+        ]
+
+        if should_detect_error:
+            # Debe detectar que falta la tilde
+            assert len(mi_issues) > 0, f"Debería detectar error en: '{text}'"
+        else:
+            # NO debe marcar como error (es posesivo, correcto sin tilde)
+            assert len(mi_issues) == 0, f"Falso positivo en: '{text}'"

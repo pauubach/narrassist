@@ -836,17 +836,62 @@ Si no hay errores adicionales, responde con un array vacío: []"""
         context_end = min(len(text), position + len(word) + 20)
         context = text[context_start:context_end].lower()
 
+        # Caso especial: "mi" vs "mí"
+        if word == "mi":
+            return self._mi_needs_accent(text, position)
+
         # Reglas contextuales para tildes diacríticas
+        # NOTA: Estas reglas deben ser MUY conservadoras para evitar falsos positivos
         rules = {
             "mas": lambda c: "pero" not in c and "sin embargo" not in c,
             "si": lambda c: "?" in c or "!" in c or "claro" in c or "por supuesto" in c,
             "el": lambda c: position > 0 and text[position - 1] in ".,;:",
             "tu": lambda c: "?" in c or "eres" in c or "tienes" in c,
-            "mi": lambda c: "para" in c or "a" in c[:10],
         }
 
         if word in rules:
             return rules[word](context)
+
+        return False
+
+    def _mi_needs_accent(self, text: str, position: int) -> bool:
+        """
+        Determinar si 'mi' necesita tilde.
+
+        'mí' (con tilde) = pronombre personal preposicional
+        - Ejemplos: para mí, a mí, de mí, por mí, ante mí
+
+        'mi' (sin tilde) = adjetivo posesivo
+        - Ejemplos: mi casa, mi hermana, mi sobrina
+
+        La tilde SOLO se requiere cuando va precedido inmediatamente por una preposición.
+        """
+        # Verificar caracteres previos a "mi"
+        if position < 1:
+            return False
+
+        # Obtener las palabras anteriores (hasta 20 caracteres)
+        # NO hacer strip() para no perder espacios al final
+        preceding_text = text[max(0, position - 20):position].lower()
+
+        # Preposiciones que requieren "mí" con tilde
+        # El patrón verifica que termine con la preposición + espacios antes de "mi"
+        prep_patterns = [
+            r'\bpara\s+$',      # para mí
+            r'\ba\s+$',          # a mí
+            r'\bde\s+$',         # de mí
+            r'\bpor\s+$',        # por mí
+            r'\bante\s+$',       # ante mí
+            r'\bcontra\s+$',     # contra mí
+            r'\bentre\s+$',      # entre ... y mí
+            r'\bhacia\s+$',      # hacia mí
+            r'\bsin\s+$',        # sin mí
+            r'\bcon\s+$',        # con mí (poco común pero válido)
+        ]
+
+        for pattern in prep_patterns:
+            if re.search(pattern, preceding_text):
+                return True
 
         return False
 
