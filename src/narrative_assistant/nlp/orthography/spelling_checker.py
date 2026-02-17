@@ -355,8 +355,10 @@ SPELLING_PATTERNS = [
     (r"(?<![IVXLCDM])(\w)\1{2,}(?![IVXLCDM])", SpellingErrorType.REPEATED_CHAR, "Letras repetidas"),
     # Espacios múltiples en la misma línea (NO saltos de párrafo \n\n)
     (r"[^\S\n]{2,}", SpellingErrorType.TYPO, "Espacios múltiples"),
-    # Puntuación duplicada
-    (r"([.!?])\1+", SpellingErrorType.TYPO, "Puntuación duplicada"),
+    # Puntuación duplicada (4+ puntos, o 2+ de ! o ?)
+    # NOTA: Excluye ... (puntos suspensivos, que son 3 puntos exactamente)
+    (r"\.{4,}", SpellingErrorType.TYPO, "Demasiados puntos (usar ... para suspensivos)"),
+    (r"([!?])\1+", SpellingErrorType.TYPO, "Puntuación duplicada"),
     # Coma o punto seguido de letra sin espacio
     (r"[,.](?=[a-záéíóúñ])", SpellingErrorType.TYPO, "Falta espacio después de puntuación"),
 ]
@@ -902,6 +904,10 @@ Si no hay errores adicionales, responde con un array vacío: []"""
         context_end = min(len(text), position + len(word) + 30)
         context = text[context_start:context_end].lower()
 
+        # "a" vs "ha" (verbo haber)
+        if word.lower() == "a":
+            return self._a_should_be_ha(text, position)
+
         # "haber" vs "a ver"
         if word.lower() == "haber":
             if "vamos" in context or "veamos" in context:
@@ -911,6 +917,35 @@ Si no hay errores adicionales, responde con un array vacío: []"""
 
         # "hay" vs "ahí" vs "ay"
         return bool(word.lower() == "hay" and ("allí" in context or "aquí" in context))
+
+    def _a_should_be_ha(self, text: str, position: int) -> bool:
+        """
+        Determinar si 'a' (preposición) debería ser 'ha' (verbo haber).
+
+        'a' (sin h) = preposición de movimiento/dirección
+        - Ejemplos: voy a casa, salió a comprar
+
+        'ha' (con h) = verbo haber (3ª persona singular presente)
+        - Ejemplos: ha estado, ha venido, ha comido
+
+        Indicadores: participios (terminados en -ado, -ido, -to, -cho, etc.)
+        """
+        # Verificar si hay un participio después de "a"
+        following_text = text[position + 1:min(len(text), position + 30)].strip().lower()
+
+        # Participios regulares e irregulares comunes
+        participle_patterns = [
+            r'^\s*(estado|sido|tenido|habido)',  # haber
+            r'^\s*\w+ado\b',   # participios -ado (hablado, comido, etc.)
+            r'^\s*\w+ido\b',   # participios -ido (vendido, vivido, etc.)
+            r'^\s*(hecho|dicho|visto|puesto|escrito|roto|abierto|cubierto|vuelto|muerto)',  # irregulares
+        ]
+
+        for pattern in participle_patterns:
+            if re.search(pattern, following_text):
+                return True
+
+        return False
 
     def _context_suggests_confusion(self, context: str, word: str, alternatives: list[str]) -> bool:
         """Determinar si el contexto sugiere confusión entre palabras."""

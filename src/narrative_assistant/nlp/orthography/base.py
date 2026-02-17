@@ -211,6 +211,8 @@ COMMON_HOMOPHONES: dict[str, list[str]] = {
     "hay": ["ahí", "ay"],
     "ahí": ["hay", "ay"],
     "ay": ["hay", "ahí"],
+    "a": ["ha"],  # preposición vs verbo haber (ej: "a estado" → "ha estado")
+    "ha": ["a"],  # verbo haber vs preposición
     "halla": ["haya", "aya"],
     "haya": ["halla", "aya"],
     "echo": ["hecho"],
