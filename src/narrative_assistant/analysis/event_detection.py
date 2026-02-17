@@ -722,12 +722,10 @@ class EventDetector:
 
         # Fase 4: Detectores LLM (opcional, más lentos)
         if self.enable_llm:
-            # TODO: Implementar detectores LLM para BETRAYAL, ALLIANCE, REVELATION, DECISION
-            llm_events = []
-            # llm_events.extend(self.betrayal_detector.detect(text))
-            # llm_events.extend(self.alliance_detector.detect(text))
-            # llm_events.extend(self.revelation_detector.detect(text))
-            # llm_events.extend(self.decision_detector.detect(text))
+            # Import lazy para evitar dependencias pesadas
+            from .event_detection_llm import detect_llm_tier1_events
+
+            llm_events = detect_llm_tier1_events(text, doc=self.nlp(text) if self.nlp else None)
             events.extend(llm_events)
             logger.debug(f"Fase LLM: {len(llm_events)} eventos detectados")
 

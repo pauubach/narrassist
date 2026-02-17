@@ -1042,9 +1042,12 @@ class PipelineConsistencyMixin:
             context_analyzer = ContextualAnalyzer()
 
             # Filtrar solo personajes principales (>500 palabras de diálogo total)
+            from ...entities.models import EntityType
+
             main_characters = []
             for entity in context.entities:
-                if entity.entity_type != "PERSON":
+                # CRITICAL FIX: Comparar con EntityType enum, no string "PERSON"
+                if entity.entity_type not in (EntityType.CHARACTER, EntityType.ANIMAL, EntityType.CREATURE):
                     continue
 
                 # Estimar palabras totales de diálogo (heurística simple)
