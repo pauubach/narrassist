@@ -169,7 +169,7 @@
                 <!-- Panel Inconsistencias -->
                 <InconsistenciesPanel
                   v-show="sidebarTab === 'inconsistencies'"
-                  :project-id="projectId"
+                  :project-id="project.id"
                   :alerts="alerts"
                   :entities="entities"
                   :loading="loading"

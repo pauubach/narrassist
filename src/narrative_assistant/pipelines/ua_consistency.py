@@ -1041,7 +1041,8 @@ class PipelineConsistencyMixin:
 
             context_analyzer = ContextualAnalyzer()
 
-            # Filtrar solo personajes principales (>500 palabras de diálogo total)
+            # Filtrar solo personajes principales (>50 palabras de diálogo total)
+            # REDUCED threshold from 500 to 50 para soportar documentos cortos/test
             from ...entities.models import EntityType
 
             main_characters = []
@@ -1055,7 +1056,7 @@ class PipelineConsistencyMixin:
                 total_mentions = entity.mention_count or 0
                 estimated_dialogue_words = total_mentions * 10  # ~10 palabras por mención
 
-                if estimated_dialogue_words >= 500:
+                if estimated_dialogue_words >= 50:  # Threshold reducido para docs cortos
                     main_characters.append(entity)
 
             logger.info(

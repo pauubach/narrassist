@@ -10,6 +10,9 @@ import ProgressSpinner from 'primevue/progressspinner'
 import type { Chapter, Entity, Alert } from '@/types'
 import { api } from '@/services/apiClient'
 import { getChapterEvents, type DetectedEvent, type ChapterEventsResponse } from '@/services/events'
+import EventsExportDialog from '@/components/events/EventsExportDialog.vue'
+import EventDensityStrip from '@/components/events/EventDensityStrip.vue'
+import EventStatsCard from '@/components/events/EventStatsCard.vue'
 
 /**
  * ChapterInspector - Panel de detalles de capítulo para el inspector.
@@ -94,6 +97,20 @@ const eventsLoading = ref(false)
 const eventsError = ref<string | null>(null)
 const chapterEvents = ref<ChapterEventsResponse | null>(null)
 const eventsCache = ref<Map<number, ChapterEventsResponse>>(new Map())
+
+// Export/Stats UI state
+const showExportDialog = ref(false)
+const showStats = ref(false)
+
+// Density data for visualization
+interface ChapterDensity {
+  chapter: number
+  tier1: number
+  tier2: number
+  tier3: number
+  total: number
+}
+const densityData = ref<ChapterDensity[]>([])
 
 // Load chapter summary when chapter changes
 async function loadChapterSummary() {
@@ -312,6 +329,33 @@ function clearEventFilters() {
   selectedEventTypes.value.clear()
   selectedEventTypes.value = new Set()
 }
+
+/** Cargar datos de densidad de eventos */
+async function loadEventDensity() {
+  try {
+    const response = await fetch(`/api/projects/${props.projectId}/events/stats`)
+    const data = await response.json()
+
+    if (data.success) {
+      densityData.value = data.data.density_by_chapter.map((ch: any) => ({
+        chapter: ch.chapter,
+        tier1: ch.tier1,
+        tier2: ch.tier2,
+        tier3: ch.tier3,
+        total: ch.total
+      }))
+    }
+  } catch (error) {
+    console.error('Error loading event density:', error)
+  }
+}
+
+/** Navegar a un capítulo específico */
+function navigateToChapter(chapterNumber: number) {
+  // Emitir evento para que el componente padre maneje la navegación
+  console.log('Navigate to chapter:', chapterNumber)
+  // TODO: Implementar navegación entre capítulos en el inspector
+}
 </script>
 
 <template>
@@ -330,6 +374,26 @@ function clearEventFilters() {
       <div class="chapter-badge">
         <i class="pi pi-book"></i>
         <span>Capítulo {{ chapter.chapterNumber }}</span>
+      </div>
+
+      <!-- Event actions -->
+      <div class="header-actions">
+        <Button
+          v-tooltip.bottom="'Exportar eventos'"
+          icon="pi pi-download"
+          text
+          rounded
+          size="small"
+          @click="showExportDialog = true"
+        />
+        <Button
+          v-tooltip.bottom="'Estadísticas de eventos'"
+          icon="pi pi-chart-bar"
+          text
+          rounded
+          size="small"
+          @click="showStats = !showStats"
+        />
       </div>
     </div>
 
@@ -546,6 +610,27 @@ function clearEventFilters() {
         @click="emit('go-to-start')"
       />
     </div>
+
+    <!-- Event density visualization -->
+    <EventDensityStrip
+      v-if="densityData.length > 0"
+      :density-data="densityData"
+      :current-chapter="chapter.chapterNumber"
+      :width="400"
+      :height="60"
+      @navigate-to-chapter="navigateToChapter"
+    />
+
+    <!-- Export dialog -->
+    <EventsExportDialog v-model:visible="showExportDialog" :project-id="projectId" />
+
+    <!-- Stats card -->
+    <EventStatsCard
+      :visible="showStats"
+      :project-id="projectId"
+      @close="showStats = false"
+      @navigate-to-chapter="navigateToChapter"
+    />
   </div>
 </template>
 
@@ -581,10 +666,18 @@ function clearEventFilters() {
   border-radius: var(--border-radius-xl);
   font-size: 0.875rem;
   font-weight: 500;
+  flex: 1;
 }
 
 .chapter-badge i {
   font-size: 0.875rem;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+  flex-shrink: 0;
 }
 
 .inspector-body {
