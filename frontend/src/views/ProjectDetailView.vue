@@ -1129,6 +1129,13 @@ const onAnalysisCompleted = async () => {
 // Reload stale data when switching to tabs that depend on analysis
 watch(() => workspaceStore.activeTab, async (newTab) => {
   if (!project.value) return
+
+  // Si navegamos a 'text' y hay un scroll pendiente, asegurar que los capítulos estén cargados
+  if (newTab === 'text' && workspaceStore.scrollToPosition !== null) {
+    console.log('[ProjectDetailView] Navigating to text with pending scroll, ensuring chapters loaded...')
+    await loadChapters(project.value.id, project.value)
+  }
+
   if (newTab === 'relationships' && (!relationships.value || relationships.value.length === 0)) {
     await loadEntities(project.value.id)
     await loadRelationships(project.value.id)

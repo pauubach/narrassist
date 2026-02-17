@@ -16,6 +16,11 @@ export function useProjectData() {
   const chapters = ref<Chapter[]>([])
   const relationships = ref<any>(null)
 
+  // Estados de carga
+  const loadingChapters = ref(false)
+  const chaptersLoaded = ref(false)
+  const lastLoadedProjectId = ref<number | null>(null)
+
   const entitiesCount = computed(() => entities.value.length)
   const alertsCount = computed(() => alerts.value.length)
 
@@ -41,14 +46,35 @@ export function useProjectData() {
     }
   }
 
-  async function loadChapters(projectId: number, fallbackProject?: { wordCount: number; chapterCount: number }) {
+  async function loadChapters(projectId: number, fallbackProject?: { wordCount: number; chapterCount: number }, forceReload = false) {
+    // Cache: si ya están cargados para este proyecto, no recargar
+    if (!forceReload && chaptersLoaded.value && lastLoadedProjectId.value === projectId && chapters.value.length > 0) {
+      console.log('[useProjectData] Chapters already loaded from cache')
+      return
+    }
+
+    // Si ya está cargando, esperar
+    if (loadingChapters.value) {
+      console.log('[useProjectData] Chapters already loading, waiting...')
+      // Esperar a que termine la carga actual
+      while (loadingChapters.value) {
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
+      return
+    }
+
+    loadingChapters.value = true
     try {
       const data = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${projectId}/chapters`)
       if (data.success) {
         chapters.value = transformChapters(data.data || [])
+        chaptersLoaded.value = true
+        lastLoadedProjectId.value = projectId
+        console.log('[useProjectData] Chapters loaded successfully:', chapters.value.length)
       }
     } catch (err) {
       console.error('Error loading chapters:', err)
+      chaptersLoaded.value = false
       if (fallbackProject && fallbackProject.chapterCount > 0) {
         chapters.value = Array.from({ length: fallbackProject.chapterCount }, (_, i) => ({
           id: i + 1,
@@ -61,6 +87,8 @@ export function useProjectData() {
           positionEnd: 0,
         }))
       }
+    } finally {
+      loadingChapters.value = false
     }
   }
 
@@ -82,6 +110,8 @@ export function useProjectData() {
     relationships,
     entitiesCount,
     alertsCount,
+    loadingChapters,
+    chaptersLoaded,
     loadEntities,
     loadAlerts,
     loadChapters,
