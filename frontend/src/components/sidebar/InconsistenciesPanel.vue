@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import DsBadge from '@/components/ds/DsBadge.vue'
 import DsEmptyState from '@/components/ds/DsEmptyState.vue'
 import type { Alert, Entity } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
+import { getProjectContinuity, type ContinuityResponse } from '@/services/continuity'
 
 /**
  * InconsistenciesPanel - Panel de inconsistencias críticas
@@ -16,6 +17,8 @@ import { useAlertUtils } from '@/composables/useAlertUtils'
  */
 
 interface Props {
+  /** ID del proyecto */
+  projectId: number
   /** Alertas del proyecto */
   alerts: Alert[]
   /** Entidades del proyecto */
@@ -27,6 +30,28 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   loading: false
 })
+
+// Estado de continuidad
+const continuityData = ref<ContinuityResponse | null>(null)
+const continuityLoading = ref(false)
+const continuityError = ref<string | null>(null)
+
+// Cargar continuidad cuando cambia el projectId
+watch(() => props.projectId, async (newId) => {
+  if (!newId) return
+
+  continuityLoading.value = true
+  continuityError.value = null
+
+  try {
+    continuityData.value = await getProjectContinuity(newId)
+  } catch (err) {
+    console.error('Error loading continuity:', err)
+    continuityError.value = 'Error al cargar continuidad'
+  } finally {
+    continuityLoading.value = false
+  }
+}, { immediate: true })
 
 const emit = defineEmits<{
   /** Navegar a una alerta específica */
@@ -190,11 +215,77 @@ function getCategoryLabel(category: string): string {
 
     <!-- Empty state -->
     <DsEmptyState
-      v-if="!loading && stats.total === 0"
+      v-if="!loading && !continuityLoading && stats.total === 0 && (!continuityData || continuityData.total_issues === 0)"
       icon="pi-check-circle"
       title="Sin inconsistencias"
       description="No se detectaron inconsistencias críticas en el manuscrito"
     />
+
+    <!-- Sección de continuidad de eventos -->
+    <div v-if="continuityData && continuityData.total_issues > 0" class="continuity-section">
+      <div class="section-header">
+        <i class="pi pi-link"></i>
+        <h4>Continuidad de Eventos</h4>
+        <DsBadge
+          :severity="continuityData.issues_by_severity.critical.length > 0 ? 'critical' : 'high'"
+          size="sm"
+        >
+          {{ continuityData.total_issues }}
+        </DsBadge>
+      </div>
+
+      <div class="continuity-description">
+        Eventos sin resolución detectados en {{ continuityData.total_chapters }} capítulos
+      </div>
+
+      <!-- Issues críticos -->
+      <div
+        v-if="continuityData.issues_by_severity.critical.length > 0"
+        class="severity-group"
+      >
+        <div class="severity-label critical">
+          <i class="pi pi-exclamation-triangle"></i>
+          <span>Crítico ({{ continuityData.issues_by_severity.critical.length }})</span>
+        </div>
+        <div
+          v-for="(issue, idx) in continuityData.issues_by_severity.critical"
+          :key="`critical-${idx}`"
+          class="continuity-issue"
+        >
+          <div class="issue-icon">
+            <i class="pi pi-times-circle"></i>
+          </div>
+          <div class="issue-content">
+            <span class="issue-description">{{ issue.description }}</span>
+            <span class="issue-type">{{ issue.event_type }} → {{ issue.paired_type }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Issues alta prioridad -->
+      <div
+        v-if="continuityData.issues_by_severity.high.length > 0"
+        class="severity-group"
+      >
+        <div class="severity-label high">
+          <i class="pi pi-exclamation-circle"></i>
+          <span>Alta ({{ continuityData.issues_by_severity.high.length }})</span>
+        </div>
+        <div
+          v-for="(issue, idx) in continuityData.issues_by_severity.high"
+          :key="`high-${idx}`"
+          class="continuity-issue"
+        >
+          <div class="issue-icon">
+            <i class="pi pi-exclamation-circle"></i>
+          </div>
+          <div class="issue-content">
+            <span class="issue-description">{{ issue.description }}</span>
+            <span class="issue-type">{{ issue.event_type }} → {{ issue.paired_type }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Lista de inconsistencias por entidad -->
     <div v-else class="inconsistencies-list">
@@ -499,5 +590,128 @@ function getCategoryLabel(category: string): string {
 
 .dark .alert-item:hover {
   background: var(--surface-800);
+}
+
+/* Continuity section */
+.continuity-section {
+  margin-bottom: var(--ds-space-4);
+  padding: var(--ds-space-3);
+  background: var(--surface-0);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--surface-200);
+}
+
+.continuity-section .section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  margin-bottom: var(--ds-space-2);
+}
+
+.continuity-section .section-header i {
+  color: var(--primary-color);
+}
+
+.continuity-section .section-header h4 {
+  flex: 1;
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.continuity-description {
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+  margin-bottom: var(--ds-space-3);
+}
+
+.severity-group {
+  margin-bottom: var(--ds-space-3);
+}
+
+.severity-label {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: var(--ds-space-2);
+  padding: var(--ds-space-1) var(--ds-space-2);
+  border-radius: var(--border-radius);
+}
+
+.severity-label.critical {
+  color: var(--red-600);
+  background: var(--red-50);
+}
+
+.severity-label.high {
+  color: var(--orange-600);
+  background: var(--orange-50);
+}
+
+.continuity-issue {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2);
+  margin-bottom: var(--ds-space-1);
+  border-radius: var(--border-radius);
+  background: var(--surface-50);
+}
+
+.issue-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.issue-icon i {
+  font-size: 0.7rem;
+  color: var(--text-color-secondary);
+}
+
+.issue-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.issue-description {
+  font-size: 0.8rem;
+  color: var(--text-color);
+  line-height: 1.3;
+}
+
+.issue-type {
+  font-size: 0.7rem;
+  color: var(--text-color-secondary);
+  font-family: monospace;
+}
+
+.dark .continuity-section {
+  background: var(--surface-800);
+  border-color: var(--surface-700);
+}
+
+.dark .severity-label.critical {
+  color: var(--red-400);
+  background: var(--red-900);
+}
+
+.dark .severity-label.high {
+  color: var(--orange-400);
+  background: var(--orange-900);
+}
+
+.dark .continuity-issue {
+  background: var(--surface-700);
 }
 </style>

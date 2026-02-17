@@ -1338,3 +1338,126 @@ def get_chapter_scenes(project_id: int, chapter_number: int):
     except Exception as e:
         logger.error(f"Error getting chapter scenes: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.get("/api/projects/{project_id}/continuity", response_model=ApiResponse)
+def get_project_continuity(project_id: int):
+    """
+    Analiza continuidad de eventos paired en todo el proyecto.
+
+    Detecta inconsistencias cuando eventos esperados no ocurren:
+    - Promesas sin cumplir/romper
+    - Heridas sin curación
+    - Objetos adquiridos sin uso/pérdida
+    - Flashbacks sin cerrar
+    - Conflictos sin resolución
+    - Separaciones sin reencuentro
+    - Etc.
+
+    Args:
+        project_id: ID del proyecto
+
+    Returns:
+        ApiResponse con issues de continuidad agrupados por severidad
+    """
+    try:
+        from narrative_assistant.analysis.event_continuity import track_continuity_in_chapters
+        from narrative_assistant.analysis.event_detection import detect_events_in_chapter
+        from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        if not deps.project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = deps.project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        # Obtener todos los capítulos
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_chapters_by_project(project_id)
+
+        if not chapters:
+            return ApiResponse(
+                success=True,
+                data={
+                    "project_id": project_id,
+                    "total_issues": 0,
+                    "issues_by_severity": {"critical": [], "high": [], "medium": [], "low": []},
+                    "issues_by_type": {},
+                }
+            )
+
+        # Cargar modelo spaCy
+        nlp = load_spacy_model()
+
+        # Detectar eventos en todos los capítulos
+        events_by_chapter = {}
+        prev_chapter_text = None
+
+        for chapter in sorted(chapters, key=lambda c: c.chapter_number):
+            events = detect_events_in_chapter(
+                text=chapter.content,
+                chapter_number=chapter.chapter_number,
+                nlp=nlp,
+                enable_llm=False,  # Sin LLM para análisis rápido
+                prev_chapter_text=prev_chapter_text
+            )
+            events_by_chapter[chapter.chapter_number] = events
+            prev_chapter_text = chapter.content
+
+        # Rastrear continuidad
+        issues = track_continuity_in_chapters(events_by_chapter)
+
+        # Agrupar por severidad
+        issues_by_severity = {
+            "critical": [],
+            "high": [],
+            "medium": [],
+            "low": [],
+        }
+
+        for issue in issues:
+            issue_dict = {
+                "event_type": issue.event_type.value,
+                "paired_type": issue.paired_type.value,
+                "description": issue.description,
+                "severity": issue.severity,
+                "source_events": [
+                    {
+                        "event_type": e.event_type.value,
+                        "description": e.description,
+                        "confidence": e.confidence,
+                        "start_char": e.start_char,
+                        "end_char": e.end_char,
+                        "metadata": e.metadata,
+                    }
+                    for e in issue.source_events
+                ],
+                "metadata": issue.metadata,
+            }
+            issues_by_severity[issue.severity].append(issue_dict)
+
+        # Contar por tipo de evento
+        issues_by_type = {}
+        for issue in issues:
+            event_type = issue.event_type.value
+            if event_type not in issues_by_type:
+                issues_by_type[event_type] = 0
+            issues_by_type[event_type] += 1
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "total_chapters": len(chapters),
+                "total_issues": len(issues),
+                "issues_by_severity": issues_by_severity,
+                "issues_by_type": issues_by_type,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing project continuity: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
