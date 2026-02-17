@@ -160,8 +160,8 @@ class CrutchWordsDetector(BaseDetector):
 
         # Contar palabras totales para normalizar
         word_count = len(text.split())
-        if word_count < 100:
-            return []  # Texto demasiado corto para análisis estadístico
+        if word_count < 50:
+            return []  # Texto demasiado corto para análisis estadístico (min 50 palabras)
 
         # Contar ocurrencias de cada muletilla
         occurrences: dict[str, list[tuple[int, int]]] = {}

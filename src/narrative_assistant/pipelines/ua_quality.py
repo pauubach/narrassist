@@ -510,7 +510,17 @@ class PipelineQualityMixin:
                 for ch in context.chapters:
                     ch_num = _ch_num(ch)
                     ch_content = _ch_content(ch)
+                    ch_start_offset = _ch_val(ch, "start_char", 0)
+
                     issues = detector.detect(ch_content, chapter_index=ch_num)
+
+                    # Ajustar posiciones: relativas al capítulo → absolutas al documento
+                    for issue in issues:
+                        if hasattr(issue, 'start_char') and issue.start_char is not None:
+                            issue.start_char += ch_start_offset
+                        if hasattr(issue, 'end_char') and issue.end_char is not None:
+                            issue.end_char += ch_start_offset
+
                     all_issues.extend(issues)
             else:
                 all_issues = detector.detect(context.full_text)
@@ -536,7 +546,17 @@ class PipelineQualityMixin:
                 for ch in context.chapters:
                     ch_num = _ch_num(ch)
                     ch_content = _ch_content(ch)
+                    ch_start_offset = _ch_val(ch, "start_char", 0)
+
                     issues = detector.detect(ch_content, chapter_index=ch_num)
+
+                    # Ajustar posiciones: relativas al capítulo → absolutas al documento
+                    for issue in issues:
+                        if hasattr(issue, 'start_char') and issue.start_char is not None:
+                            issue.start_char += ch_start_offset
+                        if hasattr(issue, 'end_char') and issue.end_char is not None:
+                            issue.end_char += ch_start_offset
+
                     all_issues.extend(issues)
             else:
                 all_issues = detector.detect(context.full_text)
