@@ -10,7 +10,7 @@ import Dialog from 'primevue/dialog'
 import SelectButton from 'primevue/selectbutton'
 import InputChips from 'primevue/inputchips'
 import Tag from 'primevue/tag'
-import Drawer from 'primevue/drawer'
+// import Drawer from 'primevue/drawer' // Not used yet
 import DsBadge from '@/components/ds/DsBadge.vue'
 import DsEmptyState from '@/components/ds/DsEmptyState.vue'
 import MergeEntitiesDialog from '@/components/MergeEntitiesDialog.vue'

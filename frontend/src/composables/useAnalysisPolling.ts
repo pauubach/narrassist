@@ -25,7 +25,7 @@ interface AnalysisPollingOptions {
 }
 
 export function useAnalysisPolling(options: AnalysisPollingOptions) {
-  const { project, entities, alerts, chapters, loadEntities, loadAlerts, loadChapters } = options
+  const { project, entities, alerts: _alerts, chapters, loadEntities, loadAlerts, loadChapters } = options
 
   const analysisStore = useAnalysisStore()
   const projectsStore = useProjectsStore()

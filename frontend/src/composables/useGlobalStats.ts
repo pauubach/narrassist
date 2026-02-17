@@ -6,7 +6,7 @@
  */
 
 import { computed } from 'vue'
-import type { Alert, AlertCategory } from '@/types'
+import type { Alert } from '@/types'
 import { META_CATEGORIES } from '@/composables/useAlertUtils'
 import { safeGetItem, safeSetItem } from '@/utils/safeStorage'
 

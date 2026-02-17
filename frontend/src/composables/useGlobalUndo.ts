@@ -94,7 +94,7 @@ export function useGlobalUndo(projectId: () => number | null) {
 
         return result
       }
-    } catch (error) {
+    } catch (_error) {
       const result: UndoResult = {
         success: false,
         message: 'Error de conexión al deshacer',

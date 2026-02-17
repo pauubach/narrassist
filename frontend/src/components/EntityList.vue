@@ -363,7 +363,7 @@ import { api } from '@/services/apiClient'
 // Umbral para activar virtualización (más de 50 items)
 const VIRTUALIZATION_THRESHOLD = 50
 
-const toast = useToast()
+const _toast = useToast()
 
 const props = withDefaults(defineProps<{
   entities: Entity[]

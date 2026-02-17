@@ -1061,7 +1061,7 @@ const {
 } = useOllamaManagement()
 
 const {
-  availableLLMOptions, gpuRequirementTooltip,
+  availableLLMOptions: _availableLLMOptions, gpuRequirementTooltip,
   getNLPMethodsForCategory, isMethodEnabled, toggleMethod,
   setCharacterKnowledgeMode, applyRecommendedConfig,
 } = useNLPMethods(settings, saveSettings, applyDefaultsFromCapabilities)

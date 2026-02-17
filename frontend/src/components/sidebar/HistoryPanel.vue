@@ -17,7 +17,7 @@ const props = defineProps<{
   projectId: number
 }>()
 
-const { undoEntry, undoBatch, fetchHistory, fetchUndoableCount, undoing, undoableCount } =
+const { undoEntry, undoBatch, fetchHistory, fetchUndoableCount: _fetchUndoableCount, undoing, undoableCount } =
   useGlobalUndo(() => props.projectId)
 
 const { setItemRef: setHistoryRef, getTabindex: getHistoryTabindex, onKeydown: onHistoryKeydown, focusedIndex: historyFocusedIndex } = useListKeyboardNav()
