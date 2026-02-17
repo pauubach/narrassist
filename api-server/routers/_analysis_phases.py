@@ -824,6 +824,30 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
                     dialogues_total += len(dialogues_to_save)
 
         logger.info(f"Dialogues detected and persisted: {dialogues_total} dialogues across {chapters_count} chapters")
+
+        # S16b: Inicializar dialogue_style_preference desde correction_config
+        try:
+            from narrative_assistant.nlp.dialogue_config_mapper import map_correction_config_to_dialogue_preference
+            from narrative_assistant.persistence.project import ProjectManager
+
+            proj_manager = ProjectManager(db_session)
+            project = proj_manager.get_by_id(project_id)
+
+            if project and project.settings_json:
+                correction_config = project.settings_json.get("correction_config", {})
+                dialogue_dash = correction_config.get("dialogue_dash")
+                quote_style = correction_config.get("quote_style")
+
+                # Mapear a preferencia de diálogo
+                preference = map_correction_config_to_dialogue_preference(dialogue_dash, quote_style)
+
+                # Guardar en settings
+                if "dialogue_style_preference" not in project.settings_json:
+                    project.settings_json["dialogue_style_preference"] = preference
+                    proj_manager.update(project)
+                    logger.info(f"Initialized dialogue_style_preference={preference} from correction_config")
+        except Exception as pref_err:
+            logger.warning(f"Error initializing dialogue_style_preference (continuing): {pref_err}")
     except Exception as e:
         logger.warning(f"Error detecting/persisting dialogues (continuing): {e}")
 

@@ -373,13 +373,36 @@ def update_project_correction_config(
         # Re-scan selectivo: actualizar alertas de tipografía sin re-análisis completo
         rescan_result = _rescan_typography_alerts(int(project_id), effective_config)
 
+        # S16: Sincronizar dialogue_style_preference con correction_config
+        dialogue_alerts = 0
+        try:
+            from narrative_assistant.nlp.dialogue_config_mapper import map_correction_config_to_dialogue_preference
+            from narrative_assistant.nlp.dialogue_preference_manager import get_dialogue_preference_manager
+
+            # Extraer dialogue_dash y quote_style del effective_config
+            dialogue_dash = effective_config.get("dialogue_dash")
+            quote_style = effective_config.get("quote_style")
+
+            # Mapear a preferencia
+            new_preference = map_correction_config_to_dialogue_preference(dialogue_dash, quote_style)
+
+            # Actualizar preferencia y generar alertas
+            pref_manager = get_dialogue_preference_manager()
+            pref_result = pref_manager.update_preference(int(project_id), new_preference, min_severity="info")
+
+            if pref_result.is_success:
+                dialogue_alerts = pref_result.value.get("alerts_created", 0)
+                logger.info(f"Synced dialogue_style_preference={new_preference}, created {dialogue_alerts} dialogue alerts")
+        except Exception as dlg_err:
+            logger.warning(f"Error syncing dialogue_style_preference (continuing): {dlg_err}")
+
         return ApiResponse(
             success=True,
             data={
                 "config": effective_config,
                 "message": "Configuración guardada correctamente",
                 "alerts_removed": rescan_result.get("removed", 0),
-                "alerts_created": rescan_result.get("created", 0),
+                "alerts_created": rescan_result.get("created", 0) + dialogue_alerts,
                 "rescan": True,
             }
         )
