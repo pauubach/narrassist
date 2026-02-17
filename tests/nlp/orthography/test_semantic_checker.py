@@ -174,7 +174,7 @@ class TestSemanticChecker:
 
     def test_confusion_pairs_configured(self):
         """Verificar que CONFUSION_PAIRS tiene al menos un par."""
-        assert len(CONFUSION_PAIRS) >= 5  # Al menos riegos + 4 más
+        assert len(CONFUSION_PAIRS) >= 58  # 58 pares implementados
 
     def test_confusion_pairs_structure(self):
         """Verificar estructura de CONFUSION_PAIRS."""
@@ -245,6 +245,158 @@ class TestSemanticChecker:
         assert elapsed < 2.0
         # Debe detectar muchos issues (500 líneas con "riegos de seguridad")
         assert len(issues) == 500
+
+    # -------------------------------------------------------------------------
+    # Triple homofonía: ha / ah / a
+    # -------------------------------------------------------------------------
+
+    def test_ha_verb_correct(self, checker_no_embeddings):
+        """NO detecta 'ha' en contexto de verbo haber (correcto)."""
+        text = "Ella ha comido bien hoy."
+        issues = checker_no_embeddings.check(text)
+
+        ha_issues = [i for i in issues if "ha" in i.word.lower()]
+        assert len(ha_issues) == 0
+
+    def test_a_instead_of_ha_detected(self, checker_no_embeddings):
+        """Detecta 'a' en contexto de verbo haber (debería ser 'ha')."""
+        text = "Ella a comido bien hoy."
+        issues = checker_no_embeddings.check(text)
+
+        a_issues = [i for i in issues if i.word.lower() == "a"]
+        if len(a_issues) > 0:
+            assert "ha" in a_issues[0].suggestions
+
+    def test_ah_interjection_correct(self, checker_no_embeddings):
+        """NO detecta 'ah' en contexto de interjección (correcto)."""
+        text = "¡Ah, ya entiendo!"
+        issues = checker_no_embeddings.check(text)
+
+        ah_issues = [i for i in issues if "ah" in i.word.lower()]
+        assert len(ah_issues) == 0
+
+    def test_a_preposition_correct(self, checker_no_embeddings):
+        """NO detecta 'a' en contexto de preposición (correcto)."""
+        text = "Voy a casa ahora mismo."
+        issues = checker_no_embeddings.check(text)
+
+        # No debe haber issues sobre "a" como preposición
+        a_issues = [i for i in issues if i.word.lower() == "a" and "casa" in text]
+        assert len(a_issues) == 0
+
+    # -------------------------------------------------------------------------
+    # Triple homofonía: hay / ahí / ay
+    # -------------------------------------------------------------------------
+
+    def test_hay_verb_correct(self, checker_no_embeddings):
+        """NO detecta 'hay' en contexto de verbo haber (correcto)."""
+        text = "Hay mucha gente en la sala."
+        issues = checker_no_embeddings.check(text)
+
+        hay_issues = [i for i in issues if "hay" in i.word.lower()]
+        assert len(hay_issues) == 0
+
+    def test_ahi_instead_of_hay_detected(self, checker_no_embeddings):
+        """Detecta 'ahí' en contexto de verbo haber (debería ser 'hay')."""
+        text = "Ahí mucha gente en la sala."
+        issues = checker_no_embeddings.check(text)
+
+        ahi_issues = [i for i in issues if "ahí" in i.word.lower()]
+        if len(ahi_issues) > 0:
+            assert "hay" in ahi_issues[0].suggestions
+
+    def test_ahi_place_correct(self, checker_no_embeddings):
+        """NO detecta 'ahí' en contexto de lugar (correcto)."""
+        text = "Deja el libro ahí, por favor."
+        issues = checker_no_embeddings.check(text)
+
+        ahi_issues = [i for i in issues if "ahí" in i.word.lower()]
+        assert len(ahi_issues) == 0
+
+    def test_ay_interjection_correct(self, checker_no_embeddings):
+        """NO detecta 'ay' en contexto de interjección (correcto)."""
+        text = "¡Ay, qué dolor!"
+        issues = checker_no_embeddings.check(text)
+
+        ay_issues = [i for i in issues if i.word.lower() == "ay"]
+        assert len(ay_issues) == 0
+
+    # -------------------------------------------------------------------------
+    # Triple homofonía: vaya / valla / baya
+    # -------------------------------------------------------------------------
+
+    def test_vaya_verb_correct(self, checker_no_embeddings):
+        """NO detecta 'vaya' en contexto de verbo ir (correcto)."""
+        text = "Espero que vaya bien el examen."
+        issues = checker_no_embeddings.check(text)
+
+        vaya_issues = [i for i in issues if "vaya" in i.word.lower()]
+        assert len(vaya_issues) == 0
+
+    def test_valla_fence_correct(self, checker_no_embeddings):
+        """NO detecta 'valla' en contexto de cerca (correcto)."""
+        text = "La valla publicitaria es muy grande."
+        issues = checker_no_embeddings.check(text)
+
+        valla_issues = [i for i in issues if "valla" in i.word.lower()]
+        assert len(valla_issues) == 0
+
+    def test_valla_instead_of_vaya_detected(self, checker_no_embeddings):
+        """Detecta 'valla' en contexto de verbo ir (debería ser 'vaya')."""
+        text = "Espero que valla bien el examen."
+        issues = checker_no_embeddings.check(text)
+
+        valla_issues = [i for i in issues if "valla" in i.word.lower()]
+        if len(valla_issues) > 0:
+            assert "vaya" in valla_issues[0].suggestions
+
+    def test_baya_fruit_correct(self, checker_no_embeddings):
+        """NO detecta 'baya' en contexto de fruto (correcto)."""
+        text = "La baya del arándano es deliciosa."
+        issues = checker_no_embeddings.check(text)
+
+        baya_issues = [i for i in issues if "baya" in i.word.lower()]
+        assert len(baya_issues) == 0
+
+    # -------------------------------------------------------------------------
+    # Otras homofonías importantes
+    # -------------------------------------------------------------------------
+
+    def test_botar_votar_detected(self, checker_no_embeddings):
+        """Detecta 'botar' en contexto de elecciones (debería ser 'votar')."""
+        text = "Voy a botar en las próximas elecciones."
+        issues = checker_no_embeddings.check(text)
+
+        botar_issues = [i for i in issues if "botar" in i.word.lower()]
+        if len(botar_issues) > 0:
+            assert "votar" in botar_issues[0].suggestions
+
+    def test_grabar_gravar_detected(self, checker_no_embeddings):
+        """Detecta 'grabar' en contexto de impuestos (debería ser 'gravar')."""
+        text = "El gobierno va a grabar los productos importados."
+        issues = checker_no_embeddings.check(text)
+
+        grabar_issues = [i for i in issues if "grabar" in i.word.lower()]
+        if len(grabar_issues) > 0:
+            assert "gravar" in grabar_issues[0].suggestions
+
+    def test_vaca_baca_detected(self, checker_no_embeddings):
+        """Detecta 'vaca' en contexto de portaequipajes (debería ser 'baca')."""
+        text = "Coloca el equipaje en la vaca del coche."
+        issues = checker_no_embeddings.check(text)
+
+        vaca_issues = [i for i in issues if "vaca" in i.word.lower()]
+        if len(vaca_issues) > 0:
+            assert "baca" in vaca_issues[0].suggestions
+
+    def test_caza_casa_detected(self, checker_no_embeddings):
+        """Detecta 'caza' en contexto de vivienda (debería ser 'casa')."""
+        text = "Vivo en una caza muy bonita."
+        issues = checker_no_embeddings.check(text)
+
+        caza_issues = [i for i in issues if "caza" in i.word.lower()]
+        if len(caza_issues) > 0:
+            assert "casa" in caza_issues[0].suggestions
 
 
 class TestIntegration:

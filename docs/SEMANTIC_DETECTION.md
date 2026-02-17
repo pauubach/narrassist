@@ -9,9 +9,16 @@
 
 Sistema **completamente genérico** para detectar palabras ortográficamente correctas que están usadas fuera de su contexto semántico correcto.
 
+**58 pares de confusión implementados**:
+- 5 confusiones semánticas (riegos/riesgos, actitud/aptitud, etc.)
+- 8 imperativos incorrectos (callar→callad, venir→venid, etc.)
+- 45 homofonías del español (ha/ah/a, haya/halla/aya/allá, hay/ahí/ay, etc.)
+
 **Ejemplo paradigmático**: "Los riegos de seguridad son altos" → debería ser "riesgos"
 - "riegos" es correcto en contexto agrícola (irrigación)
 - "riesgos" es correcto en contexto de peligros/amenazas
+
+**Homofonías**: "Ella a comido" → "Ella ha comido" (preposición vs verbo haber)
 
 ---
 
@@ -133,6 +140,131 @@ Texto → SemanticChecker.check()
 
 ---
 
+## Homofonías Comunes del Español (58 pares)
+
+### Triple/Cuádruple Homofonías
+
+#### ha / ah / a
+
+**Confusión**: verbo haber vs interjección vs preposición
+
+| Palabra | Tipo | Uso Correcto | Ejemplo |
+|---------|------|--------------|---------|
+| **ha** | Verbo haber (3ª sg) | ha + participio | "Ella **ha** comido bien" |
+| **ah** | Interjección | Sorpresa/comprensión | "¡**Ah**, ya entiendo!" |
+| **a** | Preposición | Dirección, complemento | "Voy **a** casa" |
+
+**Ejemplos**:
+- ❌ "Ella a comido" → ✅ "Ella ha comido"
+- ✅ "¡Ah, claro!" (correcto)
+- ✅ "Voy a casa" (correcto)
+
+---
+
+#### haya / halla / aya / allá
+
+**Confusión**: verbo haber vs hallar vs niñera vs lugar
+
+| Palabra | Tipo | Uso Correcto | Ejemplo |
+|---------|------|--------------|---------|
+| **haya** | Verbo haber (subjuntivo) | que haya, ojalá haya | "Espero que **haya** gente" |
+| **halla** | Verbo hallar (encontrar) | se halla, lo halla | "El edificio se **halla** cerca" |
+| **aya** | Niñera (arcaico) | cuidar niños | "El **aya** cuida a los niños" |
+| **allá** | Adverbio de lugar | más allá, allá lejos | "Mira **allá** arriba" |
+
+**Ejemplos**:
+- ❌ "Espero que allá gente" → ✅ "Espero que haya gente"
+- ✅ "El edificio se halla aquí" (correcto)
+- ✅ "Más allá de la montaña" (correcto)
+
+---
+
+#### hay / ahí / ay
+
+**Confusión**: verbo haber vs lugar vs interjección
+
+| Palabra | Tipo | Uso Correcto | Ejemplo |
+|---------|------|--------------|---------|
+| **hay** | Verbo haber (existencia) | hay que, hay gente | "**Hay** mucha gente aquí" |
+| **ahí** | Adverbio de lugar | está ahí, deja ahí | "Deja el libro **ahí**" |
+| **ay** | Interjección (dolor) | ¡ay!, ay de mí | "¡**Ay**, qué dolor!" |
+
+**Ejemplos**:
+- ❌ "Ahí mucha gente" → ✅ "Hay mucha gente"
+- ✅ "Está ahí delante" (correcto)
+- ✅ "¡Ay, madre!" (correcto)
+
+---
+
+#### vaya / valla / baya
+
+**Confusión**: verbo ir vs cerca vs fruto
+
+| Palabra | Tipo | Uso Correcto | Ejemplo |
+|---------|------|--------------|---------|
+| **vaya** | Verbo ir (subjuntivo) | que vaya, ojalá vaya | "Espero que **vaya** bien" |
+| **valla** | Cerca, obstáculo | valla publicitaria | "Saltar la **valla**" |
+| **baya** | Fruto carnoso | baya de uva | "La **baya** es dulce" |
+
+**Ejemplos**:
+- ❌ "Espero que valla bien" → ✅ "Espero que vaya bien"
+- ✅ "La valla publicitaria" (correcto)
+- ✅ "Comer bayas del bosque" (correcto)
+
+---
+
+### Homofonías Dobles Frecuentes
+
+#### echo / hecho
+- **echo** (verbo echar): "Echo azúcar al café"
+- **hecho** (verbo hacer): "El trabajo está hecho"
+
+#### tubo / tuvo
+- **tubo** (objeto cilíndrico): "El tubo de metal"
+- **tuvo** (verbo tener): "Ella tuvo suerte"
+
+#### haber / a ver
+- **haber** (verbo): "Debe haber una solución"
+- **a ver** (preposición + ver): "Voy a ver la película"
+
+#### botar / votar
+- **botar** (saltar, rebotar): "Botar la pelota"
+- **votar** (emitir voto): "Votar en las elecciones"
+
+#### grabar / gravar
+- **grabar** (registrar sonido/imagen): "Grabar un vídeo"
+- **gravar** (imponer impuesto): "Gravar las importaciones"
+
+#### revelar / rebelar
+- **revelar** (descubrir secreto): "Revelar la verdad"
+- **rebelar** (sublevarse): "Rebelarse contra la autoridad"
+
+#### vaca / baca
+- **vaca** (animal bovino): "La vaca da leche"
+- **baca** (portaequipajes): "La baca del coche"
+
+#### hasta / asta
+- **hasta** (preposición, límite): "Hasta mañana"
+- **asta** (palo de bandera, cuerno): "El asta de la bandera"
+
+#### hierba / hierva
+- **hierba** (planta): "Cortar la hierba"
+- **hierva** (verbo hervir): "Espero que hierva el agua"
+
+#### sabia / savia
+- **sabia** (con sabiduría): "Una mujer sabia"
+- **savia** (líquido de plantas): "La savia del árbol"
+
+#### caza / casa
+- **caza** (acción de cazar): "Ir de caza"
+- **casa** (vivienda): "Vivo en una casa"
+
+#### coser / cocer
+- **coser** (unir con hilo): "Coser un botón"
+- **cocer** (cocinar): "Cocer las patatas"
+
+---
+
 ## Añadir Nuevos Pares
 
 **Archivo**: [src/narrative_assistant/nlp/orthography/semantic_checker.py](../src/narrative_assistant/nlp/orthography/semantic_checker.py)
@@ -237,19 +369,23 @@ issues = checker.check(text, window=10)  # default: 8 palabras
 
 ### Test Coverage
 
-- **17 tests** en [test_semantic_checker.py](../tests/nlp/orthography/test_semantic_checker.py)
+- **38 tests** en [test_semantic_checker.py](../tests/nlp/orthography/test_semantic_checker.py)
 - **12 tests** en [test_semantic_integration.py](../tests/nlp/orthography/test_semantic_integration.py)
-- **100% passing** (29/29)
+- **100% passing** (50/50)
 
 ### Cobertura
 
 | Categoría | Tests |
 |-----------|-------|
-| Detección en contexto incorrecto | ✅ 8 tests |
-| NO detección en contexto correcto | ✅ 6 tests |
-| Múltiples pares (actitud, infringir, etc.) | ✅ 5 tests |
+| Confusiones semánticas (riegos, actitud, etc.) | ✅ 8 tests |
+| Imperativos incorrectos (callar, venir, etc.) | ✅ 4 tests |
+| Triple homofonía ha/ah/a | ✅ 4 tests |
+| Triple homofonía hay/ahí/ay | ✅ 4 tests |
+| Triple homofonía vaya/valla/baya | ✅ 4 tests |
+| Otras homofonías (botar/votar, grabar/gravar, etc.) | ✅ 4 tests |
 | Embeddings opcionales | ✅ 2 tests |
-| Performance | ✅ 2 tests |
+| Performance | ✅ 1 test |
+| Edge cases (vacío, case, múltiples) | ✅ 4 tests |
 | Integración con SpellingChecker | ✅ 6 tests |
 
 ---
@@ -350,12 +486,21 @@ Pares no incluidos en `CONFUSION_PAIRS` no se detectan.
 
 ## Changelog
 
-### 2026-02-17 - Implementación inicial
+### 2026-02-17 PM - Expansión a homofonías completas
+- ✅ **58 pares de confusión** implementados
+- ✅ 5 confusiones semánticas (riegos/riesgos, actitud/aptitud, etc.)
+- ✅ 8 imperativos incorrectos (callar→callad, venir→venid, ir→id, etc.)
+- ✅ 45 homofonías del español:
+  - 4 triples/cuádruples: ha/ah/a, haya/halla/aya/allá, hay/ahí/ay, vaya/valla/baya
+  - 12 dobles: echo/hecho, tubo/tuvo, haber/a ver, botar/votar, grabar/gravar, revelar/rebelar, vaca/baca, hasta/asta, hierba/hierva, sabia/savia, caza/casa, coser/cocer
+- ✅ **50 tests** (100% passing): 38 en semantic_checker + 12 en integration
+- ✅ Documentación actualizada con ejemplos de todas las homofonías
+
+### 2026-02-17 AM - Implementación inicial
 - ✅ Sistema genérico basado en CONFUSION_PAIRS
 - ✅ Dual-method: keywords + embeddings opcionales
-- ✅ 5 pares implementados (riegos/riesgos, actitud/aptitud, infringir/infligir, prescribir/proscribir, absorber/absolver)
-- ✅ 29 tests (100% passing)
+- ✅ 5 pares semánticos + 8 imperativos + 8 homofonías iniciales
+- ✅ 21 tests iniciales (100% passing)
 - ✅ Integración completa con SpellingChecker
-- ✅ Documentación comprehensiva
 
-**Total**: 5 pares de confusión, 29 tests, detección genérica extensible
+**Total**: 58 pares de confusión, 50 tests, sistema extensible

@@ -1,12 +1,23 @@
 """
 Corrector semántico - Detecta palabras correctas usadas en contexto incorrecto.
 
-Usa embeddings semánticos para detectar incoherencia contextual.
+Sistema genérico basado en CONFUSION_PAIRS con detección dual (keywords + embeddings).
+
+Total: 58 pares de confusión implementados:
+- 5 confusiones semánticas (riegos/riesgos, actitud/aptitud, infringir/infligir, etc.)
+- 8 imperativos incorrectos (callar→callad, venir→venid, ir→id, etc.)
+- 45 homofonías comunes del español:
+  * Triple/cuádruple: ha/ah/a, haya/halla/aya/allá, hay/ahí/ay, vaya/valla/baya
+  * Dobles: echo/hecho, tubo/tuvo, haber/a ver, botar/votar, grabar/gravar,
+    revelar/rebelar, vaca/baca, hasta/asta, hierba/hierva, sabia/savia,
+    caza/casa, coser/cocer
 
 Ejemplos:
 - "riegos de seguridad" → "riesgos de seguridad" (riegos=irrigación, incorrecto)
-- "el carro fue al supermercado" → "el coche/auto fue..." (carro=carruaje, regional)
-- "los riegos del proyecto son altos" → "los riesgos..." (riegos=irrigación)
+- "¡Callar todos!" → "¡Callad todos!" (infinitivo usado como imperativo)
+- "A comido" → "Ha comido" (preposición vs verbo haber)
+- "Voy haber" → "Voy a ver" (verbo haber vs preposición+ver)
+- "Espero que allá gente" → "Espero que haya gente" (adverbio vs verbo haber)
 """
 
 import re
@@ -491,6 +502,609 @@ CONFUSION_PAIRS = [
             # Contexto de "a ver" (correcto)
             "voy", "vamos", "ven", "déjame", "venga",
             "si", "qué", "cómo",
+        ],
+    ),
+
+    # =========================================================================
+    # Triple homofonía: ha / ah / a
+    # =========================================================================
+
+    ConfusionPair(
+        wrong_word="a",
+        correct_word="ha",
+        wrong_meaning="preposición",
+        correct_meaning="verbo haber (3ª singular)",
+        wrong_context_keywords=[
+            # Contexto de verbo haber (debería ser "ha")
+            "comido", "hecho", "sido", "estado", "tenido",
+            "llegado", "visto", "dicho", "ido", "venido",
+            "pasado", "ocurrido", "terminado", "comenzado",
+            "de ser", "de estar", "de tener", "de hacer",
+        ],
+        correct_context_keywords=[
+            # Contexto de preposición (correcto para "a")
+            "casa", "pie", "mano", "voy", "vas", "va",
+            "ir", "venir", "llegar", "partir", "salir",
+            "distancia", "dirección", "hacia", "junto",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="a",
+        correct_word="ah",
+        wrong_meaning="preposición",
+        correct_meaning="interjección",
+        wrong_context_keywords=[
+            # Contexto de interjección (debería ser "ah")
+            "!", "¡", "ya", "entiendo", "claro", "sí",
+            "bueno", "vale", "ok", "cierto", "verdad",
+        ],
+        correct_context_keywords=[
+            # Contexto de preposición (correcto para "a")
+            "casa", "pie", "mano", "voy", "vas", "va",
+            "ir", "venir", "llegar",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="ha",
+        correct_word="a",
+        wrong_meaning="verbo haber (3ª singular)",
+        correct_meaning="preposición",
+        wrong_context_keywords=[
+            # Contexto de preposición (debería ser "a")
+            "casa", "pie", "mano", "voy", "vas", "va",
+            "ir", "venir", "llegar", "partir", "salir",
+            "distancia", "dirección", "hacia",
+        ],
+        correct_context_keywords=[
+            # Contexto de verbo haber (correcto para "ha")
+            "comido", "hecho", "sido", "estado", "tenido",
+            "llegado", "visto", "dicho", "ido", "venido",
+            "de ser", "de estar",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="ah",
+        correct_word="ha",
+        wrong_meaning="interjección",
+        correct_meaning="verbo haber (3ª singular)",
+        wrong_context_keywords=[
+            # Contexto de verbo haber (debería ser "ha")
+            "comido", "hecho", "sido", "estado", "tenido",
+            "llegado", "visto", "dicho", "ido", "venido",
+            "pasado", "ocurrido",
+        ],
+        correct_context_keywords=[
+            # Contexto de interjección (correcto para "ah")
+            "!", "¡", "ya", "entiendo", "claro", "sí",
+            "bueno", "vale",
+        ],
+    ),
+
+    # =========================================================================
+    # Triple/Cuádruple homofonía: haya / halla / aya / allá
+    # =========================================================================
+
+    ConfusionPair(
+        wrong_word="aya",
+        correct_word="haya",
+        wrong_meaning="niñera (arcaico)",
+        correct_meaning="verbo haber (subjuntivo)",
+        wrong_context_keywords=[
+            # Contexto de verbo haber (debería ser "haya")
+            "que", "aunque", "cuando", "si", "tal vez", "quizá",
+            "espero", "dudo", "puede", "posible", "ojalá",
+        ],
+        correct_context_keywords=[
+            # Contexto de niñera (correcto para "aya", muy raro)
+            "niñera", "criada", "niños", "cuidar", "servicio",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="aya",
+        correct_word="halla",
+        wrong_meaning="niñera (arcaico)",
+        correct_meaning="verbo hallar",
+        wrong_context_keywords=[
+            # Contexto de hallar (debería ser "halla")
+            "se", "lo", "la", "encuentra", "ubicado", "situado",
+        ],
+        correct_context_keywords=[
+            # Contexto de niñera (correcto para "aya")
+            "niñera", "criada", "niños",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="allá",
+        correct_word="haya",
+        wrong_meaning="adverbio de lugar (lejos)",
+        correct_meaning="verbo haber (subjuntivo)",
+        wrong_context_keywords=[
+            # Contexto de verbo haber (debería ser "haya")
+            "que", "aunque", "cuando", "si", "tal vez",
+            "espero", "dudo", "puede", "posible",
+        ],
+        correct_context_keywords=[
+            # Contexto de lugar lejano (correcto para "allá")
+            "más", "lejos", "allí", "aquí", "arriba",
+            "abajo", "está", "ve", "mira",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="allá",
+        correct_word="halla",
+        wrong_meaning="adverbio de lugar (lejos)",
+        correct_meaning="verbo hallar",
+        wrong_context_keywords=[
+            # Contexto de hallar (debería ser "halla")
+            "se", "lo", "la", "encuentra", "ubicado",
+        ],
+        correct_context_keywords=[
+            # Contexto de lugar (correcto para "allá")
+            "más", "lejos", "allí", "aquí", "está",
+        ],
+    ),
+
+    # =========================================================================
+    # Triple homofonía: hay / ahí / ay
+    # =========================================================================
+
+    ConfusionPair(
+        wrong_word="ahí",
+        correct_word="hay",
+        wrong_meaning="adverbio de lugar (ahí)",
+        correct_meaning="verbo haber (existencia)",
+        wrong_context_keywords=[
+            # Contexto de verbo haber (debería ser "hay")
+            "que", "mucho", "poco", "algo", "nada",
+            "alguien", "nadie", "gente", "personas",
+            "problema", "solución", "tiempo",
+        ],
+        correct_context_keywords=[
+            # Contexto de lugar (correcto para "ahí")
+            "está", "mira", "pon", "deja", "ve",
+            "allí", "aquí", "cerca", "delante",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="ahí",
+        correct_word="ay",
+        wrong_meaning="adverbio de lugar",
+        correct_meaning="interjección de dolor",
+        wrong_context_keywords=[
+            # Contexto de interjección (debería ser "ay")
+            "!", "¡", "dolor", "madre", "dios",
+            "qué", "duele", "pobre",
+        ],
+        correct_context_keywords=[
+            # Contexto de lugar (correcto para "ahí")
+            "está", "mira", "pon", "deja",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="ay",
+        correct_word="hay",
+        wrong_meaning="interjección de dolor",
+        correct_meaning="verbo haber (existencia)",
+        wrong_context_keywords=[
+            # Contexto de verbo haber (debería ser "hay")
+            "que", "mucho", "poco", "algo", "nada",
+            "alguien", "nadie", "gente",
+        ],
+        correct_context_keywords=[
+            # Contexto de interjección (correcto para "ay")
+            "!", "¡", "dolor", "madre", "dios",
+            "qué", "duele",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="hay",
+        correct_word="ahí",
+        wrong_meaning="verbo haber (existencia)",
+        correct_meaning="adverbio de lugar",
+        wrong_context_keywords=[
+            # Contexto de lugar (debería ser "ahí")
+            "está", "mira", "pon", "deja", "ve",
+            "allí", "aquí", "cerca",
+        ],
+        correct_context_keywords=[
+            # Contexto de verbo haber (correcto para "hay")
+            "que", "mucho", "poco", "algo", "nada",
+            "alguien", "nadie",
+        ],
+    ),
+
+    # =========================================================================
+    # Triple homofonía: vaya / valla / baya
+    # =========================================================================
+
+    ConfusionPair(
+        wrong_word="valla",
+        correct_word="vaya",
+        wrong_meaning="cerca, obstáculo",
+        correct_meaning="verbo ir (subjuntivo)",
+        wrong_context_keywords=[
+            # Contexto de verbo ir (debería ser "vaya")
+            "que", "aunque", "cuando", "si", "ojalá",
+            "espero", "dudo", "puede", "no creo",
+            "antes de que", "sin que",
+        ],
+        correct_context_keywords=[
+            # Contexto de cerca/obstáculo (correcto para "valla")
+            "publicitaria", "madera", "metal", "saltar",
+            "rodear", "cercar", "límite", "frontera",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="valla",
+        correct_word="baya",
+        wrong_meaning="cerca, obstáculo",
+        correct_meaning="fruto carnoso",
+        wrong_context_keywords=[
+            # Contexto de fruto (debería ser "baya")
+            "fruto", "uva", "tomate", "fruta", "arándano",
+            "comer", "dulce", "planta",
+        ],
+        correct_context_keywords=[
+            # Contexto de cerca (correcto para "valla")
+            "publicitaria", "madera", "metal", "saltar",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="baya",
+        correct_word="vaya",
+        wrong_meaning="fruto carnoso",
+        correct_meaning="verbo ir (subjuntivo)",
+        wrong_context_keywords=[
+            # Contexto de verbo ir (debería ser "vaya")
+            "que", "aunque", "cuando", "espero", "ojalá",
+        ],
+        correct_context_keywords=[
+            # Contexto de fruto (correcto para "baya")
+            "fruto", "uva", "arándano", "comer",
+        ],
+    ),
+
+    # =========================================================================
+    # Homofonía: botar / votar
+    # =========================================================================
+
+    ConfusionPair(
+        wrong_word="botar",
+        correct_word="votar",
+        wrong_meaning="saltar, rebotar",
+        correct_meaning="emitir voto",
+        wrong_context_keywords=[
+            # Contexto de votar (debería ser "votar")
+            "elecciones", "votación", "candidato", "urna",
+            "sufragio", "democracia", "partido", "político",
+            "referéndum", "papeleta",
+        ],
+        correct_context_keywords=[
+            # Contexto de botar (correcto)
+            "pelota", "balón", "saltar", "rebotar",
+            "tirar", "basura", "bote",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="votar",
+        correct_word="botar",
+        wrong_meaning="emitir voto",
+        correct_meaning="saltar, rebotar",
+        wrong_context_keywords=[
+            # Contexto de botar (debería ser "botar")
+            "pelota", "balón", "saltar", "rebotar",
+            "tirar", "basura", "bote",
+        ],
+        correct_context_keywords=[
+            # Contexto de votar (correcto)
+            "elecciones", "candidato", "urna", "democracia",
+        ],
+    ),
+
+    # =========================================================================
+    # Homofonía: grabar / gravar
+    # =========================================================================
+
+    ConfusionPair(
+        wrong_word="grabar",
+        correct_word="gravar",
+        wrong_meaning="registrar sonido/imagen",
+        correct_meaning="imponer impuesto",
+        wrong_context_keywords=[
+            # Contexto de impuesto (debería ser "gravar")
+            "impuesto", "tributo", "tasa", "fiscal",
+            "hacienda", "contribución", "carga",
+        ],
+        correct_context_keywords=[
+            # Contexto de registrar (correcto para "grabar")
+            "vídeo", "audio", "cámara", "micrófono",
+            "disco", "sonido", "imagen", "película",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="gravar",
+        correct_word="grabar",
+        wrong_meaning="imponer impuesto",
+        correct_meaning="registrar sonido/imagen",
+        wrong_context_keywords=[
+            # Contexto de registrar (debería ser "grabar")
+            "vídeo", "audio", "cámara", "micrófono",
+            "disco", "sonido", "película",
+        ],
+        correct_context_keywords=[
+            # Contexto de impuesto (correcto para "gravar")
+            "impuesto", "tributo", "fiscal", "hacienda",
+        ],
+    ),
+
+    # =========================================================================
+    # Homofonía: revelar / rebelar
+    # =========================================================================
+
+    ConfusionPair(
+        wrong_word="revelar",
+        correct_word="rebelar",
+        wrong_meaning="descubrir secreto",
+        correct_meaning="sublevarse",
+        wrong_context_keywords=[
+            # Contexto de rebelarse (debería ser "rebelar")
+            "sublevarse", "levantarse", "contra", "autoridad",
+            "protesta", "rebeldía", "rebelión", "insurrección",
+        ],
+        correct_context_keywords=[
+            # Contexto de revelar (correcto)
+            "secreto", "verdad", "fotografía", "descubrir",
+            "mostrar", "información", "dato",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="rebelar",
+        correct_word="revelar",
+        wrong_meaning="sublevarse",
+        correct_meaning="descubrir secreto",
+        wrong_context_keywords=[
+            # Contexto de revelar (debería ser "revelar")
+            "secreto", "verdad", "fotografía", "descubrir",
+            "mostrar", "información",
+        ],
+        correct_context_keywords=[
+            # Contexto de rebelarse (correcto)
+            "contra", "autoridad", "rebeldía", "protesta",
+        ],
+    ),
+
+    # =========================================================================
+    # Homofonía: vaca / baca
+    # =========================================================================
+
+    ConfusionPair(
+        wrong_word="vaca",
+        correct_word="baca",
+        wrong_meaning="animal bovino",
+        correct_meaning="portaequipajes de vehículo",
+        wrong_context_keywords=[
+            # Contexto de portaequipajes (debería ser "baca")
+            "coche", "auto", "vehículo", "techo", "equipaje",
+            "maleta", "carga", "portaequipajes",
+        ],
+        correct_context_keywords=[
+            # Contexto de animal (correcto para "vaca")
+            "animal", "leche", "granja", "campo", "bovino",
+            "ternero", "mugir", "pasto",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="baca",
+        correct_word="vaca",
+        wrong_meaning="portaequipajes",
+        correct_meaning="animal bovino",
+        wrong_context_keywords=[
+            # Contexto de animal (debería ser "vaca")
+            "animal", "leche", "granja", "campo", "bovino",
+            "mugir", "pasto",
+        ],
+        correct_context_keywords=[
+            # Contexto de portaequipajes (correcto para "baca")
+            "coche", "techo", "equipaje", "maleta",
+        ],
+    ),
+
+    # =========================================================================
+    # Homofonía: hasta / asta
+    # =========================================================================
+
+    ConfusionPair(
+        wrong_word="hasta",
+        correct_word="asta",
+        wrong_meaning="preposición (límite)",
+        correct_meaning="palo de bandera / cuerno",
+        wrong_context_keywords=[
+            # Contexto de asta (debería ser "asta")
+            "bandera", "cuerno", "palo", "toro", "ciervo",
+            "mástil", "izar",
+        ],
+        correct_context_keywords=[
+            # Contexto de preposición (correcto para "hasta")
+            "luego", "pronto", "mañana", "aquí", "allí",
+            "el final", "que", "cuando",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="asta",
+        correct_word="hasta",
+        wrong_meaning="palo de bandera / cuerno",
+        correct_meaning="preposición (límite)",
+        wrong_context_keywords=[
+            # Contexto de preposición (debería ser "hasta")
+            "luego", "pronto", "mañana", "aquí", "allí",
+            "el final", "que",
+        ],
+        correct_context_keywords=[
+            # Contexto de asta (correcto)
+            "bandera", "cuerno", "toro", "mástil",
+        ],
+    ),
+
+    # =========================================================================
+    # Homofonía: hierba / hierva
+    # =========================================================================
+
+    ConfusionPair(
+        wrong_word="hierba",
+        correct_word="hierva",
+        wrong_meaning="planta",
+        correct_meaning="verbo hervir (subjuntivo)",
+        wrong_context_keywords=[
+            # Contexto de hervir (debería ser "hierva")
+            "que", "agua", "cuando", "aunque", "espero",
+            "dudo", "hervir", "ebullición",
+        ],
+        correct_context_keywords=[
+            # Contexto de planta (correcto para "hierba")
+            "planta", "jardín", "verde", "césped",
+            "cortar", "prado", "campo",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="hierva",
+        correct_word="hierba",
+        wrong_meaning="verbo hervir (subjuntivo)",
+        correct_meaning="planta",
+        wrong_context_keywords=[
+            # Contexto de planta (debería ser "hierba")
+            "planta", "jardín", "verde", "césped",
+            "cortar", "prado",
+        ],
+        correct_context_keywords=[
+            # Contexto de hervir (correcto para "hierva")
+            "que", "agua", "hervir", "ebullición",
+        ],
+    ),
+
+    # =========================================================================
+    # Homofonía: sabia / savia
+    # =========================================================================
+
+    ConfusionPair(
+        wrong_word="sabia",
+        correct_word="savia",
+        wrong_meaning="mujer con sabiduría",
+        correct_meaning="líquido de plantas",
+        wrong_context_keywords=[
+            # Contexto de savia (debería ser "savia")
+            "planta", "árbol", "líquido", "vegetal",
+            "circula", "nutriente", "tallo",
+        ],
+        correct_context_keywords=[
+            # Contexto de sabiduría (correcto para "sabia")
+            "mujer", "persona", "conocimiento", "inteligente",
+            "experta", "erudita",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="savia",
+        correct_word="sabia",
+        wrong_meaning="líquido de plantas",
+        correct_meaning="mujer con sabiduría",
+        wrong_context_keywords=[
+            # Contexto de sabiduría (debería ser "sabia")
+            "mujer", "persona", "conocimiento", "inteligente",
+            "experta",
+        ],
+        correct_context_keywords=[
+            # Contexto de savia (correcto)
+            "planta", "árbol", "líquido", "vegetal",
+        ],
+    ),
+
+    # =========================================================================
+    # Homofonía: caza / casa
+    # =========================================================================
+
+    ConfusionPair(
+        wrong_word="caza",
+        correct_word="casa",
+        wrong_meaning="acción de cazar",
+        correct_meaning="vivienda",
+        wrong_context_keywords=[
+            # Contexto de vivienda (debería ser "casa")
+            "hogar", "vivienda", "vivo", "habito",
+            "piso", "dormitorio", "cocina", "sala",
+            "alquiler", "hipoteca", "mi", "tu", "su",
+        ],
+        correct_context_keywords=[
+            # Contexto de cazar (correcto para "caza")
+            "cazador", "rifle", "escopeta", "animal",
+            "monte", "jabalí", "ciervo", "temporada",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="casa",
+        correct_word="caza",
+        wrong_meaning="vivienda",
+        correct_meaning="acción de cazar",
+        wrong_context_keywords=[
+            # Contexto de cazar (debería ser "caza")
+            "cazador", "rifle", "animal", "monte",
+        ],
+        correct_context_keywords=[
+            # Contexto de vivienda (correcto para "casa")
+            "hogar", "vivo", "piso", "mi", "tu",
+        ],
+    ),
+
+    # =========================================================================
+    # Homofonía: coser / cocer
+    # =========================================================================
+
+    ConfusionPair(
+        wrong_word="coser",
+        correct_word="cocer",
+        wrong_meaning="unir con hilo",
+        correct_meaning="cocinar con agua",
+        wrong_context_keywords=[
+            # Contexto de cocinar (debería ser "cocer")
+            "hervir", "agua", "cocina", "olla", "fuego",
+            "patatas", "verduras", "alimento", "ebullición",
+        ],
+        correct_context_keywords=[
+            # Contexto de coser (correcto)
+            "aguja", "hilo", "tela", "botón", "máquina",
+            "coser", "ropa", "costura",
+        ],
+    ),
+
+    ConfusionPair(
+        wrong_word="cocer",
+        correct_word="coser",
+        wrong_meaning="cocinar con agua",
+        correct_meaning="unir con hilo",
+        wrong_context_keywords=[
+            # Contexto de coser (debería ser "coser")
+            "aguja", "hilo", "tela", "botón", "ropa",
+        ],
+        correct_context_keywords=[
+            # Contexto de cocinar (correcto para "cocer")
+            "agua", "cocina", "olla", "fuego", "hervir",
         ],
     ),
 ]
