@@ -242,6 +242,15 @@ class PipelineNERMixin:
                                 context_before = context.full_text[context_start : m["start_char"]]
                                 context_after = context.full_text[m["end_char"] : context_end]
 
+                                # Validar mención adaptativa (filtrar posesivos/genitivos)
+                                validation_metadata = self._validate_ner_mention(
+                                    entity_name=final_canonical,
+                                    surface_form=m["surface_form"],
+                                    start_char=m["start_char"],
+                                    end_char=m["end_char"],
+                                    full_text=context.full_text,
+                                )
+
                                 mention = EntityMention(
                                     entity_id=entity_id,
                                     chapter_id=chapter_id,
@@ -252,6 +261,7 @@ class PipelineNERMixin:
                                     context_after=context_after,
                                     confidence=m["confidence"],
                                     source=m["source"],
+                                    metadata=validation_metadata,  # JSON con validation_method + reasoning
                                 )
                                 mentions_to_save.append(mention)
 
@@ -418,3 +428,52 @@ class PipelineNERMixin:
             logger.debug(f"Temporal marker extractor not available: {e}")
         except Exception as e:
             logger.warning(f"Temporal marker extraction failed: {e}")
+
+    def _validate_ner_mention(
+        self,
+        entity_name: str,
+        surface_form: str,
+        start_char: int,
+        end_char: int,
+        full_text: str,
+    ) -> str | None:
+        """
+        Valida una mención NER usando el sistema adaptativo de validación.
+
+        Args:
+            entity_name: Nombre canónico de la entidad
+            surface_form: Forma superficial de la mención
+            start_char: Posición de inicio
+            end_char: Posición de fin
+            full_text: Texto completo del documento
+
+        Returns:
+            JSON string con metadata de validación (validation_method, validation_reasoning)
+            o None si no se puede validar
+        """
+        try:
+            import json
+
+            from ..nlp.mention_validation import Mention, create_validator_chain
+
+            # Crear validador (lazy, se cachea internamente)
+            validator = create_validator_chain(use_spacy=True)
+
+            # Crear objeto Mention para validación
+            mention = Mention(text=surface_form, position=start_char)
+            entities_set = {entity_name}
+
+            # Validar
+            result = validator.validate(mention, full_text, entities_set)
+
+            # Serializar metadata
+            metadata = {
+                "validation_method": result.method.value if result.method else None,
+                "validation_reasoning": result.reasoning,
+            }
+
+            return json.dumps(metadata)
+
+        except Exception as e:
+            logger.debug(f"Mention validation failed for '{surface_form}': {e}")
+            return None

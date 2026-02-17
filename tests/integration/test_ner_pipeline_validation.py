@@ -18,18 +18,18 @@ from narrative_assistant.persistence.database import get_database
 
 def test_ner_validation_metadata_serialization():
     """
-    Test unit ario que verifica que el método _validate_ner_mention funciona correctamente.
+    Test unitario que verifica que el método _validate_ner_mention funciona correctamente.
     """
-    from narrative_assistant.pipelines.ua_ner import PipelineNERMixin
+    from narrative_assistant.pipelines.unified_analysis import UnifiedAnalysisPipeline
 
-    # Crear instancia del mixin
-    mixin = PipelineNERMixin()
+    # Crear instancia del pipeline (que incluye el mixin)
+    pipeline = UnifiedAnalysisPipeline()
 
     # Texto de test
     text = "Isabel era una detective privada. La casa de Isabel estaba en el centro."
 
     # Validar mención 1: "Isabel" en posición de sujeto (debe ser válida)
-    metadata1 = mixin._validate_ner_mention(
+    metadata1 = pipeline._validate_ner_mention(
         entity_name="Isabel",
         surface_form="Isabel",
         start_char=0,
@@ -44,7 +44,7 @@ def test_ner_validation_metadata_serialization():
 
     # Validar mención 2: "Isabel" en contexto posesivo "La casa de Isabel"
     pos_isabel = text.index("de Isabel")
-    metadata2 = mixin._validate_ner_mention(
+    metadata2 = pipeline._validate_ner_mention(
         entity_name="Isabel",
         surface_form="Isabel",
         start_char=pos_isabel + 3,  # Después de "de "
@@ -71,76 +71,76 @@ def test_backward_compatibility_mentions_without_metadata():
     # Obtener base de datos
     db = get_database()
 
-    try:
-        # Crear un proyecto de test
-        from narrative_assistant.persistence.project import Project
+    # Crear un proyecto de test
+    from narrative_assistant.persistence.project import ProjectManager
 
-        project = Project.create(
-            db=db,
-            name="Test Backward Compat",
-            description="Test de compatibilidad hacia atrás",
-        )
+    project_manager = ProjectManager(db=db)
+    result = project_manager.create_from_document(
+        text="Test document content.",
+        name="Test Backward Compat",
+        document_format="txt",
+        description="Test de compatibilidad hacia atrás",
+    )
 
-        # Crear una entidad
-        from narrative_assistant.entities.models import Entity, EntityType
+    assert result.is_success, f"Fallo al crear proyecto: {result.error}"
+    project = result.value
 
-        entity_repo = EntityRepository(db)
-        entity = Entity(
-            project_id=project.id,
-            canonical_name="Test Entity",
-            entity_type=EntityType.CHARACTER,
-        )
-        entity_id = entity_repo.create_entity(entity)
+    # Crear una entidad
+    from narrative_assistant.entities.models import Entity, EntityType
 
-        # Crear una mención sin metadata (legacy)
-        legacy_mention = EntityMention(
-            entity_id=entity_id,
-            surface_form="Test",
-            start_char=0,
-            end_char=4,
-            confidence=1.0,
-            source="manual",
-            metadata=None,  # Sin metadata (legacy)
-        )
+    entity_repo = EntityRepository(db)
+    entity = Entity(
+        project_id=project.id,
+        canonical_name="Test Entity",
+        entity_type=EntityType.CHARACTER,
+    )
+    entity_id = entity_repo.create_entity(entity)
 
-        # Guardar mención legacy
-        saved_count = entity_repo.create_mentions_batch([legacy_mention])
-        assert saved_count == 1, "Debe poder guardar mención sin metadata"
+    # Crear una mención sin metadata (legacy)
+    legacy_mention = EntityMention(
+        entity_id=entity_id,
+        surface_form="Test",
+        start_char=0,
+        end_char=4,
+        confidence=1.0,
+        source="manual",
+        metadata=None,  # Sin metadata (legacy)
+    )
 
-        # Recuperar mención
-        mentions = entity_repo.get_mentions_for_entity(entity_id)
-        assert len(mentions) == 1, "Debe haber una mención"
-        assert mentions[0].metadata is None, "Metadata debe ser None (legacy)"
+    # Guardar mención legacy
+    saved_count = entity_repo.create_mentions_batch([legacy_mention])
+    assert saved_count == 1, "Debe poder guardar mención sin metadata"
 
-        # Crear una mención con metadata
-        metadata_dict = {
-            "validation_method": "regex",
-            "validation_reasoning": "Sujeto al inicio de oración",
-        }
-        modern_mention = EntityMention(
-            entity_id=entity_id,
-            surface_form="Test2",
-            start_char=10,
-            end_char=15,
-            confidence=0.9,
-            source="ner",
-            metadata=json.dumps(metadata_dict),
-        )
+    # Recuperar mención
+    mentions = entity_repo.get_mentions_by_entity(entity_id)
+    assert len(mentions) == 1, "Debe haber una mención"
+    assert mentions[0].metadata is None, "Metadata debe ser None (legacy)"
 
-        saved_count = entity_repo.create_mentions_batch([modern_mention])
-        assert saved_count == 1, "Debe poder guardar mención con metadata"
+    # Crear una mención con metadata
+    metadata_dict = {
+        "validation_method": "regex",
+        "validation_reasoning": "Sujeto al inicio de oración",
+    }
+    modern_mention = EntityMention(
+        entity_id=entity_id,
+        surface_form="Test2",
+        start_char=10,
+        end_char=15,
+        confidence=0.9,
+        source="ner",
+        metadata=json.dumps(metadata_dict),
+    )
 
-        # Recuperar ambas menciones
-        all_mentions = entity_repo.get_mentions_for_entity(entity_id)
-        assert len(all_mentions) == 2, "Debe haber dos menciones"
+    saved_count = entity_repo.create_mentions_batch([modern_mention])
+    assert saved_count == 1, "Debe poder guardar mención con metadata"
 
-        # Verificar que ambas coexisten
-        legacy_found = any(m.metadata is None for m in all_mentions)
-        modern_found = any(m.metadata is not None for m in all_mentions)
+    # Recuperar ambas menciones
+    all_mentions = entity_repo.get_mentions_by_entity(entity_id)
+    assert len(all_mentions) == 2, "Debe haber dos menciones"
 
-        assert legacy_found, "Debe haber mención legacy sin metadata"
-        assert modern_found, "Debe haber mención moderna con metadata"
+    # Verificar que ambas coexisten
+    legacy_found = any(m.metadata is None for m in all_mentions)
+    modern_found = any(m.metadata is not None for m in all_mentions)
 
-    finally:
-        # Limpiar
-        db.close()
+    assert legacy_found, "Debe haber mención legacy sin metadata"
+    assert modern_found, "Debe haber mención moderna con metadata"
