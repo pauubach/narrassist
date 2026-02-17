@@ -420,6 +420,7 @@
                   @go-to-start="onGoToChapterStart"
                   @view-alerts="onViewChapterAlerts"
                   @select-entity="onEntityClick"
+                  @navigate-to-event="onNavigateToEvent"
                 />
 
                 <!-- Sin selección ni capítulo visible: resumen del proyecto -->
@@ -1049,6 +1050,22 @@ const onViewChapterAlerts = () => {
     workspaceStore.toggleLeftPanel()
   }
   // The AlertsPanel will show alerts, user can filter by chapter if needed
+}
+
+const onNavigateToEvent = (startChar: number, endChar: number) => {
+  // Navigate to event position in current chapter
+  if (!currentChapter.value) return
+
+  const chapterId = currentChapter.value.id
+
+  // Clear existing highlights and set new position
+  workspaceStore.clearAlertHighlights()
+  workspaceStore.setScrollToPosition(chapterId, startChar, endChar)
+
+  // Ensure we're in text tab
+  if (workspaceStore.activeTab !== 'text') {
+    workspaceStore.setActiveTab('text')
+  }
 }
 
 // TextSelectionInspector handlers

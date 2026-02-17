@@ -9,6 +9,7 @@ import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import type { Chapter, Entity, Alert } from '@/types'
 import { api } from '@/services/apiClient'
+import { getChapterEvents, type DetectedEvent, type ChapterEventsResponse } from '@/services/events'
 
 /**
  * ChapterInspector - Panel de detalles de capítulo para el inspector.
@@ -76,6 +77,8 @@ const emit = defineEmits<{
   (e: 'view-alerts'): void
   /** Seleccionar un personaje */
   (e: 'select-entity', entityId: number): void
+  /** Navegar a un evento en el texto */
+  (e: 'navigate-to-event', startChar: number, endChar: number): void
 }>()
 
 // Chapter summary data
@@ -85,6 +88,12 @@ const chapterSummary = ref<ChapterSummaryData | null>(null)
 
 // Cache for chapter summaries
 const summaryCache = ref<Map<number, ChapterSummaryData>>(new Map())
+
+// Events data
+const eventsLoading = ref(false)
+const eventsError = ref<string | null>(null)
+const chapterEvents = ref<ChapterEventsResponse | null>(null)
+const eventsCache = ref<Map<number, ChapterEventsResponse>>(new Map())
 
 // Load chapter summary when chapter changes
 async function loadChapterSummary() {
@@ -121,12 +130,39 @@ async function loadChapterSummary() {
   }
 }
 
+// Load chapter events
+async function loadChapterEvents() {
+  if (!props.chapter) return
+
+  // Check cache first
+  const cached = eventsCache.value.get(props.chapter.chapterNumber)
+  if (cached) {
+    chapterEvents.value = cached
+    return
+  }
+
+  eventsLoading.value = true
+  eventsError.value = null
+
+  try {
+    const data = await getChapterEvents(props.projectId, props.chapter.chapterNumber)
+    chapterEvents.value = data
+    eventsCache.value.set(props.chapter.chapterNumber, data)
+  } catch (err) {
+    console.error('Error loading chapter events:', err)
+    eventsError.value = 'Error al cargar eventos'
+  } finally {
+    eventsLoading.value = false
+  }
+}
+
 // Watch for chapter changes
 watch(
   () => props.chapter?.id,
   () => {
     if (props.chapter) {
       loadChapterSummary()
+      loadChapterEvents()
     }
   },
   { immediate: true }
@@ -165,21 +201,26 @@ const topCharacters = computed(() => {
     .slice(0, 8)
 })
 
-/** Eventos clave combinados */
+/** Eventos detectados (combinando todos los tiers) */
 const keyEvents = computed(() => {
-  if (!chapterSummary.value) return []
-  const events = [
-    ...(chapterSummary.value.key_events || []),
-    ...(chapterSummary.value.llm_events || []),
+  if (!chapterEvents.value) return []
+
+  // Combinar eventos de todos los tiers
+  const allEvents = [
+    ...(chapterEvents.value.tier1_events || []),
+    ...(chapterEvents.value.tier2_events || []),
+    ...(chapterEvents.value.tier3_events || []),
   ]
-  // Dedup by description
-  const seen = new Set<string>()
-  return events.filter(e => {
-    const key = e.description.toLowerCase().substring(0, 30)
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  }) // Sin límite - mostrar todos con scroll
+
+  // Mapear a formato esperado por el template + incluir posiciones para navegación
+  return allEvents.map(e => ({
+    event_type: e.event_type,
+    description: e.description,
+    characters_involved: [], // TODO: Extraer de entity_ids si es necesario
+    start_char: e.start_char,
+    end_char: e.end_char,
+    confidence: e.confidence,
+  }))
 })
 
 function getToneSeverity(tone: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
@@ -225,6 +266,13 @@ function getEventTypeLabel(eventType: string): string {
     transformation: 'Transformación',
   }
   return labels[eventType] || eventType
+}
+
+/** Navegar a un evento en el texto */
+function navigateToEvent(event: any) {
+  if (event.start_char !== undefined && event.end_char !== undefined) {
+    emit('navigate-to-event', event.start_char, event.end_char)
+  }
 }
 
 // ============================================================================
@@ -407,7 +455,12 @@ function clearEventFilters() {
             </div>
 
             <div class="events-list">
-              <div v-for="(event, idx) in filteredKeyEvents" :key="idx" class="event-item">
+              <div
+                v-for="(event, idx) in filteredKeyEvents"
+                :key="idx"
+                class="event-item"
+                @click="navigateToEvent(event)"
+              >
                 <i :class="`pi ${getEventIcon(event.event_type)}`"></i>
                 <span>{{ event.description }}</span>
               </div>
@@ -788,11 +841,20 @@ function clearEventFilters() {
   align-items: flex-start;
   gap: var(--ds-space-2);
   font-size: 0.9rem;
+  padding: var(--ds-space-2);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.event-item:hover {
+  background: var(--surface-50);
 }
 
 .event-item i {
   color: var(--text-color-secondary);
   margin-top: 2px;
+  flex-shrink: 0;
 }
 
 .no-events-filtered {
