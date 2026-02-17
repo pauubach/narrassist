@@ -1504,15 +1504,18 @@ class AlertEngine:
 
         excerpt = sentence[:120] + "..." if len(sentence) > 120 else sentence
 
+        # Convertir glue_percentage a escala 0-100 si está en escala 0-1
+        glue_pct = glue_percentage * 100 if glue_percentage <= 1.0 else glue_percentage
+
         return self.create_alert(
             project_id=project_id,
             category=AlertCategory.STYLE,
             severity=severity,
             alert_type="sticky_sentence",
             title="Frase pegajosa (exceso de palabras funcionales)",
-            description=f'Frase con {glue_percentage:.0f}% de palabras funcionales: "{excerpt}"',
+            description=f'Frase con {glue_pct:.0f}% de palabras funcionales: "{excerpt}"',
             explanation=(
-                f"Esta frase tiene un {glue_percentage:.0f}% de palabras funcionales "
+                f"Esta frase tiene un {glue_pct:.0f}% de palabras funcionales "
                 f"(artículos, preposiciones, conjunciones), lo que dificulta la fluidez. "
                 f"Las frases con más del 40% de palabras funcionales suelen percibirse como pesadas."
             ),
@@ -1524,7 +1527,7 @@ class AlertEngine:
             confidence=confidence,
             source_module="sticky_sentences",
             extra_data={
-                "glue_percentage": round(glue_percentage, 1),
+                "glue_percentage": round(glue_pct, 1),
                 "severity_level": severity_level,
             },
         )
