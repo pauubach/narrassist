@@ -391,11 +391,20 @@ def build_chat_system_prompt(
     if context_text:
         prompt_parts.extend([
             '',
-            '## Reglas de citación',
-            'Cuando cites texto del manuscrito, usa el formato: "texto citado" [REF:N]',
-            'donde N es el número del fragmento de contexto proporcionado.',
-            'Si encuentras información contradictoria en distintos fragmentos,',
-            'cita TODAS las versiones con sus respectivas referencias.',
+            '## Reglas de citación - IMPORTANTE',
+            'SIEMPRE que respondas basándote en los fragmentos de contexto, DEBES citar usando [REF:N].',
+            '',
+            'Formato obligatorio:',
+            '- Cuando menciones información del manuscrito: "texto citado" [REF:N]',
+            '- N = número del fragmento (ej: [REF:1], [REF:2])',
+            '- Usa múltiples referencias si la info viene de varios fragmentos',
+            '',
+            'Ejemplos correctos:',
+            '- "Elena tenía los ojos verdes" [REF:1]',
+            '- Isabel aparece en los capítulos 3 [REF:1] y 7 [REF:3]',
+            '- Según el texto, "era pelirroja" [REF:2]',
+            '',
+            'NUNCA respondas con información del manuscrito sin incluir [REF:N].',
         ])
 
     # Texto seleccionado por el usuario
