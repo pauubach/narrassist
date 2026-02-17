@@ -625,6 +625,25 @@ except Exception as e:
 async def startup_load_modules():
     """Try to load narrative_assistant modules on server startup."""
     _early_logger.info("=== Startup event triggered ===")
+
+    # S7c-01: Reset stuck "analyzing"/"queued" projects from previous crash
+    # IMPORTANT: Must run ALWAYS on startup, even if modules already loaded
+    try:
+        db = deps.get_database()
+        stuck = db.fetchall(
+            "SELECT id, name FROM projects WHERE analysis_status IN ('analyzing', 'queued')"
+        )
+        if stuck:
+            for row in stuck:
+                db.execute(
+                    "UPDATE projects SET analysis_status = 'pending', "
+                    "analysis_progress = 0 WHERE id = ?",
+                    (row['id'],)
+                )
+            logger.info(f"Startup: reset {len(stuck)} stuck projects to 'pending': {[r['name'] for r in stuck]}")
+    except Exception as e:
+        logger.debug(f"Startup: could not reset stuck projects: {e}")
+
     if not deps.MODULES_LOADED:
         logger.info("Startup: attempting to load narrative_assistant modules...")
         _early_logger.info("Startup: attempting to load narrative_assistant modules...")
@@ -632,23 +651,6 @@ async def startup_load_modules():
         if deps.MODULES_LOADED:
             logger.info("Startup: modules loaded successfully")
             _early_logger.info("Startup: modules loaded successfully")
-
-            # S7c-01: Reset stuck "analyzing"/"queued" projects from previous crash
-            try:
-                db = deps.get_database()
-                stuck = db.fetchall(
-                    "SELECT id, name FROM projects WHERE analysis_status IN ('analyzing', 'queued')"
-                )
-                if stuck:
-                    for row in stuck:
-                        db.execute(
-                            "UPDATE projects SET analysis_status = 'error', "
-                            "analysis_progress = 0 WHERE id = ?",
-                            (row['id'],)
-                        )
-                    logger.info(f"Startup: reset {len(stuck)} stuck projects: {[r['name'] for r in stuck]}")
-            except Exception as e:
-                logger.debug(f"Startup: could not reset stuck projects: {e}")
         else:
             logger.warning(f"Startup: modules not loaded - {deps.MODULES_ERROR}")
             _early_logger.warning(f"Startup: modules not loaded - {deps.MODULES_ERROR}")
