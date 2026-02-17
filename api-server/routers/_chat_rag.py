@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # Palabras vacías en español (no aportan como términos de búsqueda)
 _STOPWORDS_ES = frozenset({
     "pero", "como", "para", "este", "esta", "esto", "esos", "esas",
-    "tiene", "tiene", "están", "están", "hacer", "hace", "hizo",
+    "tiene", "están", "hacer", "hace", "hizo",
     "puede", "pudo", "podría", "sobre", "también", "cuando", "donde",
     "porque", "aunque", "mientras", "después", "antes", "entre",
     "desde", "hasta", "según", "durante", "mediante", "hacia",
@@ -29,8 +29,7 @@ _STOPWORDS_ES = frozenset({
     "mucho", "mucha", "muchos", "muchas", "poco", "poca",
     "cual", "cuál", "quien", "quién", "cuyo", "cuya",
     "mismo", "misma", "mismos", "mismas", "varios", "varias",
-    "dónde", "cómo", "cuándo", "cuánto", "cuántos",
-    "tiene", "cuál", "qué",
+    "dónde", "cómo", "cuándo", "cuánto", "cuántos", "qué",
 })
 
 
@@ -375,7 +374,7 @@ def build_chat_system_prompt(
         System prompt completo
     """
     prompt_parts = [
-        f'Eres un asistente experto en análisis literario y corrección de textos.',
+        'Eres un asistente experto en análisis literario y corrección de textos.',
         f'Estás ayudando a analizar el manuscrito "{project_name}".',
         '',
         'Tu rol es:',

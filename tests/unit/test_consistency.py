@@ -414,8 +414,10 @@ class TestHairConsistency:
         assert result.is_success
         inconsistencies = result.value
         hair_incon = [i for i in inconsistencies if i.attribute_key == AttributeKey.HAIR_COLOR]
-        # Debería detectar al menos 2 inconsistencias (negro→rubio, rubio→negro)
-        assert len(hair_incon) >= 2
+        # Debería detectar 1 inconsistencia con múltiples valores conflictivos
+        assert len(hair_incon) == 1
+        # Y tener 2 valores conflictivos (negro y rubio)
+        assert len(hair_incon[0].conflicting_values) == 2
 
 
 class TestBuildConsistency:

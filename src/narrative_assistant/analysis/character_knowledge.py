@@ -1368,13 +1368,12 @@ class CharacterKnowledgeAnalyzer:
 
                 # Buscar en ventana de 500 chars antes de la presentación
                 search_window = text[max(0, pos - 500): pos]
-                window_offset = max(0, pos - 500)
 
                 # Usar nombre canónico (case-sensitive) para distinguir
                 # nombres propios de adjetivos homónimos
                 seen_eids = set()
                 for eid, canon_name in self._entity_names.items():
-                    if eid in seen_eids or eid == known_id or eid == presenter_id:
+                    if eid in seen_eids or eid in (known_id, presenter_id):
                         continue
                     seen_eids.add(eid)
                     if self._person_ids and eid not in self._person_ids:

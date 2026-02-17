@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue'
+import { ref, type ComponentPublicInstance, type Ref } from 'vue'
 
 /**
  * Composable para navegación por teclado en listas (roving tabindex).
@@ -32,8 +32,14 @@ export function useListKeyboardNav(opts?: {
   const focusedIndex = ref(-1) as Ref<number>
   const itemRefs: (HTMLElement | null)[] = []
 
-  function setItemRef(el: Element | null, index: number) {
-    itemRefs[index] = el as HTMLElement | null
+  function setItemRef(el: Element | ComponentPublicInstance | null, index: number) {
+    // Vue template refs pueden ser Element o ComponentPublicInstance
+    // Extraemos el $el si es un componente, sino usamos el elemento directamente
+    if (el && '$el' in el) {
+      itemRefs[index] = el.$el as HTMLElement | null
+    } else {
+      itemRefs[index] = el as HTMLElement | null
+    }
   }
 
   function getTabindex(index: number): number {

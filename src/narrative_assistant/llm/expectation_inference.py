@@ -700,8 +700,9 @@ Extrae la siguiente información sobre el personaje:
     ) -> list[ExpectationViolation]:
         """Detecta violaciones usando votación multi-modelo por roles."""
         try:
-            from .client import get_llm_client
             from narrative_assistant.llm.sanitization import sanitize_for_prompt
+
+            from .client import get_llm_client
 
             client = get_llm_client()
             if not client or not client.is_available:

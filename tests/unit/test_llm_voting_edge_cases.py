@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
-from narrative_assistant.llm.config import (
+from narrative_assistant.llm.config import (  # noqa: E402
     LEVEL_MIN_BUDGET_GB,
     MODEL_MEMORY_GB,
     QUALITY_MATRIX,
@@ -1041,7 +1041,7 @@ class TestIntegrationRoundTrip:
         }
 
         def complete_side_effect(prompt, system, max_tokens, temperature, model_name):
-            return responses.get(model_name, None)
+            return responses.get(model_name)
 
         mock_client.complete = MagicMock(side_effect=complete_side_effect)
         mock_client._get_available_ollama_models = MagicMock(return_value=available)

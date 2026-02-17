@@ -921,7 +921,7 @@ class AttributeConsistencyChecker:
 
         key_name = get_attribute_display_name(attr_key)
         gender = get_attribute_gender(attr_key)
-        entity = conflicting_values[0].value  # Usamos el primer valor para referencia
+        # entity = conflicting_values[0].value  # Usamos el primer valor para referencia
 
         # Construir lista de valores con ubicaciones
         values_list = []

@@ -724,7 +724,7 @@ class LocalLLMClient:
         sensitivity: float = 5.0,
         max_tokens: int | None = None,
         temperature: float | None = None,
-    ) -> "VotingResult":
+    ):
         """
         Ejecuta una query con votación multi-modelo por roles.
 

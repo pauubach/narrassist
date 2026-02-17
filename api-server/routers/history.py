@@ -16,7 +16,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Query
 
-from deps import ApiResponse
+from ..deps import ApiResponse
 
 logger = logging.getLogger(__name__)
 

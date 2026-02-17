@@ -470,7 +470,7 @@ def estimate_analysis_time(
     """
     # Tokens estimados por palabra (prompt + respuesta)
     tokens_per_word = 2.5
-    total_tokens = word_count * tokens_per_word
+    # total_tokens = word_count * tokens_per_word  # noqa: F841
 
     # Número de tareas LLM × slots por nivel
     num_tasks = len(AnalysisTask)

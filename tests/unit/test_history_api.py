@@ -14,7 +14,7 @@ import pytest
 # Añadir api-server al path para importar routers
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "api-server"))
 
-from narrative_assistant.persistence.history import (
+from narrative_assistant.persistence.history import (  # noqa: E402
     ChangeType,
     HistoryEntry,
     UndoResult,
@@ -25,17 +25,17 @@ from narrative_assistant.persistence.history import (
 
 def _make_entry(**kwargs) -> HistoryEntry:
     """Crea un HistoryEntry con defaults sensatos."""
-    defaults = dict(
-        id=1,
-        project_id=1,
-        action_type=ChangeType.ENTITY_DELETED,
-        target_type="entity",
-        target_id=10,
-        old_value={"canonical_name": "Juan"},
-        new_value=None,
-        note="test",
-        created_at=datetime(2025, 6, 15, 12, 0),
-    )
+    defaults = {
+        "id": 1,
+        "project_id": 1,
+        "action_type": ChangeType.ENTITY_DELETED,
+        "target_type": "entity",
+        "target_id": 10,
+        "old_value": {"canonical_name": "Juan"},
+        "new_value": None,
+        "note": "test",
+        "created_at": datetime(2025, 6, 15, 12, 0),
+    }
     defaults.update(kwargs)
     return HistoryEntry(**defaults)
 

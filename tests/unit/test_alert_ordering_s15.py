@@ -8,8 +8,9 @@ Verifica que las alertas se ordenen por:
 4. Fecha de creación (más recientes primero)
 """
 
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
 
 from narrative_assistant.alerts.models import Alert, AlertCategory, AlertSeverity, AlertStatus
 from narrative_assistant.alerts.repository import AlertRepository

@@ -16,7 +16,7 @@ import sqlite3
 
 import pytest
 
-from narrative_assistant.persistence.history import (
+from narrative_assistant.persistence.history import (  # noqa: E402
     ChangeType,
     HistoryEntry,
     HistoryManager,

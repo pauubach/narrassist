@@ -11,7 +11,7 @@ Cubre:
 
 import pytest
 
-from narrative_assistant.llm.config import (
+from narrative_assistant.llm.config import (  # noqa: E402
     QUALITY_MATRIX,
     ROLE_SUBSTITUTES,
     AnalysisTask,

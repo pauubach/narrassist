@@ -27,7 +27,6 @@ import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
-from functools import lru_cache
 from typing import Protocol
 
 logger = logging.getLogger(__name__)
@@ -158,15 +157,11 @@ class RegexValidator:
             next_validator: Siguiente validador en la cadena (Chain of Responsibility)
         """
         self.next = next_validator
-        self._compiled_patterns = self._compile_patterns()
-
-    @lru_cache(maxsize=1)
-    def _compile_patterns(self) -> dict:
-        """Compila patrones regex una sola vez."""
-        compiled = {}
-        for name, pattern in self.POSSESSIVE_PATTERNS.items():
-            compiled[name] = re.compile(pattern, re.IGNORECASE)
-        return compiled
+        # Compilar patrones una sola vez (evita lru_cache en método → memory leak)
+        self._compiled_patterns = {
+            name: re.compile(pattern, re.IGNORECASE)
+            for name, pattern in self.POSSESSIVE_PATTERNS.items()
+        }
 
     def validate(
         self, mention: Mention, context: str, entities: set[str]
@@ -180,7 +175,6 @@ class RegexValidator:
         """
         # Extraer contexto antes de la mención (50 chars)
         mention_start = mention.position
-        mention_end = mention.position + len(mention.text)
         context_start = max(0, mention_start - 50)
         before = context[context_start:mention_start]
 

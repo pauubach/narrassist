@@ -885,37 +885,38 @@ def check_gender_agreement(doc: Doc) -> list[GrammarIssue]:
     # - RAE: https://www.rae.es/buen-uso-español/el-artículo-ante-nombres-femeninos-comenzados-por-a-tónica
     # - Hispanoteca, Kwiziq, Berges Institute
     # - Ver: docs/research/S15_feminine_a_tonica_detection.md
-    FEMININE_WITH_EL = {
-        # Grupo 1: Palabras comunes (uso frecuente)
-        "agua", "águila", "alma", "arma", "hambre", "área", "aula", "hacha", "hada",
-        "ama", "ala", "alba", "alga", "anca", "ancla", "ansia", "arca", "arpa",
-        "asa", "aspa", "asta", "aura", "ave", "aya", "habla", "haba",
-
-        # Grupo 2: Palabras adicionales (investigación S15)
-        "acta", "afta", "agria", "alca", "ánfora", "ánima", "ánade", "aria",
-        "ascua", "asma", "áurea",
-
-        # Grupo 3: Palabras técnicas/cultas (uso menos frecuente)
-        "álgebra", "áncora", "ápoda", "árula", "átala", "ábside",
-
-        # Nota: "hache" (letra H) es EXCEPCIÓN, usa "la hache" (ver FEMININE_WITH_LA_EXCEPTIONS)
-    }
-
-    # EXCEPCIONES: Sustantivos femeninos con 'a' tónica que usan "la" (NO "el")
-    # Según RAE: https://www.rae.es/dpd/el
-    FEMININE_WITH_LA_EXCEPTIONS = {
-        # 1. Nombres de letras del abecedario
-        "a",      # "la a" (letra)
-        "hache",  # "la hache" (letra H)
-        "alfa",   # "la alfa" (letra griega)
-
-        # 2. Sustantivos de género común (cuando designan mujeres)
-        # "la árabe", "la ácrata" (pero "el árabe" para hombres)
-        # Nota: Estos se manejan mediante contexto (difícil de detectar sin análisis semántico)
-
-        # 3. Topónimos (uso fluctuante, no forzar)
-        # "la/el Argelia", "la/el Ática"
-    }
+    # FIXME: Estas listas se usarán en futura implementación de detector de artículos (S15+)
+    # FEMININE_WITH_EL = {
+    #     # Grupo 1: Palabras comunes (uso frecuente)
+    #     "agua", "águila", "alma", "arma", "hambre", "área", "aula", "hacha", "hada",
+    #     "ama", "ala", "alba", "alga", "anca", "ancla", "ansia", "arca", "arpa",
+    #     "asa", "aspa", "asta", "aura", "ave", "aya", "habla", "haba",
+    #
+    #     # Grupo 2: Palabras adicionales (investigación S15)
+    #     "acta", "afta", "agria", "alca", "ánfora", "ánima", "ánade", "aria",
+    #     "ascua", "asma", "áurea",
+    #
+    #     # Grupo 3: Palabras técnicas/cultas (uso menos frecuente)
+    #     "álgebra", "áncora", "ápoda", "árula", "átala", "ábside",
+    #
+    #     # Nota: "hache" (letra H) es EXCEPCIÓN, usa "la hache" (ver FEMININE_WITH_LA_EXCEPTIONS)
+    # }
+    #
+    # # EXCEPCIONES: Sustantivos femeninos con 'a' tónica que usan "la" (NO "el")
+    # # Según RAE: https://www.rae.es/dpd/el
+    # FEMININE_WITH_LA_EXCEPTIONS = {
+    #     # 1. Nombres de letras del abecedario
+    #     "a",      # "la a" (letra)
+    #     "hache",  # "la hache" (letra H)
+    #     "alfa",   # "la alfa" (letra griega)
+    #
+    #     # 2. Sustantivos de género común (cuando designan mujeres)
+    #     # "la árabe", "la ácrata" (pero "el árabe" para hombres)
+    #     # Nota: Estos se manejan mediante contexto (difícil de detectar sin análisis semántico)
+    #
+    #     # 3. Topónimos (uso fluctuante, no forzar)
+    #     # "la/el Argelia", "la/el Ática"
+    # }
 
     # Fallback: palabras muy comunes con género conocido
     # (Usado cuando spaCy no proporciona morfología, ej: detecta como PROPN)

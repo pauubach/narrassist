@@ -533,7 +533,7 @@ def _get_system_ram_gb() -> float:
     return 8.0  # Default conservador
 
 
-def detect_capacity() -> "HardwareProfile":
+def detect_capacity():
     """
     Detecta la capacidad efectiva del hardware para modelos LLM.
 
@@ -545,7 +545,7 @@ def detect_capacity() -> "HardwareProfile":
     Returns:
         HardwareProfile con presupuesto efectivo calculado
     """
-    from ..llm.config import HardwareProfile
+    from ..llm.config import HardwareProfile  # noqa: F821
 
     detector = get_device_detector()
     ram_gb = _get_system_ram_gb()

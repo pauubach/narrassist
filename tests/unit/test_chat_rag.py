@@ -16,7 +16,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "api-server"))
 
-from routers._chat_rag import (
+from routers._chat_rag import (  # noqa: E402
     build_numbered_context,
     build_reference_index,
     build_selection_context,
