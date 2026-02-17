@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 28
+SCHEMA_VERSION = 29
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -1210,8 +1210,80 @@ CREATE INDEX IF NOT EXISTS idx_speech_by_character ON character_speech_snapshots
     created_at DESC
 );
 
+-- ============================================================================
+-- Analysis Phase Caches (v0.10.15 - S17)
+-- Objetivo: 100x speedup en re-análisis cuando documento NO cambió
+-- ============================================================================
+
+-- Cache de NER (Named Entity Recognition)
+-- Ahorra 3-5 minutos de procesamiento (spaCy + Ollama + Transformer)
+CREATE TABLE IF NOT EXISTS ner_cache (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    document_fingerprint TEXT NOT NULL,  -- SHA-256 cache key
+    config_hash TEXT NOT NULL,           -- 16-char hash de configuración NER
+    entities_json TEXT NOT NULL,         -- JSON: [{id, name, type, mentions: [...]}]
+    entity_count INTEGER DEFAULT 0,
+    mention_count INTEGER DEFAULT 0,
+    processed_chars INTEGER DEFAULT 0,
+    cache_version INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    UNIQUE(project_id, document_fingerprint, config_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_ner_cache_lookup ON ner_cache(
+    project_id,
+    document_fingerprint,
+    config_hash
+);
+
+-- Cache de Correferencias (Coreference Resolution)
+-- Ahorra 5-7 minutos de procesamiento (LLM voting multi-método)
+CREATE TABLE IF NOT EXISTS coreference_cache (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    document_fingerprint TEXT NOT NULL,
+    config_hash TEXT NOT NULL,           -- Hash de CorefConfig
+    chains_json TEXT NOT NULL,           -- JSON: {chains: [...], unresolved: [...], method: "..."}
+    chain_count INTEGER DEFAULT 0,
+    mention_count INTEGER DEFAULT 0,
+    cache_version INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    UNIQUE(project_id, document_fingerprint, config_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_coref_cache_lookup ON coreference_cache(
+    project_id,
+    document_fingerprint,
+    config_hash
+);
+
+-- Cache de Atributos (Attribute Extraction)
+-- Ahorra 30 segundos de procesamiento (regex + NLP)
+CREATE TABLE IF NOT EXISTS attribute_cache (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    document_fingerprint TEXT NOT NULL,
+    config_hash TEXT NOT NULL,           -- Hash de configuración extracción
+    attributes_json TEXT NOT NULL,       -- JSON: [{entity_id, attr_type, value, evidence: {...}}]
+    attribute_count INTEGER DEFAULT 0,
+    evidence_count INTEGER DEFAULT 0,
+    cache_version INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    UNIQUE(project_id, document_fingerprint, config_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_attr_cache_lookup ON attribute_cache(
+    project_id,
+    document_fingerprint,
+    config_hash
+);
+
 -- Insertar versión del schema
-INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '27');
+INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '29');
 """
 
 
