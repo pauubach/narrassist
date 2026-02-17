@@ -749,6 +749,12 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
                         expanded_context = chapter_content[context_start:context_end]
                         break
 
+            # Debug: log selection context
+            logger.info(f"Selection context - text: {request.selected_text[:50]}...")
+            logger.info(f"Selection context - chapter: {request.selected_text_chapter}")
+            logger.info(f"Selection context - positions: {request.selected_text_start} - {request.selected_text_end}")
+            logger.info(f"Selection context - expanded: {len(expanded_context) if expanded_context else 0} chars")
+
             selection_context = build_selection_context(
                 request.selected_text, ch_title, expanded_context
             )
@@ -768,6 +774,11 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
             selection_context=selection_context,
             history_text=history_text,
         )
+
+        # Debug: log system prompt
+        logger.debug(f"System prompt (first 500 chars):\n{system_prompt[:500]}...")
+        if selection_context:
+            logger.info(f"Selection context included: YES ({len(selection_context)} chars)")
 
         # ================================================================
         # Selección de modelo (misma lógica existente)

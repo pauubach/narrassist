@@ -106,6 +106,11 @@ class PipelineQualityMixin:
         if self.config.run_acronyms_check:
             tasks.append(("acronyms", self._run_acronyms_check))
 
+        # Muletillas lingüísticas (catálogo prescriptivo)
+        # Complementa CrutchWordsDetector (análisis estadístico)
+        if getattr(self.config, 'run_filler_detection', True):
+            tasks.append(("fillers", self._run_filler_detection))
+
         # Ejecutar en paralelo si está configurado
         if self.config.parallel_extraction and len(tasks) > 1:
             self._run_parallel_tasks(tasks, context)
@@ -625,3 +630,72 @@ class PipelineQualityMixin:
             logger.debug(f"Acronym detector not available: {e}")
         except Exception as e:
             logger.warning(f"Acronym check failed: {e}")
+
+    def _run_filler_detection(self, context: AnalysisContext) -> None:
+        """Detectar muletillas lingüísticas (catálogo prescriptivo)."""
+        try:
+            from ..corrections.base import CorrectionIssue
+            from ..corrections.types import CorrectionCategory
+            from ..nlp.style.filler_detector import get_filler_detector
+
+            detector = get_filler_detector()
+            result = detector.detect(context.full_text)
+
+            if result.is_failure:
+                logger.debug(f"Filler detection failed: {result.error}")
+                context.filler_issues = []
+                context.stats["filler_issues"] = 0
+                return
+
+            report = result.value
+            filler_issues = []
+
+            # Convertir FillerReport a CorrectionIssues
+            for filler in report.fillers:
+                if not filler.is_excessive:
+                    continue
+
+                # Reportar primeras 5 ocurrencias de cada muletilla excesiva
+                for occ in filler.occurrences[:5]:
+                    issue = CorrectionIssue(
+                        category=CorrectionCategory.CRUTCH_WORDS.value,
+                        issue_type="linguistic_filler",
+                        start_char=occ.start_char,
+                        end_char=occ.end_char,
+                        text=occ.text,
+                        explanation=(
+                            f"Muletilla lingüística '{filler.phrase}' "
+                            f"({filler.count} veces, {filler.frequency_per_1000:.1f} por 1000 palabras). "
+                            f"{filler.suggestion}"
+                        ),
+                        suggestion=filler.suggestion,
+                        confidence=0.7 if filler.severity.value == "high" else 0.6,
+                        context=occ.context,
+                        chapter_index=None,  # TODO: Mapear posición a capítulo
+                        rule_id=f"filler_{filler.normalized}",
+                        extra_data={
+                            "filler_type": filler.filler_type.value,
+                            "severity": filler.severity.value,
+                            "total_occurrences": filler.count,
+                            "frequency_per_1000": filler.frequency_per_1000,
+                            "in_dialogue": occ.in_dialogue,
+                        },
+                    )
+                    filler_issues.append(issue)
+
+            context.filler_issues = filler_issues
+            context.stats["filler_issues"] = len(filler_issues)
+            logger.info(
+                f"Fillers: {len(filler_issues)} issues from "
+                f"{report.excessive_fillers} excessive fillers "
+                f"({report.total_fillers} total types)"
+            )
+
+        except ImportError as e:
+            logger.debug(f"Filler detector not available: {e}")
+            context.filler_issues = []
+            context.stats["filler_issues"] = 0
+        except Exception as e:
+            logger.warning(f"Filler detection failed: {e}")
+            context.filler_issues = []
+            context.stats["filler_issues"] = 0
