@@ -1357,7 +1357,7 @@ class EntityRepository:
                     merged_by=new_data.get("merged_by", "user"),
                     undone_at=(
                         datetime.fromisoformat(row["undone_at"])
-                        if row.get("undone_at")
+                        if dict(row).get("undone_at")
                         else None
                     ),
                     note=row["note"],

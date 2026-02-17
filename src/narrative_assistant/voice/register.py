@@ -369,7 +369,7 @@ class RegisterAnalyzer:
             from ..llm.client import get_llm_client
 
             client = get_llm_client()
-            if not client or not client.is_available():
+            if not client or not client.is_available:
                 return None
 
             prompt = (

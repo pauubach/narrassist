@@ -516,7 +516,7 @@ def _get_system_ram_gb() -> float:
     try:
         import psutil
 
-        return psutil.virtual_memory().total / (1024**3)
+        return float(psutil.virtual_memory().total / (1024**3))
     except ImportError:
         pass
 

@@ -594,7 +594,7 @@ class AnalysisCache:
         total = self._hits + self._misses
         if total == 0:
             return 0.0
-        return self._hits / total
+        return float(self._hits / total)
 
 
 # ============================================================================

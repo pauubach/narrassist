@@ -147,7 +147,7 @@ def _detect_stressed_a_automatic(word: str) -> bool:
         .replace("â", "a")
     )
 
-    return first_syllable_normalized.startswith(("a", "ha"))
+    return bool(first_syllable_normalized.startswith(("a", "ha")))
 
 
 @lru_cache(maxsize=512)
@@ -242,7 +242,7 @@ def clear_cache():
     logger.debug("Cache de detección de 'a' tónica limpiado")
 
 
-def get_cache_stats() -> dict[str, int]:
+def get_cache_stats() -> dict[str, int | None]:
     """
     Obtiene estadísticas del cache de detección.
 

@@ -501,7 +501,7 @@ Extrae la siguiente información sobre el personaje:
                     start = cleaned.find("{")
                     end = cleaned.rfind("}") + 1
                     if start != -1 and end > start:
-                        return json.loads(cleaned[start:end])
+                        return dict(json.loads(cleaned[start:end]))
                 except Exception:
                     pass
                 return None
@@ -524,7 +524,7 @@ Extrae la siguiente información sobre el personaje:
                     f"confianza={voting_result.confidence:.2f}, "
                     f"fallbacks={voting_result.fallbacks_applied}"
                 )
-                return voting_result.consensus
+                return dict(voting_result.consensus)
 
             return None
 
@@ -747,7 +747,7 @@ Si no hay violaciones, responde: {{"violations": []}}"""
                     start = cleaned.find("{")
                     end = cleaned.rfind("}") + 1
                     if start != -1 and end > start:
-                        return json.loads(cleaned[start:end])
+                        return dict(json.loads(cleaned[start:end]))
                 except Exception:
                     pass
                 return None
@@ -766,16 +766,34 @@ Si no hay violaciones, responde: {{"violations": []}}"""
             if not result.is_valid or not result.consensus:
                 return []
 
+            severity_map = {
+                "alta": ViolationSeverity.HIGH,
+                "media": ViolationSeverity.MEDIUM,
+                "baja": ViolationSeverity.LOW,
+            }
+
             violations = []
             for v_data in result.consensus.get("violations", []):
+                raw_severity = v_data.get("severity", "media").lower()
+                severity = severity_map.get(raw_severity, ViolationSeverity.MEDIUM)
+
+                placeholder_expectation = BehavioralExpectation(
+                    character_id=profile.character_id,
+                    character_name=profile.character_name,
+                    expectation_type=ExpectationType.BEHAVIORAL,
+                    description=v_data.get("explanation", ""),
+                    reasoning="Detectado por votación multi-modelo",
+                    confidence=result.confidence,
+                )
+
                 violations.append(
                     ExpectationViolation(
-                        character_id=profile.character_id,
-                        character_name=profile.character_name,
+                        expectation=placeholder_expectation,
                         violation_text=v_data.get("text", ""),
                         explanation=v_data.get("explanation", ""),
                         chapter_number=chapter_number,
                         position=position,
+                        severity=severity,
                         consensus_score=result.confidence,
                         detection_methods=["voting_llm"],
                     )

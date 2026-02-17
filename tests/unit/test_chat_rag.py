@@ -186,8 +186,8 @@ class TestBuildNumberedContext:
              "global_start": 100, "global_end": 109},
         ]
         text, ref_map = build_numbered_context(excerpts)
-        assert "[1]" in text
-        assert "[2]" in text
+        assert "[REF:1]" in text
+        assert "[REF:2]" in text
         assert "Cap 1" in text
         assert "texto uno" in text
         assert 1 in ref_map

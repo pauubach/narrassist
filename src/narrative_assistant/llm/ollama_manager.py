@@ -1251,7 +1251,7 @@ class OllamaManager:
                         model.benchmark_toks = toks
                         break
 
-                return toks
+                return float(toks)
 
             logger.warning(f"Benchmark {model_name}: HTTP {response.status_code}")
             return None
