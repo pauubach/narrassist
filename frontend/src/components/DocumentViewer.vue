@@ -117,7 +117,7 @@
         <Button label="Reintentar" @click="loadDocument" />
       </div>
 
-      <div v-else class="document-content" @click="handleDocumentClick">
+      <div v-else class="document-content" @click="handleDocumentClick" @mouseup="handleMouseUp">
         <!-- Renderizar capítulos con lazy loading -->
         <div
           v-for="chapter in chapters"
@@ -186,8 +186,10 @@ import DialogueAttributionPanel from '@/components/DialogueAttributionPanel.vue'
 import { apiUrl } from '@/config/api'
 import { api } from '@/services/apiClient'
 import { sanitizeHtml } from '@/utils/sanitizeHtml'
+import { useSelectionStore } from '@/stores/selection'
 
 const toast = useToast()
+const selectionStore = useSelectionStore()
 
 // Referencias a elementos de capítulos para intersection observer
 const chapterRefs = new Map<number, Element>()
@@ -1350,6 +1352,49 @@ const doExport = async () => {
   } finally {
     exportLoading.value = false
   }
+}
+
+// Captura de selección de texto para el asistente
+const handleMouseUp = () => {
+  const selection = window.getSelection()
+  if (!selection || selection.isCollapsed) {
+    // No hay selección - limpiar
+    selectionStore.setTextSelection(null)
+    return
+  }
+
+  const selectedText = selection.toString().trim()
+  if (!selectedText) {
+    selectionStore.setTextSelection(null)
+    return
+  }
+
+  // Calcular posiciones aproximadas
+  const range = selection.getRangeAt(0)
+  const container = range.commonAncestorContainer
+
+  // Intentar encontrar el capítulo
+  let chapterElement: HTMLElement | null = null
+  let node: Node | null = container
+  while (node && node !== viewerContainer.value) {
+    if (node instanceof HTMLElement && node.classList.contains('chapter-section')) {
+      chapterElement = node
+      break
+    }
+    node = node.parentNode
+  }
+
+  const chapterTitle = chapterElement?.dataset.chapterId
+    ? chapters.value.find(c => c.id === parseInt(chapterElement!.dataset.chapterId!))?.title
+    : undefined
+
+  // Guardar selección en el store
+  selectionStore.setTextSelection({
+    start: 0, // Posiciones aproximadas - se pueden calcular más precisamente si es necesario
+    end: selectedText.length,
+    text: selectedText,
+    chapter: chapterTitle
+  })
 }
 
 // Event delegation para clicks en entidades (evita onclick inline y window pollution)

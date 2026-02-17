@@ -384,7 +384,7 @@ function clearSelectionContext() {
     <!-- Selection context bar -->
     <div v-if="activeSelection" class="selection-context-bar">
       <i class="pi pi-text-select"></i>
-      <span class="selection-preview" :title="activeSelection.text">
+      <span class="selection-preview" :title="activeSelection.text" v-tooltip.top="'Texto seleccionado como contexto para tu pregunta'">
         "{{ activeSelectionPreview }}"
       </span>
       <Button
