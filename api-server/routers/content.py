@@ -960,3 +960,131 @@ def get_external_dictionary_links(word: str):
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
+@router.post("/api/projects/{project_id}/search/similar", response_model=ApiResponse)
+def search_similar_text(
+    project_id: int,
+    query: str = Body(..., embed=True, min_length=1, description="Texto a buscar"),
+    limit: int = Body(10, embed=True, ge=1, le=50, description="Máximo de resultados"),
+    min_similarity: float = Body(0.5, embed=True, ge=0.0, le=1.0, description="Similaridad mínima"),
+) -> ApiResponse:
+    """
+    Busca fragmentos de texto similares al query usando embeddings semánticos.
+
+    Devuelve fragmentos del manuscrito ordenados por similaridad semántica.
+
+    Args:
+        project_id: ID del proyecto
+        query: Texto de búsqueda (min 1 char)
+        limit: Máximo de resultados (1-50, default 10)
+        min_similarity: Umbral mínimo de similaridad (0.0-1.0, default 0.5)
+
+    Returns:
+        Lista de fragmentos con sus posiciones, capítulos y scores de similaridad
+    """
+    try:
+        # Validar proyecto
+        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+        project = result.value
+
+        # Cargar documento
+        from narrative_assistant.persistence.document import get_document_repository
+        doc_repo = get_document_repository()
+        doc_result = doc_repo.get_by_project(project_id)
+
+        if doc_result.is_failure:
+            raise HTTPException(status_code=404, detail="Documento no encontrado")
+
+        document = doc_result.value
+        if not document or not document.full_text:
+            return ApiResponse(
+                success=True,
+                data={"matches": [], "query": query, "count": 0}
+            )
+
+        # Cargar modelo de embeddings
+        from narrative_assistant.nlp.embeddings import get_embeddings_model
+        model = get_embeddings_model()
+
+        # Split en fragmentos (ventanas de ~200 palabras con overlap)
+        from narrative_assistant.nlp.chunking import TextChunker
+        chunker = TextChunker(chunk_size=200, overlap=50)
+        chunks = chunker.chunk_text(document.full_text)
+
+        # Compute embeddings para query y chunks
+        query_emb = model.encode([query])[0]
+        chunk_texts = [c.text for c in chunks]
+        chunk_embs = model.encode(chunk_texts)
+
+        # Calcular similaridades coseno manualmente
+        import numpy as np
+
+        def cosine_similarity_single(a, b):
+            """Calcula similaridad coseno entre un vector y una matriz de vectores."""
+            # Normalizar query
+            a_norm = a / np.linalg.norm(a)
+            # Normalizar chunks (por filas)
+            b_norms = np.linalg.norm(b, axis=1, keepdims=True)
+            b_normalized = b / (b_norms + 1e-8)
+            # Producto punto
+            return np.dot(b_normalized, a_norm)
+
+        similarities = cosine_similarity_single(query_emb, chunk_embs)
+
+        # Filtrar por umbral y ordenar
+        matches = []
+        for i, (chunk, score) in enumerate(zip(chunks, similarities)):
+            if score >= min_similarity:
+                matches.append({
+                    "text": chunk.text,
+                    "start_char": chunk.start_char,
+                    "end_char": chunk.end_char,
+                    "similarity": float(score),
+                    "chapter_id": None,  # TODO: mapear a capítulo
+                })
+
+        # Ordenar por similaridad descendente
+        matches.sort(key=lambda x: x["similarity"], reverse=True)
+        matches = matches[:limit]
+
+        # Mapear a capítulos si existen
+        if project.chapter_count > 0:
+            from narrative_assistant.persistence.chapter import get_chapter_repository
+            ch_repo = get_chapter_repository()
+            chapters_result = ch_repo.get_all_by_project(project_id)
+
+            if chapters_result.is_success:
+                chapters = chapters_result.value
+                # Ordenar capítulos por posición
+                chapters_sorted = sorted(chapters, key=lambda c: c.position)
+
+                # Mapear cada match a su capítulo
+                for match in matches:
+                    start = match["start_char"]
+                    cumulative = 0
+
+                    for chapter in chapters_sorted:
+                        ch_len = len(chapter.content) if chapter.content else 0
+                        if cumulative <= start < cumulative + ch_len:
+                            match["chapter_id"] = chapter.id
+                            match["chapter_title"] = chapter.title
+                            match["start_char_in_chapter"] = start - cumulative
+                            break
+                        cumulative += ch_len
+
+        return ApiResponse(
+            success=True,
+            data={
+                "matches": matches,
+                "query": query,
+                "count": len(matches),
+                "total_chunks": len(chunks),
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error searching similar text: {e}", exc_info=True)
+        return ApiResponse(success=False, error=f"Error en búsqueda: {str(e)}")
+
+

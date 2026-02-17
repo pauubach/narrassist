@@ -134,6 +134,9 @@
                   <span v-if="tab === 'alerts' && alertsCount > 0" class="sidebar-badge">
                     {{ alertsCount > 99 ? '99+' : alertsCount }}
                   </span>
+                  <span v-if="tab === 'inconsistencies' && inconsistenciesCount > 0" class="sidebar-badge sidebar-badge--warning">
+                    {{ inconsistenciesCount > 99 ? '99+' : inconsistenciesCount }}
+                  </span>
                   <span v-if="tab === 'history' && undoableCount > 0" class="sidebar-badge sidebar-badge--history">
                     {{ undoableCount > 99 ? '99+' : undoableCount }}
                   </span>
@@ -163,6 +166,16 @@
                   @alert-navigate="onAlertNavigate"
                 />
 
+                <!-- Panel Inconsistencias -->
+                <InconsistenciesPanel
+                  v-show="sidebarTab === 'inconsistencies'"
+                  :alerts="alerts"
+                  :entities="entities"
+                  :loading="loading"
+                  @alert-navigate="onAlertNavigate"
+                  @entity-select="onEntitySelect"
+                />
+
                 <!-- Panel Personajes -->
                 <CharactersPanel
                   v-show="sidebarTab === 'characters'"
@@ -178,6 +191,15 @@
                   :project-id="project.id"
                   :selection-chapter-number="currentChapter?.chapterNumber ?? null"
                   @navigate-to-reference="onChatReferenceNavigate"
+                />
+
+                <!-- Panel Búsqueda Semántica -->
+                <SemanticSearchPanel
+                  v-show="sidebarTab === 'search'"
+                  :project-id="project.id"
+                  :chapters="chapters"
+                  :initial-query="searchQuery"
+                  @navigate-to-position="onSearchResultNavigate"
                 />
 
                 <!-- Panel Historial -->
@@ -449,7 +471,7 @@ import StatusBar from '@/components/layout/StatusBar.vue'
 import { WorkspaceTabs, TextTab, AlertsTab, EntitiesTab, RelationsTab, StyleTab, GlossaryTab, ResumenTab, PanelResizer } from '@/components/workspace'
 import { AnalysisRequired } from '@/components/analysis'
 import { TimelineView } from '@/components/timeline'
-import { ChaptersPanel, AlertsPanel, CharactersPanel, AssistantPanel, HistoryPanel } from '@/components/sidebar'
+import { ChaptersPanel, AlertsPanel, CharactersPanel, AssistantPanel, HistoryPanel, InconsistenciesPanel, SemanticSearchPanel } from '@/components/sidebar'
 import { ProjectSummary, EntityInspector, AlertInspector, ChapterInspector, TextSelectionInspector } from '@/components/inspector'
 import ComparisonBanner from '@/components/alerts/ComparisonBanner.vue'
 import DocumentTypeChip from '@/components/DocumentTypeChip.vue'
@@ -497,6 +519,15 @@ const unresolvedAlertCount = computed(() =>
   alerts.value.filter(a => a.status === 'active').length
 )
 
+const inconsistenciesCount = computed(() => {
+  const INCONSISTENCY_CATEGORIES = ['attribute', 'behavior', 'temporal', 'continuity', 'coherence']
+  return alerts.value.filter((a: Alert) =>
+    a.status === 'active' &&
+    a.category &&
+    INCONSISTENCY_CATEGORIES.includes(a.category)
+  ).length
+})
+
 // Batch tab statuses (performance optimization #9)
 const tabStatuses = computed(() => {
   const pid = project.value?.id
@@ -530,13 +561,16 @@ const initialEntityId = ref<number | null>(null)
 
 // Estado del sidebar
 const sidebarTab = ref<SidebarTab>('chapters')
+const searchQuery = ref<string>('')
 
 // Helpers para sidebar tabs
 const getSidebarTabIcon = (tab: SidebarTab): string => {
   const icons: Record<SidebarTab, string> = {
     chapters: 'pi pi-book',
     alerts: 'pi pi-exclamation-triangle',
+    inconsistencies: 'pi pi-exclamation-circle',
     characters: 'pi pi-users',
+    search: 'pi pi-search',
     assistant: 'pi pi-comments',
     history: 'pi pi-history'
   }
@@ -547,7 +581,9 @@ const getSidebarTabTitle = (tab: SidebarTab): string => {
   const titles: Record<SidebarTab, string> = {
     chapters: 'Capítulos',
     alerts: 'Alertas',
+    inconsistencies: 'Inconsistencias',
     characters: 'Personajes',
+    search: 'Búsqueda',
     assistant: 'Asistente',
     history: 'Historial'
   }
@@ -1016,10 +1052,15 @@ const onViewChapterAlerts = () => {
 
 // TextSelectionInspector handlers
 const onSearchSimilarText = (text: string) => {
-  console.log('Search similar text:', text.substring(0, 50) + '...')
-  // NO limpiar la selección - mantenerla para que el chat tenga contexto
-  // selectionStore.setTextSelection(null)
-  sidebarTab.value = 'assistant'
+  // Establecer query y abrir panel de búsqueda
+  searchQuery.value = text
+  sidebarTab.value = 'search'
+  // Mantener la selección visible mientras se busca
+}
+
+const onSearchResultNavigate = (position: number, text: string, chapterId?: number) => {
+  // Navegar a la posición del resultado en el texto
+  workspaceStore.navigateToTextPosition(position, text, chapterId)
 }
 
 const onAskAiAboutSelection = (_text: string) => {
@@ -1367,6 +1408,14 @@ const startReanalysis = async () => {
   align-items: center;
   justify-content: center;
   padding: 0 4px;
+}
+
+.sidebar-badge--warning {
+  background: var(--orange-500);
+}
+
+.sidebar-badge--history {
+  background: var(--blue-500);
 }
 
 .sidebar-content {

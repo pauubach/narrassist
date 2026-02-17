@@ -52,6 +52,7 @@ class TimelineEvent:
         description: Descripción del evento
         chapter: Número de capítulo
         paragraph: Número de párrafo
+        event_type: Tipo de evento según taxonomía (EventType enum value)
         story_date: Fecha en el tiempo de la historia
         story_date_resolution: Resolución de la fecha
         discourse_position: Posición en el texto (orden del discurso)
@@ -67,6 +68,9 @@ class TimelineEvent:
     description: str
     chapter: int
     paragraph: int = 0
+
+    # Tipo de evento (según taxonomía)
+    event_type: str | None = None  # EventType enum value (string)
 
     # Tiempo de la historia (story time)
     story_date: date | None = None
