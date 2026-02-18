@@ -379,7 +379,7 @@ class CrossBookEventAnalyzer:
         from narrative_assistant.persistence.database import get_database
         return get_database()
 
-    def analyze(self, collection_id: int) -> CrossBookEventReport:
+    def analyze(self, collection_id: int, validate_with_llm: bool = False) -> CrossBookEventReport:
         """
         Analiza contradicciones de eventos entre todos los libros
         de una colección.
@@ -472,6 +472,10 @@ class CrossBookEventAnalyzer:
                 )
                 all_contradictions.extend(contradictions)
 
+        # Validación LLM opcional (reduce falsos positivos)
+        if validate_with_llm and all_contradictions:
+            all_contradictions = self._validate_contradictions(all_contradictions)
+
         report = CrossBookEventReport(
             collection_id=collection_id,
             collection_name=collection.name,
@@ -503,3 +507,47 @@ class CrossBookEventAnalyzer:
             e for e in events
             if entity_id in e.get("entity_ids", [])
         ]
+
+    def _validate_contradictions(
+        self, contradictions: list[EventContradiction]
+    ) -> list[EventContradiction]:
+        """
+        Valida contradicciones con LLM para reducir falsos positivos.
+
+        Las contradicciones con veredicto DISMISSED se eliminan.
+        Las demás se actualizan con la confianza ajustada.
+        """
+        from .contradiction_validator import get_contradiction_validator
+
+        validator = get_contradiction_validator()
+        if not validator.is_available:
+            logger.info("LLM not available, skipping contradiction validation")
+            return contradictions
+
+        results = validator.validate_batch(contradictions)
+
+        validated = []
+        for result in results:
+            if result.verdict == "DISMISSED":
+                logger.debug(
+                    f"Dismissed contradiction: {result.contradiction.rule} "
+                    f"— {result.reasoning}"
+                )
+                continue
+
+            # Actualizar confianza del candidato
+            c = result.contradiction
+            c.confidence = result.adjusted_confidence
+            if result.reasoning:
+                c.metadata["llm_reasoning"] = result.reasoning
+            if result.narrative_explanation:
+                c.metadata["narrative_explanation"] = result.narrative_explanation
+            if result.models_used:
+                c.metadata["llm_models"] = result.models_used
+            validated.append(c)
+
+        logger.info(
+            f"LLM validation: {len(contradictions)} candidates → "
+            f"{len(validated)} validated ({len(contradictions) - len(validated)} dismissed)"
+        )
+        return validated

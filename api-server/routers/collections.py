@@ -264,7 +264,7 @@ def cross_book_analysis(collection_id: int):
 
 
 @router.get("/collections/{collection_id}/cross-book-events")
-def cross_book_events(collection_id: int):
+def cross_book_events(collection_id: int, validate_llm: bool = False):
     """
     Analiza contradicciones de eventos entre libros de una colección.
 
@@ -273,7 +273,10 @@ def cross_book_events(collection_id: int):
     - injury_healed_differently: Herida inconsistente
     - acquisition_vs_loss: Objeto sin continuidad
     - location_impossibility: Ubicación imposible entre libros
+
+    Args:
+        validate_llm: Si True, valida candidatos con LLM para reducir falsos positivos.
     """
     analyzer = _get_cross_book_event_analyzer()
-    report = analyzer.analyze(collection_id)
+    report = analyzer.analyze(collection_id, validate_with_llm=validate_llm)
     return report.to_dict()

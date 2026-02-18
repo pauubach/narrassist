@@ -608,6 +608,100 @@ Responde SOLO con un JSON en este formato exacto:
 Si NO hay decisión crucial, usa: {{"has_decision": false, "description": "", "confidence": 0.0, "decision_maker": "", "choice": ""}}"""
 
 
+# ============================================================================
+# VALIDACIÓN DE CONTRADICCIONES CROSS-BOOK
+# ============================================================================
+
+EVENT_CONTRADICTION_SYSTEM = """Eres un experto en continuidad narrativa que revisa sagas de libros.
+Tu tarea es validar si una posible contradicción entre eventos de dos libros es REAL o un falso positivo.
+
+Reglas:
+- Sé conservador: solo confirma contradicciones claras e inequívocas.
+- Considera que el autor puede haber dejado la discrepancia intencionalmente (giro argumental, narrador no fiable).
+- Los saltos temporales entre libros son normales (años pueden pasar entre tomos).
+- Un personaje que "muere" puede haber simulado su muerte, ser resucitado, o haber sido confundido con otro.
+- Cambios de ubicación entre libros son normales si hay elipsis temporal.
+
+Razona paso a paso antes de dar tu veredicto.
+Responde SIEMPRE en formato JSON válido."""
+
+EVENT_CONTRADICTION_TEMPLATE = """## Contradicción candidata
+
+**Regla**: {rule}
+**Personaje**: {entity_name}
+**Descripción**: {description}
+
+### Libro A: «{book_a}»
+{context_a}
+
+### Libro B: «{book_b}»
+{context_b}
+
+## Instrucciones
+
+1. ANALIZA ambos fragmentos de contexto.
+2. EVALÚA si hay una explicación narrativa plausible (giro, elipsis, narrador no fiable).
+3. DETERMINA tu veredicto.
+
+Responde en este formato JSON:
+
+{{
+  "verdict": "CONFIRMED|PROBABLE|DOUBTFUL|DISMISSED",
+  "reasoning": "explicación paso a paso (2-3 frases)",
+  "adjusted_confidence": 0.0-1.0,
+  "narrative_explanation": "posible justificación narrativa si existe, o null"
+}}
+
+Significado de veredictos:
+- CONFIRMED: Contradicción clara sin justificación narrativa posible.
+- PROBABLE: Probablemente contradicción, pero hay ambigüedad menor.
+- DOUBTFUL: Podría explicarse con una lectura generosa del texto.
+- DISMISSED: No es contradicción real (falso positivo)."""
+
+EVENT_CONTRADICTION_EXAMPLES = [
+    {
+        "input": """## Contradicción candidata
+
+**Regla**: death_then_alive
+**Personaje**: Don Rodrigo
+**Descripción**: Don Rodrigo muere en «El amanecer» pero aparece vivo en «El ocaso»
+
+### Libro A: «El amanecer»
+"Don Rodrigo cerró los ojos por última vez. El médico confirmó su muerte a las tres de la madrugada."
+
+### Libro B: «El ocaso»
+"Don Rodrigo entró en la taberna, más viejo pero con la misma mirada desafiante de siempre."
+""",
+        "output": """{
+  "verdict": "CONFIRMED",
+  "reasoning": "El texto de Libro A describe una muerte explícita confirmada por un médico. No hay indicación de muerte aparente o simulada. En Libro B aparece físicamente vivo sin explicación sobrenatural o narrativa.",
+  "adjusted_confidence": 0.95,
+  "narrative_explanation": null
+}""",
+    },
+    {
+        "input": """## Contradicción candidata
+
+**Regla**: death_then_alive
+**Personaje**: La Condesa
+**Descripción**: La Condesa muere en «Sombras» pero aparece viva en «Luces»
+
+### Libro A: «Sombras»
+"Todos dieron por muerta a la Condesa tras el naufragio. Nunca se encontró el cuerpo."
+
+### Libro B: «Luces»
+"La Condesa apareció en la puerta, empapada y temblorosa, después de meses perdida."
+""",
+        "output": """{
+  "verdict": "DISMISSED",
+  "reasoning": "En Libro A se la da por muerta pero no hay confirmación médica ni hallazgo de cuerpo. Es un caso clásico de 'muerte presunta' que se resuelve en Libro B con su reaparición. No hay contradicción real.",
+  "adjusted_confidence": 0.1,
+  "narrative_explanation": "Supervivencia tras naufragio — muerte presunta resuelta narrativamente"
+}""",
+    },
+]
+
+
 # UTILIDADES (actualización)
 # ============================================================================
 
@@ -623,4 +717,5 @@ RECOMMENDED_TEMPERATURES = {
     "temporal_extraction": 0.2,
     "coherence_editorial": 0.2,
     "event_detection": 0.3,  # Detección de eventos narrativos
+    "contradiction_validation": 0.1,  # Validación de contradicciones cross-book
 }

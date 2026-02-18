@@ -48,6 +48,7 @@ class AnalysisTask(Enum):
     TEMPORAL = "temporal"
     PROFILING = "profiling"
     CLASSICAL_SPANISH = "classical_spanish"
+    CONTRADICTION = "contradiction"  # Cross-book event contradictions
 
 
 # =============================================================================
@@ -199,6 +200,15 @@ QUALITY_MATRIX: dict[AnalysisTask, TaskVotingConfig] = {
             VotingSlot(ModelRole.NARRATIVE, "hermes3", 0.20),
         ],
         min_confidence=0.85,
+    ),
+    AnalysisTask.CONTRADICTION: TaskVotingConfig(
+        task=AnalysisTask.CONTRADICTION,
+        slots=[
+            VotingSlot(ModelRole.REASONING, "deepseek-r1", 0.45),
+            VotingSlot(ModelRole.SPANISH, "qwen3", 0.35),
+            VotingSlot(ModelRole.NARRATIVE, "hermes3", 0.20),
+        ],
+        min_confidence=0.70,
     ),
 }
 
