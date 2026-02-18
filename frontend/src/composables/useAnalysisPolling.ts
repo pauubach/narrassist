@@ -125,15 +125,15 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
         // project.analysisStatus y analysisStore.isAnalyzing cambien juntos
         analysisStore.setAnalyzing(project.value!.id, false)
         await analysisStore.loadExecutedPhases(project.value!.id)
-        await loadEntities(project.value!.id)
-        await loadAlerts(project.value!.id)
-        await loadChapters(project.value!.id)
+        await loadEntities(project.value!.id, true) // forceReload para actualizar mention_count
+        await loadAlerts(project.value!.id, true) // forceReload para actualizar alertas
+        await loadChapters(project.value!.id, true) // forceReload para actualizar capítulos
 
         // Retry if data seems stale
         if (project.value && project.value.wordCount === 0 && (progressData.metrics?.chapters_found || 0) > 0) {
           await new Promise(resolve => setTimeout(resolve, 1000))
           await projectsStore.fetchProject(project.value.id)
-          await loadChapters(project.value.id)
+          await loadChapters(project.value.id, true) // forceReload en retry también
         }
       }
     } catch (err) {

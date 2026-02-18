@@ -762,21 +762,39 @@ class AlertEngine:
         }
         title_prefix = category_titles.get(category, "Corrección")
 
-        # Descripción según si hay sugerencia
-        if suggestion:
-            description = f"'{text}' → '{suggestion}'"
+        # Generar título breve que identifique el problema
+        # Para muletillas/palabras repetidas, mostrar la palabra
+        # Para otros casos, usar un resumen del tipo de issue
+        if issue_type in ("overused_word", "crutch_word"):
+            title = f"{title_prefix}: «{text[:30]}»"
         else:
-            description = f"'{text}'"
+            # Para otros tipos, título descriptivo basado en el texto
+            title = f"{title_prefix}: «{text[:30]}{'...' if len(text) > 30 else ''}»"
+
+        # Descripción = la explicación técnica completa (ej: estadísticas)
+        # Esto es lo que el detector generó como explanation
+        description = explanation
+
+        # Explanation = contexto del texto o consejo práctico
+        # Si hay contexto, mostrarlo formateado
+        # Si no, dar consejo práctico genérico
+        if context:
+            explanation_text = AlertFormatter.format_context(context, prefix="Contexto")
+        elif not suggestion:
+            # Sin contexto ni sugerencia, dar consejo genérico
+            explanation_text = "Revise el fragmento marcado y considere si es necesaria una corrección."
+        else:
+            # Hay sugerencia, el contexto está implícito en excerpt
+            explanation_text = None
 
         return self.create_alert(
             project_id=project_id,
             category=alert_category,
             severity=severity,
             alert_type=f"{category}_{issue_type}",
-            title=f"{title_prefix}: {explanation[:50]}{'...' if len(explanation) > 50 else ''}",
+            title=title,
             description=description,
-            explanation=AlertFormatter.format_context(context, prefix="Contexto")
-            or explanation,
+            explanation=explanation_text,
             suggestion=suggestion,
             chapter=chapter,
             start_char=start_char,

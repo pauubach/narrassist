@@ -399,11 +399,6 @@ function onChapterClick(chapterNumber: number) {
             <span class="role-count">{{ roleStats.inDialogue }}</span>
             <span class="role-label">en diálogos</span>
           </div>
-          <div v-if="roleStats.passive > 0" class="role-stat role-stat--muted">
-            <i class="pi pi-minus-circle" style="color: var(--ds-color-text-secondary)"></i>
-            <span class="role-count">{{ roleStats.passive }}</span>
-            <span class="role-label">pasivas</span>
-          </div>
         </div>
       </div>
 
@@ -466,44 +461,6 @@ function onChapterClick(chapterNumber: number) {
         <span class="nav-hint">← → para navegar</span>
       </div>
 
-      <!-- Filtro: Solo apariciones activas (Mejora 2) -->
-      <div class="nav-filter">
-        <label for="filter-active" class="filter-label">
-          <i class="pi pi-filter" style="font-size: 0.75rem"></i>
-          Solo activas
-        </label>
-        <InputSwitch
-          id="filter-active"
-          v-model="mentionNav.filterOnlyActive.value"
-          v-tooltip.bottom="'Mostrar solo menciones donde el personaje es sujeto/objeto (excluye contextos posesivos)'"
-        />
-      </div>
-
-      <!-- Slider de Threshold de Confianza (Mejora 5) -->
-      <div class="confidence-threshold-filter">
-        <div class="threshold-header">
-          <label for="confidence-threshold" class="threshold-label">
-            <i class="pi pi-chart-line" style="font-size: 0.75rem"></i>
-            Confianza mínima
-          </label>
-          <span class="threshold-value">{{ (mentionNav.confidenceThreshold.value * 100).toFixed(0) }}%</span>
-        </div>
-        <Slider
-          id="confidence-threshold"
-          v-model="mentionNav.confidenceThreshold.value"
-          :min="0"
-          :max="1"
-          :step="0.05"
-          class="confidence-slider"
-          :aria-label="`Confianza mínima: ${(mentionNav.confidenceThreshold.value * 100).toFixed(0)}%`"
-        />
-        <div class="threshold-hints">
-          <span class="hint-low">0%</span>
-          <span class="hint-mid">50%</span>
-          <span class="hint-high">100%</span>
-        </div>
-      </div>
-
       <div class="nav-controls">
         <Button
           v-tooltip.bottom="'Anterior (←)'"
@@ -534,32 +491,6 @@ function onChapterClick(chapterNumber: number) {
           <mark>{{ mentionNav.currentMention.value.surfaceForm }}</mark>
           <span class="context-after">{{ mentionNav.currentMention.value.contextAfter }}</span>
         </p>
-
-        <!-- Badge diagnóstico (Mejora 1) - Solo para menciones de baja confianza -->
-        <div
-          v-if="mentionNav.currentMention.value.confidence < 0.75"
-          v-tooltip.bottom="mentionNav.currentMention.value.validationReasoning || 'Mención con baja confianza'"
-          class="mention-diagnostic-badge"
-          :class="{
-            'badge--warning': mentionNav.currentMention.value.confidence >= 0.60,
-            'badge--error': mentionNav.currentMention.value.confidence < 0.60
-          }"
-          role="status"
-          :aria-label="`Confianza: ${Math.round(mentionNav.currentMention.value.confidence * 100)}%. ${mentionNav.currentMention.value.validationReasoning || 'Mención dudosa'}`"
-        >
-          <i
-            :class="{
-              'pi pi-exclamation-triangle': mentionNav.currentMention.value.confidence >= 0.60,
-              'pi pi-times-circle': mentionNav.currentMention.value.confidence < 0.60
-            }"
-          ></i>
-          <span class="badge-label">
-            Confianza: {{ Math.round(mentionNav.currentMention.value.confidence * 100) }}%
-          </span>
-          <span v-if="mentionNav.currentMention.value.validationReasoning" class="badge-reason">
-            {{ mentionNav.currentMention.value.validationReasoning }}
-          </span>
-        </div>
       </div>
     </div>
 
