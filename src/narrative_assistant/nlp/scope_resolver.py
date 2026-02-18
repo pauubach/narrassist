@@ -567,6 +567,33 @@ class ScopeResolver:
             candidates = sorted(unique_per_names)
             return (candidates, attr_sent_text)
 
+        # Patrón 4: "X se enfadó con Y porque tenía <atributo>"
+        # Subordinada causal con "porque/ya que/puesto que" donde ambos
+        # candidatos son posibles.
+        if self._is_causal_subordinate_ambiguity(
+            position, attr_sent_idx, entity_mentions
+        ):
+            candidates = sorted(unique_per_names)
+            return (candidates, attr_sent_text)
+
+        # Patrón 5: "X miró a Y. Tenía <atributo>."
+        # Anáfora cero: oración adyacente sin sujeto explícito,
+        # oración previa con 2+ entidades PER distintas.
+        if self._is_zero_anaphora_ambiguity(
+            position, attr_sent_idx, entity_mentions
+        ):
+            candidates = sorted(unique_per_names)
+            return (candidates, attr_sent_text)
+
+        # Patrón 6: "Entre X y Y, tenía <atributo>"
+        # Coordinación con "entre/junto a/con": introduce dos candidatos
+        # y el atributo aparece sin sujeto claro.
+        if self._is_coordination_ambiguity(
+            position, attr_sent_idx, entity_mentions
+        ):
+            candidates = sorted(unique_per_names)
+            return (candidates, attr_sent_text)
+
         return None
 
     def _is_cuando_subordinate_ambiguity(
@@ -727,6 +754,155 @@ class ScopeResolver:
                 f"with {entities_in_sent}"
             )
             return True
+
+        return False
+
+    def _is_causal_subordinate_ambiguity(
+        self,
+        position: int,
+        attr_sent_idx: int,
+        entity_mentions: list[tuple[str, int, int, str]],
+    ) -> bool:
+        """
+        Detecta "X verbo a/con Y porque tenía <atributo>".
+
+        Las subordinadas causales (porque, ya que, puesto que, dado que)
+        son sistemáticamente ambiguas cuando la cláusula principal tiene
+        dos entidades PER y el verbo causal carece de sujeto explícito.
+
+        Returns:
+            True si se detecta el patrón ambiguo
+        """
+        attr_sent_start, attr_sent_end = self._sentence_spans[attr_sent_idx]
+        sent_text = self.text[attr_sent_start:attr_sent_end]
+        sent_lower = sent_text.lower()
+
+        # Buscar nexo causal seguido de verbo sin sujeto explícito
+        causal_nexos = r"(?:porque|ya que|puesto que|dado que|pues)"
+        causal_verbs = r"(?:tenía|era|llevaba|mostraba|lucía|parecía|estaba)"
+        pattern = rf"\b{causal_nexos}\s+{causal_verbs}\b"
+
+        if not re.search(pattern, sent_lower):
+            return False
+
+        # Verificar que hay >= 2 entidades PER en la oración
+        entities_in_sent = set()
+        for name, start, end, etype in entity_mentions:
+            if etype == "PER" and attr_sent_start <= start < attr_sent_end:
+                entities_in_sent.add(name)
+
+        if len(entities_in_sent) >= 2:
+            logger.debug(
+                f"Ambiguity detected: causal subordinate pattern "
+                f"with {entities_in_sent}"
+            )
+            return True
+
+        return False
+
+    def _is_zero_anaphora_ambiguity(
+        self,
+        position: int,
+        attr_sent_idx: int,
+        entity_mentions: list[tuple[str, int, int, str]],
+    ) -> bool:
+        """
+        Detecta "X verbo a Y. Tenía <atributo>." (anáfora cero ampliada).
+
+        Cuando una oración empieza con un verbo conjugado sin sujeto
+        explícito y la oración anterior contiene 2+ entidades PER,
+        la atribución es ambigua.
+
+        Returns:
+            True si se detecta el patrón ambiguo
+        """
+        if attr_sent_idx < 1:
+            return False
+
+        attr_sent_start, attr_sent_end = self._sentence_spans[attr_sent_idx]
+        sent_text = self.text[attr_sent_start:attr_sent_end].strip()
+
+        # La oración del atributo empieza con verbo conjugado (pro-drop)
+        first_token = None
+        for token in self.doc:
+            if token.idx >= attr_sent_start and not token.is_space:
+                first_token = token
+                break
+
+        if first_token is None or not morpho_utils.is_verb(first_token):
+            return False
+
+        # Verificar que el verbo no tiene sujeto explícito
+        if morpho_utils.has_explicit_subject(first_token):
+            return False
+
+        # Verificar que la oración previa tiene >= 2 entidades PER
+        prev_start, prev_end = self._sentence_spans[attr_sent_idx - 1]
+        prev_entities = set()
+        for name, start, end, etype in entity_mentions:
+            if etype == "PER" and prev_start <= start < prev_end:
+                prev_entities.add(name)
+
+        if len(prev_entities) >= 2:
+            logger.debug(
+                f"Ambiguity detected: zero anaphora with "
+                f"{prev_entities} in previous sentence"
+            )
+            return True
+
+        return False
+
+    def _is_coordination_ambiguity(
+        self,
+        position: int,
+        attr_sent_idx: int,
+        entity_mentions: list[tuple[str, int, int, str]],
+    ) -> bool:
+        """
+        Detecta "Entre X y Y, tenía <atributo>" o "X junto a/con Y, tenía..."
+
+        Coordinaciones que introducen 2 entidades como grupo, seguidas de
+        un atributo sin sujeto explícito.
+
+        Returns:
+            True si se detecta el patrón ambiguo
+        """
+        attr_sent_start, attr_sent_end = self._sentence_spans[attr_sent_idx]
+        sent_text = self.text[attr_sent_start:attr_sent_end]
+        sent_lower = sent_text.lower()
+
+        # Patrón: "entre X y Y" o "X junto a Y" o "X con Y" seguido de coma + verbo
+        coord_patterns = [
+            r"\bentre\s+\w+\s+y\s+\w+",           # "entre Juan y María"
+            r"\w+\s+junto\s+a\s+\w+",              # "Juan junto a María"
+        ]
+
+        has_coordination = any(
+            re.search(p, sent_lower) for p in coord_patterns
+        )
+
+        if not has_coordination:
+            return False
+
+        # Verificar que hay >= 2 entidades PER antes de la posición del atributo
+        entities_before_attr = set()
+        for name, start, end, etype in entity_mentions:
+            if etype == "PER" and attr_sent_start <= start < position:
+                entities_before_attr.add(name)
+
+        if len(entities_before_attr) < 2:
+            return False
+
+        # Verificar que no hay sujeto explícito para el verbo del atributo
+        attr_token = self._token_at_position(position)
+        if attr_token is not None:
+            verb = self._find_governing_verb(attr_token)
+            if verb is not None and not morpho_utils.has_explicit_subject(verb):
+                logger.debug(
+                    f"Ambiguity detected: coordination pattern "
+                    f"with {entities_before_attr}"
+                )
+                return True
 
         return False
 
