@@ -15,106 +15,16 @@ from typing import Any
 
 from spacy.tokens import Doc
 
+from ..llm.prompts import (
+    ALLIANCE_DETECTION_TEMPLATE,
+    BETRAYAL_DETECTION_TEMPLATE,
+    DECISION_DETECTION_TEMPLATE,
+    REVELATION_DETECTION_TEMPLATE,
+)
 from .event_detection import DetectedEvent
 from .event_types import EventType
 
 logger = logging.getLogger(__name__)
-
-
-# ============================================================================
-# Prompts para detectores LLM
-# ============================================================================
-
-BETRAYAL_PROMPT = """Analiza el siguiente texto narrativo y detecta si hay alguna TRAICIÓN (betrayal).
-
-Una traición ocurre cuando:
-- Un personaje rompe la confianza o lealtad de otro
-- Alguien actúa en contra de un aliado o amigo
-- Se revela que un personaje trabajaba secretamente contra otro
-- Hay un cambio de bando o lealtad inesperado
-
-Texto:
-{text}
-
-Responde SOLO con un JSON en este formato exacto:
-{{
-  "has_betrayal": true/false,
-  "description": "descripción breve del evento de traición (max 80 caracteres)",
-  "confidence": 0.0-1.0,
-  "betrayer": "nombre del traidor",
-  "victim": "nombre de la víctima"
-}}
-
-Si NO hay traición, usa: {{"has_betrayal": false, "description": "", "confidence": 0.0, "betrayer": "", "victim": ""}}
-"""
-
-ALLIANCE_PROMPT = """Analiza el siguiente texto narrativo y detecta si se forma una ALIANZA.
-
-Una alianza ocurre cuando:
-- Dos o más personajes acuerdan trabajar juntos
-- Se forma un pacto, acuerdo o colaboración
-- Personajes enemigos deciden unir fuerzas
-- Se menciona explícitamente una unión estratégica
-
-Texto:
-{text}
-
-Responde SOLO con un JSON en este formato exacto:
-{{
-  "has_alliance": true/false,
-  "description": "descripción breve de la alianza (max 80 caracteres)",
-  "confidence": 0.0-1.0,
-  "members": ["personaje1", "personaje2"]
-}}
-
-Si NO hay alianza, usa: {{"has_alliance": false, "description": "", "confidence": 0.0, "members": []}}
-"""
-
-REVELATION_PROMPT = """Analiza el siguiente texto narrativo y detecta si hay una REVELACIÓN importante.
-
-Una revelación ocurre cuando:
-- Se descubre un secreto importante
-- Un personaje confiesa algo crucial
-- Se revela información que cambia la comprensión de la trama
-- Hay una verdad oculta que sale a la luz
-
-Texto:
-{text}
-
-Responde SOLO con un JSON en este formato exacto:
-{{
-  "has_revelation": true/false,
-  "description": "descripción breve de la revelación (max 80 caracteres)",
-  "confidence": 0.0-1.0,
-  "revealer": "quién revela (si aplica)",
-  "content": "qué se revela"
-}}
-
-Si NO hay revelación, usa: {{"has_revelation": false, "description": "", "confidence": 0.0, "revealer": "", "content": ""}}
-"""
-
-DECISION_PROMPT = """Analiza el siguiente texto narrativo y detecta si hay una DECISIÓN crucial.
-
-Una decisión crucial ocurre cuando:
-- Un personaje toma una decisión importante que afecta la trama
-- Hay un momento de elección difícil o dilema
-- Se menciona explícitamente que alguien decide algo importante
-- Un personaje elige entre opciones con consecuencias significativas
-
-Texto:
-{text}
-
-Responde SOLO con un JSON en este formato exacto:
-{{
-  "has_decision": true/false,
-  "description": "descripción breve de la decisión (max 80 caracteres)",
-  "confidence": 0.0-1.0,
-  "decision_maker": "quién decide",
-  "choice": "qué decide"
-}}
-
-Si NO hay decisión crucial, usa: {{"has_decision": false, "description": "", "confidence": 0.0, "decision_maker": "", "choice": ""}}
-"""
 
 
 # ============================================================================
@@ -200,6 +110,29 @@ class LLMEventDetector:
         logger.warning(f"No se pudo extraer JSON de respuesta: {response[:100]}")
         return {}
 
+    def _chunk_text(self, text: str, max_words: int = 500) -> list[tuple[str, int]]:
+        """
+        Divide texto en fragmentos manejables para procesamiento LLM.
+
+        Args:
+            text: Texto a dividir
+            max_words: Máximo de palabras por fragmento
+
+        Returns:
+            Lista de (texto_fragmento, offset_inicial)
+        """
+        words = text.split()
+        chunks = []
+
+        for i in range(0, len(words), max_words):
+            chunk_words = words[i:i + max_words]
+            chunk_text = " ".join(chunk_words)
+            # Calcular offset aproximado
+            offset = len(" ".join(words[:i]))
+            chunks.append((chunk_text, offset))
+
+        return chunks
+
 
 # ============================================================================
 # Detectores Tier 1 (LLM)
@@ -227,7 +160,7 @@ class BetrayalDetector(LLMEventDetector):
         events = []
 
         for chunk_text, start_offset in chunks:
-            prompt = BETRAYAL_PROMPT.format(text=chunk_text)
+            prompt = BETRAYAL_DETECTION_TEMPLATE.format(text=chunk_text)
             response = self._query_ollama(prompt)
             data = self._extract_json(response)
 
@@ -247,29 +180,6 @@ class BetrayalDetector(LLMEventDetector):
 
         return events
 
-    def _chunk_text(self, text: str, max_words: int = 500) -> list[tuple[str, int]]:
-        """
-        Divide texto en fragmentos manejables.
-
-        Args:
-            text: Texto a dividir
-            max_words: Máximo de palabras por fragmento
-
-        Returns:
-            Lista de (texto_fragmento, offset_inicial)
-        """
-        words = text.split()
-        chunks = []
-
-        for i in range(0, len(words), max_words):
-            chunk_words = words[i:i + max_words]
-            chunk_text = " ".join(chunk_words)
-            # Calcular offset aproximado
-            offset = len(" ".join(words[:i]))
-            chunks.append((chunk_text, offset))
-
-        return chunks
-
 
 class AllianceDetector(LLMEventDetector):
     """Detecta formación de alianzas usando LLM."""
@@ -283,7 +193,7 @@ class AllianceDetector(LLMEventDetector):
         events = []
 
         for chunk_text, start_offset in chunks:
-            prompt = ALLIANCE_PROMPT.format(text=chunk_text)
+            prompt = ALLIANCE_DETECTION_TEMPLATE.format(text=chunk_text)
             response = self._query_ollama(prompt)
             data = self._extract_json(response)
 
@@ -302,17 +212,6 @@ class AllianceDetector(LLMEventDetector):
 
         return events
 
-    def _chunk_text(self, text: str, max_words: int = 500) -> list[tuple[str, int]]:
-        """Divide texto en fragmentos."""
-        words = text.split()
-        chunks = []
-        for i in range(0, len(words), max_words):
-            chunk_words = words[i:i + max_words]
-            chunk_text = " ".join(chunk_words)
-            offset = len(" ".join(words[:i]))
-            chunks.append((chunk_text, offset))
-        return chunks
-
 
 class RevelationDetector(LLMEventDetector):
     """Detecta revelaciones usando LLM."""
@@ -326,7 +225,7 @@ class RevelationDetector(LLMEventDetector):
         events = []
 
         for chunk_text, start_offset in chunks:
-            prompt = REVELATION_PROMPT.format(text=chunk_text)
+            prompt = REVELATION_DETECTION_TEMPLATE.format(text=chunk_text)
             response = self._query_ollama(prompt)
             data = self._extract_json(response)
 
@@ -346,17 +245,6 @@ class RevelationDetector(LLMEventDetector):
 
         return events
 
-    def _chunk_text(self, text: str, max_words: int = 500) -> list[tuple[str, int]]:
-        """Divide texto en fragmentos."""
-        words = text.split()
-        chunks = []
-        for i in range(0, len(words), max_words):
-            chunk_words = words[i:i + max_words]
-            chunk_text = " ".join(chunk_words)
-            offset = len(" ".join(words[:i]))
-            chunks.append((chunk_text, offset))
-        return chunks
-
 
 class DecisionDetector(LLMEventDetector):
     """Detecta decisiones cruciales usando LLM."""
@@ -370,7 +258,7 @@ class DecisionDetector(LLMEventDetector):
         events = []
 
         for chunk_text, start_offset in chunks:
-            prompt = DECISION_PROMPT.format(text=chunk_text)
+            prompt = DECISION_DETECTION_TEMPLATE.format(text=chunk_text)
             response = self._query_ollama(prompt)
             data = self._extract_json(response)
 
@@ -389,17 +277,6 @@ class DecisionDetector(LLMEventDetector):
                 ))
 
         return events
-
-    def _chunk_text(self, text: str, max_words: int = 500) -> list[tuple[str, int]]:
-        """Divide texto en fragmentos."""
-        words = text.split()
-        chunks = []
-        for i in range(0, len(words), max_words):
-            chunk_words = words[i:i + max_words]
-            chunk_text = " ".join(chunk_words)
-            offset = len(" ".join(words[:i]))
-            chunks.append((chunk_text, offset))
-        return chunks
 
 
 # ============================================================================

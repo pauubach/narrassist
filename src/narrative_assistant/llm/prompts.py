@@ -509,6 +509,105 @@ Si no hay problemas, devuelve {{"issues": []}}.
 Solo reporta problemas claros. No flagees diferencias temáticas intencionales entre secciones."""
 
 
+# ============================================================================
+# DETECCIÓN DE EVENTOS NARRATIVOS (Tier 1 - LLM)
+# ============================================================================
+
+EVENT_DETECTION_SYSTEM = """Eres un experto en análisis narrativo especializado en detectar eventos clave en textos literarios.
+
+Analiza el texto y detecta eventos significativos que impulsan la trama.
+
+Responde SIEMPRE en formato JSON válido.
+Usa confianza alta (>0.7) solo cuando hay evidencia clara en el texto."""
+
+BETRAYAL_DETECTION_TEMPLATE = """Analiza el siguiente texto narrativo y detecta si hay alguna TRAICIÓN (betrayal).
+
+Una traición ocurre cuando:
+- Un personaje rompe la confianza o lealtad de otro
+- Alguien actúa en contra de un aliado o amigo
+- Se revela que un personaje trabajaba secretamente contra otro
+- Hay un cambio de bando o lealtad inesperado
+
+Texto:
+{text}
+
+Responde SOLO con un JSON en este formato exacto:
+{{
+  "has_betrayal": true/false,
+  "description": "descripción breve del evento de traición (max 80 caracteres)",
+  "confidence": 0.0-1.0,
+  "betrayer": "nombre del traidor",
+  "victim": "nombre de la víctima"
+}}
+
+Si NO hay traición, usa: {{"has_betrayal": false, "description": "", "confidence": 0.0, "betrayer": "", "victim": ""}}"""
+
+ALLIANCE_DETECTION_TEMPLATE = """Analiza el siguiente texto narrativo y detecta si se forma una ALIANZA.
+
+Una alianza ocurre cuando:
+- Dos o más personajes acuerdan trabajar juntos
+- Se forma un pacto, acuerdo o colaboración
+- Personajes enemigos deciden unir fuerzas
+- Se menciona explícitamente una unión estratégica
+
+Texto:
+{text}
+
+Responde SOLO con un JSON en este formato exacto:
+{{
+  "has_alliance": true/false,
+  "description": "descripción breve de la alianza (max 80 caracteres)",
+  "confidence": 0.0-1.0,
+  "members": ["personaje1", "personaje2"]
+}}
+
+Si NO hay alianza, usa: {{"has_alliance": false, "description": "", "confidence": 0.0, "members": []}}"""
+
+REVELATION_DETECTION_TEMPLATE = """Analiza el siguiente texto narrativo y detecta si hay una REVELACIÓN importante.
+
+Una revelación ocurre cuando:
+- Se descubre un secreto importante
+- Un personaje confiesa algo crucial
+- Se revela información que cambia la comprensión de la trama
+- Hay una verdad oculta que sale a la luz
+
+Texto:
+{text}
+
+Responde SOLO con un JSON en este formato exacto:
+{{
+  "has_revelation": true/false,
+  "description": "descripción breve de la revelación (max 80 caracteres)",
+  "confidence": 0.0-1.0,
+  "revealer": "quién revela (si aplica)",
+  "content": "qué se revela"
+}}
+
+Si NO hay revelación, usa: {{"has_revelation": false, "description": "", "confidence": 0.0, "revealer": "", "content": ""}}"""
+
+DECISION_DETECTION_TEMPLATE = """Analiza el siguiente texto narrativo y detecta si hay una DECISIÓN crucial.
+
+Una decisión crucial ocurre cuando:
+- Un personaje toma una decisión importante que afecta la trama
+- Hay un momento de elección difícil o dilema
+- Se menciona explícitamente que alguien decide algo importante
+- Un personaje elige entre opciones con consecuencias significativas
+
+Texto:
+{text}
+
+Responde SOLO con un JSON en este formato exacto:
+{{
+  "has_decision": true/false,
+  "description": "descripción breve de la decisión (max 80 caracteres)",
+  "confidence": 0.0-1.0,
+  "decision_maker": "quién decide",
+  "choice": "qué decide"
+}}
+
+Si NO hay decisión crucial, usa: {{"has_decision": false, "description": "", "confidence": 0.0, "decision_maker": "", "choice": ""}}"""
+
+
 # UTILIDADES (actualización)
 # ============================================================================
 
@@ -523,4 +622,5 @@ RECOMMENDED_TEMPERATURES = {
     "flashback_validation": 0.1,
     "temporal_extraction": 0.2,
     "coherence_editorial": 0.2,
+    "event_detection": 0.3,  # Detección de eventos narrativos
 }
