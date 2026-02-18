@@ -58,6 +58,11 @@ def _get_cross_book_analyzer():
     return CrossBookAnalyzer()
 
 
+def _get_cross_book_event_analyzer():
+    from narrative_assistant.analysis.cross_book_events import CrossBookEventAnalyzer
+    return CrossBookEventAnalyzer()
+
+
 # ==================== BK-05: Comparación antes/después ====================
 
 @router.get("/projects/{project_id}/comparison")
@@ -254,5 +259,21 @@ def get_link_suggestions(collection_id: int, threshold: float = Query(default=0.
 def cross_book_analysis(collection_id: int):
     """Ejecuta análisis cross-book: compara atributos de entidades enlazadas."""
     analyzer = _get_cross_book_analyzer()
+    report = analyzer.analyze(collection_id)
+    return report.to_dict()
+
+
+@router.get("/collections/{collection_id}/cross-book-events")
+def cross_book_events(collection_id: int):
+    """
+    Analiza contradicciones de eventos entre libros de una colección.
+
+    Compara eventos narrativos de entidades enlazadas aplicando reglas:
+    - death_then_alive: Personaje muere y reaparece
+    - injury_healed_differently: Herida inconsistente
+    - acquisition_vs_loss: Objeto sin continuidad
+    - location_impossibility: Ubicación imposible entre libros
+    """
+    analyzer = _get_cross_book_event_analyzer()
     report = analyzer.analyze(collection_id)
     return report.to_dict()
