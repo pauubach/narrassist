@@ -3227,8 +3227,7 @@ def _emit_grammar_alerts(ctx: dict, tracker: ProgressTracker):
             except Exception as e:
                 logger.warning(f"Error creating correction alert: {e}")
 
-    # Marcar fase parcial de alertas como completada
-    tracker.mark_phase_completed("grammar_alerts")
+    # No marcar fase aquí: run_alerts() gestiona el ciclo de la fase "alerts"
     _update_storage(project_id, metrics_update={"alerts_generated": alerts_created})
     logger.info(f"Grammar alerts emitted: {alerts_created} alerts")
 
@@ -3376,8 +3375,7 @@ def _emit_consistency_alerts(ctx: dict, tracker: ProgressTracker):
             except Exception as e:
                 logger.warning(f"Error creating anachronism alert: {e}")
 
-    # Marcar fase parcial de alertas de coherencia como completada
-    tracker.mark_phase_completed("consistency_alerts")
+    # No marcar fase aquí: run_alerts() gestiona el ciclo de la fase "alerts"
 
     ctx.setdefault("alerts_created", 0)
     ctx["alerts_created"] += alerts_created

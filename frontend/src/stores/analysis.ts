@@ -126,7 +126,7 @@ export const TAB_PHASE_GATES: Partial<Record<WorkspaceTab, {
 }>> = {
   entities: { partial: 'entities', complete: 'attributes' },
   alerts: { partial: 'grammar', complete: 'alerts' },
-  relationships: { partial: 'coreference', complete: 'coreference' },
+  relationships: { partial: 'coreference', complete: 'relationships' },
   timeline: { partial: 'timeline', complete: 'timeline' },  // Ahora usa su propia fase
   style: { partial: 'grammar', complete: 'register' },
   glossary: { partial: 'coreference', complete: 'coreference' },
