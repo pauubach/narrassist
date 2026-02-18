@@ -139,8 +139,8 @@ function selectScope(value: string) {
 
         <Message severity="info" :closable="false" class="scope-hint">
           {{ selectedScope === 'global'
-            ? 'El sistema no volverá a detectar este texto como entidad en ningún proyecto.'
-            : 'El sistema no volverá a detectar este texto como entidad en este proyecto.'
+            ? 'No se detectará en ningún proyecto. Puedes revertirlo en Configuración > Datos y Mantenimiento.'
+            : 'No se detectará en este proyecto. Puedes deshacerlo desde el historial.'
           }}
         </Message>
       </div>

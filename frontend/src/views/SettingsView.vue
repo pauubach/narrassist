@@ -924,6 +924,58 @@
                 />
               </div>
             </div>
+
+            <Divider />
+
+            <div class="setting-item column">
+              <div class="setting-info">
+                <label class="setting-label">Entidades rechazadas (global)</label>
+                <p class="setting-description">
+                  Textos marcados como "no es una entidad" en todos tus proyectos.
+                  Al restaurar, volverán a detectarse en futuros análisis.
+                </p>
+              </div>
+
+              <div v-if="loadingRejections" class="loading-patterns">
+                <i class="pi pi-spin pi-spinner"></i>
+                <span>Cargando...</span>
+              </div>
+
+              <div v-else-if="userRejections.length === 0" class="empty-rejections">
+                <i class="pi pi-check-circle"></i>
+                <span>No hay entidades rechazadas globalmente</span>
+              </div>
+
+              <div v-else class="user-rejections-list">
+                <div
+                  v-for="rejection in userRejections"
+                  :key="rejection.id"
+                  class="rejection-item"
+                >
+                  <div class="rejection-info">
+                    <span class="rejection-name">{{ rejection.entityName }}</span>
+                    <Tag
+                      v-if="rejection.entityType"
+                      :value="rejection.entityType"
+                      severity="secondary"
+                      class="rejection-type"
+                    />
+                    <span v-if="rejection.reason" class="rejection-reason">
+                      — {{ rejection.reason }}
+                    </span>
+                  </div>
+                  <Button
+                    icon="pi pi-undo"
+                    severity="secondary"
+                    text
+                    rounded
+                    size="small"
+                    v-tooltip.left="'Restaurar: volver a detectar esta entidad'"
+                    @click="removeRejection(rejection)"
+                  />
+                </div>
+              </div>
+            </div>
           </template>
         </Card>
       </div>
@@ -1414,6 +1466,56 @@ const startLanguageTool = async () => {
   }
 }
 
+// ── User rejected entities (global) ─────────────────────────
+
+interface UserRejection {
+  id: number
+  entityName: string
+  entityType: string | null
+  reason: string | null
+  rejectedAt: string
+}
+
+const userRejections = ref<UserRejection[]>([])
+const loadingRejections = ref(false)
+
+async function loadUserRejections() {
+  loadingRejections.value = true
+  try {
+    const data = await api.getRaw<{ success: boolean; data?: UserRejection[] }>('/api/entity-filters/user-rejections')
+    if (data.success && data.data) {
+      userRejections.value = data.data
+    }
+  } catch (e) {
+    console.debug('Error loading user rejections:', e)
+  } finally {
+    loadingRejections.value = false
+  }
+}
+
+async function removeRejection(rejection: UserRejection) {
+  try {
+    const data = await api.del<{ success: boolean }>(`/api/entity-filters/user-rejections/${rejection.id}`)
+    if (data.success) {
+      userRejections.value = userRejections.value.filter(r => r.id !== rejection.id)
+      toast.add({
+        severity: 'success',
+        summary: 'Entidad restaurada',
+        detail: `"${rejection.entityName}" volverá a detectarse en futuros análisis`,
+        life: 3000,
+      })
+    }
+  } catch (e) {
+    console.error('Error removing rejection:', e)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'No se pudo restaurar la entidad',
+      life: 3000,
+    })
+  }
+}
+
 // Navigation
 const activeSection = ref('apariencia')
 const contentArea = ref<HTMLElement | null>(null)
@@ -1425,6 +1527,7 @@ onMounted(async () => {
   await loadCurrentDataLocation()
   await loadCorrectionPresets()
   await loadQualityLevels()
+  loadUserRejections()
 })
 
 onUnmounted(() => {

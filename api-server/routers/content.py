@@ -112,125 +112,9 @@ def create_glossary_entry(
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse)
-def get_glossary_entry(
-    project_id: int,
-    entry_id: int,
-) -> ApiResponse:
-    """
-    Obtiene una entrada específica del glosario.
-    """
-    try:
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
-        if result.is_failure:
-            raise HTTPException(status_code=404, detail="Project not found")
-        _ = result.value
-
-        from narrative_assistant.persistence.glossary import GlossaryRepository
-
-        repo = GlossaryRepository()
-        entry = repo.get(entry_id)
-
-        if not entry or entry.project_id != project_id:
-            raise HTTPException(status_code=404, detail="Glossary entry not found")
-
-        return ApiResponse(success=True, data=entry.to_dict())
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting glossary entry: {e}", exc_info=True)
-        return ApiResponse(success=False, error="Error interno del servidor")
-
-
-@router.put("/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse)
-def update_glossary_entry(
-    project_id: int,
-    entry_id: int,
-    request: GlossaryEntryRequest,
-) -> ApiResponse:
-    """
-    Actualiza una entrada existente del glosario.
-    """
-    try:
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
-        if result.is_failure:
-            raise HTTPException(status_code=404, detail="Project not found")
-        _ = result.value
-
-        from narrative_assistant.persistence.glossary import GlossaryRepository
-
-        repo = GlossaryRepository()
-        existing = repo.get(entry_id)
-
-        if not existing or existing.project_id != project_id:
-            raise HTTPException(status_code=404, detail="Glossary entry not found")
-
-        # Actualizar campos
-        existing.term = request.term
-        existing.definition = request.definition  # type: ignore[assignment]
-        existing.variants = request.variants  # type: ignore[attr-defined]
-        existing.category = request.category  # type: ignore[assignment]
-        existing.subcategory = request.subcategory  # type: ignore[attr-defined]
-        existing.context_notes = request.context_notes  # type: ignore[attr-defined]
-        existing.related_terms = request.related_terms  # type: ignore[attr-defined]
-        existing.usage_example = request.usage_example  # type: ignore[attr-defined]
-        existing.is_technical = request.is_technical  # type: ignore[attr-defined]
-        existing.is_invented = request.is_invented  # type: ignore[attr-defined]
-        existing.is_proper_noun = request.is_proper_noun  # type: ignore[attr-defined]
-        existing.include_in_publication_glossary = request.include_in_publication_glossary  # type: ignore[attr-defined]
-
-        repo.update(existing)
-
-        return ApiResponse(
-            success=True,
-            data=existing.to_dict(),
-            message=f"Término '{request.term}' actualizado",
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating glossary entry: {e}", exc_info=True)
-        return ApiResponse(success=False, error="Error interno del servidor")
-
-
-@router.delete("/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse)
-def delete_glossary_entry(
-    project_id: int,
-    entry_id: int,
-) -> ApiResponse:
-    """
-    Elimina una entrada del glosario.
-    """
-    try:
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
-        if result.is_failure:
-            raise HTTPException(status_code=404, detail="Project not found")
-        _ = result.value
-
-        from narrative_assistant.persistence.glossary import GlossaryRepository
-
-        repo = GlossaryRepository()
-        existing = repo.get(entry_id)
-
-        if not existing or existing.project_id != project_id:
-            raise HTTPException(status_code=404, detail="Glossary entry not found")
-
-        term = existing.term
-        repo.delete(entry_id)
-
-        return ApiResponse(
-            success=True,
-            message=f"Término '{term}' eliminado del glosario",
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting glossary entry: {e}", exc_info=True)
-        return ApiResponse(success=False, error="Error interno del servidor")
-
+# NOTE: Rutas con literal path (/context/llm, /search, /suggestions, etc.)
+# DEBEN ir ANTES de rutas con {entry_id} para evitar que FastAPI las
+# capture como entry_id (causando 422 al intentar parsear "suggestions" como int).
 
 @router.get("/api/projects/{project_id}/glossary/context/llm", response_model=ApiResponse)
 def get_glossary_llm_context(
@@ -638,6 +522,129 @@ def accept_glossary_suggestion(
         raise
     except Exception as e:
         logger.error(f"Error accepting glossary suggestion: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+# Rutas con {entry_id} van AL FINAL de las rutas de glossary
+# para no capturar rutas literales como /suggestions, /search, etc.
+
+@router.get("/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse)
+def get_glossary_entry(
+    project_id: int,
+    entry_id: int,
+) -> ApiResponse:
+    """
+    Obtiene una entrada específica del glosario.
+    """
+    try:
+        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        _ = result.value
+
+        from narrative_assistant.persistence.glossary import GlossaryRepository
+
+        repo = GlossaryRepository()
+        entry = repo.get(entry_id)
+
+        if not entry or entry.project_id != project_id:
+            raise HTTPException(status_code=404, detail="Glossary entry not found")
+
+        return ApiResponse(success=True, data=entry.to_dict())
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting glossary entry: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.put("/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse)
+def update_glossary_entry(
+    project_id: int,
+    entry_id: int,
+    request: GlossaryEntryRequest,
+) -> ApiResponse:
+    """
+    Actualiza una entrada existente del glosario.
+    """
+    try:
+        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        _ = result.value
+
+        from narrative_assistant.persistence.glossary import GlossaryRepository
+
+        repo = GlossaryRepository()
+        existing = repo.get(entry_id)
+
+        if not existing or existing.project_id != project_id:
+            raise HTTPException(status_code=404, detail="Glossary entry not found")
+
+        # Actualizar campos
+        existing.term = request.term
+        existing.definition = request.definition  # type: ignore[assignment]
+        existing.variants = request.variants  # type: ignore[attr-defined]
+        existing.category = request.category  # type: ignore[assignment]
+        existing.subcategory = request.subcategory  # type: ignore[attr-defined]
+        existing.context_notes = request.context_notes  # type: ignore[attr-defined]
+        existing.related_terms = request.related_terms  # type: ignore[attr-defined]
+        existing.usage_example = request.usage_example  # type: ignore[attr-defined]
+        existing.is_technical = request.is_technical  # type: ignore[attr-defined]
+        existing.is_invented = request.is_invented  # type: ignore[attr-defined]
+        existing.is_proper_noun = request.is_proper_noun  # type: ignore[attr-defined]
+        existing.include_in_publication_glossary = request.include_in_publication_glossary  # type: ignore[attr-defined]
+
+        repo.update(existing)
+
+        return ApiResponse(
+            success=True,
+            data=existing.to_dict(),
+            message=f"Término '{request.term}' actualizado",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating glossary entry: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.delete("/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse)
+def delete_glossary_entry(
+    project_id: int,
+    entry_id: int,
+) -> ApiResponse:
+    """
+    Elimina una entrada del glosario.
+    """
+    try:
+        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        _ = result.value
+
+        from narrative_assistant.persistence.glossary import GlossaryRepository
+
+        repo = GlossaryRepository()
+        existing = repo.get(entry_id)
+
+        if not existing or existing.project_id != project_id:
+            raise HTTPException(status_code=404, detail="Glossary entry not found")
+
+        term = existing.term
+        repo.delete(entry_id)
+
+        return ApiResponse(
+            success=True,
+            message=f"Término '{term}' eliminado del glosario",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting glossary entry: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
