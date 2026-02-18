@@ -56,6 +56,11 @@ export type ApiAlertCategory =
   | 'punctuation'
   | 'repetition'
   | 'agreement'
+  | 'timeline'
+  | 'character_consistency'
+  | 'voice_deviation'
+  | 'emotional'
+  | 'dialogue'
   | 'other'
 
 /** Alerta tal como la devuelve la API */

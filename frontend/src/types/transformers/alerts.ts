@@ -63,6 +63,11 @@ const CATEGORY_MAP: Record<ApiAlertCategory, AlertCategory> = {
   punctuation: 'punctuation',
   repetition: 'repetition',
   agreement: 'agreement',
+  timeline: 'timeline',
+  character_consistency: 'attribute',
+  voice_deviation: 'style',
+  emotional: 'behavior',
+  dialogue: 'other',
   other: 'other',
 }
 
@@ -83,7 +88,7 @@ const STATUS_TO_API: Record<AlertStatus, ApiAlertStatus> = {
 
 const CATEGORY_TO_API: Record<AlertCategory, ApiAlertCategory> = {
   attribute: 'consistency',
-  timeline: 'consistency',
+  timeline: 'timeline',
   relationship: 'consistency',
   location: 'world',
   behavior: 'behavioral',

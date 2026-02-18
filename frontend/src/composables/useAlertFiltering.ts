@@ -273,7 +273,6 @@ export function useAlertFiltering(
           }))
         }, 300)
       },
-      { deep: true }
     )
   }
 
