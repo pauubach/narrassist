@@ -36,6 +36,9 @@ def get_chapter_events(project_id: int, chapter_number: int):
     """
     Obtiene eventos narrativos detectados en un capítulo específico.
 
+    Lee primero de la tabla narrative_events (si existe).
+    Si no hay datos persistidos, detecta on-the-fly (fallback para proyectos pre-migración).
+
     Args:
         project_id: ID del proyecto
         chapter_number: Número de capítulo
@@ -60,26 +63,54 @@ def get_chapter_events(project_id: int, chapter_number: int):
         if not chapter:
             raise HTTPException(status_code=404, detail=f"Capítulo {chapter_number} no encontrado")
 
-        from narrative_assistant.analysis.event_detection import detect_events_in_chapter
         from narrative_assistant.analysis.event_types import EVENT_TIER_MAP, EventTier
-        from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+        from narrative_assistant.persistence.event_repository import get_event_repository
 
-        nlp = load_spacy_model()
+        # Intentar leer de tabla narrative_events primero
+        event_repo = get_event_repository()
+        result = event_repo.get_by_chapter(project_id, chapter_number)
 
-        # Get previous chapter text for POV change detection
-        prev_chapter_text = None
-        if chapter_number > 1:
-            prev_ch = next((ch for ch in chapters if ch.chapter_number == chapter_number - 1), None)
-            if prev_ch:
-                prev_chapter_text = prev_ch.content
+        events = []
+        if result.is_success and result.value:
+            # Hay eventos persistidos, convertir a DetectedEvent
+            from narrative_assistant.analysis.event_detection import DetectedEvent
+            from narrative_assistant.analysis.event_types import EventType
 
-        events = detect_events_in_chapter(
-            text=chapter.content,
-            chapter_number=chapter_number,
-            nlp=nlp,
-            enable_llm=False,
-            prev_chapter_text=prev_chapter_text
-        )
+            events = [
+                DetectedEvent(
+                    event_type=EventType(e.event_type),
+                    description=e.description,
+                    confidence=e.confidence,
+                    start_char=e.start_char,
+                    end_char=e.end_char,
+                    entity_ids=e.entity_ids,
+                    metadata=e.metadata,
+                )
+                for e in result.value
+            ]
+            logger.info(f"Loaded {len(events)} events from narrative_events table")
+        else:
+            # Fallback: detectar on-the-fly (proyectos pre-migración v30)
+            logger.info(f"No persisted events found, detecting on-the-fly for chapter {chapter_number}")
+            from narrative_assistant.analysis.event_detection import detect_events_in_chapter
+            from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+
+            nlp = load_spacy_model()
+
+            # Get previous chapter text for POV change detection
+            prev_chapter_text = None
+            if chapter_number > 1:
+                prev_ch = next((ch for ch in chapters if ch.chapter_number == chapter_number - 1), None)
+                if prev_ch:
+                    prev_chapter_text = prev_ch.content
+
+            events = detect_events_in_chapter(
+                text=chapter.content,
+                chapter_number=chapter_number,
+                nlp=nlp,
+                enable_llm=False,
+                prev_chapter_text=prev_chapter_text
+            )
 
         def event_to_dict(e):
             return {
