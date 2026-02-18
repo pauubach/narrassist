@@ -2446,7 +2446,7 @@ const handleScroll = () => {
 }
 
 .ollama-ready-info i {
-  color: var(--green-500);
+  color: var(--ds-text-success);
 }
 
 /* Ollama action card - cuando necesita acción */
@@ -2476,7 +2476,7 @@ const handleScroll = () => {
 }
 
 .ollama-action-card.ollama-state-no_models .ollama-action-content > i {
-  color: var(--blue-500);
+  color: var(--ds-text-info);
 }
 
 .ollama-action-text {
@@ -2690,7 +2690,7 @@ const handleScroll = () => {
 }
 
 .recommended-star {
-  color: var(--yellow-500);
+  color: var(--ds-text-warning);
   font-size: 0.9rem;
 }
 

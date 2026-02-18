@@ -1384,7 +1384,7 @@ defineExpose({ focusSearch })
 
 .dark .merged-indicator:hover {
   background: var(--blue-800);
-  border-color: var(--blue-500);
+  border-color: var(--ds-text-info);
 }
 
 /* Panel central - Contenido */
@@ -1767,7 +1767,7 @@ defineExpose({ focusSearch })
 .relevance-high { color: var(--green-600); }
 .relevance-medium { color: var(--blue-600); }
 .relevance-low { color: var(--orange-600); }
-.relevance-very-low { color: var(--red-500); }
+.relevance-very-low { color: var(--ds-text-danger); }
 
 /* Diálogos */
 .edit-dialog {

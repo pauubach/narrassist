@@ -489,7 +489,7 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--red-500);
+  color: var(--ds-text-danger);
   font-weight: 500;
 }
 

@@ -465,7 +465,7 @@ watch(selectedChapter, (newChapter) => {
 }
 
 .stat-item.success .stat-value {
-  color: var(--green-500);
+  color: var(--ds-text-success);
 }
 
 .stat-item.warning .stat-value {
@@ -473,7 +473,7 @@ watch(selectedChapter, (newChapter) => {
 }
 
 .stat-item.danger .stat-value {
-  color: var(--red-500);
+  color: var(--ds-text-danger);
 }
 
 /* Loading and Error States */
@@ -490,7 +490,7 @@ watch(selectedChapter, (newChapter) => {
 }
 
 .error-state {
-  color: var(--red-500);
+  color: var(--ds-text-danger);
 }
 
 .error-state i,
@@ -525,7 +525,7 @@ watch(selectedChapter, (newChapter) => {
 }
 
 .attribution-item.confidence-high {
-  border-color: var(--green-500);
+  border-color: var(--ds-text-success);
 }
 
 .attribution-item.confidence-medium {
@@ -533,7 +533,7 @@ watch(selectedChapter, (newChapter) => {
 }
 
 .attribution-item.confidence-low {
-  border-color: var(--red-500);
+  border-color: var(--ds-text-danger);
 }
 
 .attribution-item.confidence-unknown {

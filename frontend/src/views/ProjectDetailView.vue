@@ -289,6 +289,7 @@
               ref="alertsDashboardRef"
               :alerts="alerts"
               :chapters="chapters"
+              :entities="entities"
               :loading="loading"
               :analysis-executed="project.analysisStatus === 'completed'"
               @alert-select="onAlertSelect"

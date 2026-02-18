@@ -1062,8 +1062,8 @@ const deleteExpectation = (index: number) => {
   border-left: 4px solid var(--primary-color);
 }
 
-.expectation-item.expectation-relational { border-color: var(--green-500); }
-.expectation-item.expectation-knowledge { border-color: var(--yellow-500); }
+.expectation-item.expectation-relational { border-color: var(--ds-text-success); }
+.expectation-item.expectation-knowledge { border-color: var(--ds-text-warning); }
 .expectation-item.expectation-capability { border-color: var(--purple-500); }
 
 .expectation-header {
@@ -1125,7 +1125,7 @@ const deleteExpectation = (index: number) => {
   align-items: center;
   gap: 0.5rem;
   margin: 0 0 1rem 0;
-  color: var(--red-500);
+  color: var(--ds-text-danger);
   font-size: 0.9rem;
 }
 
@@ -1138,7 +1138,7 @@ const deleteExpectation = (index: number) => {
 }
 
 .violation-item.violation-high { border-color: var(--orange-500); }
-.violation-item.violation-medium { border-color: var(--yellow-500); }
+.violation-item.violation-medium { border-color: var(--ds-text-warning); }
 .violation-item.violation-low { border-color: var(--gray-400); }
 
 .violation-header {
@@ -1413,11 +1413,11 @@ const deleteExpectation = (index: number) => {
 }
 
 .comparison-higher {
-  color: var(--green-500);
+  color: var(--ds-text-success);
 }
 
 .comparison-lower {
-  color: var(--red-500);
+  color: var(--ds-text-danger);
 }
 
 .comparison-similar {

@@ -729,7 +729,7 @@ watch(() => props.projectId, (newId) => {
 }
 
 .error-state {
-  color: var(--red-500);
+  color: var(--ds-text-danger);
 }
 
 .error-state i {
@@ -802,7 +802,7 @@ watch(() => props.projectId, (newId) => {
 }
 
 .stat-icon.success {
-  color: var(--green-500);
+  color: var(--ds-text-success);
 }
 
 .stat-info {
@@ -981,7 +981,7 @@ watch(() => props.projectId, (newId) => {
 }
 
 .change-item.severity-critical {
-  border-color: var(--red-500);
+  border-color: var(--ds-text-danger);
   background: var(--red-50);
 }
 
@@ -991,7 +991,7 @@ watch(() => props.projectId, (newId) => {
 }
 
 .change-item.severity-medium {
-  border-color: var(--yellow-500);
+  border-color: var(--ds-text-warning);
 }
 
 .change-item.severity-low {
@@ -1121,7 +1121,7 @@ watch(() => props.projectId, (newId) => {
 }
 
 .overview-consistency.consistency-low {
-  color: var(--red-500);
+  color: var(--ds-text-danger);
 }
 
 .overview-segments {

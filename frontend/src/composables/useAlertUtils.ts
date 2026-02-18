@@ -135,6 +135,86 @@ export function translateAttributeName(key: string): string {
     .replace(/\b\w/g, l => l.toUpperCase())
 }
 
+/**
+ * Labels en español para cada tipo específico de alerta (AlertIssueType).
+ *
+ * Cubre ~55 de 80+ tipos del backend. Los tipos no listados usan fallback
+ * en getAlertTypeLabel().
+ */
+export const ALERT_TYPE_LABELS: Record<string, string> = {
+  // Repetition
+  linguistic_filler: 'Muletilla (catálogo)',
+  overused_word: 'Palabra sobreusada',
+  lexical_close: 'Repetición léxica',
+  sentence_start: 'Inicio oración repetido',
+  paragraph_start: 'Inicio párrafo repetido',
+  cacophony: 'Cacofonía',
+
+  // Typography (dashguiones, comillas, puntos suspensivos, espaciado)
+  wrong_dash_dialogue: 'Guion de diálogo incorrecto',
+  wrong_dash_range: 'Guion de rango incorrecto',
+  wrong_dash_inciso: 'Guion de inciso incorrecto',
+  wrong_quote_style: 'Estilo de comillas incorrecto',
+  mixed_quotes: 'Comillas mezcladas',
+  wrong_ellipsis: 'Puntos suspensivos incorrectos',
+  spacing_before_punct: 'Espacio antes de puntuación',
+  spacing_after_punct: 'Espacio después de puntuación',
+  multiple_spaces: 'Espacios múltiples',
+  invalid_punct_sequence: 'Secuencia de puntuación inválida',
+  unclosed_pair: 'Par sin cerrar',
+  quote_period_order: 'Orden punto-comilla incorrecto',
+
+  // Grammar
+  leismo: 'Leísmo',
+  laismo: 'Laísmo',
+  loismo: 'Loísmo',
+  dequeismo: 'Dequeísmo',
+  queismo: 'Queísmo',
+  gender_agreement: 'Concordancia de género',
+  number_agreement: 'Concordancia de número',
+  adjective_agreement: 'Concordancia de adjetivo',
+  subject_verb: 'Concordancia sujeto-verbo',
+  redundancy: 'Redundancia',
+  gender_disagreement: 'Discordancia género',
+  number_disagreement: 'Discordancia número',
+
+  // Clarity
+  sentence_too_long: 'Oración demasiado larga',
+  sentence_long_warning: 'Oración larga',
+  too_many_subordinates: 'Demasiadas subordinadas',
+  paragraph_no_pauses: 'Párrafo sin pausas',
+  run_on_sentence: 'Oración continua',
+  paragraph_too_short: 'Párrafo muy corto',
+  paragraph_too_long: 'Párrafo muy largo',
+
+  // POV
+  person_shift: 'Cambio de persona',
+  focalizer_shift: 'Cambio de focalizador',
+  tu_usted_mix: 'Mezcla tú/usted',
+  inconsistent_omniscience: 'Omnisciencia inconsistente',
+  pov_shift: 'Cambio de POV',
+
+  // Style
+  register_change: 'Cambio de registro',
+  speech_change: 'Cambio de habla',
+  sticky_sentence: 'Oración pegajosa',
+  low_energy_sentence: 'Oración baja energía',
+
+  // Spelling
+  typo: 'Error tipográfico',
+  misspelling: 'Falta ortográfica',
+  accent: 'Tilde incorrecta',
+
+  // Anglicisms
+  raw_anglicism: 'Anglicismo crudo',
+  morphological_anglicism: 'Anglicismo morfológico',
+  semantic_calque: 'Calco semántico',
+}
+
+export function getAlertTypeLabel(type: string): string {
+  return ALERT_TYPE_LABELS[type] || type.replace(/_/g, ' ')
+}
+
 export interface SeverityConfig {
   label: string
   icon: string

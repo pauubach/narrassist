@@ -407,11 +407,11 @@ function getTypeLabel(type: string): string {
 }
 
 .header-left .analysis-status.success {
-  color: var(--green-500);
+  color: var(--ds-text-success);
 }
 
 .header-left .analysis-status.error {
-  color: var(--red-500);
+  color: var(--ds-text-danger);
 }
 
 .header-left .analysis-status.pending {

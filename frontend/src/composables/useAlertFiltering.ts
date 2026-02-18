@@ -7,11 +7,16 @@
 
 import { ref, computed, watch, onMounted, type Ref, type ComputedRef } from 'vue'
 import type { Alert, AlertSeverity } from '@/types'
-import { useAlertUtils, META_CATEGORIES, type MetaCategoryKey } from './useAlertUtils'
+import { useAlertUtils, getAlertTypeLabel, META_CATEGORIES, type MetaCategoryKey } from './useAlertUtils'
+import { safeSetItem, safeGetItem } from '@/utils/safeStorage'
 
 export interface AlertFilteringOptions {
   /** Estados por defecto al iniciar (default: ['active']) */
   defaultStatuses?: string[]
+  /** Clave para persistir filtros en localStorage (si se omite, no persiste) */
+  persistKey?: string
+  /** Fuente de entidades para filtro por entidad */
+  entities?: () => Array<{ id: number; name: string }>
 }
 
 export interface AlertStats {
@@ -21,6 +26,31 @@ export interface AlertStats {
   byStatus: Record<string, number>
   active: number
 }
+
+/** Preset de filtro rápido */
+export interface FilterPreset {
+  key: string
+  label: string
+  icon: string
+  filters: Partial<{
+    selectedSeverities: AlertSeverity[]
+    selectedCategories: string[]
+    selectedAlertTypes: string[]
+  }>
+}
+
+export const FILTER_PRESETS: FilterPreset[] = [
+  { key: 'grammar', label: 'Errores gramaticales', icon: 'pi pi-spell-check',
+    filters: { selectedCategories: ['grammar', 'agreement', 'typography', 'punctuation'] } },
+  { key: 'high', label: 'Severidad alta+', icon: 'pi pi-exclamation-triangle',
+    filters: { selectedSeverities: ['critical', 'high'] } },
+  { key: 'consistency', label: 'Inconsistencias', icon: 'pi pi-exclamation-circle',
+    filters: { selectedCategories: ['attribute', 'timeline', 'relationship', 'location', 'behavior', 'knowledge'] } },
+  { key: 'style', label: 'Estilo y repetición', icon: 'pi pi-pencil',
+    filters: { selectedCategories: ['style', 'repetition'] } },
+]
+
+const PERSIST_SCHEMA_VERSION = 1
 
 export function useAlertFiltering(
   alerts: () => Alert[],
@@ -36,6 +66,8 @@ export function useAlertFiltering(
   const selectedStatuses = ref<string[]>([...defaultStatuses])
   const chapterRange = ref<{ min: number | null; max: number | null }>({ min: null, max: null })
   const minConfidence = ref<number | null>(null)
+  const selectedAlertTypes = ref<string[]>([])
+  const selectedEntityIds = ref<number[]>([])
 
   // === Meta-categorías (single-pass, más eficiente) ===
   const selectedMetaCategory = ref<MetaCategoryKey | null>(null)
@@ -94,6 +126,21 @@ export function useAlertFiltering(
     }))
   })
 
+  const alertTypeOptions = computed(() => {
+    const types = new Set(alerts().map(a => a.alertType).filter(Boolean))
+    return Array.from(types).sort().map(t => ({
+      label: getAlertTypeLabel(t),
+      value: t
+    }))
+  })
+
+  const entityOptions = computed(() => {
+    if (options?.entities) {
+      return options.entities().map(e => ({ label: e.name, value: e.id }))
+    }
+    return []
+  })
+
   // === Filtrado (single-pass + sort) ===
   const filteredAlerts = computed(() => {
     const query = searchQuery.value?.toLowerCase()
@@ -103,6 +150,8 @@ export function useAlertFiltering(
     const hasStatusFilter = selectedStatuses.value.length > 0
     const hasChapterRange = chapterRange.value.min != null || chapterRange.value.max != null
     const hasConfidenceFilter = minConfidence.value !== null
+    const hasAlertTypeFilter = selectedAlertTypes.value.length > 0
+    const hasEntityFilter = selectedEntityIds.value.length > 0
     const { min: chapterMin, max: chapterMax } = chapterRange.value
 
     const result = alerts().filter(a => {
@@ -115,6 +164,9 @@ export function useAlertFiltering(
       if (hasCategoryFilter && (!a.category || !selectedCategories.value.includes(a.category))) {
         return false
       }
+      if (hasAlertTypeFilter && !selectedAlertTypes.value.includes(a.alertType)) {
+        return false
+      }
       if (hasStatusFilter && !selectedStatuses.value.includes(a.status)) {
         return false
       }
@@ -124,6 +176,9 @@ export function useAlertFiltering(
         if (chapterMax != null && a.chapter > chapterMax) return false
       }
       if (hasConfidenceFilter && (a.confidence ?? 0) < minConfidence.value!) {
+        return false
+      }
+      if (hasEntityFilter && !a.entityIds?.some(id => selectedEntityIds.value.includes(id))) {
         return false
       }
       return true
@@ -160,6 +215,7 @@ export function useAlertFiltering(
   const hasActiveFilters = computed(() =>
     searchQuery.value || selectedSeverities.value.length > 0 || selectedCategories.value.length > 0
       || chapterRange.value.min != null || chapterRange.value.max != null || minConfidence.value !== null
+      || selectedAlertTypes.value.length > 0 || selectedEntityIds.value.length > 0
   )
 
   function clearFilters() {
@@ -170,6 +226,55 @@ export function useAlertFiltering(
     chapterRange.value = { min: null, max: null }
     minConfidence.value = null
     selectedMetaCategory.value = null
+    selectedAlertTypes.value = []
+    selectedEntityIds.value = []
+  }
+
+  function applyPreset(preset: FilterPreset) {
+    clearFilters()
+    if (preset.filters.selectedSeverities) selectedSeverities.value = [...preset.filters.selectedSeverities]
+    if (preset.filters.selectedCategories) selectedCategories.value = [...preset.filters.selectedCategories]
+    if (preset.filters.selectedAlertTypes) selectedAlertTypes.value = [...preset.filters.selectedAlertTypes]
+  }
+
+  // === Persistencia ===
+  if (options?.persistKey) {
+    const key = options.persistKey
+
+    onMounted(() => {
+      try {
+        const raw = safeGetItem(key)
+        if (raw) {
+          const saved = JSON.parse(raw)
+          if (saved._v === PERSIST_SCHEMA_VERSION) {
+            if (saved.severities?.length) selectedSeverities.value = saved.severities
+            if (saved.categories?.length) selectedCategories.value = saved.categories
+            if (saved.alertTypes?.length) selectedAlertTypes.value = saved.alertTypes
+            if (saved.entityIds?.length) selectedEntityIds.value = saved.entityIds
+            if (saved.confidence != null) minConfidence.value = saved.confidence
+          }
+        }
+      } catch { /* ignore corrupt data */ }
+    })
+
+    let persistTimer: ReturnType<typeof setTimeout> | null = null
+    watch(
+      [selectedSeverities, selectedCategories, selectedAlertTypes, selectedEntityIds, minConfidence],
+      () => {
+        if (persistTimer) clearTimeout(persistTimer)
+        persistTimer = setTimeout(() => {
+          safeSetItem(key, JSON.stringify({
+            _v: PERSIST_SCHEMA_VERSION,
+            severities: selectedSeverities.value,
+            categories: selectedCategories.value,
+            alertTypes: selectedAlertTypes.value,
+            entityIds: selectedEntityIds.value,
+            confidence: minConfidence.value,
+          }))
+        }, 300)
+      },
+      { deep: true }
+    )
   }
 
   /**
@@ -200,6 +305,8 @@ export function useAlertFiltering(
     selectedStatuses,
     chapterRange,
     minConfidence,
+    selectedAlertTypes,
+    selectedEntityIds,
 
     // Meta-categories
     selectedMetaCategory,
@@ -211,6 +318,11 @@ export function useAlertFiltering(
     statusOptions,
     confidenceOptions,
     categoryOptions,
+    alertTypeOptions,
+    entityOptions,
+
+    // Presets
+    applyPreset,
 
     // Computed
     filteredAlerts,

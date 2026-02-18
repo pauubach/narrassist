@@ -705,7 +705,7 @@ watch(() => props.alerts, () => {
 .empty-icon {
   font-size: 2.5rem;
   opacity: 0.5;
-  color: var(--green-500);
+  color: var(--ds-text-success);
 }
 
 .alerts-container {

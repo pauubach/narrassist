@@ -378,7 +378,7 @@ watch(
 }
 
 .error-state {
-  color: var(--red-500);
+  color: var(--ds-text-danger);
 }
 
 .error-state i {
@@ -428,7 +428,7 @@ watch(
 }
 
 .fact-item.fact-secret {
-  border-color: var(--red-500);
+  border-color: var(--ds-text-danger);
   background: var(--red-50);
 }
 

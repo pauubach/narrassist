@@ -14,9 +14,9 @@ import AlertsAnalytics from '@/components/alerts/AlertsAnalytics.vue'
 import SequentialCorrectionMode from './SequentialCorrectionMode.vue'
 import SuppressionRulesDialog from '@/components/alerts/SuppressionRulesDialog.vue'
 import type { Alert, AlertSeverity, AlertStatus, AlertSource } from '@/types'
-import { useAlertUtils, type MetaCategoryKey } from '@/composables/useAlertUtils'
+import { useAlertUtils, getAlertTypeLabel, META_CATEGORIES, type MetaCategoryKey } from '@/composables/useAlertUtils'
 import { useAlertExport } from '@/composables/useAlertExport'
-import { useAlertFiltering } from '@/composables/useAlertFiltering'
+import { useAlertFiltering, FILTER_PRESETS } from '@/composables/useAlertFiltering'
 import { useSequentialMode } from '@/composables/useSequentialMode'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useToast } from 'primevue/usetoast'
@@ -34,6 +34,7 @@ interface Props {
   projectId?: number
   loading?: boolean
   chapters?: Array<{ id: number; chapterNumber: number; title: string }>
+  entities?: Array<{ id: number; name: string }>
   analysisExecuted?: boolean
 }
 
@@ -41,6 +42,7 @@ const props = withDefaults(defineProps<Props>(), {
   projectId: 0,
   loading: false,
   chapters: () => [],
+  entities: () => [],
   analysisExecuted: true
 })
 
@@ -71,14 +73,23 @@ const {
   chapterRange,
   minConfidence,
   selectedMetaCategory,
+  selectedAlertTypes,
+  selectedEntityIds,
   filteredAlerts,
   stats,
   metaCategoryCounts,
+  alertTypeOptions,
+  entityOptions,
   toggleMetaCategory,
   clearFilters,
   hasActiveFilters,
-  syncWithWorkspaceStore
-} = useAlertFiltering(() => props.alerts, { defaultStatuses: ['active'] })
+  syncWithWorkspaceStore,
+  applyPreset
+} = useAlertFiltering(() => props.alerts, {
+  defaultStatuses: ['active'],
+  persistKey: 'alert_filters_v1',
+  entities: () => props.entities || []
+})
 
 // Alert export composable
 const { exportAlerts, getExportMenuItems } = useAlertExport(() => props.projectId)
@@ -110,10 +121,10 @@ function toggleExportMenu(event: Event) {
 }
 
 // Sincronizar con el store (workspace alert severity filter)
-syncWithWorkspaceStore()
+syncWithWorkspaceStore(workspaceStore)
 
 onMounted(() => {
-  syncWithWorkspaceStore()
+  syncWithWorkspaceStore(workspaceStore)
 })
 
 // Opciones de filtros
@@ -145,6 +156,27 @@ const confidenceOptions = [
   { label: '> 80%', value: 80 },
   { label: '> 70%', value: 70 }
 ]
+
+const presetOptions = [
+  { label: 'Filtros rápidos...', value: null },
+  { label: 'Errores gramaticales', value: 'grammar' },
+  { label: 'Severidad alta+', value: 'high' },
+  { label: 'Inconsistencias', value: 'consistency' },
+  { label: 'Estilo', value: 'style' }
+]
+
+const selectedPreset = ref<string | null>(null)
+
+function handlePresetChange(presetKey: string | null) {
+  if (presetKey) {
+    const preset = FILTER_PRESETS.find(p => p.key === presetKey)
+    if (preset) {
+      applyPreset(preset)
+      // Reset visual state after applying
+      selectedPreset.value = null
+    }
+  }
+}
 
 // Emitir alertas filtradas al parent cuando cambian
 watch(filteredAlerts, (filtered) => {
@@ -220,6 +252,28 @@ defineExpose({ focusSearch })
           :max-selected-labels="2"
         />
 
+        <MultiSelect
+          v-if="alertTypeOptions.length > 0"
+          v-model="selectedAlertTypes"
+          :options="alertTypeOptions"
+          option-label="label"
+          option-value="value"
+          placeholder="Tipo de alerta"
+          class="filter-select"
+          :max-selected-labels="2"
+        />
+
+        <MultiSelect
+          v-if="entityOptions.length > 0"
+          v-model="selectedEntityIds"
+          :options="entityOptions"
+          option-label="label"
+          option-value="value"
+          placeholder="Entidad"
+          class="filter-select"
+          :max-selected-labels="2"
+        />
+
         <ChapterRangeSelector
           :chapters="props.chapters"
           :project-id="props.projectId"
@@ -246,6 +300,16 @@ defineExpose({ focusSearch })
       </div>
 
       <div class="toolbar-actions">
+        <Select
+          v-model="selectedPreset"
+          :options="presetOptions"
+          option-label="label"
+          option-value="value"
+          placeholder="Filtros rápidos..."
+          class="preset-select"
+          @change="handlePresetChange($event.value)"
+        />
+
         <Button
           v-if="hasActiveFilters"
           label="Limpiar"

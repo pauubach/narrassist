@@ -62,7 +62,7 @@ export const useRelationshipGraphStore = defineStore('relationshipGraph', () => 
     { label: 'Amistad', value: 'FRIENDSHIP', color: '#10b981', icon: 'pi pi-heart-fill' },
     { label: 'Profesional', value: 'PROFESSIONAL', color: '#3b82f6', icon: 'pi pi-briefcase' },
     { label: 'Rivalidad', value: 'RIVALRY', color: '#f97316', icon: 'pi pi-bolt' },
-    { label: 'Aliado', value: 'ALLY', color: '#06b6d4', icon: 'pi pi-shield' },
+    { label: 'Aliado', value: 'ALLY', color: '#0891b2', icon: 'pi pi-shield' },
     { label: 'Mentor', value: 'MENTOR', color: '#a855f7', icon: 'pi pi-star' },
     { label: 'Enemigo', value: 'ENEMY', color: '#ef4444', icon: 'pi pi-times-circle' },
     { label: 'Neutral', value: 'NEUTRAL', color: '#6b7280', icon: 'pi pi-minus-circle' }

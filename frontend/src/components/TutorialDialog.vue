@@ -463,12 +463,12 @@ const finish = () => {
 }
 
 .feature-card.highlight-privacy i {
-  color: var(--green-500);
+  color: var(--ds-text-success);
 }
 
 :global(.dark) .feature-card.highlight-privacy {
   background: var(--p-surface-800);
-  border-color: var(--green-500);
+  border-color: var(--ds-text-success);
 }
 
 :global(.dark) .feature-card.highlight-privacy i {

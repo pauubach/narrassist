@@ -102,14 +102,14 @@ Libro B (ej: personaje muere en Libro 2 pero aparece vivo en Libro 3).
 
 **Riesgos**: Falsos positivos altos sin fine-tuning; requiere LLM ≥7B params.
 
-### Wire-ups pendientes (componentes ya implementados)
+### ~~Wire-ups pendientes~~ ✅ COMPLETADO (S17)
 
-| Feature | Componente(s) | Dónde cablear | Esfuerzo |
-|---------|--------------|---------------|----------|
-| VersionHistory | `VersionHistory.vue`, `VersionComparison.vue`, `VersionSparkline.vue` | `RevisionView.vue` como pestaña | 2h |
-| LicenseDialog | `LicenseDialog.vue` (822 LOC) | `SettingsView.vue` sección "Licencia" | 1h |
-| HomeView | `HomeView.vue` (434 LOC) | Router: `/` → component en vez de redirect | 0.5h |
-| Suppression Rules | Backend: 3 endpoints en `alerts.py` | `SettingsView.vue` o `AlertsDashboard.vue` | 3h |
+| Feature | Componente(s) | Dónde cableado | Estado |
+|---------|--------------|----------------|--------|
+| VersionHistory | `VersionHistory.vue`, `VersionComparison.vue`, `VersionSparkline.vue` | `ResumenTab.vue` — stat-card + full card | ✅ S17 |
+| LicenseDialog | `LicenseDialog.vue` | `SettingsView.vue` — sección "Licencia" | ✅ S17 |
+| HomeView | `HomeView.vue` | Router `/` → component, MenuBar "Inicio" | ✅ S17 |
+| Suppression Rules | `SuppressionRulesDialog.vue` | `AlertsDashboard.vue` — toolbar button | ✅ S17 |
 
 ### Mejoras de componentes (baja prioridad)
 

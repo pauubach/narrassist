@@ -1809,7 +1809,7 @@ defineExpose({
 
 .viewer-error i {
   font-size: 3rem;
-  color: var(--red-500);
+  color: var(--ds-text-danger);
 }
 
 .document-content {
@@ -2019,7 +2019,7 @@ defineExpose({
 
 /* Toggle de errores de gramatica activo */
 .grammar-toggle-active {
-  color: var(--blue-500) !important;
+  color: var(--ds-text-info) !important;
   border-color: var(--blue-500) !important;
 }
 

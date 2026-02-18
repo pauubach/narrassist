@@ -10,7 +10,7 @@
  */
 
 import { ref, type Ref } from 'vue'
-import { useToast } from 'primevue/usetoast'
+import { useAppToast } from './useAppToast'
 import type { Entity, EntityAttribute } from '@/types'
 import { api } from '@/services/apiClient'
 import { getAttributeCategoriesForEntityType } from '@/config/attributes'
@@ -67,7 +67,7 @@ export interface UseEntityCrudReturn {
  * Composable para operaciones CRUD de entidades y atributos
  */
 export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudReturn {
-  const toast = useToast()
+  const toast = useAppToast()
 
   // Edit entity dialog state
   const editingEntity = ref<Entity | null>(null)
@@ -122,12 +122,7 @@ export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudRetur
       if (data.success) {
         showEditDialog.value = false
         options.onSuccess?.()
-        toast.add({
-          severity: 'success',
-          summary: 'Guardado',
-          detail: 'Entidad actualizada correctamente',
-          life: 3000,
-        })
+        toast.success('Entidad actualizada correctamente')
       } else {
         toast.add({
           severity: 'error',

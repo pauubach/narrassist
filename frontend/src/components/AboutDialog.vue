@@ -158,7 +158,7 @@ watch(() => props.visible, (newValue) => {
 }
 
 .privacy-badge i {
-  color: var(--green-500);
+  color: var(--ds-text-success);
 }
 
 .system-status h3 {

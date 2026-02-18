@@ -322,7 +322,7 @@ watch(() => props.projectId, (newId) => {
 }
 
 .error-state {
-  color: var(--red-500);
+  color: var(--ds-text-danger);
 }
 
 .error-state i {

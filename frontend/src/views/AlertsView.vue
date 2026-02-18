@@ -607,7 +607,7 @@ onMounted(async () => {
 }
 
 .stat-item.critical i {
-  color: var(--red-500);
+  color: var(--ds-text-danger);
 }
 
 .stat-item.warning i {
@@ -615,7 +615,7 @@ onMounted(async () => {
 }
 
 .stat-item.info i {
-  color: var(--blue-500);
+  color: var(--ds-text-info);
 }
 
 .stat-value {

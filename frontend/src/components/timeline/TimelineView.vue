@@ -1183,7 +1183,7 @@ watch(() => props.projectId, () => {
 
 .error-icon {
   font-size: 3rem;
-  color: var(--red-500);
+  color: var(--ds-text-danger);
   opacity: 0.7;
 }
 
@@ -1196,7 +1196,7 @@ watch(() => props.projectId, () => {
 .error-message {
   margin: 0;
   font-size: 0.9375rem;
-  color: var(--red-500);
+  color: var(--ds-text-danger);
   max-width: 400px;
   text-align: center;
 }

@@ -508,7 +508,7 @@ function toggleDetails() {
 }
 
 .status-completed i {
-  color: var(--green-500);
+  color: var(--ds-text-success);
 }
 
 .status-error {
@@ -517,7 +517,7 @@ function toggleDetails() {
 }
 
 .status-error i {
-  color: var(--red-500);
+  color: var(--ds-text-danger);
 }
 
 .status-queued {
@@ -539,7 +539,7 @@ function toggleDetails() {
 }
 
 .status-queued-heavy .queued-heavy-check {
-  color: var(--green-500);
+  color: var(--ds-text-success);
 }
 
 .status-pending {

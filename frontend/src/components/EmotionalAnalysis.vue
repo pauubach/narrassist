@@ -378,7 +378,7 @@ watch(
 }
 
 .stat-item.has-issues .stat-value {
-  color: var(--red-500);
+  color: var(--ds-text-danger);
 }
 
 .stat-value {
@@ -516,11 +516,11 @@ watch(
 }
 
 .incoherence-item.type-emotion_dialogue {
-  border-left-color: var(--yellow-500);
+  border-left-color: var(--ds-text-warning);
 }
 
 .incoherence-item.type-emotion_action {
-  border-left-color: var(--blue-500);
+  border-left-color: var(--ds-text-info);
 }
 
 .incoherence-item.type-temporal_jump {
@@ -589,7 +589,7 @@ watch(
 }
 
 .incoherence-suggestion i {
-  color: var(--green-500);
+  color: var(--ds-text-success);
   margin-top: 2px;
 }
 
@@ -605,7 +605,7 @@ watch(
 
 .no-incoherences i {
   font-size: 1.25rem;
-  color: var(--green-500);
+  color: var(--ds-text-success);
 }
 
 .error-message {

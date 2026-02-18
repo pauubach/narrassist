@@ -783,7 +783,7 @@ onMounted(() => {
 }
 
 .stat-value.warning {
-  color: var(--yellow-500);
+  color: var(--ds-text-warning);
 }
 
 .stat-label {
@@ -1169,7 +1169,7 @@ onMounted(() => {
 .empty-tab i {
   font-size: 2rem;
   margin-bottom: var(--ds-space-2);
-  color: var(--green-500);
+  color: var(--ds-text-success);
 }
 
 /* Dark mode */
