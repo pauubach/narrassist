@@ -424,9 +424,11 @@ class TestSubordinateClauseAmbiguity:
         """
         text = "Cuando Ana encontró a Carlos tenía una barba espesa."
         result = _resolve("barba", text, ["Ana", "Carlos"], nlp=shared_spacy_nlp)
-        assert result is None, (
-            f"Ambiguous 'cuando X encontró a Y tenía...': should return None. Got: {result}"
+        assert isinstance(result, AmbiguousResult), (
+            f"Ambiguous 'cuando X encontró a Y tenía...': should return AmbiguousResult. Got: {result}"
         )
+        assert set(result.candidates) == {"Ana", "Carlos"}
+        assert "barba espesa" in result.context_text.lower()
 
     def test_cuando_abrazo_a_tenia_pelo(self, shared_spacy_nlp):
         """
@@ -435,9 +437,11 @@ class TestSubordinateClauseAmbiguity:
         """
         text = "Cuando Pedro abrazó a Elena tenía el pelo mojado."
         result = _resolve("pelo", text, ["Pedro", "Elena"], nlp=shared_spacy_nlp)
-        assert result is None, (
-            f"Ambiguous subordinate: should return None. Got: {result}"
+        assert isinstance(result, AmbiguousResult), (
+            f"Ambiguous subordinate: should return AmbiguousResult. Got: {result}"
         )
+        assert set(result.candidates) == {"Pedro", "Elena"}
+        assert "pelo mojado" in result.context_text.lower()
 
     def test_cuando_with_only_one_entity_is_NOT_ambiguous(self, shared_spacy_nlp):
         """
