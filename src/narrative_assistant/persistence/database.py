@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 29
+SCHEMA_VERSION = 30
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -705,6 +705,43 @@ CREATE INDEX IF NOT EXISTS idx_ooc_events_project ON ooc_events(project_id);
 CREATE INDEX IF NOT EXISTS idx_ooc_events_entity ON ooc_events(entity_id);
 
 -- ===================================================================
+-- TABLA: Eventos narrativos detectados (versión 30)
+-- ===================================================================
+-- Almacena eventos narrativos detectados por event_detection.py y event_detection_llm.py
+-- Complementa a las 4 tablas existentes (timeline_events, vital_status_events,
+-- character_location_events, ooc_events) que almacenan datos del módulo temporal/
+CREATE TABLE IF NOT EXISTS narrative_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    chapter INTEGER,                      -- Capítulo donde ocurre (puede ser NULL para eventos globales)
+
+    -- Tipo de evento (48 tipos en 3 tiers)
+    event_type TEXT NOT NULL,             -- EventType enum value (ENCOUNTER, DEATH, etc.)
+    tier INTEGER NOT NULL,                -- 1 (estructural), 2 (transicional), 3 (micro)
+
+    -- Descripción y ubicación
+    description TEXT NOT NULL,
+    start_char INTEGER,                   -- Posición inicial en el texto (NULL si evento global)
+    end_char INTEGER,                     -- Posición final en el texto (NULL si evento global)
+
+    -- Entidades involucradas
+    entity_ids TEXT,                      -- JSON array de entity IDs participantes
+
+    -- Metadata del evento
+    confidence REAL DEFAULT 0.8,
+    metadata TEXT,                        -- JSON: {participants, location, temporal_marker, emotional_valence, llm_model, etc.}
+
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_narrative_events_project ON narrative_events(project_id);
+CREATE INDEX IF NOT EXISTS idx_narrative_events_chapter ON narrative_events(chapter);
+CREATE INDEX IF NOT EXISTS idx_narrative_events_type ON narrative_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_narrative_events_tier ON narrative_events(tier);
+
+-- ===================================================================
 -- NUEVAS TABLAS: Sistema híbrido de filtros de entidades (versión 7)
 -- ===================================================================
 
@@ -1283,7 +1320,7 @@ CREATE INDEX IF NOT EXISTS idx_attr_cache_lookup ON attribute_cache(
 );
 
 -- Insertar versión del schema
-INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '29');
+INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '30');
 """
 
 
