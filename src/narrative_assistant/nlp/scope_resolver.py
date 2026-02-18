@@ -820,7 +820,6 @@ class ScopeResolver:
             return False
 
         attr_sent_start, attr_sent_end = self._sentence_spans[attr_sent_idx]
-        sent_text = self.text[attr_sent_start:attr_sent_end].strip()
 
         # La oración del atributo empieza con verbo conjugado (pro-drop)
         first_token = None

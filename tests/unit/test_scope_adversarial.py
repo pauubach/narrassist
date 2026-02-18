@@ -17,8 +17,7 @@ import re
 
 import pytest
 
-from narrative_assistant.nlp.scope_resolver import ScopeResolver
-
+from narrative_assistant.nlp.scope_resolver import AmbiguousResult, ScopeResolver
 
 # =============================================================================
 # Helpers
@@ -71,6 +70,8 @@ def _resolve_scope(
     result = resolver.find_nearest_entity_by_scope(
         target_pos, mentions, prefer_subject=prefer_subject
     )
+    if isinstance(result, AmbiguousResult):
+        return result
     return result[0] if result else None
 
 
@@ -98,6 +99,8 @@ def _resolve_scope_confidence(
     result = resolver.find_nearest_entity_by_scope(
         target_pos, mentions, prefer_subject=prefer_subject
     )
+    if isinstance(result, AmbiguousResult):
+        return result
     return result if result else (None, 0.0)
 
 
@@ -168,11 +171,6 @@ class TestConSusOjosAmbiguity:
             f"Instrumental 'con sus ojos' pertenece al sujeto María. Got: {result}"
         )
 
-    @pytest.mark.xfail(reason=(
-        "Ambiguedad real: 'con sus ojos' puede ser instrumental del sujeto o "
-        "atributo del objeto. Sin contexto adicional, es imposible desambiguar "
-        "al 100%, pero la heuristica deberia favorecer al sujeto."
-    ))
     def test_instrumental_con_sin_a_personal(self, shared_spacy_nlp):
         """
         "Contempló el paisaje con sus ojos azules."
@@ -210,13 +208,19 @@ class TestSubjectVsObjectAcrossSentences:
     def test_objeto_no_contamina_sujeto_tacito(self, shared_spacy_nlp):
         """
         "Pedro llamó a Elena. Tenía los ojos cansados."
-        → "ojos cansados" = Pedro (sujeto de "llamó")
+        → Genuinamente ambiguo: "Tenía" puede referirse a Pedro (sujeto) o Elena.
+          Aceptamos tanto resolución a Pedro como detección de ambigüedad.
         """
         text = "Pedro llamó a Elena. Tenía los ojos cansados."
         result = _resolve_scope(shared_spacy_nlp, text, ["Pedro", "Elena"])
-        assert result == "Pedro", (
-            f"Sujeto tacito de 'tenia' hereda Pedro, no Elena. Got: {result}"
-        )
+        if isinstance(result, AmbiguousResult):
+            assert "Pedro" in result.candidates and "Elena" in result.candidates, (
+                f"AmbiguousResult should include both candidates. Got: {result.candidates}"
+            )
+        else:
+            assert result == "Pedro", (
+                f"Sujeto tacito de 'tenia' hereda Pedro, no Elena. Got: {result}"
+            )
 
     def test_objeto_directo_sin_a_personal(self, shared_spacy_nlp):
         """

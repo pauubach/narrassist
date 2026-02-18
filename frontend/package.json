@@ -7,8 +7,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:docs && vue-tsc && vite build",
-    "build:docs": "node scripts/build-docs.js",
+    "build": "vue-tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint src --fix",
     "type-check": "vue-tsc --noEmit",

@@ -182,15 +182,11 @@ def _check_injury_healed_differently(
     contradictions = []
 
     injuries_a = [e for e in events_a if e["event_type"] == EventType.INJURY.value]
-    injuries_b = [e for e in events_b if e["event_type"] == EventType.INJURY.value]
-    healings_a = [e for e in events_a if e["event_type"] == EventType.HEALING.value]
     healings_b = [e for e in events_b if e["event_type"] == EventType.HEALING.value]
 
     # Herida en A, curación incompatible en B (o viceversa)
     for injury in injuries_a:
-        injury_desc = injury.get("description", "").lower()
         for healing in healings_b:
-            healing_desc = healing.get("description", "").lower()
             # Si ambos mencionan partes del cuerpo diferentes, es sospechoso
             injury_meta = injury.get("metadata", {})
             healing_meta = healing.get("metadata", {})

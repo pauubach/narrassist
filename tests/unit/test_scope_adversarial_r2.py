@@ -22,7 +22,6 @@ import pytest
 
 from narrative_assistant.nlp.scope_resolver import AmbiguousResult, ScopeResolver
 
-
 # =============================================================================
 # Helpers (compatibles con round 1)
 # =============================================================================
@@ -443,7 +442,7 @@ class TestSubordinateClauseAmbiguity:
         assert set(result.candidates) == {"Pedro", "Elena"}
         assert "pelo mojado" in result.context_text.lower()
 
-    def test_cuando_with_only_one_entity_is_NOT_ambiguous(self, shared_spacy_nlp):
+    def test_cuando_with_only_one_entity_is_not_ambiguous(self, shared_spacy_nlp):
         """
         'Cuando Juan llegó tenía el pelo mojado.'
         NOT ambiguous: only one candidate (Juan).

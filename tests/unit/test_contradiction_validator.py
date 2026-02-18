@@ -4,8 +4,9 @@ Tests para el validador LLM de contradicciones cross-book.
 Usa mocks para el cliente LLM — no requiere Ollama real.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from narrative_assistant.analysis.contradiction_validator import (
     MIN_CONFIDENCE_FOR_LLM,
@@ -16,7 +17,6 @@ from narrative_assistant.analysis.contradiction_validator import (
 )
 from narrative_assistant.analysis.cross_book_events import EventContradiction
 from narrative_assistant.analysis.event_types import EventType
-
 
 # ============================================================================
 # Fixtures

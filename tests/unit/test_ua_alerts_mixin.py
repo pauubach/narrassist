@@ -4,11 +4,13 @@ Tests unitarios para PipelineAlertsMixin (ua_alerts.py).
 Objetivo: Subir coverage de 3% a >40%.
 """
 
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+
+from narrative_assistant.alerts.models import Alert, AlertCategory, AlertSeverity
 from narrative_assistant.pipelines.ua_alerts import PipelineAlertsMixin
 from narrative_assistant.pipelines.unified_analysis import AnalysisContext
-from narrative_assistant.alerts.models import Alert, AlertCategory, AlertSeverity
 
 
 class MockPipeline(PipelineAlertsMixin):

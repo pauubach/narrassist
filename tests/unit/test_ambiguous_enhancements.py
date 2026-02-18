@@ -117,15 +117,15 @@ class TestBatchResolution:
 
     def test_batch_request_model(self):
         """Verificar que el modelo Pydantic de batch request es válido."""
-        from pathlib import Path
         import sys
+        from pathlib import Path
 
         # Agregar api-server al path
         api_server_path = str(Path(__file__).parent.parent.parent / "api-server")
         sys.path.insert(0, api_server_path)
 
         try:
-            from deps import BatchResolveAmbiguousAttributesRequest, AmbiguousAttributeResolution
+            from deps import AmbiguousAttributeResolution, BatchResolveAmbiguousAttributesRequest
 
             # Crear request válido
             req = BatchResolveAmbiguousAttributesRequest(
@@ -146,8 +146,8 @@ class TestBatchResolution:
 
     def test_batch_request_requires_at_least_one_resolution(self):
         """Batch request debe fallar si no hay resoluciones."""
-        from pathlib import Path
         import sys
+        from pathlib import Path
 
         api_server_path = str(Path(__file__).parent.parent.parent / "api-server")
         sys.path.insert(0, api_server_path)
@@ -210,8 +210,8 @@ class TestLLMSemanticDisambiguation:
 
         Para ejecutar: pytest -k test_llm_can_suggest --run-llm
         """
-        from narrative_assistant.nlp.scope_resolver import ScopeResolver
         from narrative_assistant.llm.client import get_llm_client
+        from narrative_assistant.nlp.scope_resolver import ScopeResolver
 
         # Verificar que Ollama está disponible
         llm = get_llm_client()

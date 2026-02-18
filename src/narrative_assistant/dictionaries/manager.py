@@ -166,7 +166,6 @@ class DictionaryManager:
                 # Try direct import path
                 try:
                     import importlib.util
-                    import sys
                     # Find scripts/build_thesaurus_db.py relative to project root
                     script_candidates = [
                         Path(__file__).parent.parent.parent.parent / "scripts" / "build_thesaurus_db.py",
@@ -189,6 +188,8 @@ class DictionaryManager:
                     logger.warning(f"Auto-build de synonyms.db falló: {e}. La app funcionará sin sinónimos.")
             except Exception as e:
                 logger.warning(f"Auto-build de synonyms.db falló: {e}. La app funcionará sin sinónimos.")
+        except Exception as e:
+            logger.warning(f"Error verificando synonyms.db: {e}. La app funcionará sin sinónimos.")
 
     def lookup(
         self,

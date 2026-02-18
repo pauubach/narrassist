@@ -4,8 +4,9 @@ Ultra coverage boost - Tests finales para llegar a 60%+ en todos los pipelines.
 Estrategia: Tests muy específicos para cada rama condicional y método interno.
 """
 
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
 
 
 @pytest.fixture

@@ -23,7 +23,6 @@ from narrative_assistant.analysis.cross_book_events import (
 )
 from narrative_assistant.analysis.event_types import EventType
 
-
 # ============================================================================
 # Helpers
 # ============================================================================

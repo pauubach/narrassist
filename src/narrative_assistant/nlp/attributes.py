@@ -1664,6 +1664,7 @@ class AttributeExtractor(AttributeContextMixin, AttributeVotingMixin, AttributeE
             return Result.success(AttributeExtractionResult(processed_chars=0))
 
         result = AttributeExtractionResult(processed_chars=len(text))
+        self._pending_ambiguous: list[AmbiguousAttribute] = []
         all_extractions: dict[str, list[ExtractedAttribute]] = {}  # método -> atributos
 
         # Crear y cachear doc spaCy y ScopeResolver para scope resolution
@@ -1716,6 +1717,9 @@ class AttributeExtractor(AttributeContextMixin, AttributeVotingMixin, AttributeE
 
             # Eliminar duplicados finales
             result.attributes = self._deduplicate(result.attributes)
+
+            # Transferir atributos ambiguos colectados por sub-métodos
+            result.ambiguous_attributes = self._pending_ambiguous
 
             logger.info(
                 f"Atributos finales (votación): {len(result.attributes)}, "
@@ -2189,7 +2193,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                     if isinstance(entity_result, AmbiguousResult):
                         # Colectar para alerta interactiva
                         ambig_attr = AmbiguousAttribute(
-                            attribute_key=attr_key.value,
+                            attribute_key=key.value,
                             attribute_value=value or "",
                             candidates=entity_result.candidates,
                             source_text=entity_result.context_text,
@@ -2197,9 +2201,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                             end_char=match.end(),
                             chapter_id=chapter_id,
                         )
-                        result.ambiguous_attributes.append(ambig_attr)
+                        self._pending_ambiguous.append(ambig_attr)
                         logger.debug(
-                            f"Ambiguous attribute collected: {attr_key.value}={value}, "
+                            f"Ambiguous attribute collected: {key.value}={value}, "
                             f"candidates={entity_result.candidates}"
                         )
                         continue  # No agregar a atributos normales
@@ -3421,7 +3425,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                                             end_char=adj.idx + len(adj.text),
                                             chapter_id=chapter_id,
                                         )
-                                        result.ambiguous_attributes.append(ambig_attr)
+                                        self._pending_ambiguous.append(ambig_attr)
                                 continue  # Skip atribución normal
 
                             entity_name = entity_result

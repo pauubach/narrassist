@@ -10,9 +10,10 @@ profundos que cubren:
 - Integración entre fases
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch, call
 from datetime import datetime
+from unittest.mock import MagicMock, Mock, call, patch
+
+import pytest
 
 
 # Fixtures comunes (duplicados de test_pipelines_coverage_boost.py)
@@ -312,8 +313,8 @@ class TestPipelineAlertsDeepCoverage:
     @patch('narrative_assistant.alerts.engine.get_alert_engine')
     def test_generate_alerts_coherence_breaks(self, mock_engine, mock_config, mock_context):
         """Genera alertas de saltos de coherencia."""
-        from narrative_assistant.pipelines.ua_alerts import PipelineAlertsMixin
         from narrative_assistant.alerts.models import AlertSeverity
+        from narrative_assistant.pipelines.ua_alerts import PipelineAlertsMixin
 
         brk = Mock()
         brk.severity = Mock(value="high")

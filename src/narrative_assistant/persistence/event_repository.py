@@ -11,7 +11,6 @@ import threading
 from dataclasses import dataclass
 from datetime import datetime
 
-from ..analysis.event_types import EventType
 from ..core.errors import DatabaseError
 from ..core.result import Result
 from .database import get_database

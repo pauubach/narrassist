@@ -6,6 +6,7 @@ hasta la creación de alertas interactivas para resolución del usuario.
 """
 
 import pytest
+
 from narrative_assistant.alerts.models import AlertCategory, AlertSeverity, AlertStatus
 from narrative_assistant.nlp.scope_resolver import AmbiguousResult
 

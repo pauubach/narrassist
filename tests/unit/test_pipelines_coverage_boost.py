@@ -10,9 +10,11 @@ Cubre:
 - analysis_pipeline.py (14% → 40%)
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch, call
 from datetime import datetime
+from unittest.mock import MagicMock, Mock, call, patch
+
+import pytest
+
 
 # Fixtures comunes
 @pytest.fixture

@@ -8,8 +8,9 @@ Cubre:
 - Edge cases
 """
 
-import pytest
 from datetime import date
+
+import pytest
 
 from narrative_assistant.analysis.temporal_alignment import (
     AGE_TOLERANCE_YEARS,
@@ -21,7 +22,6 @@ from narrative_assistant.analysis.temporal_alignment import (
     _check_age_inconsistency,
     _check_date_conflict,
 )
-
 
 # ============================================================================
 # Helpers
