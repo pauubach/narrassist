@@ -402,12 +402,19 @@ Cuando el detective interrogó al sospechoso tenía los ojos inyectados en sangr
 2. **Dependencia de NER**: Si spaCy no detecta una entidad, no se incluye como candidato
 3. **Contexto de una oración**: No considera contexto discursivo más amplio
 
-### Trabajo Futuro
+### Trabajo Futuro (Completado parcialmente - ver "Mejoras Post-Implementación")
 
-1. **Análisis semántico con LLM**: Usar Ollama para desambiguar casos complejos
-2. **Memoria contextual**: Recordar atributos previamente asignados para inferencia
-3. **Sugerencia por defecto**: Basada en género gramatical o saliencia de entidad
-4. **Batch resolution**: Permitir resolver múltiples atributos ambiguos a la vez
+~~1. **Análisis semántico con LLM**: Usar Ollama para desambiguar casos complejos~~ ✅ **IMPLEMENTADO**
+~~2. **Memoria contextual**: Recordar atributos previamente asignados para inferencia~~ ✅ **IMPLEMENTADO** (sugerencia contextual)
+~~3. **Sugerencia por defecto**: Basada en género gramatical o saliencia de entidad~~ ✅ **PARCIAL** (sugerencia contextual cubre atributos, falta género)
+~~4. **Batch resolution**: Permitir resolver múltiples atributos ambiguos a la vez~~ ✅ **IMPLEMENTADO**
+
+**Pendiente**:
+1. **UI para batch resolution**: Checkbox multi-select en AlertsDashboard + botón "Resolver seleccionadas"
+2. **Sugerencia por género gramatical**: Si atributo tiene género (ej: "rubia"), eliminar candidatos incompatibles
+3. **Expansión de patrones sintácticos**: Detectar más casos (elipsis, anáfora cero, etc.)
+4. **Contexto discursivo ampliado**: Considerar párrafos anteriores, no solo oración actual
+5. **Historial de decisiones**: Aprender de resoluciones previas del usuario (ML opcional)
 
 ---
 
