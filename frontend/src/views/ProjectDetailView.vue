@@ -159,7 +159,7 @@
                 <!-- Panel Alertas (muestra alertas filtradas por el dashboard cuando está activo) -->
                 <AlertsPanel
                   v-show="sidebarTab === 'alerts'"
-                  :alerts="workspaceStore.activeTab === 'alerts' && dashboardFilteredAlerts.length > 0 ? dashboardFilteredAlerts : alerts"
+                  :alerts="workspaceStore.activeTab === 'alerts' && dashboardFilteredAlerts !== null ? dashboardFilteredAlerts : alerts"
                   @navigate="navigateToAlerts"
                   @filter-severity="handleFilterSeverity"
                   @alert-click="onAlertSelect"
@@ -558,7 +558,8 @@ const alertsDashboardRef = ref<InstanceType<typeof AlertsDashboard> | null>(null
 const glossaryTabRef = ref<InstanceType<typeof GlossaryTab> | null>(null)
 
 // Alertas filtradas por el dashboard (se pasan al sidebar)
-const dashboardFilteredAlerts = ref<Alert[]>([])
+// null = no hay filtro activo; [] = filtro activo sin resultados
+const dashboardFilteredAlerts = ref<Alert[] | null>(null)
 
 function onDashboardFilterChange(filtered: Alert[]) {
   dashboardFilteredAlerts.value = filtered

@@ -4,17 +4,20 @@ Script para inspeccionar el estado de la cola heavy.
 """
 
 import sys
+from pathlib import Path
 
 # Add parent directory to path
-sys.path.insert(0, "d:/repos/tfm")
-sys.path.insert(0, "d:/repos/tfm/api-server")
+_script_dir = Path(__file__).resolve().parent
+_project_root = _script_dir.parent
+sys.path.insert(0, str(_project_root))
+sys.path.insert(0, str(_project_root / "api-server"))
 
 def main():
     try:
         import deps
 
         with deps._progress_lock:
-            print(f"=== HEAVY ANALYSIS STATE ===\n")
+            print("=== HEAVY ANALYSIS STATE ===\n")
 
             # Queue
             print(f"Heavy queue: {len(deps._heavy_analysis_queue)} items")

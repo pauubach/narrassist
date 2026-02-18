@@ -13,7 +13,7 @@ from deps import (
     _verify_entity_ownership,
     logger,
 )
-from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter()
 
@@ -1833,7 +1833,7 @@ def list_rejected_entities(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/entities/{entity_id}/reject", response_model=ApiResponse)
-def reject_entity_by_id(project_id: int, entity_id: int, body: dict = Body(default={})):
+def reject_entity_by_id(project_id: int, entity_id: int, body: dict | None = None):
     """
     Rechaza una entidad por su ID.
 
@@ -1845,6 +1845,8 @@ def reject_entity_by_id(project_id: int, entity_id: int, body: dict = Body(defau
         entity_id: ID de la entidad
         body: Opcional, con campo 'reason'
     """
+    if body is None:
+        body = {}
     try:
         from narrative_assistant.entities.repository import get_entity_repository
         from narrative_assistant.nlp.entity_validator import get_entity_validator
@@ -1853,6 +1855,9 @@ def reject_entity_by_id(project_id: int, entity_id: int, body: dict = Body(defau
         entity = entity_repo.get_entity(entity_id)
 
         if not entity:
+            raise HTTPException(status_code=404, detail="Entidad no encontrada")
+
+        if entity.project_id != project_id:
             raise HTTPException(status_code=404, detail="Entidad no encontrada")
 
         entity_text = entity.canonical_name

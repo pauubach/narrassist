@@ -113,7 +113,7 @@ def get_chapter_events(project_id: int, chapter_number: int):
         raise
     except Exception as e:
         logger.error(f"Error detecting events for project {project_id} chapter {chapter_number}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=f"Error interno del servidor: {str(e)}")
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 # ============================================================================
@@ -221,7 +221,7 @@ def export_events(
         raise
     except Exception as e:
         logger.error(f"Error exporting events for project {project_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 
 def _apply_event_filters(events, tier_filter, event_types_str, critical_only):
@@ -438,7 +438,7 @@ def get_event_stats(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error calculating event stats for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=f"Error interno del servidor: {str(e)}")
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 def _calculate_event_stats(events_by_chapter, chapters, project_id):
