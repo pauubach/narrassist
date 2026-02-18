@@ -34,7 +34,7 @@
     </div>
 
     <!-- Results -->
-    <div v-else class="results-container">
+    <div v-else-if="report && report.global_stats" class="results-container">
       <!-- Global Stats -->
       <div class="stats-cards">
         <Card class="stat-card">

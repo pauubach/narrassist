@@ -356,8 +356,8 @@ const selectedSeverity = ref('medium')
 const chartType = ref<'bars' | 'pie'>('bars')
 
 const chartTypeOptions = [
-  { icon: 'pi pi-chart-bar', value: 'bars' },
-  { icon: 'pi pi-chart-pie', value: 'pie' }
+  { icon: 'pi pi-chart-bar', value: 'bars', label: 'Barras' },
+  { icon: 'pi pi-chart-pie', value: 'pie', label: 'Circular' }
 ]
 
 const severityOptions = [
