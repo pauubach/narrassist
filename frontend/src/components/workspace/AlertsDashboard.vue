@@ -13,7 +13,9 @@ import ChapterRangeSelector from '@/components/alerts/ChapterRangeSelector.vue'
 import AlertsAnalytics from '@/components/alerts/AlertsAnalytics.vue'
 import SequentialCorrectionMode from './SequentialCorrectionMode.vue'
 import type { Alert, AlertSeverity, AlertStatus, AlertSource } from '@/types'
-import { useAlertUtils, META_CATEGORIES, type MetaCategoryKey } from '@/composables/useAlertUtils'
+import { useAlertUtils, type MetaCategoryKey } from '@/composables/useAlertUtils'
+import { useAlertExport } from '@/composables/useAlertExport'
+import { useAlertFiltering } from '@/composables/useAlertFiltering'
 import { useSequentialMode } from '@/composables/useSequentialMode'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useToast } from 'primevue/usetoast'
@@ -58,6 +60,27 @@ const toast = useToast()
 const { getSeverityLabel, getCategoryConfig } = useAlertUtils()
 const workspaceStore = useWorkspaceStore()
 
+// Alert filtering composable
+const {
+  searchQuery,
+  selectedSeverities,
+  selectedCategories,
+  selectedStatuses,
+  chapterRange,
+  minConfidence,
+  selectedMetaCategory,
+  filteredAlerts,
+  stats,
+  metaCategoryCounts,
+  toggleMetaCategory,
+  clearFilters,
+  hasActiveFilters,
+  syncWithWorkspaceStore
+} = useAlertFiltering(() => props.alerts, { defaultStatuses: ['active'] })
+
+// Alert export composable
+const { exportAlerts, getExportMenuItems } = useAlertExport(() => props.projectId)
+
 // Sequential mode
 const sequentialMode = useSequentialMode(
   () => props.alerts,
@@ -73,71 +96,23 @@ const sequentialMode = useSequentialMode(
 // Estado para diálogos
 const showResolveAllDialog = ref(false)
 const exportMenuRef = ref<InstanceType<typeof Menu> | null>(null)
+const searchInputRef = ref<InstanceType<typeof InputText> | null>(null)
 
-// Menú de export
-const exportMenuItems: MenuItem[] = [
-  {
-    label: 'Exportar CSV',
-    icon: 'pi pi-file',
-    command: () => exportAlerts('csv')
-  },
-  {
-    label: 'Exportar JSON',
-    icon: 'pi pi-code',
-    command: () => exportAlerts('json')
-  }
-]
+// Menú de export (usando composable)
+const exportMenuItems = computed<MenuItem[]>(() =>
+  getExportMenuItems(() => props.alerts)
+)
 
 function toggleExportMenu(event: Event) {
   exportMenuRef.value?.toggle(event)
 }
 
-// Meta-categorías
-const selectedMetaCategory = ref<MetaCategoryKey | null>(null)
-
-const metaCategoryCounts = computed(() => {
-  const active = props.alerts.filter(a => a.status === 'active')
-  return {
-    errors: active.filter(a => META_CATEGORIES.errors.categories.includes(a.category)).length,
-    inconsistencies: active.filter(a => META_CATEGORIES.inconsistencies.categories.includes(a.category)).length,
-    suggestions: active.filter(a => META_CATEGORIES.suggestions.categories.includes(a.category)).length,
-  }
-})
-
-function toggleMetaCategory(key: MetaCategoryKey) {
-  if (selectedMetaCategory.value === key) {
-    selectedMetaCategory.value = null
-    selectedCategories.value = []
-  } else {
-    selectedMetaCategory.value = key
-    selectedCategories.value = [...META_CATEGORIES[key].categories]
-  }
-}
-
-// Estado de filtros
-const searchQuery = ref('')
-const searchInputRef = ref<InstanceType<typeof InputText> | null>(null)
-const selectedSeverities = ref<AlertSeverity[]>([])
-
-// Sincronizar con el filtro de severidad del store
-watch(() => workspaceStore.alertSeverityFilter, (newFilter) => {
-  if (newFilter) {
-    selectedSeverities.value = [newFilter as AlertSeverity]
-    workspaceStore.setAlertSeverityFilter(null)
-  }
-}, { immediate: true })
+// Sincronizar con el store (workspace alert severity filter)
+syncWithWorkspaceStore()
 
 onMounted(() => {
-  if (workspaceStore.alertSeverityFilter) {
-    selectedSeverities.value = [workspaceStore.alertSeverityFilter as AlertSeverity]
-    workspaceStore.setAlertSeverityFilter(null)
-  }
+  syncWithWorkspaceStore()
 })
-
-const selectedCategories = ref<string[]>([])
-const selectedStatuses = ref<string[]>(['active'])
-const chapterRange = ref<{ min: number | null; max: number | null }>({ min: null, max: null })
-const minConfidence = ref<number | null>(null)
 
 // Opciones de filtros
 const severityOptions: Array<{ label: string; value: AlertSeverity }> = [
@@ -169,91 +144,15 @@ const confidenceOptions = [
   { label: '> 70%', value: 70 }
 ]
 
-// Alertas filtradas (un solo pase)
-const filteredAlerts = computed(() => {
-  const query = searchQuery.value?.toLowerCase()
-  const hasSearch = !!query
-  const hasSeverityFilter = selectedSeverities.value.length > 0
-  const hasCategoryFilter = selectedCategories.value.length > 0
-  const hasStatusFilter = selectedStatuses.value.length > 0
-  const hasChapterRange = chapterRange.value.min != null || chapterRange.value.max != null
-  const hasConfidenceFilter = minConfidence.value !== null
-  const { min: chapterMin, max: chapterMax } = chapterRange.value
-
-  const result = props.alerts.filter(a => {
-    if (hasSearch && !(a.title.toLowerCase().includes(query!) || a.description?.toLowerCase().includes(query!))) {
-      return false
-    }
-    if (hasSeverityFilter && !selectedSeverities.value.includes(a.severity)) {
-      return false
-    }
-    if (hasCategoryFilter && (!a.category || !selectedCategories.value.includes(a.category))) {
-      return false
-    }
-    if (hasStatusFilter && !selectedStatuses.value.includes(a.status)) {
-      return false
-    }
-    if (hasChapterRange) {
-      if (a.chapter == null) return false
-      if (chapterMin != null && a.chapter < chapterMin) return false
-      if (chapterMax != null && a.chapter > chapterMax) return false
-    }
-    if (hasConfidenceFilter && (a.confidence ?? 0) < minConfidence.value!) {
-      return false
-    }
-    return true
-  })
-
-  const severityOrder = { critical: 0, high: 1, medium: 2, low: 3, info: 4 }
-  return result.sort((a, b) => {
-    const severityDiff = severityOrder[a.severity] - severityOrder[b.severity]
-    if (severityDiff !== 0) return severityDiff
-    return (a.chapter ?? 999) - (b.chapter ?? 999)
-  })
-})
-
 // Emitir alertas filtradas al parent cuando cambian
 watch(filteredAlerts, (filtered) => {
   emit('filter-change', filtered)
 }, { immediate: true })
 
-// Estadísticas (un solo pase)
-const stats = computed(() => {
-  const bySeverity: Record<string, number> = {}
-  let active = 0
-
-  for (const alert of props.alerts) {
-    bySeverity[alert.severity] = (bySeverity[alert.severity] || 0) + 1
-    if (alert.status === 'active') active++
-  }
-
-  return {
-    total: props.alerts.length,
-    filtered: filteredAlerts.value.length,
-    bySeverity,
-    active
-  }
-})
-
 // Helpers
 function getCategoryLabel(category: string): string {
   return getCategoryConfig(category as any).label
 }
-
-function clearFilters() {
-  searchQuery.value = ''
-  selectedSeverities.value = []
-  selectedCategories.value = []
-  selectedStatuses.value = ['active']
-  chapterRange.value = { min: null, max: null }
-  minConfidence.value = null
-  selectedMetaCategory.value = null
-}
-
-const hasActiveFilters = computed(() =>
-  searchQuery.value || selectedSeverities.value.length || selectedCategories.value.length
-    || chapterRange.value.min != null || chapterRange.value.max != null || minConfidence.value !== null
-)
 
 function handleResolveAll() {
   showResolveAllDialog.value = true
@@ -272,90 +171,7 @@ function handleNavigateFromSequential(source?: AlertSource) {
   }
 }
 
-function exportAlerts(format: 'json' | 'csv' = 'csv') {
-  if (!props.alerts || props.alerts.length === 0) {
-    toast.add({ severity: 'warn', summary: 'Sin datos', detail: 'No hay alertas para exportar', life: 4000 })
-    return
-  }
-
-  try {
-    if (format === 'csv') {
-      const headers = ['ID', 'Severidad', 'Categoría', 'Estado', 'Capítulo', 'Título', 'Descripción', 'Confianza', 'Fecha']
-      const rows = props.alerts.map(a => [
-        a.id,
-        a.severity,
-        a.category || '',
-        a.status,
-        a.chapter || '',
-        `"${(a.title || '').replace(/"/g, '""')}"`,
-        `"${(a.description || '').replace(/"/g, '""')}"`,
-        a.confidence ? (a.confidence * 100).toFixed(0) + '%' : '',
-        a.createdAt || ''
-      ])
-
-      const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.join(','))
-      ].join('\n')
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `alertas_proyecto_${props.projectId}.csv`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-
-      toast.add({ severity: 'success', summary: 'Exportado', detail: `${props.alerts.length} alertas exportadas (CSV)`, life: 3000 })
-    } else {
-      const content = {
-        projectId: props.projectId,
-        exportedAt: new Date().toISOString(),
-        totalAlerts: props.alerts.length,
-        bySeverity: {
-          critical: props.alerts.filter(a => a.severity === 'critical').length,
-          high: props.alerts.filter(a => a.severity === 'high').length,
-          medium: props.alerts.filter(a => a.severity === 'medium').length,
-          low: props.alerts.filter(a => a.severity === 'low').length,
-          info: props.alerts.filter(a => a.severity === 'info').length,
-        },
-        byStatus: {
-          active: props.alerts.filter(a => a.status === 'active').length,
-          resolved: props.alerts.filter(a => a.status === 'resolved').length,
-          dismissed: props.alerts.filter(a => a.status === 'dismissed').length,
-        },
-        alerts: props.alerts.map(a => ({
-          id: a.id,
-          title: a.title,
-          description: a.description,
-          severity: a.severity,
-          category: a.category,
-          status: a.status,
-          chapter: a.chapter,
-          confidence: a.confidence,
-          createdAt: a.createdAt,
-        })),
-      }
-
-      const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `alertas_proyecto_${props.projectId}.json`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-
-      toast.add({ severity: 'success', summary: 'Exportado', detail: `${props.alerts.length} alertas exportadas (JSON)`, life: 3000 })
-    }
-  } catch (err) {
-    console.error('Error exporting alerts:', err)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Error al exportar alertas', life: 5000 })
-  }
-}
+// exportAlerts ahora viene del composable useAlertExport
 
 function focusSearch() {
   const el = (searchInputRef.value as any)?.$el as HTMLElement | undefined

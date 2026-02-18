@@ -20,6 +20,7 @@ import type { Entity, EntityAttribute } from '@/types'
 import { transformEntityAttribute } from '@/types/transformers'
 import type { ApiEntityAttribute } from '@/types/api'
 import { useEntityUtils } from '@/composables/useEntityUtils'
+import { useEntityCrud } from '@/composables/useEntityCrud'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import { useListKeyboardNav } from '@/composables/useListKeyboardNav'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -68,6 +69,43 @@ const { getEntityIcon, getEntityLabel, getEntityColor } = useEntityUtils()
 const { formatChapterLabel } = useAlertUtils()
 const { setItemRef: setEntityRef, getTabindex: getEntityTabindex, onKeydown: onEntityListKeydown, focusedIndex: entityFocusedIndex } = useListKeyboardNav()
 
+// Entity CRUD composable
+const {
+  editingEntity,
+  showEditDialog,
+  openEditDialog,
+  saveEntity,
+  deleteEntity,
+  loadingAttributes,
+  attributes: selectedEntityAttributes,
+  loadAttributes: loadEntityAttributes,
+  editingAttributeId,
+  editingAttributeValue,
+  savingAttribute,
+  startEditAttribute,
+  cancelEditAttribute,
+  saveEditedAttribute,
+  newAttribute,
+  showAddAttribute,
+  createAttribute,
+  getAttributeCategories,
+  deleteAttribute,
+  loadingRichData,
+  entityRelationships,
+  entityVitalStatus,
+  loadRichData: loadEntityRichData
+} = useEntityCrud({
+  projectId: () => props.projectId,
+  onSuccess: () => {
+    emit('refresh')
+  },
+  onAttributeChange: async () => {
+    if (selectedEntity.value) {
+      await loadEntityRichData(selectedEntity.value.id)
+    }
+  }
+})
+
 // Estado de filtros
 const searchQuery = ref('')
 const searchInputRef = ref<InstanceType<typeof DsInput> | null>(null)
@@ -79,37 +117,28 @@ const showOnlyRelevant = ref(false) // Filtrar entidades con baja relevancia
 // NOTA: selectedEntity se mantiene para operaciones locales (editar, eliminar, etc.)
 // El panel de detalles se maneja en el panel derecho global (EntityInspector)
 const selectedEntity = ref<Entity | null>(null)
-const selectedEntityAttributes = ref<EntityAttribute[]>([])
-const loadingAttributes = ref(false)
 
-// Inline attribute editing
-const showAddAttribute = ref(false)
-const newAttribute = ref({ category: 'physical', name: '', value: '' })
-const editingAttributeId = ref<number | null>(null)
-const editingAttributeValue = ref('')
-const savingAttribute = ref(false)
-
-const attributeCategoryOptions = [
-  { label: 'Físico', value: 'physical' },
-  { label: 'Psicológico', value: 'psychological' },
-  { label: 'Social', value: 'social' },
-  { label: 'Otro', value: 'other' },
-]
-const entityRelationships = ref<any[]>([])
-const entityVitalStatus = ref<any>(null)
-const loadingRichData = ref(false)
-const showEditDialog = ref(false)
 const showMergeDialog = ref(false)
 const showUndoMergeDialog = ref(false)
 const showRejectDialog = ref(false)
 const showProfileModal = ref(false)
 const entityToReject = ref<Entity | null>(null)
-const editingEntity = ref<Entity | null>(null)
 const entityToUndoMerge = ref<Entity | null>(null)
 const selectedEntitiesForMerge = ref<Entity[]>([])
 
+// Attribute categories (usando composable en vez de hardcoded)
+const attributeCategoryOptions = computed(() => getAttributeCategories(selectedEntity.value?.type))
+
 // ID de la última entidad seleccionada automáticamente
 const lastAutoSelectedId = ref<number | null>(null)
+
+// Watch para actualizar selectedEntity cuando se guarda una edición
+watch(() => editingEntity.value, (newVal, oldVal) => {
+  // Si la entidad editada coincide con la seleccionada y se cerró el diálogo, actualizar
+  if (oldVal && !newVal && selectedEntity.value && oldVal.id === selectedEntity.value.id) {
+    selectedEntity.value = { ...oldVal }
+  }
+})
 
 // Watch para seleccionar entidad inicial (navegación desde /characters/:id o onEntityEdit)
 watch(() => props.initialEntityId, async (entityId) => {
@@ -257,51 +286,7 @@ async function handleEntityClick(entity: Entity) {
   // El panel derecho (EntityInspector) no debe abrirse aquí
 }
 
-/**
- * Carga los atributos de una entidad desde el backend
- */
-async function loadEntityAttributes(entityId: number) {
-  loadingAttributes.value = true
-  try {
-    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/entities/${entityId}/attributes`)
-    if (data.success) {
-      const rawAttributes: ApiEntityAttribute[] = data.data || []
-      selectedEntityAttributes.value = rawAttributes.map(transformEntityAttribute)
-    } else {
-      selectedEntityAttributes.value = []
-    }
-  } catch (err) {
-    console.error('Error loading entity attributes:', err)
-    selectedEntityAttributes.value = []
-  } finally {
-    loadingAttributes.value = false
-  }
-}
-
-/**
- * Carga datos enriquecidos de la entidad desde el story-bible API
- * (relaciones y estado vital)
- */
-async function loadEntityRichData(entityId: number) {
-  loadingRichData.value = true
-  try {
-    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/story-bible/${entityId}`)
-    if (data.success && data.data) {
-      const entry = data.data
-      entityRelationships.value = entry.relationships || []
-      entityVitalStatus.value = entry.vital_status || null
-    } else {
-      entityRelationships.value = []
-      entityVitalStatus.value = null
-    }
-  } catch (err) {
-    console.error('Error loading rich entity data:', err)
-    entityRelationships.value = []
-    entityVitalStatus.value = null
-  } finally {
-    loadingRichData.value = false
-  }
-}
+// loadEntityAttributes y loadEntityRichData ahora vienen del composable useEntityCrud
 
 function clearFilters() {
   searchQuery.value = ''
@@ -310,8 +295,7 @@ function clearFilters() {
 }
 
 function onEntityEdit(entity: Entity) {
-  editingEntity.value = { ...entity }
-  showEditDialog.value = true
+  openEditDialog(entity)
 }
 
 function onEntityMerge(entity: Entity) {
@@ -325,25 +309,9 @@ function onUndoMerge(entity: Entity) {
 }
 
 async function onEntityDelete(entity: Entity) {
-  if (!confirm(`"${entity.name}" dejará de aparecer en la lista de entidades.\n\nSi vuelves a analizar el documento, podría reaparecer.`)) {
-    return
-  }
-
-  try {
-    const data = await api.del<any>(`/api/projects/${props.projectId}/entities/${entity.id}`)
-
-    if (data.success) {
-      if (selectedEntity.value?.id === entity.id) {
-        selectedEntity.value = null
-      }
-      emit('refresh')
-      toast.add({ severity: 'success', summary: 'Oculta', detail: `"${entity.name}" se ha ocultado`, life: 3000 })
-    } else {
-      toast.add({ severity: 'error', summary: 'Error', detail: `Error al ocultar: ${data.error}`, life: 5000 })
-    }
-  } catch (err) {
-    console.error('Error deleting entity:', err)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo ocultar la entidad', life: 5000 })
+  await deleteEntity(entity)
+  if (selectedEntity.value?.id === entity.id) {
+    selectedEntity.value = null
   }
 }
 
@@ -419,35 +387,7 @@ async function handleRejectEntity(scope: 'project' | 'global', reason: string) {
   }
 }
 
-async function saveEntity() {
-  if (!editingEntity.value) {
-    showEditDialog.value = false
-    return
-  }
-
-  try {
-    const data = await api.putRaw<any>(`/api/projects/${props.projectId}/entities/${editingEntity.value.id}`, {
-      name: editingEntity.value.name,
-      type: editingEntity.value.type,
-      importance: editingEntity.value.importance,
-      aliases: editingEntity.value.aliases,
-    })
-
-    if (data.success) {
-      showEditDialog.value = false
-      if (selectedEntity.value?.id === editingEntity.value.id) {
-        selectedEntity.value = { ...editingEntity.value }
-      }
-      emit('refresh')
-      toast.add({ severity: 'success', summary: 'Guardado', detail: 'Entidad actualizada correctamente', life: 3000 })
-    } else {
-      toast.add({ severity: 'error', summary: 'Error', detail: `Error al guardar: ${data.error}`, life: 5000 })
-    }
-  } catch (err) {
-    console.error('Error updating entity:', err)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo guardar la entidad', life: 5000 })
-  }
-}
+// saveEntity ahora viene del composable useEntityCrud
 
 async function onMergeEntities(primaryEntityId: number, entityIdsToMerge: number[], resolutions?: Array<{ attribute_name: string; chosen_value: string }>) {
   try {
@@ -613,105 +553,19 @@ function navigateToRelatedEntity(relatedEntityId: number) {
   }
 }
 
-/**
- * Inicia la edición inline de un atributo
- */
-function startEditAttribute(attr: EntityAttribute) {
-  editingAttributeId.value = attr.id
-  editingAttributeValue.value = attr.value
-}
+// Attribute functions (startEditAttribute, cancelEditAttribute, saveEditedAttribute,
+// createAttribute, deleteAttribute) ahora vienen del composable useEntityCrud
 
-/**
- * Cancela la edición inline
- */
-function cancelEditAttribute() {
-  editingAttributeId.value = null
-  editingAttributeValue.value = ''
-}
-
-/**
- * Guarda el valor editado de un atributo existente
- */
-async function saveEditedAttribute(attr: EntityAttribute) {
-  if (!selectedEntity.value || !editingAttributeValue.value.trim()) return
-
-  savingAttribute.value = true
-  try {
-    const data = await api.putRaw<any>(
-      `/api/projects/${props.projectId}/entities/${selectedEntity.value.id}/attributes/${attr.id}`,
-      { value: editingAttributeValue.value.trim() }
-    )
-
-    if (data.success) {
-      await loadEntityAttributes(selectedEntity.value.id)
-      toast.add({ severity: 'success', summary: 'Guardado', detail: 'Atributo actualizado', life: 2000 })
-    } else {
-      toast.add({ severity: 'error', summary: 'Error', detail: data.error || 'No se pudo actualizar', life: 4000 })
-    }
-  } catch (err) {
-    console.error('Error updating attribute:', err)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Error al actualizar el atributo', life: 4000 })
-  } finally {
-    savingAttribute.value = false
-    editingAttributeId.value = null
-    editingAttributeValue.value = ''
+// Wrappers locales para mantener compatibilidad con template
+async function onCreateAttribute() {
+  if (selectedEntity.value) {
+    await createAttribute(selectedEntity.value.id)
   }
 }
 
-/**
- * Crea un nuevo atributo para la entidad seleccionada
- */
-async function createAttribute() {
-  if (!selectedEntity.value || !newAttribute.value.name.trim() || !newAttribute.value.value.trim()) return
-
-  savingAttribute.value = true
-  try {
-    const data = await api.postRaw<any>(
-      `/api/projects/${props.projectId}/entities/${selectedEntity.value.id}/attributes`,
-      {
-        category: newAttribute.value.category,
-        name: newAttribute.value.name.trim(),
-        value: newAttribute.value.value.trim(),
-        confidence: 1.0,
-      }
-    )
-
-    if (data.success) {
-      await loadEntityAttributes(selectedEntity.value.id)
-      newAttribute.value = { category: 'physical', name: '', value: '' }
-      showAddAttribute.value = false
-      toast.add({ severity: 'success', summary: 'Creado', detail: 'Atributo añadido', life: 2000 })
-    } else {
-      toast.add({ severity: 'error', summary: 'Error', detail: data.error || 'No se pudo crear', life: 4000 })
-    }
-  } catch (err) {
-    console.error('Error creating attribute:', err)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Error al crear el atributo', life: 4000 })
-  } finally {
-    savingAttribute.value = false
-  }
-}
-
-/**
- * Elimina un atributo de la entidad seleccionada
- */
-async function deleteAttribute(attr: EntityAttribute) {
-  if (!selectedEntity.value) return
-
-  try {
-    const data = await api.del<any>(
-      `/api/projects/${props.projectId}/entities/${selectedEntity.value.id}/attributes/${attr.id}`
-    )
-
-    if (data.success) {
-      await loadEntityAttributes(selectedEntity.value.id)
-      toast.add({ severity: 'success', summary: 'Eliminado', detail: 'Atributo eliminado', life: 2000 })
-    } else {
-      toast.add({ severity: 'error', summary: 'Error', detail: data.error || 'No se pudo eliminar', life: 4000 })
-    }
-  } catch (err) {
-    console.error('Error deleting attribute:', err)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Error al eliminar el atributo', life: 4000 })
+async function onDeleteAttribute(attr: EntityAttribute) {
+  if (selectedEntity.value) {
+    await deleteAttribute(selectedEntity.value.id, attr.id)
   }
 }
 
@@ -1008,7 +862,7 @@ defineExpose({ focusSearch })
                     size="small"
                     :loading="savingAttribute"
                     :disabled="!newAttribute.name.trim() || !newAttribute.value.trim()"
-                    @click="createAttribute"
+                    @click="onCreateAttribute"
                   />
                   <Button
                     icon="pi pi-times"
@@ -1074,7 +928,7 @@ defineExpose({ focusSearch })
                       text rounded size="small"
                       severity="danger"
                       class="attribute-nav-btn attribute-delete-btn"
-                      @click.stop="deleteAttribute(attr)"
+                      @click.stop="onDeleteAttribute(attr)"
                     />
                   </template>
                 </div>
