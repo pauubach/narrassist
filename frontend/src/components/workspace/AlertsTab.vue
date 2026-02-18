@@ -748,7 +748,8 @@ defineExpose({ focusSearch })
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: visible; /* Permitir que los badges se muestren completos */
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Toolbar */

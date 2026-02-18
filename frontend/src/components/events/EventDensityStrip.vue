@@ -311,7 +311,7 @@ function handleMouseMove(event: MouseEvent) {
   border-radius: var(--border-radius);
   font-size: 0.8125rem;
   pointer-events: none;
-  z-index: 1000;
+  z-index: var(--ds-z-tooltip);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 

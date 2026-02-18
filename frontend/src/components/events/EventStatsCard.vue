@@ -189,7 +189,7 @@ function formatEventType(type: string): string {
   border: 1px solid var(--surface-border);
   border-radius: var(--border-radius);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  z-index: 100;
+  z-index: var(--ds-z-popover);
   overflow: hidden;
   display: flex;
   flex-direction: column;

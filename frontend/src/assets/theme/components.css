@@ -8,6 +8,41 @@
  */
 
 /* ============================================================================
+   Z-INDEX OVERRIDES — PrimeVue overlays
+   Ensures all PrimeVue overlays render above app fixed elements (z-index 1030).
+   Uses !important because PrimeVue sets inline z-index dynamically.
+   ============================================================================ */
+
+.p-dropdown-panel,
+.p-select-overlay,
+.p-multiselect-overlay,
+.p-datepicker-panel,
+.p-overlaypanel {
+  z-index: var(--ds-z-dropdown, 1000) !important;
+}
+
+.p-menu,
+.p-contextmenu,
+.p-tieredmenu,
+.p-megamenu-overlay {
+  z-index: var(--ds-z-dropdown, 1000) !important;
+}
+
+.p-dialog-mask {
+  z-index: var(--ds-z-modal-backdrop, 1040) !important;
+}
+
+.p-dialog {
+  z-index: var(--ds-z-modal, 1050) !important;
+}
+
+.p-confirmpopup {
+  z-index: var(--ds-z-popover, 1060) !important;
+}
+
+/* Tooltip: see also below in TOOLTIP section */
+
+/* ============================================================================
    DROPDOWN / SELECT
    ============================================================================ */
 
@@ -593,6 +628,10 @@
 /* ============================================================================
    TOOLTIP
    ============================================================================ */
+
+.p-tooltip {
+  z-index: var(--ds-z-tooltip, 1070) !important;
+}
 
 .p-tooltip .p-tooltip-text {
   background: var(--color-gray-800);

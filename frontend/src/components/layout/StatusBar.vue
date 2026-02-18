@@ -620,7 +620,7 @@ function toggleDetails() {
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12);
   padding: 1rem;
   margin-bottom: 0.5rem;
-  z-index: 9999; /* Fix: Mayor que tabs/panels para evitar superposición */
+  z-index: var(--ds-z-popover); /* Mayor que tabs/panels para evitar superposición */
   color: var(--p-text-color, var(--text-color, #1e293b));
 }
 
