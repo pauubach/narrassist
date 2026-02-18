@@ -63,6 +63,11 @@ def _get_cross_book_event_analyzer():
     return CrossBookEventAnalyzer()
 
 
+def _get_temporal_analyzer():
+    from narrative_assistant.analysis.temporal_alignment import CrossBookTemporalAnalyzer
+    return CrossBookTemporalAnalyzer()
+
+
 # ==================== BK-05: Comparación antes/después ====================
 
 @router.get("/projects/{project_id}/comparison")
@@ -279,4 +284,18 @@ def cross_book_events(collection_id: int, validate_llm: bool = False):
     """
     analyzer = _get_cross_book_event_analyzer()
     report = analyzer.analyze(collection_id, validate_with_llm=validate_llm)
+    return report.to_dict()
+
+
+@router.get("/collections/{collection_id}/cross-book-temporal")
+def cross_book_temporal(collection_id: int):
+    """
+    Analiza inconsistencias temporales entre libros de una colección.
+
+    Compara líneas temporales de entidades enlazadas:
+    - Edad inconsistente entre libros
+    - Conflictos de fechas entre libros
+    """
+    analyzer = _get_temporal_analyzer()
+    report = analyzer.analyze(collection_id)
     return report.to_dict()
