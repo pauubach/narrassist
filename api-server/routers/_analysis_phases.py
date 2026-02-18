@@ -3009,6 +3009,86 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
 
 
 # ============================================================================
+# Phase 6b: Event Detection & Persistence (silent — no UI phase)
+# ============================================================================
+
+
+def run_events(ctx: dict, tracker: ProgressTracker):
+    """
+    Detecta eventos narrativos y los persiste en narrative_events.
+
+    Se ejecuta después de consistency. No tiene fase UI propia
+    (es background work). Borra eventos previos y re-detecta.
+    """
+    from narrative_assistant.analysis.event_detection import detect_events_in_chapter
+    from narrative_assistant.analysis.event_types import EVENT_TIER_MAP
+    from narrative_assistant.persistence.event_repository import get_event_repository
+
+    project_id = ctx["project_id"]
+    chapters_data = ctx["chapters_data"]
+    nlp = ctx.get("nlp")
+
+    if not chapters_data:
+        logger.info(f"run_events: no chapters for project {project_id}, skipping")
+        return
+
+    # Cargar spaCy si no está en contexto
+    if nlp is None:
+        from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+        nlp = load_spacy_model()
+
+    event_repo = get_event_repository()
+
+    # Borrar eventos previos de este proyecto
+    delete_result = event_repo.delete_by_project(project_id)
+    if delete_result.is_success and delete_result.value:
+        logger.info(f"run_events: deleted {delete_result.value} old events for project {project_id}")
+
+    # Detectar eventos por capítulo
+    all_events = []
+    prev_chapter_text = None
+    sorted_chapters = sorted(chapters_data, key=lambda c: c["chapter_number"])
+
+    for ch in sorted_chapters:
+        ch_num = ch["chapter_number"]
+        content = ch["content"]
+
+        detected = detect_events_in_chapter(
+            text=content,
+            chapter_number=ch_num,
+            nlp=nlp,
+            enable_llm=False,  # Sin LLM para no bloquear pipeline
+            prev_chapter_text=prev_chapter_text,
+        )
+
+        for event in detected:
+            tier = EVENT_TIER_MAP.get(event.event_type)
+            all_events.append({
+                "event_type": event.event_type.value,
+                "tier": tier.value if tier else 1,
+                "description": event.description,
+                "chapter": ch_num,
+                "start_char": event.start_char,
+                "end_char": event.end_char,
+                "entity_ids": event.entity_ids,
+                "confidence": event.confidence,
+                "metadata": event.metadata,
+            })
+
+        prev_chapter_text = content
+
+    # Persistir en batch
+    if all_events:
+        save_result = event_repo.save_events(project_id, all_events)
+        if save_result.is_success:
+            logger.info(f"run_events: persisted {save_result.value} events for project {project_id}")
+        else:
+            logger.error(f"run_events: failed to save events: {save_result.error}")
+    else:
+        logger.info(f"run_events: no events detected for project {project_id}")
+
+
+# ============================================================================
 # Phase 7: Grammar
 # ============================================================================
 

@@ -414,6 +414,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 run_cleanup,
                 run_completion,
                 run_consistency,
+                run_events,
                 run_finally_cleanup,
                 run_fusion,
                 run_grammar,
@@ -556,6 +557,9 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                     # Propagate exceptions from either thread
                     future_grammar.result()
                     future_attrs.result()
+
+                # Persist narrative events (silent — no UI phase)
+                run_events(ctx, tracker)
 
                 # Consistency alerts need attributes (produced by thread 2)
                 _emit_consistency_alerts(ctx, tracker)
