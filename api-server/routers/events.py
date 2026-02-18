@@ -28,6 +28,74 @@ router = APIRouter()
 
 
 # ============================================================================
+# Helper: obtener eventos de un proyecto (DB → fallback on-the-fly)
+# ============================================================================
+
+def _get_all_project_events(project_id: int, chapters) -> dict[int, list]:
+    """
+    Obtiene eventos de todos los capítulos, priorizando datos persistidos.
+
+    Returns:
+        dict de chapter_number → lista de DetectedEvent
+    """
+    from narrative_assistant.analysis.event_detection import DetectedEvent, detect_events_in_chapter
+    from narrative_assistant.analysis.event_types import EventType
+    from narrative_assistant.persistence.event_repository import get_event_repository
+
+    event_repo = get_event_repository()
+    persisted = event_repo.get_by_project(project_id)
+
+    if persisted.is_success and persisted.value:
+        # Convertir NarrativeEvent → DetectedEvent agrupados por capítulo
+        events_by_chapter: dict[int, list] = {}
+        for e in persisted.value:
+            try:
+                event = DetectedEvent(
+                    event_type=EventType(e.event_type),
+                    description=e.description,
+                    confidence=e.confidence,
+                    start_char=e.start_char,
+                    end_char=e.end_char,
+                    entity_ids=e.entity_ids,
+                    metadata={**e.metadata, "chapter": e.chapter or 0},
+                )
+                ch = e.chapter or 0
+                events_by_chapter.setdefault(ch, []).append(event)
+            except ValueError:
+                logger.warning(f"Unknown event_type in DB: {e.event_type}, skipping")
+
+        # Asegurar que capítulos sin eventos estén presentes
+        for ch in chapters:
+            events_by_chapter.setdefault(ch.chapter_number, [])
+
+        logger.info(f"Loaded {sum(len(v) for v in events_by_chapter.values())} events from DB")
+        return events_by_chapter
+
+    # Fallback: detectar on-the-fly
+    logger.info(f"No persisted events, detecting on-the-fly for project {project_id}")
+    from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+
+    nlp = load_spacy_model()
+    events_by_chapter = {}
+    prev_chapter_text = None
+
+    for chapter in sorted(chapters, key=lambda c: c.chapter_number):
+        events = detect_events_in_chapter(
+            text=chapter.content,
+            chapter_number=chapter.chapter_number,
+            nlp=nlp,
+            enable_llm=False,
+            prev_chapter_text=prev_chapter_text,
+        )
+        for event in events:
+            event.metadata["chapter"] = chapter.chapter_number
+        events_by_chapter[chapter.chapter_number] = events
+        prev_chapter_text = chapter.content
+
+    return events_by_chapter
+
+
+# ============================================================================
 # Chapter Events Endpoint
 # ============================================================================
 
@@ -68,26 +136,27 @@ def get_chapter_events(project_id: int, chapter_number: int):
 
         # Intentar leer de tabla narrative_events primero
         event_repo = get_event_repository()
-        result = event_repo.get_by_chapter(project_id, chapter_number)
+        persisted = event_repo.get_by_chapter(project_id, chapter_number)
 
         events = []
-        if result.is_success and result.value:
+        if persisted.is_success and persisted.value:
             # Hay eventos persistidos, convertir a DetectedEvent
             from narrative_assistant.analysis.event_detection import DetectedEvent
             from narrative_assistant.analysis.event_types import EventType
 
-            events = [
-                DetectedEvent(
-                    event_type=EventType(e.event_type),
-                    description=e.description,
-                    confidence=e.confidence,
-                    start_char=e.start_char,
-                    end_char=e.end_char,
-                    entity_ids=e.entity_ids,
-                    metadata=e.metadata,
-                )
-                for e in result.value
-            ]
+            for e in persisted.value:
+                try:
+                    events.append(DetectedEvent(
+                        event_type=EventType(e.event_type),
+                        description=e.description,
+                        confidence=e.confidence,
+                        start_char=e.start_char,
+                        end_char=e.end_char,
+                        entity_ids=e.entity_ids,
+                        metadata=e.metadata,
+                    ))
+                except ValueError:
+                    logger.warning(f"Unknown event_type in DB: {e.event_type}, skipping")
             logger.info(f"Loaded {len(events)} events from narrative_events table")
         else:
             # Fallback: detectar on-the-fly (proyectos pre-migración v30)
@@ -198,31 +267,11 @@ def export_events(
                 and (chapter_end is None or ch.chapter_number <= chapter_end)
             ]
 
-        # Detectar eventos en todos los capítulos
-        from narrative_assistant.analysis.event_detection import detect_events_in_chapter
-        from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+        # Obtener eventos (DB → fallback on-the-fly)
+        events_by_chapter = _get_all_project_events(project_id, chapters)
+        all_events = [e for events in events_by_chapter.values() for e in events]
 
-        nlp = load_spacy_model()
-        all_events = []
-        prev_chapter_text = None
-
-        for chapter in sorted(chapters, key=lambda c: c.chapter_number):
-            events = detect_events_in_chapter(
-                text=chapter.content,
-                chapter_number=chapter.chapter_number,
-                nlp=nlp,
-                enable_llm=False,  # Sin LLM para export rápido
-                prev_chapter_text=prev_chapter_text
-            )
-
-            # Añadir metadata de capítulo a cada evento
-            for event in events:
-                event.metadata["chapter"] = chapter.chapter_number
-
-            all_events.extend(events)
-            prev_chapter_text = chapter.content
-
-        logger.info(f"Detected {len(all_events)} total events before filtering")
+        logger.info(f"Got {len(all_events)} total events before filtering")
 
         # Aplicar filtros
         filtered_events = _apply_event_filters(
@@ -291,7 +340,7 @@ def _apply_event_filters(events, tier_filter, event_types_str, critical_only):
         # Rastrear continuidad
         for ch_num in sorted(events_by_chapter.keys()):
             for event in events_by_chapter[ch_num]:
-                tracker.track_event(event, chapter=ch_num)
+                tracker.track_event(event)
 
         issues = tracker.check_continuity()
 
@@ -441,24 +490,8 @@ def get_event_stats(project_id: int):
                 "density_by_chapter": []
             })
 
-        # Detectar eventos
-        from narrative_assistant.analysis.event_detection import detect_events_in_chapter
-        from narrative_assistant.nlp.spacy_gpu import load_spacy_model
-
-        nlp = load_spacy_model()
-        events_by_chapter = {}
-        prev_chapter_text = None
-
-        for chapter in sorted(chapters, key=lambda c: c.chapter_number):
-            events = detect_events_in_chapter(
-                text=chapter.content,
-                chapter_number=chapter.chapter_number,
-                nlp=nlp,
-                enable_llm=False,
-                prev_chapter_text=prev_chapter_text
-            )
-            events_by_chapter[chapter.chapter_number] = events
-            prev_chapter_text = chapter.content
+        # Obtener eventos (DB → fallback on-the-fly)
+        events_by_chapter = _get_all_project_events(project_id, chapters)
 
         # Calcular stats
         stats = _calculate_event_stats(events_by_chapter, chapters, project_id)
@@ -482,7 +515,7 @@ def _calculate_event_stats(events_by_chapter, chapters, project_id):
 
     for ch_num in sorted(events_by_chapter.keys()):
         for event in events_by_chapter[ch_num]:
-            tracker.track_event(event, chapter=ch_num)
+            tracker.track_event(event)
 
     issues = tracker.check_continuity()
     critical_issues = [

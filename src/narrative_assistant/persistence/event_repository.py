@@ -202,26 +202,21 @@ class EventRepository:
         """
         try:
             with self.db.connection() as conn:
-                # Buscar entity_id en el JSON array
+                # Buscar entity_id en el JSON array usando json_each (preciso)
                 rows = conn.execute(
                     """
-                    SELECT id, project_id, chapter, event_type, tier, description,
-                           start_char, end_char, entity_ids, confidence, metadata,
-                           created_at
-                    FROM narrative_events
-                    WHERE project_id = ?
-                      AND entity_ids LIKE ?
-                    ORDER BY chapter, start_char
+                    SELECT DISTINCT ne.id, ne.project_id, ne.chapter, ne.event_type,
+                           ne.tier, ne.description, ne.start_char, ne.end_char,
+                           ne.entity_ids, ne.confidence, ne.metadata, ne.created_at
+                    FROM narrative_events ne, json_each(ne.entity_ids) je
+                    WHERE ne.project_id = ?
+                      AND je.value = ?
+                    ORDER BY ne.chapter, ne.start_char
                     """,
-                    (project_id, f'%{entity_id}%'),
+                    (project_id, entity_id),
                 ).fetchall()
 
-                # Filtrar post-query para match exacto en JSON
-                events = []
-                for row in rows:
-                    event = self._row_to_event(row)
-                    if entity_id in event.entity_ids:
-                        events.append(event)
+                events = [self._row_to_event(row) for row in rows]
 
                 return Result.success(events)
 
