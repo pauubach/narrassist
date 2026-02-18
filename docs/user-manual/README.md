@@ -70,5 +70,5 @@
 
 ---
 
-**Versión del manual**: v0.6.0
+**Versión del manual**: v0.10.15
 **Última actualización**: 2026-02-18

@@ -65,28 +65,18 @@ markdown_extensions:
 nav:
   - Inicio: index.md
   - Manual de Usuario:
-    - Introducción: user-manual/introduction.md
-    - Primer Análisis: user-manual/first-analysis.md
-    - Gestión de Entidades: user-manual/entities.md
-    - Alertas de Inconsistencia: user-manual/alerts.md
-    - Timeline y Eventos: user-manual/timeline-events.md
-    - Colecciones y Sagas: user-manual/collections-sagas.md
-    - Configuración: user-manual/settings.md
-    - Casos de Uso: user-manual/use-cases.md
-  - Referencia API:
-    - Endpoints: api-reference/endpoints.md
-    - Proyectos: api-reference/projects.md
-    - Entidades: api-reference/entities.md
-    - Alertas: api-reference/alerts.md
-    - Colecciones: api-reference/collections.md
-    - Eventos: api-reference/events.md
-    - Timeline: api-reference/timeline.md
-    - Configuración: api-reference/configuration.md
-  - Desarrollo:
-    - Arquitectura: architecture/README.md
-    - ADRs: architecture/adr/README.md
+    - Introducción: user-manual/01-introduction.md
+    - Primer Análisis: user-manual/02-first-analysis.md
+    - Gestión de Entidades: user-manual/03-entities.md
+    - Alertas de Inconsistencia: user-manual/04-alerts.md
+    - Timeline y Eventos: user-manual/05-timeline-events.md
+    - Colecciones y Sagas: user-manual/06-collections-sagas.md
+    - Configuración: user-manual/07-settings.md
+    - Casos de Uso: user-manual/08-use-cases.md
+  - Referencia:
+    - Endpoints HTTP: api-reference/http-endpoints.md
+    - ADRs: adr/README.md
     - Changelog: CHANGELOG.md
-    - FAQ: FAQ.md
 
 extra:
   version:
@@ -95,7 +85,5 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/pauubach/narrassist
-    - icon: fontawesome/brands/twitter
-      link: https://twitter.com/pauubach
 
 copyright: Copyright &copy; 2024-2026 Pau Ubach
