@@ -40,10 +40,6 @@
       @update:visible="onTutorialVisibilityChange"
       @complete="onTutorialComplete"
     />
-    <UserGuideDialog
-      :visible="showUserGuide"
-      @update:visible="showUserGuide = $event"
-    />
     <DataManagementDialog
       :visible="showManageData"
       @update:visible="showManageData = $event"
@@ -70,7 +66,7 @@ import { useAnalysisStore } from '@/stores/analysis'
 import KeyboardShortcutsDialog from '@/components/KeyboardShortcutsDialog.vue'
 import AboutDialog from '@/components/AboutDialog.vue'
 import TutorialDialog from '@/components/TutorialDialog.vue'
-import UserGuideDialog from '@/components/UserGuideDialog.vue'
+import { openManual } from '@/utils/openManual'
 import MenuBar from '@/components/MenuBar.vue'
 import DataManagementDialog from '@/components/DataManagementDialog.vue'
 import ModelSetupDialog from '@/components/ModelSetupDialog.vue'
@@ -106,7 +102,6 @@ onErrorCaptured((err, instance, info) => {
 const showShortcutsHelp = ref(false)
 const showAbout = ref(false)
 const showTutorial = ref(false)
-const showUserGuide = ref(false)
 const showManageData = ref(false)
 const showTierComparison = ref(false)
 
@@ -181,7 +176,7 @@ useNativeMenu({
   onTutorial: () => { showTutorial.value = true },
   onKeyboardShortcuts: () => { showShortcutsHelp.value = true },
   onAbout: () => { showAbout.value = true },
-  onUserGuide: () => { showUserGuide.value = true },
+  onUserGuide: () => { openManual() },
   onManageData: () => { showManageData.value = true },
 })
 
@@ -233,12 +228,12 @@ const onShowHelp = () => { showShortcutsHelp.value = true }
 const onToggleTheme = () => { themeStore.toggleMode() }
 const onMenuAbout = () => { showAbout.value = true }
 const onMenuTutorial = () => { openTutorial() }
-const onMenuUserGuide = () => { showUserGuide.value = true }
+const onMenuUserGuide = () => { openManual() }
 const onMenuManageData = () => { showManageData.value = true }
 const onF1 = (e: KeyboardEvent) => {
   if (e.key === 'F1') {
     e.preventDefault()
-    showUserGuide.value = true
+    openManual()
   }
 }
 
