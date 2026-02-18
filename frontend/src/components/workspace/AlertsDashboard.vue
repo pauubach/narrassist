@@ -14,7 +14,7 @@ import AlertsAnalytics from '@/components/alerts/AlertsAnalytics.vue'
 import SequentialCorrectionMode from './SequentialCorrectionMode.vue'
 import SuppressionRulesDialog from '@/components/alerts/SuppressionRulesDialog.vue'
 import type { Alert, AlertSeverity, AlertStatus, AlertSource } from '@/types'
-import { useAlertUtils, getAlertTypeLabel, META_CATEGORIES, type MetaCategoryKey } from '@/composables/useAlertUtils'
+import { META_CATEGORIES, type MetaCategoryKey } from '@/composables/useAlertUtils'
 import { useAlertExport } from '@/composables/useAlertExport'
 import { useAlertFiltering, FILTER_PRESETS } from '@/composables/useAlertFiltering'
 import { useSequentialMode } from '@/composables/useSequentialMode'
@@ -61,7 +61,6 @@ const emit = defineEmits<{
 
 const toast = useToast()
 const showSuppressionRules = ref(false)
-const { getSeverityLabel, getCategoryConfig } = useAlertUtils()
 const workspaceStore = useWorkspaceStore()
 
 // Alert filtering composable
@@ -78,6 +77,10 @@ const {
   filteredAlerts,
   stats,
   metaCategoryCounts,
+  severityOptions,
+  statusOptions,
+  confidenceOptions,
+  categoryOptions,
   alertTypeOptions,
   entityOptions,
   toggleMetaCategory,
@@ -127,42 +130,10 @@ onMounted(() => {
   syncWithWorkspaceStore(workspaceStore)
 })
 
-// Opciones de filtros
-const severityOptions: Array<{ label: string; value: AlertSeverity }> = [
-  { label: 'Crítica', value: 'critical' },
-  { label: 'Alta', value: 'high' },
-  { label: 'Media', value: 'medium' },
-  { label: 'Baja', value: 'low' },
-  { label: 'Info', value: 'info' }
-]
-
-const categoryOptions = computed(() => {
-  const categories = new Set(props.alerts.map(a => a.category).filter(Boolean))
-  return Array.from(categories).map(cat => ({
-    label: getCategoryLabel(cat!),
-    value: cat
-  }))
-})
-
-const statusOptions = [
-  { label: 'Activas', value: 'active' },
-  { label: 'Resueltas', value: 'resolved' },
-  { label: 'Descartadas', value: 'dismissed' }
-]
-
-const confidenceOptions = [
-  { label: 'Cualquier confianza', value: null },
-  { label: '> 90%', value: 90 },
-  { label: '> 80%', value: 80 },
-  { label: '> 70%', value: 70 }
-]
-
+// Preset options derivados de FILTER_PRESETS (F-6: eliminar duplicación)
 const presetOptions = [
   { label: 'Filtros rápidos...', value: null },
-  { label: 'Errores gramaticales', value: 'grammar' },
-  { label: 'Severidad alta+', value: 'high' },
-  { label: 'Inconsistencias', value: 'consistency' },
-  { label: 'Estilo', value: 'style' }
+  ...FILTER_PRESETS.map(p => ({ label: p.label, value: p.key }))
 ]
 
 const selectedPreset = ref<string | null>(null)
@@ -182,11 +153,6 @@ function handlePresetChange(presetKey: string | null) {
 watch(filteredAlerts, (filtered) => {
   emit('filter-change', filtered)
 }, { immediate: true })
-
-// Helpers
-function getCategoryLabel(category: string): string {
-  return getCategoryConfig(category as any).label
-}
 
 function handleResolveAll() {
   showResolveAllDialog.value = true

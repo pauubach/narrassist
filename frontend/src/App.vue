@@ -49,6 +49,10 @@
       :visible="showTierComparison"
       @update:visible="showTierComparison = $event"
     />
+    <DocumentationDialog
+      :visible="showDocumentation"
+      @update:visible="showDocumentation = $event"
+    />
   </div>
 </template>
 
@@ -66,7 +70,7 @@ import { useAnalysisStore } from '@/stores/analysis'
 import KeyboardShortcutsDialog from '@/components/KeyboardShortcutsDialog.vue'
 import AboutDialog from '@/components/AboutDialog.vue'
 import TutorialDialog from '@/components/TutorialDialog.vue'
-import { openManual } from '@/utils/openManual'
+import DocumentationDialog from '@/components/DocumentationDialog.vue'
 import MenuBar from '@/components/MenuBar.vue'
 import DataManagementDialog from '@/components/DataManagementDialog.vue'
 import ModelSetupDialog from '@/components/ModelSetupDialog.vue'
@@ -104,6 +108,7 @@ const showAbout = ref(false)
 const showTutorial = ref(false)
 const showManageData = ref(false)
 const showTierComparison = ref(false)
+const showDocumentation = ref(false)
 
 // Detect Tauri environment - check immediately and also on mount
 // __TAURI__ is injected by Tauri's webview, check multiple ways
@@ -176,7 +181,7 @@ useNativeMenu({
   onTutorial: () => { showTutorial.value = true },
   onKeyboardShortcuts: () => { showShortcutsHelp.value = true },
   onAbout: () => { showAbout.value = true },
-  onUserGuide: () => { openManual() },
+  onUserGuide: () => { showDocumentation.value = true },
   onManageData: () => { showManageData.value = true },
 })
 
@@ -228,12 +233,12 @@ const onShowHelp = () => { showShortcutsHelp.value = true }
 const onToggleTheme = () => { themeStore.toggleMode() }
 const onMenuAbout = () => { showAbout.value = true }
 const onMenuTutorial = () => { openTutorial() }
-const onMenuUserGuide = () => { openManual() }
+const onMenuUserGuide = () => { showDocumentation.value = true }
 const onMenuManageData = () => { showManageData.value = true }
 const onF1 = (e: KeyboardEvent) => {
   if (e.key === 'F1') {
     e.preventDefault()
-    openManual()
+    showDocumentation.value = true
   }
 }
 
