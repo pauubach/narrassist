@@ -182,13 +182,8 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
     )?;
 
     // Menu Ver — pestañas Ctrl+1..8 en orden visual
-    let view_chapters = MenuItem::with_id(
-        app,
-        view_menu::CHAPTERS,
-        "Texto",
-        true,
-        Some("CmdOrCtrl+1"),
-    )?;
+    let view_chapters =
+        MenuItem::with_id(app, view_menu::CHAPTERS, "Texto", true, Some("CmdOrCtrl+1"))?;
     let view_entities = MenuItem::with_id(
         app,
         view_menu::ENTITIES,
