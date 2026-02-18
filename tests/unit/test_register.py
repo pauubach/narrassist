@@ -788,15 +788,13 @@ class TestLLMFallback:
         result = analyzer._check_ambiguous_word_llm("fuerte", "Era un hombre fuerte y valiente")
         assert result is False  # From cache, no LLM call
 
-    @patch("narrative_assistant.voice.register.get_llm_client", create=True)
+    @patch("narrative_assistant.llm.client.get_llm_client")
     def test_check_ambiguous_word_llm_unavailable(self, mock_get_client):
         """Si el LLM no está disponible, devuelve None."""
         mock_get_client.return_value = None
         analyzer = RegisterAnalyzer(use_llm_fallback=True)
 
-        with patch("narrative_assistant.voice.register.RegisterAnalyzer._check_ambiguous_word_llm",
-                    wraps=analyzer._check_ambiguous_word_llm):
-            result = analyzer._check_ambiguous_word_llm("fuerte", "¡Qué fuerte tío!")
+        result = analyzer._check_ambiguous_word_llm("fuerte", "¡Qué fuerte tío!")
 
         # Should return None since client is None
         assert result is None
