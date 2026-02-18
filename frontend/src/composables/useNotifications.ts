@@ -9,15 +9,11 @@
 
 import { ref } from 'vue'
 
-// Sonidos base64 (cortos, para evitar archivos externos)
-// Sonido de éxito: tono agradable ascendente
-const SUCCESS_SOUND = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp+Zk46Kh4WDgoGBgYKDhYeJjI+SlZibnp+fnpyZlpOQjYqHhYOBgICAgIGDhYeKjZCTlpmbnZ6enZuYlZKPjImGhIKBgICAgYOFiIuOkZSXmp2en56cmpmWk5CNioeFg4GAgICBg4aIi46RlJeanZ6fnpyamJWSkI2KiIWDgYCAgIGDhoiLjpGUl5qdnp+enJqYlZKQjYqIhYOBgICAgYOGiIuOkZSXmp2en56cmpiVkpCNioiFg4GAgA=='
-
-// Sonido de error: tono breve descendente
-const ERROR_SOUND = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAAB/f39/f39/f4CAgICBgYKCg4OEhIWFhoaHh4iIiYmKiouLjIyNjY6Ojo+PkJCRkZKSk5OUlJWVlpaXl5iYmZmampubm5ucnJ2dnp6fn6CgoKGhoqKjo6SkpaWmpqenqKipqaqqq6usrK2trq6vr7CwsbGysbKysbGwsK+vrq6traysq6uqqqlpaGhoZ2dmZmVlZGRjY2JiYWFgYF9fXl5dXVxcW1taWllZWFhXV1ZWVVVUVFNTUlJRUVBQT09OTk1NTExLS0pKSUlISEdHRkZFRURE'
-
-// Sonido de información: tono neutro
-const INFO_SOUND = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACAgICAgICAgYGBgYKCgoKDg4ODhISEhIWFhYaGhoaHh4eHiIiIiYmJiYqKiouLi4uMjIyNjY2Njo6Ojo+Pj5CQkJCRkZGSkpKSk5OTlJSUlJWVlZaWlpaXl5eXmJiYmJmZmZqampqbm5ucnJycnZ2dnp6enp+fn6CgoKChoaGhoqKio6OjpKSkpaWlpqampqenp6ioqKipqamqqqqrq6usrKytra2urq6vr6+wsLCxsbGysbKy'
+// Sonidos reales (.wav) importados como assets de Vite
+import SUCCESS_SOUND from '@/assets/sounds/success.wav'
+import ERROR_SOUND from '@/assets/sounds/error.wav'
+import WARNING_SOUND from '@/assets/sounds/warning.wav'
+import INFO_SOUND from '@/assets/sounds/info.wav'
 
 export type NotificationSeverity = 'success' | 'error' | 'info' | 'warning'
 
@@ -68,8 +64,8 @@ function playSound(severity: NotificationSeverity = 'success'): void {
   const soundMap: Record<NotificationSeverity, string> = {
     success: SUCCESS_SOUND,
     error: ERROR_SOUND,
+    warning: WARNING_SOUND,
     info: INFO_SOUND,
-    warning: INFO_SOUND,
   }
 
   const soundData = soundMap[severity]
