@@ -7,7 +7,7 @@ como marcadores temporales ("acto seguido") y expresiones discursivas.
 
 import pytest
 
-from narrative_assistant.nlp.entity_validation import (
+from narrative_assistant.nlp.entity_validator import (
     DISCOURSE_MARKERS,
     EntityValidator,
     ValidationResult,
