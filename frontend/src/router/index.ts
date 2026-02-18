@@ -56,6 +56,22 @@ const routes: RouteRecordRaw[] = [
     meta: {
       title: 'Configuración - Narrative Assistant'
     }
+  },
+  {
+    path: '/collections',
+    name: 'collections',
+    component: () => import('../views/CollectionsView.vue'),
+    meta: {
+      title: 'Colecciones - Narrative Assistant'
+    }
+  },
+  {
+    path: '/collections/:id',
+    name: 'collection-detail',
+    component: () => import('../views/CollectionDetailView.vue'),
+    meta: {
+      title: 'Colección - Narrative Assistant'
+    }
   }
 ]
 

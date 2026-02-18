@@ -101,7 +101,8 @@ const isInProject = computed(() => {
 
 const menus = computed<Menu[]>(() => {
   const viewItems: MenuItem[] = [
-    { label: 'Proyectos', action: 'viewProjects', icon: 'folder' }
+    { label: 'Proyectos', action: 'viewProjects', icon: 'folder' },
+    { label: 'Colecciones', action: 'viewCollections', icon: 'folder' }
   ]
 
   // Agregar pestañas del proyecto si estamos en un proyecto (Ctrl+1..8)
@@ -310,6 +311,9 @@ const handleMenuAction = (item: MenuItem) => {
       break
     case 'viewProjects':
       router.push('/projects')
+      break
+    case 'viewCollections':
+      router.push('/collections')
       break
     case 'viewText':
       if (route.params.id) {

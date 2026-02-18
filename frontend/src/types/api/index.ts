@@ -8,6 +8,7 @@ export * from './entities'
 export * from './alerts'
 export * from './projects'
 export * from './timeline'
+export * from './collections'
 
 /** Respuesta estándar de la API */
 export interface ApiResponse<T = unknown> {
