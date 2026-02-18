@@ -73,7 +73,7 @@ describe('workspaceStore', () => {
     it('should show both panels for text tab', () => {
       expect(TAB_LAYOUT_CONFIG.text.showLeftPanel).toBe(true)
       expect(TAB_LAYOUT_CONFIG.text.showRightPanel).toBe(true)
-      expect(TAB_LAYOUT_CONFIG.text.sidebarTabs).toEqual(['chapters', 'alerts', 'inconsistencies', 'characters', 'search', 'assistant', 'history'])
+      expect(TAB_LAYOUT_CONFIG.text.sidebarTabs).toEqual(['chapters', 'alerts', 'characters', 'search', 'assistant', 'history'])
     })
 
     it('should hide both panels for entities tab (full-width)', () => {
@@ -142,7 +142,7 @@ describe('workspaceStore', () => {
     it('should return all sidebar tabs for text tab', () => {
       const store = useWorkspaceStore()
       store.setActiveTab('text', false)
-      expect(store.availableSidebarTabs).toEqual(['chapters', 'alerts', 'inconsistencies', 'characters', 'search', 'assistant', 'history'])
+      expect(store.availableSidebarTabs).toEqual(['chapters', 'alerts', 'characters', 'search', 'assistant', 'history'])
     })
 
     it('should return empty array for entities tab', () => {

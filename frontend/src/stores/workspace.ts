@@ -13,7 +13,7 @@ import type { WorkspaceTab } from '@/types'
 
 export type { WorkspaceTab }
 
-export type SidebarTab = 'chapters' | 'alerts' | 'inconsistencies' | 'characters' | 'search' | 'assistant' | 'history'
+export type SidebarTab = 'chapters' | 'alerts' | 'characters' | 'search' | 'assistant' | 'history'
 
 export interface PanelState {
   expanded: boolean
@@ -37,7 +37,7 @@ export const TAB_LAYOUT_CONFIG: Record<WorkspaceTab, TabLayoutConfig> = {
   text: {
     showLeftPanel: true,
     showRightPanel: true,
-    sidebarTabs: ['chapters', 'alerts', 'inconsistencies', 'characters', 'search', 'assistant', 'history'],
+    sidebarTabs: ['chapters', 'alerts', 'characters', 'search', 'assistant', 'history'],
     defaultSidebarTab: 'chapters'
   },
   entities: {
