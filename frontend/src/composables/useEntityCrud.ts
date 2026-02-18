@@ -122,23 +122,13 @@ export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudRetur
       if (data.success) {
         showEditDialog.value = false
         options.onSuccess?.()
-        toast.success('Entidad actualizada correctamente')
+        toast.updated('Entidad actualizada correctamente')
       } else {
-        toast.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: `Error al guardar: ${data.error}`,
-          life: 5000,
-        })
+        toast.error(`Error al guardar: ${data.error}`)
       }
     } catch (err) {
       console.error('Error updating entity:', err)
-      toast.add({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'No se pudo guardar la entidad',
-        life: 5000,
-      })
+      toast.error('No se pudo guardar la entidad')
     }
   }
 
@@ -159,28 +149,13 @@ export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudRetur
 
       if (data.success) {
         options.onSuccess?.()
-        toast.add({
-          severity: 'success',
-          summary: 'Oculta',
-          detail: `"${entity.name}" se ha ocultado`,
-          life: 3000,
-        })
+        toast.deleted(`"${entity.name}" se ha ocultado`)
       } else {
-        toast.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: `Error al ocultar: ${data.error}`,
-          life: 5000,
-        })
+        toast.error(`Error al ocultar: ${data.error}`)
       }
     } catch (err) {
       console.error('Error deleting entity:', err)
-      toast.add({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'No se pudo ocultar la entidad',
-        life: 5000,
-      })
+      toast.error('No se pudo ocultar la entidad')
     }
   }
 
@@ -236,28 +211,13 @@ export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudRetur
       if (data.success) {
         await loadAttributes(attr.entityId)
         options.onAttributeChange?.()
-        toast.add({
-          severity: 'success',
-          summary: 'Guardado',
-          detail: 'Atributo actualizado',
-          life: 2000,
-        })
+        toast.updated('Atributo actualizado', { life: 2000 })
       } else {
-        toast.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: data.error || 'No se pudo actualizar',
-          life: 4000,
-        })
+        toast.error(data.error || 'No se pudo actualizar', { life: 4000 })
       }
     } catch (err) {
       console.error('Error updating attribute:', err)
-      toast.add({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Error al actualizar el atributo',
-        life: 4000,
-      })
+      toast.error('Error al actualizar el atributo', { life: 4000 })
     } finally {
       savingAttribute.value = false
       editingAttributeId.value = null
@@ -270,11 +230,9 @@ export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudRetur
    */
   async function createAttribute(entityId: number) {
     if (!newAttribute.value.name.trim() || !newAttribute.value.value.trim()) {
-      toast.add({
-        severity: 'warn',
+      toast.warn('Por favor completa el nombre y valor del atributo', {
         summary: 'Campos requeridos',
-        detail: 'Por favor completa el nombre y valor del atributo',
-        life: 4000,
+        life: 4000
       })
       return
     }
@@ -293,28 +251,13 @@ export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudRetur
         options.onAttributeChange?.()
         newAttribute.value = { category: 'physical', name: '', value: '' }
         showAddAttribute.value = false
-        toast.add({
-          severity: 'success',
-          summary: 'Creado',
-          detail: 'Atributo añadido',
-          life: 2000,
-        })
+        toast.created('Atributo añadido', { life: 2000 })
       } else {
-        toast.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: data.error || 'No se pudo crear',
-          life: 4000,
-        })
+        toast.error(data.error || 'No se pudo crear', { life: 4000 })
       }
     } catch (err) {
       console.error('Error creating attribute:', err)
-      toast.add({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Error al crear el atributo',
-        life: 4000,
-      })
+      toast.error('Error al crear el atributo', { life: 4000 })
     } finally {
       savingAttribute.value = false
     }
@@ -336,28 +279,13 @@ export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudRetur
       if (data.success) {
         await loadAttributes(entityId)
         options.onAttributeChange?.()
-        toast.add({
-          severity: 'success',
-          summary: 'Eliminado',
-          detail: 'Atributo eliminado',
-          life: 2000,
-        })
+        toast.deleted('Atributo eliminado', { life: 2000 })
       } else {
-        toast.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: data.error || 'No se pudo eliminar',
-          life: 4000,
-        })
+        toast.error(data.error || 'No se pudo eliminar', { life: 4000 })
       }
     } catch (err) {
       console.error('Error deleting attribute:', err)
-      toast.add({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Error al eliminar el atributo',
-        life: 4000,
-      })
+      toast.error('Error al eliminar el atributo', { life: 4000 })
     }
   }
 

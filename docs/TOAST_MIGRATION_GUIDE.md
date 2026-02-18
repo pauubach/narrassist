@@ -7,8 +7,8 @@ Migrar de llamadas directas a `toast.add()` al nuevo composable `useAppToast()`.
 ## Estado Actual
 
 - **Total de ocurrencias**: 225 llamadas a `toast.add()`
-- **Migradas**: ~10 en `useEntityCrud.ts` (ejemplo)
-- **Pendientes**: ~215
+- **Migradas**: 16 en `useEntityCrud.ts` (ejemplo completo) ✅
+- **Pendientes**: ~209
 
 ## Patrón de Migración
 
@@ -21,14 +21,14 @@ const toast = useToast()
 toast.add({
   severity: 'success',
   summary: 'Guardado',
-  detail: 'Operación completada',
+  detail: 'Cambios guardados correctamente',
   life: 3000,
 })
 
 toast.add({
   severity: 'error',
   summary: 'Error',
-  detail: 'Algo falló',
+  detail: 'No se pudo guardar',
   life: 5000,
 })
 ```
@@ -39,33 +39,67 @@ import { useAppToast } from '@/composables/useAppToast'
 
 const toast = useAppToast()
 
-toast.success('Operación completada')
+// Método semántico específico
+toast.saved('Cambios guardados correctamente')
 
-toast.error('Algo falló')
+// Genérico (fallback)
+toast.error('No se pudo guardar')
 ```
 
 ## API del Composable
 
-### Métodos Disponibles
+### Métodos CRUD (5)
+
+```typescript
+// Crear nuevo recurso
+toast.created('Nueva entidad añadida')
+
+// Guardar cambios (también para exportar, aplicar config)
+toast.saved('Cambios guardados correctamente')
+toast.saved('Alertas exportadas como CSV')
+toast.saved('Configuración aplicada')
+
+// Actualizar existente
+toast.updated('Entidad actualizada correctamente')
+
+// Eliminar
+toast.deleted('Alerta eliminada permanentemente')
+
+// Restaurar (también para importar)
+toast.restored('Entidad restaurada desde papelera')
+toast.restored('Trabajo editorial importado correctamente')
+```
+
+### Métodos Especiales (2)
+
+```typescript
+// Fusionar entidades
+toast.merged('2 entidades fusionadas en "Personaje Principal"')
+
+// Separar fusión
+toast.separated('Fusión deshecha, entidades restauradas')
+```
+
+### Métodos Genéricos (5)
 
 ```typescript
 // Éxito (3s)
-toast.success(message: string, options?: AppToastOptions)
+toast.success('Operación completada')
 
 // Error (5s)
-toast.error(message: string, options?: AppToastOptions)
+toast.error('No se pudo completar la operación')
 
 // Advertencia (4s)
-toast.warn(message: string, options?: AppToastOptions)
+toast.warn('El archivo es muy grande')
 
 // Info (3s)
-toast.info(message: string, options?: AppToastOptions)
+toast.info('Se requiere reiniciar')
 
 // Loading (no se cierra automáticamente)
-const loader = toast.loading(message: string)
-loader.update('Nuevo mensaje')
-loader.done('Éxito!')
-loader.fail('Error')
+const loader = toast.loading('Procesando...')
+loader.update('Procesando capítulo 5 de 45...')
+loader.done('Análisis completado')
+loader.fail('Error al procesar')
 
 // Limpiar todos
 toast.clear()
@@ -79,6 +113,9 @@ interface AppToastOptions {
   closable?: boolean   // Permite cerrar (default: true)
   group?: string       // Grupo de toast
 }
+
+// Para success, error, warn, info: también summary personalizado
+toast.success('Mensaje', { summary: 'Custom Summary' })
 ```
 
 ## Script de Migración Automática
