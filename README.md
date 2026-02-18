@@ -1,8 +1,16 @@
 # Narrative Assistant
 
+[![Versión](https://img.shields.io/badge/versión-0.10.15-blue.svg)](CHANGELOG.md)
+[![Python](https://img.shields.io/badge/python-3.11+-brightgreen.svg)](https://www.python.org/)
+[![Tauri](https://img.shields.io/badge/Tauri-2.0-24C8DB.svg)](https://tauri.app/)
+[![Licencia](https://img.shields.io/badge/licencia-MIT-green.svg)](LICENSE)
+[![Offline](https://img.shields.io/badge/offline-100%25-orange.svg)](#privacidad-total)
+
 **Asistente de corrección para manuscritos** que detecta inconsistencias narrativas de forma automática y 100% privada.
 
 > Tu manuscrito **nunca** sale de tu ordenador.
+
+📖 [Manual de Usuario](docs_site/user-manual/introduction.md) · 📝 [Historial de Cambios](CHANGELOG.md) · 🏗️ [Documentación Técnica](docs/)
 
 ---
 
@@ -59,29 +67,48 @@
 
 ## Cómo Funciona
 
-### 1. Sube tu manuscrito
+### 1. Carga tu manuscrito
 Formatos soportados: **DOCX** (prioritario), TXT, Markdown, PDF, EPUB
 
+Puedes ajustar el análisis con **presets por género**:
+- Novela de ficción
+- Divulgación / Técnico
+- Memorias / Autobiografía
+- Serie / Saga
+- Policíaca / Misterio
+- Corrección editorial
+
 ### 2. Análisis automático
-El sistema procesa el texto en múltiples fases:
-- Entidades (personajes, lugares, objetos) con NER multi-modelo (spaCy + PlanTL RoBERTa)
-- Correferencias con votación multi-método (embeddings, LLM, morfosintáctico, heurísticas)
-- Atributos, relaciones y línea temporal
-- Problemas de estilo y tipografía
-- Perfiles de personaje y detección de comportamiento fuera de carácter
+El sistema ejecuta **6 fases de análisis**:
+
+1. **Extracción de entidades** — personajes, lugares, objetos (NER multi-modelo)
+2. **Resolución de correferencias** — identifica menciones del mismo personaje (votación 4 métodos)
+3. **Extracción de atributos** — género, edad, descripción física, rasgos psicológicos
+4. **Análisis de relaciones** — familiares, románticas, profesionales, conflictos
+5. **Línea temporal** — eventos, inconsistencias temporales, anacronismos
+6. **Detección de problemas** — estilo, gramática, coherencia narrativa
+
+> 💡 Ver detalles en [Manual: Primer Análisis](docs_site/user-manual/first-analysis.md)
 
 ### 3. Revisa las alertas
 Cada alerta incluye:
-- Descripción del problema
-- Ubicación exacta en el texto (con navegación al párrafo)
-- Sugerencia de corrección
-- Nivel de confianza (ajustado por pesos adaptativos)
-- Modo foco: filtra alertas por capítulo o rango de capítulos
+- 📝 **Descripción** del problema
+- 📍 **Ubicación exacta** (navegación directa al párrafo)
+- 💡 **Sugerencia** de corrección
+- 🎯 **Confianza** ajustada por pesos adaptativos
+- 🔍 **Modo foco** por capítulo o sección
 
-### 4. Itera
-- Reanaliza después de corregir y compara versiones
-- Las alertas corregidas se resuelven automáticamente
-- El sistema aprende de tus decisiones (descartar = falso positivo, resolver = útil)
+**Filtrado avanzado**:
+- Por severidad (crítico, alto, medio, bajo)
+- Por categoría (inconsistencias, estilo, gramática)
+- Por tipo específico (atributos, temporal, POV...)
+- Búsqueda por texto
+
+### 4. Itera y mejora
+- ✏️ **Corrige** en tu editor de texto favorito
+- 🔄 **Reanaliza** para comparar versiones
+- ✅ **Resolución automática** de alertas corregidas
+- 📈 **Métricas de progreso** entre revisiones
 
 ---
 
@@ -106,17 +133,35 @@ Cada alerta incluye:
 
 ---
 
-## Instalación
+## Primeros Pasos
+
+1. **Instala** la aplicación (ver sección siguiente)
+2. **Configura** un preset según tu tipo de manuscrito
+3. **Carga** tu documento (DOCX, TXT, MD, PDF, EPUB)
+4. **Analiza** — el primer análisis tarda 2-5 minutos según el tamaño
+5. **Revisa** alertas y fichas de personajes
+6. **Corrige** en tu editor favorito (Word, Scrivener, etc.)
+7. **Reanaliza** para ver el progreso
+
+> 📖 **Guía completa**: [Manual de Usuario](docs_site/user-manual/introduction.md) con ejemplos paso a paso
+
+---
+
+## Instalación Rápida
 
 ### Usuarios Finales
 
-Descargar el instalador desde [Releases](../../releases):
-- **Windows**: `Narrative-Assistant-Setup.exe`
-- **macOS**: `Narrative-Assistant.dmg`
+1. **Descarga** el instalador desde [Releases](../../releases):
+   - **Windows**: `Narrative-Assistant-Setup.exe`
+   - **macOS**: `Narrative-Assistant.dmg`
 
-**No necesitas tener Python instalado** — la aplicación incluye Python embebido 3.12 con todas las dependencias.
+2. **Instala** y ejecuta — no necesitas tener Python instalado
 
-La primera ejecución descargará automáticamente los modelos de NLP (~1 GB). Después funciona 100% offline.
+3. **Primera ejecución**: descarga automática de modelos NLP (~1 GB)
+
+4. **¡Listo!** Funciona 100% offline después de la instalación
+
+> 💡 **Ayuda rápida**: Dentro de la aplicación, pulsa el botón "📖 Manual" para acceder a la guía completa con ejemplos paso a paso.
 
 ### Desarrolladores
 
@@ -148,26 +193,101 @@ Ver [BUILD_AND_DEPLOY.md](docs/BUILD_AND_DEPLOY.md) para construcción y [PYTHON
 
 ## Documentación
 
-Documentación técnica completa en [docs/](docs/).
+| Documento | Descripción |
+|-----------|-------------|
+| 📖 [Manual de Usuario](docs_site/user-manual/introduction.md) | Guía completa en 8 capítulos (también disponible dentro de la app) |
+| 📝 [CHANGELOG.md](CHANGELOG.md) | Historial de cambios de v0.1.0 a v0.10.15 |
+| 🏗️ [Docs Técnicas](docs/) | Arquitectura, API reference, ADRs, build process |
+| 🚀 [BUILD_AND_DEPLOY.md](docs/BUILD_AND_DEPLOY.md) | Guía para construcción y despliegue |
+| 🐍 [PYTHON_EMBED.md](docs/PYTHON_EMBED.md) | Estrategia de empaquetado multi-plataforma |
+| 🔧 [CLAUDE.md](CLAUDE.md) | Instrucciones para desarrollo con Claude Code |
 
 ---
 
-## Tests
+## Desarrollo
+
+### Tests
 
 ```bash
-# Tests unitarios (~1950 tests, ~3 min)
-pytest tests/unit -v -m "not heavy"
+# Tests ligeros (~1231 tests, ~3 min)
+pytest -v
 
 # Tests pesados (requieren modelos NLP + Ollama)
 pytest -m ""
+# o
+python scripts/run_heavy_tests.py
 
-# Lint
+# Cobertura
+pytest --cov=src --cov-report=html
+```
+
+### Linting y Type Checking
+
+```bash
+# Backend Python
 ruff check src/ tests/ api-server/
+mypy src/
 
-# Type-check frontend
+# Frontend TypeScript
 cd frontend && npx vue-tsc --noEmit
+
+# Formateo
+black src/ tests/ api-server/
+isort src/ tests/ api-server/
+```
+
+### Ejecutar en Desarrollo
+
+```bash
+# Terminal 1: API server
+cd api-server
+uvicorn main:app --reload --port 8000
+
+# Terminal 2: Frontend dev server
+cd frontend
+npm run dev
+
+# Terminal 3 (opcional): Ollama para LLM
+ollama serve
 ```
 
 ---
 
-*Versión 0.9.5 — 2026-02-14*
+---
+
+## Características Principales
+
+### 🎯 Sagas y Series (Cross-Book Analysis)
+
+- **Colecciones multi-libro**: Agrupa novelas de una saga para análisis conjunto
+- **Entity linking**: Vincula personajes, lugares y objetos entre libros
+- **Detección de inconsistencias cross-book**: Encuentra contradicciones entre libros (atributos, eventos)
+
+### 🧠 Sistema de Aprendizaje Adaptativo
+
+- **Pesos adaptativos**: El sistema aprende de tus decisiones (descartar/resolver)
+- **Ajuste automático**: Sensibilidad por tipo de alerta, proyecto y entidad
+- **Track changes**: Aprovecha marcas de revisión de Word para vincular correcciones
+
+### 📊 Visualizaciones Interactivas
+
+- **Grafo de relaciones**: Red de personajes con vis-network
+- **Línea temporal**: Vista interactiva con vis-timeline
+- **Arco emocional**: Evolución emocional de personajes por capítulo
+- **Métricas de progreso**: Minigráficos de tendencias entre revisiones
+
+### 🌐 Multi-Modelo y Multi-Método
+
+- **NER**: Votación entre spaCy + PlanTL RoBERTa + LLM + heurísticas
+- **Correferencias**: Votación entre embeddings + LLM + morfosintáctico + heurísticas
+- **LLM local**: Ollama con qwen2.5, llama3.2, mistral (100% offline)
+
+---
+
+## Versión y Licencia
+
+**Versión actual**: [0.10.15](CHANGELOG.md) — 2026-02-15
+
+**Licencia**: MIT — ver [LICENSE](LICENSE)
+
+**Repositorio**: [github.com/pauubach/narrassist](https://github.com/pauubach/narrassist)
