@@ -20,7 +20,7 @@ import re
 
 import pytest
 
-from narrative_assistant.nlp.scope_resolver import ScopeResolver
+from narrative_assistant.nlp.scope_resolver import AmbiguousResult, ScopeResolver
 
 
 # =============================================================================
@@ -45,7 +45,7 @@ def _resolve(
     entities: list[str],
     nlp=None,
     prefer_subject: bool = True,
-) -> str | None:
+) -> str | AmbiguousResult | None:
     """
     Resolve which entity owns the target body part/attribute.
 
@@ -57,7 +57,9 @@ def _resolve(
         prefer_subject: Whether to prefer grammatical subject
 
     Returns:
-        Entity name or None if unresolvable/ambiguous.
+        - Entity name (str) if unambiguously resolved
+        - AmbiguousResult if genuinely ambiguous
+        - None if target not found or no entities in scope
     """
     if nlp is None:
         from narrative_assistant.nlp.spacy_gpu import load_spacy_model
@@ -69,6 +71,11 @@ def _resolve(
     if pos == -1:
         return None
     result = resolver.find_nearest_entity_by_scope(pos, mentions, prefer_subject=prefer_subject)
+
+    # AmbiguousResult se retorna directamente
+    if isinstance(result, AmbiguousResult):
+        return result
+    # Tupla (entity_name, confidence) se desempaqueta
     return result[0] if result else None
 
 
@@ -101,7 +108,8 @@ def _resolve_with_confidence(
 class TestAmbiguityDetection:
     """
     When attribution is genuinely ambiguous (even a human reader cannot
-    determine who owns the attribute), the resolver should return None.
+    determine who owns the attribute), the resolver should return AmbiguousResult
+    with candidates.
 
     The caller will generate an alert for the user to review manually.
     """
@@ -114,10 +122,12 @@ class TestAmbiguityDetection:
         """
         text = "Cuando Juan conoció a María tenía el cabello rizado."
         result = _resolve("cabello", text, ["Juan", "María"], nlp=shared_spacy_nlp)
-        assert result is None, (
+        assert isinstance(result, AmbiguousResult), (
             f"Genuinely ambiguous: 'cuando X conoció a Y tenía...' "
-            f"should not assign. Got: {result}"
+            f"should return AmbiguousResult. Got: {result}"
         )
+        assert set(result.candidates) == {"Juan", "María"}
+        assert "cabello rizado" in result.context_text.lower()
 
     def test_cuando_vio_a_tenia_ojos(self, shared_spacy_nlp):
         """
@@ -126,9 +136,11 @@ class TestAmbiguityDetection:
         """
         text = "Cuando Pedro vio a Elena tenía los ojos enrojecidos."
         result = _resolve("ojos", text, ["Pedro", "Elena"], nlp=shared_spacy_nlp)
-        assert result is None, (
-            f"Ambiguous subordinate clause: should return None. Got: {result}"
+        assert isinstance(result, AmbiguousResult), (
+            f"Ambiguous subordinate clause: should return AmbiguousResult. Got: {result}"
         )
+        assert set(result.candidates) == {"Pedro", "Elena"}
+        assert "ojos enrojecidos" in result.context_text.lower()
 
     def test_sus_ojos_le_llamaron_la_atencion(self, shared_spacy_nlp):
         """
@@ -138,10 +150,12 @@ class TestAmbiguityDetection:
         """
         text = "María saludó a Juan. Sus ojos azules le llamaron la atención."
         result = _resolve("ojos", text, ["Juan", "María"], nlp=shared_spacy_nlp)
-        assert result is None, (
+        assert isinstance(result, AmbiguousResult), (
             f"Ambiguous: 'Sus ojos le llamaron la atención' after two characters. "
-            f"'le' is gender-neutral. Got: {result}"
+            f"'le' is gender-neutral. Should return AmbiguousResult. Got: {result}"
         )
+        assert set(result.candidates) == {"Juan", "María"}
+        assert "ojos azules" in result.context_text.lower()
 
     def test_le_dijo_que_tenia_pelo(self, shared_spacy_nlp):
         """
@@ -151,9 +165,12 @@ class TestAmbiguityDetection:
         """
         text = "Juan le dijo a María que tenía el pelo sucio."
         result = _resolve("pelo", text, ["Juan", "María"], nlp=shared_spacy_nlp)
-        assert result is None, (
-            f"Ambiguous: 'le dijo a X que tenía...' — unclear referent. Got: {result}"
+        assert isinstance(result, AmbiguousResult), (
+            f"Ambiguous: 'le dijo a X que tenía...' — unclear referent. "
+            f"Should return AmbiguousResult. Got: {result}"
         )
+        assert set(result.candidates) == {"Juan", "María"}
+        assert "pelo sucio" in result.context_text.lower()
 
     def test_cuando_se_conocieron_tenia(self, shared_spacy_nlp):
         """
@@ -163,9 +180,12 @@ class TestAmbiguityDetection:
         """
         text = "Cuando Ana y Pedro se conocieron, tenía el pelo largo."
         result = _resolve("pelo", text, ["Ana", "Pedro"], nlp=shared_spacy_nlp)
-        assert result is None, (
-            f"Ambiguous: reflexive 'se conocieron' + singular 'tenía'. Got: {result}"
+        assert isinstance(result, AmbiguousResult), (
+            f"Ambiguous: reflexive 'se conocieron' + singular 'tenía'. "
+            f"Should return AmbiguousResult. Got: {result}"
         )
+        assert set(result.candidates) == {"Ana", "Pedro"}
+        assert "pelo largo" in result.context_text.lower()
 
 
 # =============================================================================
