@@ -1,5 +1,6 @@
 <template>
-  <div class="home-view">
+  <ErrorBoundary>
+    <div class="home-view">
     <!-- Top Actions Bar -->
     <div class="top-actions">
       <Button
@@ -118,10 +119,13 @@
         <Button label="Nuevo Proyecto" icon="pi pi-plus" severity="secondary" size="large" outlined @click="goToProjects" />
       </div>
     </div>
-  </div>
+    </div>
+  </ErrorBoundary>
 </template>
 
 <script setup lang="ts">
+import ErrorBoundary from '../components/ErrorBoundary.vue'
+
 import { onMounted, computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
@@ -230,7 +234,7 @@ const goToSettings = () => {
 }
 
 .privacy-note i {
-  color: var(--green-500);
+  color: var(--ds-text-success);
 }
 
 .status-card {
@@ -397,7 +401,7 @@ const goToSettings = () => {
 
 .stat-reviewed .stat-icon-bg {
   background: var(--green-50);
-  color: var(--green-500);
+  color: var(--ds-text-success);
 }
 
 .stat-time .stat-icon-bg {
