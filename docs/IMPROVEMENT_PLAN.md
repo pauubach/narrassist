@@ -2189,8 +2189,8 @@ Requisito previo: corregir bugs descubiertos en la revisión antes de añadir 4 
 | BK-32 | LLM: coherencia argumentativa | Prompt para mistral: premisas→conclusión, saltos lógicos. ~72% precisión. |
 | BK-33 | LLM: afirmaciones sobreconfiadas | Prompt para qwen2.5: "siempre", "nunca", causación sin evidencia. ~79% precisión. |
 | BK-34 | Multi-model voting para estilo | Reutilizar patrón de expectation_inference.py. +15% precisión estimada. |
-| BK-35 | CorrectionConfigModal: pestaña "Estilo" | Matriz de severidad por regla × tipo documento. UI PrimeVue. |
-| BK-36 | Dashboard de métricas de estilo en StyleTab | Puntuación formalidad, adherencia al tipo, distribución por sub-detector. |
+| ~~BK-35~~ | ~~CorrectionConfigModal: pestaña "Estilo"~~ | ✅ DONE — Tab "Estilo" (value="3") en CorrectionConfigModal.vue con toggles: estilo habilitado, variación inicios, oraciones pegajosas, umbral sticky, registro y emociones. |
+| ~~BK-36~~ | ~~Dashboard de métricas de estilo en StyleTab~~ | ✅ DONE — StyleTab.vue con 19 sub-tabs: RegisterAnalysis, Focalization, SceneTagging, StickySentences, EchoReport, SentenceVariation, PacingAnalysis, EmotionalAnalysis, AgeReadability, etc. Adaptado por perfil de documento. |
 | BK-37 | Estado "intencional" en alertas | Nuevo status + suppression_rules para persistir entre re-análisis. |
 | BK-38 | Perfiles estilo en correction_config/registry.py | Integrar con sistema nuevo de config (type→subtype→custom). |
 
@@ -2203,9 +2203,9 @@ Requisito previo: corregir bugs descubiertos en la revisión antes de añadir 4 
 | BK-41 | Abstract structure scoring | Evaluar que el abstract tenga: objetivo, método, resultados, conclusión (IMRAD micro). |
 | BK-42 | Coherence heatmap (frontend) | Visualización tipo mapa de calor de coherencia por párrafo. Requiere UI en Vue. |
 | BK-43 | Cross-section reference validation | Verificar "como se muestra en la Sección 3" → que la sección 3 exista y sea relevante. |
-| BK-44 | Acronym glossary auto-generation | Generar tabla de siglas automáticamente desde las definiciones detectadas. Export a DOCX. |
-| BK-45 | Reconciliar dual config system | `corrections/config.py` (runtime dataclasses) vs `correction_config/models.py` (UI inheritance). Unificar o documentar bridge. |
-| BK-46 | Test hardening: Ollama degradation | Tests de degradación ante Ollama caído/lento/timeout. Config round-trip coverage completa. |
+| BK-44 | Acronym glossary auto-generation | ⚠️ PARCIAL — AcronymDetector existe (undefined, late-defined, redefined, inconsistent). Falta: export a tabla/glosario DOCX. |
+| BK-45 | Reconciliar dual config system | `corrections/config.py` (runtime dataclasses) vs `correction_config/models.py` (UI inheritance). Ambos coexisten activamente — incluso importados en el mismo archivo (`editorial.py`). |
+| BK-46 | Test hardening: Ollama degradation | ⚠️ PARCIAL — Tests básicos "unavailable" en test_event_detection_tier3.py y test_event_detection_llm.py. Falta: mid-analysis crash, timeout, partial response, recovery. |
 
 ---
 
@@ -2239,15 +2239,19 @@ Requisito previo: corregir bugs descubiertos en la revisión antes de añadir 4 
 ```
 COMPLETADO                                          PRÓXIMO (Version + Monetización)
 ───────────────────────────────────────────────── ──────────────────────────────────
-S0-S6 (NLP + Frontend) ✅                          BACKLOG ESTILO (BK-30..38)
-                                                    BACKLOG CIENTÍFICO (BK-39..44):
-S7a-S7d (Licensing + UX) ✅                        RhetoricDetector, LLM subjetividad,
-Sprint PP ✅ (17/17)                                coherencia, config modal, dashboard
-Sprint S8 ✅ (S8a + S8b + S8c)                     ──────────────────────────────────
-Sprint S15 ✅ (BK-28 Version tracking)              CONDICIONADO (requiere infra):
-Sprint S16A ✅ (BK-29 Quota UX)                     S16B (Stripe pagos, backend público)
-Sprint S17 ✅ (Style Register Detection)
+S0-S6 (NLP + Frontend) ✅                          BACKLOG ESTILO (BK-30..34,37,38)
+                                                    BK-35 Config Estilo ✅, BK-36 Dashboard ✅
+S7a-S7d (Licensing + UX) ✅                        BACKLOG CIENTÍFICO (BK-39..43):
+Sprint PP ✅ (17/17)                                BK-44 Acronym ⚠️ parcial
+Sprint S8 ✅ (S8a + S8b + S8c)                     BK-45 Dual config ⚠️, BK-46 Ollama ⚠️
+Sprint S15 ✅ (BK-28 Version tracking)              ──────────────────────────────────
+Sprint S16A ✅ (BK-29 Quota UX)                     CONDICIONADO (requiere infra):
+Sprint S17 ✅ (Style Register Detection)             S16B (Stripe pagos, backend público)
 Sprint S18 ✅ (Scientific Detectors: 3 fases)
+Sprint S19 ✅ ('a' tónica híbrida)
+Sprint S20 ✅ (Atributos Ambiguos Interactivos)
+  + R1: sugerencia contextual, batch, LLM
+  + R2: género gramatical, 6 patrones, batch UI
                                                     ──────────────────────────────────
                                                     APARCADO:
 Sprint S9 ✅ (BK-09/15/17/10b/10c)                 BK-26 Collab online
