@@ -219,6 +219,34 @@ class ExtractedAttribute:
 
 
 @dataclass
+class AmbiguousAttribute:
+    """
+    Un atributo cuya propiedad es ambigua y requiere aclaración del usuario.
+
+    Cuando el sistema no puede determinar con certeza a qué entidad
+    pertenece un atributo, se colecta aquí para generar una alerta
+    interactiva pidiendo al usuario que seleccione el propietario correcto.
+
+    Attributes:
+        attribute_key: Clave del atributo (eye_color, hair_color, etc.)
+        attribute_value: Valor del atributo ("azules", "rizado", etc.)
+        candidates: Nombres de las entidades candidatas
+        source_text: Texto de la oración ambigua
+        start_char: Posición de inicio en el texto
+        end_char: Posición de fin
+        chapter_id: ID del capítulo donde se encontró
+    """
+
+    attribute_key: str  # AttributeKey value
+    attribute_value: str
+    candidates: list[str]  # Entity names
+    source_text: str
+    start_char: int
+    end_char: int
+    chapter_id: int | None = None
+
+
+@dataclass
 class AttributeExtractionResult:
     """
     Resultado de la extracción de atributos.
@@ -227,11 +255,13 @@ class AttributeExtractionResult:
         attributes: Lista de atributos extraídos
         processed_chars: Caracteres procesados
         metaphors_filtered: Número de metáforas filtradas
+        ambiguous_attributes: Atributos con propiedad ambigua (requieren aclaración)
     """
 
     attributes: list[ExtractedAttribute] = field(default_factory=list)
     processed_chars: int = 0
     metaphors_filtered: int = 0
+    ambiguous_attributes: list[AmbiguousAttribute] = field(default_factory=list)
 
     @property
     def by_entity(self) -> dict[str, list[ExtractedAttribute]]:
@@ -2152,7 +2182,29 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                 assignment_source = None  # CESP: determinar fuente de asignación
                 if len(groups) < 2:
                     value = groups[0] if groups else None
-                    entity_name = self._find_nearest_entity(text, match.start(), entity_mentions)
+                    entity_result = self._find_nearest_entity(text, match.start(), entity_mentions)
+
+                    # Detectar y colectar atributos ambiguos
+                    from .scope_resolver import AmbiguousResult
+                    if isinstance(entity_result, AmbiguousResult):
+                        # Colectar para alerta interactiva
+                        ambig_attr = AmbiguousAttribute(
+                            attribute_key=attr_key.value,
+                            attribute_value=value or "",
+                            candidates=entity_result.candidates,
+                            source_text=entity_result.context_text,
+                            start_char=match.start(),
+                            end_char=match.end(),
+                            chapter_id=chapter_id,
+                        )
+                        result.ambiguous_attributes.append(ambig_attr)
+                        logger.debug(
+                            f"Ambiguous attribute collected: {attr_key.value}={value}, "
+                            f"candidates={entity_result.candidates}"
+                        )
+                        continue  # No agregar a atributos normales
+
+                    entity_name = entity_result
                     if not entity_name:
                         continue
                     # Asignado por proximidad (menor prioridad en CESP)
@@ -3327,28 +3379,52 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                         ]
                         if adj_children:
                             # Resolver entidad: buscar posesivo (det), prep "de X", o proximidad
-                            entity_name = None
+                            entity_result = None
+                            from .scope_resolver import AmbiguousResult
                             for child in token.children:
                                 # "Sus ojos" → det posesivo
                                 if child.dep_ == "det" and child.lemma_.lower() in (
                                     "su", "sus", "mi", "mis", "tu", "tus",
                                 ):
-                                    entity_name = self._find_nearest_entity(
+                                    entity_result = self._find_nearest_entity(
                                         text, token.idx, entity_mentions,
                                     )
                                     break
                                 # "los ojos de María" → nmod/case
                                 if child.dep_ == "nmod" and child.pos_ == "PROPN":
-                                    entity_name = self._resolve_entity_from_token(
+                                    entity_result = self._resolve_entity_from_token(
                                         child, mention_spans, doc,
                                     )
                                     break
                             # Fallback: prepositional context "con barba espesa y ojos marrones"
-                            if not entity_name:
-                                entity_name = self._find_nearest_entity(
+                            if not entity_result:
+                                entity_result = self._find_nearest_entity(
                                     text, token.idx, entity_mentions,
                                 )
 
+                            # Detectar atributos ambiguos en dependency extraction
+                            if isinstance(entity_result, AmbiguousResult):
+                                # Colectar todos los adjetivos para la alerta
+                                for adj in adj_children:
+                                    adj_lower = adj.text.lower()
+                                    if base_key == AttributeKey.HAIR_COLOR and adj_lower in _HAIR_TYPE_ADJS:
+                                        attr_key = AttributeKey.HAIR_TYPE
+                                    else:
+                                        attr_key = base_key
+                                    if self._validate_value(attr_key, adj_lower):
+                                        ambig_attr = AmbiguousAttribute(
+                                            attribute_key=attr_key.value,
+                                            attribute_value=adj_lower,
+                                            candidates=entity_result.candidates,
+                                            source_text=entity_result.context_text,
+                                            start_char=token.idx,
+                                            end_char=adj.idx + len(adj.text),
+                                            chapter_id=chapter_id,
+                                        )
+                                        result.ambiguous_attributes.append(ambig_attr)
+                                continue  # Skip atribución normal
+
+                            entity_name = entity_result
                             if entity_name:
                                 for adj in adj_children:
                                     adj_lower = adj.text.lower()

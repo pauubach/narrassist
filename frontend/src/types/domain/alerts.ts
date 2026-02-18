@@ -40,6 +40,12 @@ export interface AlertExtraData {
   value2?: string
   /** Fuentes de cada valor para navegación múltiple */
   sources?: AlertSource[]
+  /** Valor del atributo (para atributos ambiguos) */
+  attributeValue?: string
+  /** Candidatos para atributos ambiguos */
+  candidates?: Array<{ entityName: string; entityId: number }>
+  /** Texto de contexto para atributos ambiguos */
+  sourceText?: string
   /** Otros datos específicos del tipo de alerta */
   [key: string]: unknown
 }

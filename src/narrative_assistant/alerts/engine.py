@@ -1319,6 +1319,81 @@ class AlertEngine:
             },
         )
 
+    def create_from_ambiguous_attribute(
+        self,
+        project_id: int,
+        attribute_key: str,
+        attribute_value: str,
+        candidates: list[dict[str, Any]],  # [{"entity_name": str, "entity_id": int}, ...]
+        source_text: str,
+        chapter: int | None = None,
+        start_char: int | None = None,
+        end_char: int | None = None,
+        extra_data: dict[str, Any] | None = None,
+    ) -> Result[Alert]:
+        """
+        Crea alerta interactiva para atributo con propiedad ambigua.
+
+        Cuando el sistema no puede determinar con certeza a qué entidad
+        pertenece un atributo, genera una alerta pidiendo al usuario que
+        seleccione el propietario correcto.
+
+        Args:
+            project_id: ID del proyecto
+            attribute_key: Clave del atributo (eye_color, hair_color, etc.)
+            attribute_value: Valor del atributo ("azules", "rizado", etc.)
+            candidates: Lista de entidades candidatas con entity_name y entity_id
+            source_text: Texto de la oración ambigua
+            chapter: Número de capítulo
+            start_char: Posición de inicio
+            end_char: Posición de fin
+            extra_data: Datos adicionales
+
+        Returns:
+            Result con la alerta creada
+        """
+        # Formatear nombres de atributos para UI
+        attr_display_names = {
+            "eye_color": "color de ojos",
+            "hair_color": "color de cabello",
+            "hair_type": "tipo de cabello",
+            "height": "altura",
+            "build": "complexión",
+            "facial_hair": "vello facial",
+            "skin_tone": "tono de piel",
+            "age": "edad",
+        }
+        attr_display = attr_display_names.get(attribute_key, attribute_key)
+
+        # Crear lista de nombres de candidatos para descripción
+        candidate_names = [c["entity_name"] for c in candidates]
+        candidates_str = ", ".join(candidate_names)
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.CONSISTENCY,
+            severity=AlertSeverity.WARNING,
+            alert_type="ambiguous_attribute",
+            title=f"Atributo ambiguo: {attr_display}",
+            description=f"No se puede determinar a quién pertenece: «{attribute_value}»",
+            explanation=f"Candidatos posibles: {candidates_str}. Contexto: {source_text[:100]}",
+            suggestion="Seleccione la entidad propietaria del atributo",
+            chapter=chapter,
+            start_char=start_char,
+            end_char=end_char,
+            excerpt=source_text[:200] if source_text else "",
+            entity_ids=[c["entity_id"] for c in candidates],
+            confidence=0.7,  # Media-alta: sabemos que ES ambiguo
+            source_module="attribute_extraction",
+            extra_data={
+                "attribute_key": attribute_key,
+                "attribute_value": attribute_value,
+                "candidates": candidates,  # Incluye entity_id para resolución
+                "source_text": source_text,
+                **(extra_data or {}),
+            },
+        )
+
     def create_from_deceased_reappearance(
         self,
         project_id: int,

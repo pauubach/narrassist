@@ -486,6 +486,23 @@ def run_full_analysis(
                 report.stats["attributes_extracted"] = len(attributes)
                 logger.info(f"Extracted {len(attributes)} attributes")
 
+                # STEP 8a: Crear alertas de atributos ambiguos
+                # Si hay atributos con propiedad ambigua, crear alertas interactivas
+                if config.create_alerts and hasattr(attr_extraction, "ambiguous_attributes"):
+                    ambiguous_attrs = attr_extraction.ambiguous_attributes  # type: ignore[union-attr]
+                    if ambiguous_attrs:
+                        logger.info(f"Found {len(ambiguous_attrs)} ambiguous attributes")
+                        ambig_alerts_result = _create_alerts_from_ambiguous_attributes(
+                            project_id, ambiguous_attrs
+                        )
+                        if ambig_alerts_result.is_failure:
+                            report.errors.append(ambig_alerts_result.error)  # type: ignore[arg-type]
+                            logger.warning("Ambiguous attribute alert creation failed")
+                        else:
+                            ambig_alerts = ambig_alerts_result.value or []
+                            report.stats["ambiguous_attribute_alerts_created"] = len(ambig_alerts)
+                            logger.info(f"Created {len(ambig_alerts)} ambiguous attribute alerts")
+
         # STEP 9: Fusión automática de entidades similares
         # IMPORTANTE: Después de extraer atributos para que se muevan automáticamente
         if entities:
@@ -1853,6 +1870,89 @@ def _create_alerts_from_inconsistencies(
     except Exception as e:
         error = NarrativeError(
             message=f"Alert creation failed: {str(e)}",
+            severity=ErrorSeverity.RECOVERABLE,
+        )
+        return Result.failure(error)
+
+
+def _create_alerts_from_ambiguous_attributes(
+    project_id: int,
+    ambiguous_attrs: list,  # list[AmbiguousAttribute] from nlp.attributes
+) -> Result[list[Alert]]:
+    """
+    Crea alertas interactivas para atributos con propiedad ambigua.
+
+    Cuando el scope resolver no puede determinar con certeza a qué
+    entidad pertenece un atributo, genera una alerta pidiendo al usuario
+    que seleccione el propietario correcto.
+
+    Args:
+        project_id: ID del proyecto
+        ambiguous_attrs: Lista de AmbiguousAttribute colectados durante extracción
+
+    Returns:
+        Result con lista de Alert creadas
+    """
+    try:
+        engine = get_alert_engine()
+        entity_repo = get_entity_repository()
+        alerts = []
+
+        logger.info(f"Processing {len(ambiguous_attrs)} ambiguous attributes for alerts...")
+        for amb_attr in ambiguous_attrs:
+            logger.debug(
+                f"Processing ambiguous attribute: {amb_attr.attribute_key}={amb_attr.attribute_value}, "
+                f"candidates={amb_attr.candidates}"
+            )
+
+            # Resolver entity_name -> entity_id para todos los candidatos
+            candidates_with_ids = []
+            for candidate_name in amb_attr.candidates:
+                found_entities = entity_repo.find_entities_by_name(
+                    project_id=project_id, name=candidate_name
+                )
+                # Fuzzy fallback
+                if not found_entities:
+                    found_entities = entity_repo.find_entities_by_name(
+                        project_id=project_id, name=candidate_name, fuzzy=True
+                    )
+                if found_entities:
+                    candidates_with_ids.append({
+                        "entity_name": candidate_name,
+                        "entity_id": found_entities[0].id,
+                    })
+                else:
+                    logger.warning(f"Entity not found: {candidate_name}, skipping from candidates")
+
+            # Si no pudimos resolver ningún candidato, skip
+            if not candidates_with_ids:
+                logger.warning("No valid candidates found after entity resolution, skipping alert")
+                continue
+
+            # Crear alerta usando el alert engine
+            alert_result = engine.create_from_ambiguous_attribute(
+                project_id=project_id,
+                attribute_key=amb_attr.attribute_key,
+                attribute_value=amb_attr.attribute_value,
+                candidates=candidates_with_ids,
+                source_text=amb_attr.source_text,
+                chapter=amb_attr.chapter_id,
+                start_char=amb_attr.start_char,
+                end_char=amb_attr.end_char,
+            )
+
+            if alert_result.is_success:
+                alerts.append(alert_result.value)
+                logger.debug("  -> Alert created successfully")
+            else:
+                logger.warning(f"Failed to create alert: {alert_result.error}")
+
+        logger.info(f"Created {len(alerts)} ambiguous attribute alerts from {len(ambiguous_attrs)} ambiguous attributes")
+        return Result.success(alerts)  # type: ignore[arg-type]
+
+    except Exception as e:
+        error = NarrativeError(
+            message=f"Ambiguous attribute alert creation failed: {str(e)}",
             severity=ErrorSeverity.RECOVERABLE,
         )
         return Result.failure(error)

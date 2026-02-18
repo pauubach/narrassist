@@ -373,6 +373,103 @@ def reopen_alert(project_id: int, alert_id: int):
     return ApiResponse(success=True, message="Alerta reabierta")
 
 
+@router.post("/api/projects/{project_id}/alerts/{alert_id}/resolve-attribute", response_model=ApiResponse)
+def resolve_ambiguous_attribute(
+    project_id: int,
+    alert_id: int,
+    body: deps.ResolveAmbiguousAttributeRequest
+):
+    """
+    Resuelve una alerta de atributo ambiguo asignándolo a una entidad.
+
+    Args:
+        project_id: ID del proyecto
+        alert_id: ID de la alerta
+        body.entity_id: ID de la entidad seleccionada (None = "No asignar")
+
+    Returns:
+        Respuesta con éxito o error
+    """
+    from narrative_assistant.entities.repository import get_entity_repository
+
+    # Verificar ownership y tipo de alerta
+    alert, error = _verify_alert_ownership(alert_id, project_id)
+    if error:
+        return error
+
+    if alert.alert_type != "ambiguous_attribute":
+        return ApiResponse(
+            success=False,
+            error="Esta alerta no es de tipo ambiguous_attribute"
+        )
+
+    # Obtener datos del atributo desde extra_data
+    extra_data = alert.extra_data
+    if not extra_data:
+        return ApiResponse(success=False, error="extra_data vacío en la alerta")
+
+    attribute_key = extra_data.get("attribute_key")
+    attribute_value = extra_data.get("attribute_value")
+    candidates = extra_data.get("candidates", [])
+
+    if not attribute_key or not attribute_value:
+        return ApiResponse(success=False, error="Datos de atributo incompletos")
+
+    # Si entity_id es None, el usuario eligió "No asignar"
+    if body.entity_id is None:
+        alert.status = AlertStatus.RESOLVED
+        alert.resolution_note = "Usuario eligió no asignar el atributo"
+        deps.alert_repository.update(alert)  # type: ignore[attr-defined]
+        return ApiResponse(success=True, message="Atributo no asignado, alerta resuelta")
+
+    # Verificar que entity_id está entre los candidatos
+    entity_ids = [c["entity_id"] for c in candidates]
+    if body.entity_id not in entity_ids:
+        return ApiResponse(
+            success=False,
+            error=f"entity_id {body.entity_id} no está entre los candidatos válidos"
+        )
+
+    # Crear el atributo en la entidad seleccionada
+    entity_repo = get_entity_repository()
+    try:
+        # Mapear attribute_key a categoría
+        category_map = {
+            "eye_color": "physical",
+            "hair_color": "physical",
+            "hair_type": "physical",
+            "height": "physical",
+            "build": "physical",
+            "facial_hair": "physical",
+            "skin_tone": "physical",
+            "age": "physical",
+        }
+        category = category_map.get(attribute_key, "physical")
+
+        entity_repo.create_attribute(  # type: ignore[attr-defined]
+            entity_id=body.entity_id,
+            attribute_type=category,
+            attribute_key=attribute_key,
+            attribute_value=attribute_value,
+            confidence=0.9,  # Alta confianza: confirmado por usuario
+            chapter_id=alert.chapter,
+        )
+
+        # Marcar alerta como resuelta
+        alert.status = AlertStatus.RESOLVED
+        alert.resolution_note = f"Atributo asignado a entidad {body.entity_id}"
+        deps.alert_repository.update(alert)  # type: ignore[attr-defined]
+
+        return ApiResponse(
+            success=True,
+            message=f"Atributo '{attribute_value}' asignado correctamente"
+        )
+
+    except Exception as e:
+        logger.error(f"Error al crear atributo: {e}")
+        return ApiResponse(success=False, error=f"Error al crear atributo: {str(e)}")
+
+
 @router.post("/api/projects/{project_id}/alerts/resolve-all", response_model=ApiResponse)
 def resolve_all_alerts(project_id: int):
     """

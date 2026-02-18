@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sonidos Finales - Narrative Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            min-height: 100vh;
+            padding: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: #fff;
+            border-radius: 20px;
+            padding: 50px;
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6);
+            max-width: 900px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #1a1a2e;
+            margin-bottom: 10px;
+            font-size: 34px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 45px;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .notification-group {
+            margin-bottom: 35px;
+        }
+
+        .group-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .severity-badge {
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: white;
+        }
+
+        .severity-badge.info {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+        }
+
+        .severity-badge.warning {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+        }
+
+        .severity-badge.error {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        }
+
+        .severity-badge.success {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+        }
+
+        .group-title {
+            font-weight: 700;
+            color: #2c3e50;
+            font-size: 15px;
+        }
+
+        .sounds-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .sound-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 20px;
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            border: 3px solid transparent;
+            position: relative;
+        }
+
+        .sound-card.primary {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+        }
+
+        .sound-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
+        }
+
+        .sound-card.playing {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 15px 45px rgba(102, 126, 234, 0.5);
+        }
+
+        .sound-card.primary.playing {
+            border-color: #764ba2;
+        }
+
+        .primary-label {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .play-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            transition: all 0.2s;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .sound-card.playing .play-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .play-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .sound-name {
+            font-weight: 700;
+            margin-bottom: 4px;
+            font-size: 13px;
+            text-align: center;
+            color: #2c3e50;
+        }
+
+        .sound-card.playing .sound-name {
+            color: #667eea;
+        }
+
+        .sound-desc {
+            font-size: 11px;
+            opacity: 0.7;
+            text-align: center;
+            line-height: 1.4;
+            color: #555;
+        }
+
+        .duration {
+            font-size: 10px;
+            color: #999;
+            font-weight: 600;
+        }
+
+        .summary {
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+            padding: 30px;
+            border-radius: 14px;
+            border-left: 5px solid #27ae60;
+            margin-top: 40px;
+        }
+
+        .summary-title {
+            font-weight: 800;
+            color: #27ae60;
+            margin-bottom: 18px;
+            font-size: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .summary-content {
+            color: #2c3e50;
+            font-size: 14px;
+            line-height: 1.9;
+        }
+
+        .summary-content strong {
+            color: #27ae60;
+            font-weight: 700;
+        }
+
+        audio {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sonidos Finales</h1>
+        <p class="subtitle">
+            Notificaciones seleccionadas para Narrative Assistant.<br>
+            Haz clic en los botones para probar cada sonido.
+        </p>
+
+        <!-- INFO -->
+        <div class="notification-group">
+            <div class="group-header">
+                <div class="severity-badge info">INFO</div>
+                <div class="group-title">Información / Alertas de baja prioridad</div>
+            </div>
+            <div class="sounds-row">
+                <div class="sound-card primary" onclick="playSound('info.wav', this)">
+                    <div class="primary-label">SELECCIONADO</div>
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Bolígrafo - Toque</div>
+                    <div class="sound-desc">Síntesis simple</div>
+                    <div class="duration">150ms</div>
+                </div>
+                <audio id="audio-info.wav" src="info.wav"></audio>
+
+                <div class="sound-card" onclick="playSound('info_alternative.wav', this)">
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Bolígrafo Levantándose</div>
+                    <div class="sound-desc">Alternativa (stick-slip)</div>
+                    <div class="duration">100ms</div>
+                </div>
+                <audio id="audio-info_alternative.wav" src="info_alternative.wav"></audio>
+            </div>
+        </div>
+
+        <!-- WARNING -->
+        <div class="notification-group">
+            <div class="group-header">
+                <div class="severity-badge warning">WARNING</div>
+                <div class="group-title">Advertencias / Atención requerida</div>
+            </div>
+            <div class="sounds-row">
+                <div class="sound-card primary" onclick="playSound('warning.wav', this)">
+                    <div class="primary-label">SELECCIONADO</div>
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Example3 Error Gentle</div>
+                    <div class="sound-desc">Original seleccionado</div>
+                    <div class="duration">250ms</div>
+                </div>
+                <audio id="audio-warning.wav" src="warning.wav"></audio>
+            </div>
+        </div>
+
+        <!-- ERROR -->
+        <div class="notification-group">
+            <div class="group-header">
+                <div class="severity-badge error">ERROR</div>
+                <div class="group-title">Errores / Problemas críticos</div>
+            </div>
+            <div class="sounds-row">
+                <div class="sound-card primary" onclick="playSound('error.wav', this)">
+                    <div class="primary-label">SELECCIONADO</div>
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Cinema Warning 01 Suspense</div>
+                    <div class="sound-desc">Original seleccionado</div>
+                    <div class="duration">1300ms</div>
+                </div>
+                <audio id="audio-error.wav" src="error.wav"></audio>
+            </div>
+        </div>
+
+        <!-- SUCCESS -->
+        <div class="notification-group">
+            <div class="group-header">
+                <div class="severity-badge success">SUCCESS</div>
+                <div class="group-title">Éxito / Operaciones completadas</div>
+            </div>
+            <div class="sounds-row">
+                <div class="sound-card primary" onclick="playSound('success.wav', this)">
+                    <div class="primary-label">PRINCIPAL</div>
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Cinema Info 02 Fairy G</div>
+                    <div class="sound-desc">Opción 1</div>
+                    <div class="duration">800ms</div>
+                </div>
+                <audio id="audio-success.wav" src="success.wav"></audio>
+
+                <div class="sound-card" onclick="playSound('success_ghibli.wav', this)">
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Spec Info 06 Ghibli</div>
+                    <div class="sound-desc">Opción 2</div>
+                    <div class="duration">1100ms</div>
+                </div>
+                <audio id="audio-success_ghibli.wav" src="success_ghibli.wav"></audio>
+
+                <div class="sound-card" onclick="playSound('success_enya.wav', this)">
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Enya Rhapsody 09 Only Time</div>
+                    <div class="sound-desc">Opción 3</div>
+                    <div class="duration">1200ms</div>
+                </div>
+                <audio id="audio-success_enya.wav" src="success_enya.wav"></audio>
+
+                <div class="sound-card" onclick="playSound('success_novel.wav', this)">
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Novel2 Info 09 Fairy Fs</div>
+                    <div class="sound-desc">Opción 4</div>
+                    <div class="duration">1100ms</div>
+                </div>
+                <audio id="audio-success_novel.wav" src="success_novel.wav"></audio>
+            </div>
+        </div>
+
+        <div class="summary">
+            <div class="summary-title">Archivos Instalados</div>
+            <div class="summary-content">
+                <strong>INFO:</strong> info.wav (Bolígrafo - Toque - 150ms)<br>
+                <strong>WARNING:</strong> warning.wav (Example3 Error Gentle - 250ms)<br>
+                <strong>ERROR:</strong> error.wav (Cinema Warning 01 Suspense - 1300ms)<br>
+                <strong>SUCCESS:</strong> success.wav (Cinema Info 02 Fairy G - 800ms)<br><br>
+
+                <strong>Alternativas SUCCESS:</strong><br>
+                • success_ghibli.wav (Spec Info 06 Ghibli - 1100ms)<br>
+                • success_enya.wav (Enya Rhapsody 09 Only Time - 1200ms)<br>
+                • success_novel.wav (Novel2 Info 09 Fairy Fs - 1100ms)<br><br>
+
+                Ubicación: <code>frontend/src/assets/sounds/</code>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentAudio = null;
+        let currentCard = null;
+
+        function playSound(file, card) {
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+            }
+
+            if (currentCard) {
+                currentCard.classList.remove('playing');
+                const btn = currentCard.querySelector('.play-btn');
+                btn.textContent = '▶';
+            }
+
+            const audio = document.getElementById('audio-' + file);
+            if (!audio) {
+                console.error('Audio not found:', file);
+                return;
+            }
+
+            currentAudio = audio;
+            currentCard = card;
+
+            card.classList.add('playing');
+            const btn = card.querySelector('.play-btn');
+            btn.textContent = '⏸';
+
+            audio.play();
+
+            audio.onended = function() {
+                card.classList.remove('playing');
+                btn.textContent = '▶';
+                currentAudio = null;
+                currentCard = null;
+            };
+        }
+    </script>
+</body>
+</html>

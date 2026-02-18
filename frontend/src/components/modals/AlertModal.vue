@@ -42,6 +42,8 @@ const emit = defineEmits<{
   (e: 'resolve'): void
   /** Cuando se descarta la alerta */
   (e: 'dismiss'): void
+  /** Resolver atributo ambiguo seleccionando entidad */
+  (e: 'resolveAmbiguousAttribute', entityId: number | null): void
 }>()
 
 const workspaceStore = useWorkspaceStore()
@@ -114,6 +116,23 @@ function formatDate(date: Date): string {
     hour: '2-digit',
     minute: '2-digit'
   })
+}
+
+// Atributo ambiguo
+const isAmbiguousAttribute = computed(() => props.alert?.alertType === 'ambiguous_attribute')
+const ambiguousCandidates = computed(() => {
+  if (!isAmbiguousAttribute.value || !props.alert) return []
+  return props.alert.extraData?.candidates || []
+})
+
+function resolveWithCandidate(entityId: number) {
+  emit('resolveAmbiguousAttribute', entityId)
+  close()
+}
+
+function resolveAsUnassigned() {
+  emit('resolveAmbiguousAttribute', null)
+  close()
 }
 </script>
 
@@ -252,7 +271,30 @@ function formatDate(date: Date): string {
           text
           @click="goToLocation"
         />
-        <div v-if="isActive" class="action-buttons">
+
+        <!-- Botones para atributo ambiguo -->
+        <div v-if="isActive && isAmbiguousAttribute" class="ambiguous-actions">
+          <p class="ambiguous-label">¿Quién tiene este atributo?</p>
+          <div class="candidate-buttons">
+            <Button
+              v-for="candidate in ambiguousCandidates"
+              :key="candidate.entityId"
+              :label="candidate.entityName"
+              severity="info"
+              outlined
+              @click="resolveWithCandidate(candidate.entityId)"
+            />
+            <Button
+              label="No asignar"
+              severity="secondary"
+              text
+              @click="resolveAsUnassigned"
+            />
+          </div>
+        </div>
+
+        <!-- Botones estándar -->
+        <div v-else-if="isActive" class="action-buttons">
           <Button
             label="Descartar"
             icon="pi pi-times"
@@ -470,6 +512,26 @@ function formatDate(date: Date): string {
 
 .action-buttons {
   display: flex;
+  gap: var(--ds-space-2);
+}
+
+.ambiguous-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+  flex: 1;
+}
+
+.ambiguous-label {
+  margin: 0;
+  font-size: var(--ds-font-size-sm);
+  font-weight: var(--ds-font-weight-semibold);
+  color: var(--ds-color-text);
+}
+
+.candidate-buttons {
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--ds-space-2);
 }
 </style>

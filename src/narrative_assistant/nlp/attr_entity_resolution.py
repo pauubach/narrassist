@@ -153,9 +153,10 @@ class AttributeEntityResolutionMixin:
             entity_mentions: Lista de (name, start, end, entity_type) o (name, start, end)
 
         Returns:
-            Nombre de la entidad más probable o None
+            Nombre de la entidad más probable, AmbiguousResult, o None
         """
         from .attributes import _is_location_entity, _is_person_entity, _normalize_entity_mentions
+        from .scope_resolver import AmbiguousResult
 
         if not entity_mentions:
             return None
@@ -171,6 +172,14 @@ class AttributeEntityResolutionMixin:
                 scope_result = resolver.find_nearest_entity_by_scope(
                     position, normalized_mentions, prefer_subject=True
                 )
+                # Si retorna AmbiguousResult, propagarlo sin hacer fallback a heurísticas
+                if isinstance(scope_result, AmbiguousResult):
+                    logger.debug(
+                        f"Ambiguous attribution detected at position {position}, "
+                        f"candidates: {scope_result.candidates}"
+                    )
+                    return scope_result  # type: ignore[return-value]
+
                 if scope_result is not None:
                     entity_name, confidence = scope_result
                     if confidence >= 0.5:

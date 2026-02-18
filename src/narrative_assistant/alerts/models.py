@@ -176,6 +176,18 @@ class Alert:
                     str(ed.get("appearance_chapter", 0)),
                 ]
             )
+        elif self.alert_type == "ambiguous_attribute":
+            # Para atributos ambiguos: clave + valor + candidatos ordenados
+            ed = self.extra_data
+            candidates = ed.get("candidates", [])
+            candidate_names = sorted([c.get("entity_name", "") for c in candidates])
+            parts.extend(
+                [
+                    ed.get("attribute_key", ""),
+                    ed.get("attribute_value", ""),
+                    str(candidate_names),
+                ]
+            )
         else:
             # Para otros tipos: título + descripción (primeros 100 chars)
             parts.append(self.title[:100])

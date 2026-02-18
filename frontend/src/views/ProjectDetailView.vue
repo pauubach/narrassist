@@ -398,6 +398,7 @@
                   @navigate-to-position="(s, e, t) => onAlertNavigateToPosition(selectedAlert, s, e, t)"
                   @resolve="onAlertResolve(selectedAlert)"
                   @dismiss="onAlertDismiss(selectedAlert)"
+                  @resolve-ambiguous-attribute="(entityId) => onResolveAmbiguousAttribute(selectedAlert, entityId)"
                   @close="selectionStore.clearAll()"
                 />
 
@@ -1011,6 +1012,25 @@ const onAlertDismiss = async (alert: Alert) => {
   } catch (err) {
     console.error('Error dismissing alert:', err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo descartar la alerta', life: 3000 })
+  }
+}
+
+const onResolveAmbiguousAttribute = async (alert: Alert, entityId: number | null) => {
+  try {
+    const projectId = project.value!.id
+    await api.postRaw(`/api/projects/${projectId}/alerts/${alert.id}/resolve-attribute`, {
+      entity_id: entityId
+    })
+    await loadAlerts(projectId)
+    selectionStore.clearAll()
+
+    const message = entityId === null
+      ? 'Atributo no asignado'
+      : 'Atributo asignado correctamente'
+    toast.add({ severity: 'success', summary: 'Resuelto', detail: message, life: 3000 })
+  } catch (err) {
+    console.error('Error resolving ambiguous attribute:', err)
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo resolver el atributo ambiguo', life: 3000 })
   }
 }
 

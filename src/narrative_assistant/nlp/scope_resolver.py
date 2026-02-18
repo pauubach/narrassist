@@ -65,6 +65,25 @@ class ScopeSpan:
         return self.start <= position < self.end
 
 
+@dataclass
+class AmbiguousResult:
+    """
+    Resultado retornado cuando la atribución de un atributo es genuinamente ambigua.
+
+    En vez de adivinar o usar heurística de proximidad, el sistema debe
+    generar una alerta interactiva pidiendo al usuario que aclare la atribución.
+
+    Attributes:
+        candidates: Nombres de las entidades candidatas
+        position: Posición del atributo en el texto
+        context_text: Texto de la oración ambigua
+    """
+
+    candidates: list[str]  # Entity names
+    position: int
+    context_text: str
+
+
 class ScopeResolver:
     """
     Resuelve scope lingüístico para vinculación de entidades.
@@ -483,13 +502,13 @@ class ScopeResolver:
         self,
         position: int,
         entity_mentions: list[tuple[str, int, int, str]],
-    ) -> bool:
+    ) -> tuple[list[str], str] | None:
         """
         Detecta si el contexto de atribución es genuinamente ambiguo.
 
         Cuando ni un lector humano puede determinar con certeza a quién
-        pertenece el atributo, el resolver debe retornar None para que
-        el sistema genere una alerta de revisión manual.
+        pertenece el atributo, el resolver debe retornar los candidatos
+        para que el sistema genere una alerta de revisión manual.
 
         Patrones ambiguos en español:
         1. "Cuando X verbo a Y, tenía atributo" — la subordinada introduce
@@ -503,7 +522,7 @@ class ScopeResolver:
             entity_mentions: Lista de entidades candidatas
 
         Returns:
-            True si el contexto es genuinamente ambiguo
+            Tupla (candidatos, contexto) si es ambiguo, None si no lo es
         """
         # Solo es ambiguo si hay >= 2 entidades PERSONA distintas en scope
         unique_per_names = set()
@@ -511,7 +530,7 @@ class ScopeResolver:
             if etype == "PER":
                 unique_per_names.add(name)
         if len(unique_per_names) < 2:
-            return False
+            return None
 
         # Encontrar la oración que contiene el atributo
         attr_sent_idx = None
@@ -520,7 +539,7 @@ class ScopeResolver:
                 attr_sent_idx = i
                 break
         if attr_sent_idx is None:
-            return False
+            return None
 
         attr_sent_start, attr_sent_end = self._sentence_spans[attr_sent_idx]
         attr_sent_text = self.text[attr_sent_start:attr_sent_end]
@@ -531,21 +550,24 @@ class ScopeResolver:
         if self._is_cuando_subordinate_ambiguity(
             position, attr_sent_idx, entity_mentions
         ):
-            return True
+            candidates = sorted(unique_per_names)
+            return (candidates, attr_sent_text)
 
         # Patrón 2: "X verbo a Y. Sus <atributo> le/se <verbo>"
         # Donde la oración previa tiene sujeto y objeto, y la oración
         # del atributo usa "sus" + "le" (que no indica género).
         if self._is_sus_le_ambiguity(position, attr_sent_idx, entity_mentions):
-            return True
+            candidates = sorted(unique_per_names)
+            return (candidates, attr_sent_text)
 
         # Patrón 3: "X le dijo a Y que tenía <atributo>"
         # Subordinada completiva con "que tenía/que era" donde ambos
         # X (sujeto) e Y (objeto indirecto) son candidatos.
         if self._is_decir_que_ambiguity(position, attr_sent_idx, entity_mentions):
-            return True
+            candidates = sorted(unique_per_names)
+            return (candidates, attr_sent_text)
 
-        return False
+        return None
 
     def _is_cuando_subordinate_ambiguity(
         self,
@@ -887,7 +909,7 @@ class ScopeResolver:
             prefer_subject: Si True, preferir sujeto gramatical
 
         Returns:
-            Tupla (entity_name, confidence) o None
+            Tupla (entity_name, confidence), AmbiguousResult, o None
         """
         if not entity_mentions:
             return None
@@ -905,14 +927,20 @@ class ScopeResolver:
             return pronoun_result
 
         # Paso 0.7: Detección de ambigüedad genuina
-        # Si el contexto es genuinamente ambiguo, retornar None para que
-        # el sistema genere una alerta de revisión manual.
-        if self._is_ambiguous_context(position, entity_mentions):
+        # Si el contexto es genuinamente ambiguo, retornar AmbiguousResult
+        # para que el sistema genere una alerta interactiva.
+        ambiguity_result = self._is_ambiguous_context(position, entity_mentions)
+        if ambiguity_result:
+            candidates, context_text = ambiguity_result
             logger.debug(
                 f"Ambiguous context detected at position {position}, "
-                f"returning None"
+                f"candidates: {candidates}"
             )
-            return None
+            return AmbiguousResult(
+                candidates=candidates,
+                position=position,
+                context_text=context_text,
+            )
 
         # Paso 1: Intentar sujeto gramatical
         if prefer_subject:

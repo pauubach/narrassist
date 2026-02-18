@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparación SUCCESS - Análisis Optimizado</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+            min-height: 100vh;
+            padding: 30px;
+        }
+
+        .container {
+            background: #fff;
+            border-radius: 20px;
+            padding: 50px;
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6);
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #27ae60;
+            margin-bottom: 12px;
+            font-size: 36px;
+            font-weight: 900;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 40px;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .analysis {
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+            padding: 30px;
+            border-radius: 14px;
+            border-left: 5px solid #27ae60;
+            margin-bottom: 40px;
+        }
+
+        .analysis-title {
+            font-weight: 800;
+            color: #27ae60;
+            margin-bottom: 18px;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .analysis-content {
+            color: #2c3e50;
+            font-size: 14px;
+            line-height: 1.9;
+        }
+
+        .analysis-content strong {
+            color: #27ae60;
+            font-weight: 700;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .section-header::before {
+            content: '';
+            width: 5px;
+            height: 32px;
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            border-radius: 3px;
+        }
+
+        .section-title {
+            font-weight: 800;
+            color: #2c3e50;
+            font-size: 18px;
+        }
+
+        .section-desc {
+            color: #7f8c8d;
+            font-size: 13px;
+            margin-left: 20px;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .sounds-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 16px;
+        }
+
+        .sound-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 24px;
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            border: 3px solid transparent;
+            position: relative;
+        }
+
+        .sound-card.recommended {
+            border-color: #27ae60;
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+        }
+
+        .sound-card.top-choice {
+            border-color: #f39c12;
+            background: linear-gradient(135deg, #fef5e7 0%, #fdebd0 100%);
+        }
+
+        .sound-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.18);
+        }
+
+        .sound-card.playing {
+            transform: translateY(-5px) scale(1.03);
+            box-shadow: 0 18px 50px rgba(39, 174, 96, 0.5);
+        }
+
+        .badge {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 5px 14px;
+            border-radius: 14px;
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .badge.recommended-badge {
+            background: #27ae60;
+        }
+
+        .badge.top-badge {
+            background: #f39c12;
+        }
+
+        .play-btn {
+            width: 75px;
+            height: 75px;
+            border-radius: 50%;
+            background: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            transition: all 0.2s;
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.15);
+        }
+
+        .sound-card.playing .play-btn {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            box-shadow: 0 8px 28px rgba(39, 174, 96, 0.5);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+
+        .play-btn:hover {
+            transform: scale(1.12);
+        }
+
+        .sound-name {
+            font-weight: 800;
+            margin-bottom: 6px;
+            font-size: 15px;
+            text-align: center;
+            color: #2c3e50;
+        }
+
+        .sound-card.playing .sound-name {
+            color: #27ae60;
+        }
+
+        .sound-desc {
+            font-size: 11px;
+            opacity: 0.7;
+            text-align: center;
+            line-height: 1.5;
+            color: #555;
+            margin-bottom: 8px;
+        }
+
+        .stats {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.04);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 10px;
+            line-height: 1.6;
+            color: #666;
+        }
+
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+        }
+
+        .stats-label {
+            font-weight: 600;
+        }
+
+        .recommendation-box {
+            background: linear-gradient(135deg, #fff9e6 0%, #fef5e7 100%);
+            padding: 30px;
+            border-radius: 14px;
+            border-left: 5px solid #f39c12;
+            margin-top: 35px;
+        }
+
+        .rec-title {
+            font-weight: 900;
+            color: #f39c12;
+            margin-bottom: 18px;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+        }
+
+        .rec-content {
+            color: #2c3e50;
+            font-size: 15px;
+            line-height: 2;
+        }
+
+        .rec-content strong {
+            color: #f39c12;
+            font-weight: 800;
+        }
+
+        audio {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Comparación SUCCESS</h1>
+        <p class="subtitle">
+            Análisis acústico de todas las opciones + 3 nuevas alternativas optimizadas.
+        </p>
+
+        <div class="analysis">
+            <div class="analysis-title">Análisis Acústico Realizado</div>
+            <div class="analysis-content">
+                He analizado las 4 opciones originales midiendo:<br>
+                <strong>• Brillo</strong> (centroide espectral) - Frecuencias altas = más "mágico"<br>
+                <strong>• Energía</strong> (RMS) - Volumen percibido<br>
+                <strong>• Pitch</strong> - Frecuencia predominante<br>
+                <strong>• Duración</strong> - Tiempo total<br><br>
+
+                <strong>Tu patrón de preferencias:</strong> INFO (150ms) y WARNING (250ms) son BREVES.<br>
+                SUCCESS debe ser celebratorio pero no invasivo → Target: <strong>0.55-0.80s</strong>
+            </div>
+        </div>
+
+        <!-- NUEVAS OPTIMIZADAS -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-title">🆕 Alternativas Optimizadas (Generadas)</div>
+            </div>
+            <div class="section-desc">
+                Creadas específicamente según el análisis: más cortas que las originales, brillo alto, energía moderada.
+            </div>
+
+            <div class="sounds-grid">
+                <div class="sound-card top-choice" onclick="playSound('success_sparkle_brief.wav', this)">
+                    <div class="badge top-badge">TOP NUEVO</div>
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Chispa Brillante</div>
+                    <div class="sound-desc">Arpeggio ascendente rápido (Sol Mayor)</div>
+                    <div class="stats">
+                        <div class="stats-row"><span class="stats-label">Duración:</span> 650ms</div>
+                        <div class="stats-row"><span class="stats-label">Brillo:</span> >3000Hz ⭐</div>
+                        <div class="stats-row"><span class="stats-label">Pitch:</span> >1500Hz</div>
+                    </div>
+                </div>
+                <audio id="audio-success_sparkle_brief.wav" src="success_sparkle_brief.wav"></audio>
+
+                <div class="sound-card recommended" onclick="playSound('success_chime_gentle.wav', this)">
+                    <div class="badge recommended-badge">ULTRA-BREVE</div>
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Campanita Suave</div>
+                    <div class="sound-desc">Acorde Mi Mayor, el MÁS CORTO</div>
+                    <div class="stats">
+                        <div class="stats-row"><span class="stats-label">Duración:</span> 550ms ⚡</div>
+                        <div class="stats-row"><span class="stats-label">Brillo:</span> >2500Hz</div>
+                        <div class="stats-row"><span class="stats-label">Pitch:</span> >1300Hz</div>
+                    </div>
+                </div>
+                <audio id="audio-success_chime_gentle.wav" src="success_chime_gentle.wav"></audio>
+
+                <div class="sound-card" onclick="playSound('success_bell_cascade.wav', this)">
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Cascada Campanas</div>
+                    <div class="sound-desc">Pentatónica escalonada, mágico</div>
+                    <div class="stats">
+                        <div class="stats-row"><span class="stats-label">Duración:</span> 750ms</div>
+                        <div class="stats-row"><span class="stats-label">Brillo:</span> >2500Hz</div>
+                        <div class="stats-row"><span class="stats-label">Pitch:</span> >1000Hz</div>
+                    </div>
+                </div>
+                <audio id="audio-success_bell_cascade.wav" src="success_bell_cascade.wav"></audio>
+            </div>
+        </div>
+
+        <!-- ORIGINALES -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-title">📁 Opciones Originales (Del showcase)</div>
+            </div>
+            <div class="section-desc">
+                Los 4 sonidos que me mencionaste originalmente, con análisis acústico.
+            </div>
+
+            <div class="sounds-grid">
+                <div class="sound-card top-choice" onclick="playSound('success.wav', this)">
+                    <div class="badge top-badge">ACTUAL</div>
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Cinema Info 02 Fairy G</div>
+                    <div class="sound-desc">El que tienes ahora seleccionado</div>
+                    <div class="stats">
+                        <div class="stats-row"><span class="stats-label">Duración:</span> 800ms</div>
+                        <div class="stats-row"><span class="stats-label">Brillo:</span> 2960Hz ⭐</div>
+                        <div class="stats-row"><span class="stats-label">Energía:</span> 0.102</div>
+                        <div class="stats-row"><span class="stats-label">Pitch:</span> 1524Hz</div>
+                    </div>
+                </div>
+                <audio id="audio-success.wav" src="success.wav"></audio>
+
+                <div class="sound-card" onclick="playSound('success_ghibli.wav', this)">
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Spec Info 06 Ghibli</div>
+                    <div class="sound-desc">Equilibrado, medio-brillante</div>
+                    <div class="stats">
+                        <div class="stats-row"><span class="stats-label">Duración:</span> 1100ms</div>
+                        <div class="stats-row"><span class="stats-label">Brillo:</span> 1753Hz</div>
+                        <div class="stats-row"><span class="stats-label">Energía:</span> 0.116</div>
+                        <div class="stats-row"><span class="stats-label">Pitch:</span> 540Hz</div>
+                    </div>
+                </div>
+                <audio id="audio-success_ghibli.wav" src="success_ghibli.wav"></audio>
+
+                <div class="sound-card" onclick="playSound('success_enya.wav', this)">
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Enya Rhapsody 09</div>
+                    <div class="sound-desc">Cálido, el más grave y largo</div>
+                    <div class="stats">
+                        <div class="stats-row"><span class="stats-label">Duración:</span> 1200ms 🐌</div>
+                        <div class="stats-row"><span class="stats-label">Brillo:</span> 1262Hz</div>
+                        <div class="stats-row"><span class="stats-label">Energía:</span> 0.111</div>
+                        <div class="stats-row"><span class="stats-label">Pitch:</span> 456Hz</div>
+                    </div>
+                </div>
+                <audio id="audio-success_enya.wav" src="success_enya.wav"></audio>
+
+                <div class="sound-card" onclick="playSound('success_novel.wav', this)">
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Novel2 Info 09 Fairy Fs</div>
+                    <div class="sound-desc">Más energético, puede ser invasivo</div>
+                    <div class="stats">
+                        <div class="stats-row"><span class="stats-label">Duración:</span> 1100ms</div>
+                        <div class="stats-row"><span class="stats-label">Brillo:</span> 1168Hz</div>
+                        <div class="stats-row"><span class="stats-label">Energía:</span> 0.174 ⚠️</div>
+                        <div class="stats-row"><span class="stats-label">Pitch:</span> 673Hz</div>
+                    </div>
+                </div>
+                <audio id="audio-success_novel.wav" src="success_novel.wav"></audio>
+            </div>
+        </div>
+
+        <div class="recommendation-box">
+            <div class="rec-title">🎯 Recomendación Final</div>
+            <div class="rec-content">
+                Basándome en tu patrón (prefieres sonidos BREVES) y el análisis acústico:<br><br>
+
+                <strong>1º OPCIÓN: Chispa Brillante (650ms)</strong><br>
+                • Más corto que el actual (800ms)<br>
+                • Brillo altísimo (>3000Hz) = muy mágico<br>
+                • Arpeggio ascendente = progresión positiva<br><br>
+
+                <strong>2º OPCIÓN: Cinema Info 02 Fairy G (800ms) - MANTENER ACTUAL</strong><br>
+                • Ya lo tienes seleccionado<br>
+                • Mejor de los 4 originales (más corto y brillante)<br>
+                • Equilibrio perfecto<br><br>
+
+                <strong>3º OPCIÓN: Campanita Suave (550ms)</strong><br>
+                • Ultra-breve (filosofía similar a INFO)<br>
+                • Discreto pero celebratorio<br>
+                • Para quien quiera SUCCESS minimalista<br><br>
+
+                <strong>❌ DESCARTADAS:</strong> Enya (1200ms, demasiado largo) y Novel2 (0.174 energía, invasivo)
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentAudio = null;
+        let currentCard = null;
+
+        function playSound(file, card) {
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+            }
+
+            if (currentCard) {
+                currentCard.classList.remove('playing');
+                const btn = currentCard.querySelector('.play-btn');
+                btn.textContent = '▶';
+            }
+
+            const audio = document.getElementById('audio-' + file);
+            if (!audio) {
+                console.error('Audio not found:', file);
+                return;
+            }
+
+            currentAudio = audio;
+            currentCard = card;
+
+            card.classList.add('playing');
+            const btn = card.querySelector('.play-btn');
+            btn.textContent = '⏸';
+
+            audio.play();
+
+            audio.onended = function() {
+                card.classList.remove('playing');
+                btn.textContent = '▶';
+                currentAudio = null;
+                currentCard = null;
+            };
+        }
+    </script>
+</body>
+</html>

@@ -49,6 +49,8 @@ const emit = defineEmits<{
   (e: 'dismiss'): void
   /** Cerrar el inspector */
   (e: 'close'): void
+  /** Resolver atributo ambiguo seleccionando entidad */
+  (e: 'resolveAmbiguousAttribute', entityId: number | null): void
 }>()
 
 const { getSeverityLabel, getSeverityColor, getSeverityIcon, getCategoryConfig } = useAlertUtils()
@@ -158,6 +160,21 @@ function goToPrevOccurrence() {
 function goToNextOccurrence() {
   if (!canGoNext.value) return
   navigateToOccurrence(occurrenceIndex.value + 1)
+}
+
+// Atributo ambiguo
+const isAmbiguousAttribute = computed(() => props.alert.alertType === 'ambiguous_attribute')
+const ambiguousCandidates = computed(() => {
+  if (!isAmbiguousAttribute.value) return []
+  return props.alert.extraData?.candidates || []
+})
+
+function resolveWithCandidate(entityId: number) {
+  emit('resolveAmbiguousAttribute', entityId)
+}
+
+function resolveAsUnassigned() {
+  emit('resolveAmbiguousAttribute', null)
 }
 </script>
 
@@ -311,7 +328,32 @@ function goToNextOccurrence() {
         size="small"
         @click="emit('navigate')"
       />
-      <div class="action-row">
+
+      <!-- Botones para atributo ambiguo -->
+      <div v-if="isAmbiguousAttribute && alert.status === 'active'" class="ambiguous-actions">
+        <div class="ambiguous-label">¿Quién tiene este atributo?</div>
+        <div class="candidate-buttons">
+          <Button
+            v-for="candidate in ambiguousCandidates"
+            :key="candidate.entityId"
+            :label="candidate.entityName"
+            size="small"
+            severity="info"
+            outlined
+            @click="resolveWithCandidate(candidate.entityId)"
+          />
+          <Button
+            label="No asignar"
+            size="small"
+            severity="secondary"
+            text
+            @click="resolveAsUnassigned"
+          />
+        </div>
+      </div>
+
+      <!-- Botones estándar -->
+      <div v-else class="action-row">
         <Button
           label="Resolver"
           icon="pi pi-check"
@@ -571,6 +613,25 @@ function goToNextOccurrence() {
 
 .action-row > * {
   flex: 1;
+}
+
+/* Ambiguous attribute actions */
+.ambiguous-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+}
+
+.ambiguous-label {
+  font-size: var(--ds-font-size-sm);
+  font-weight: var(--ds-font-weight-semibold);
+  color: var(--ds-color-text);
+}
+
+.candidate-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-2);
 }
 
 /* Multi-source navigation for inconsistency alerts */

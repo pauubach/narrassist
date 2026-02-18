@@ -397,6 +397,11 @@ class BatchDismissRequest(BaseModel):
     scope: str = "instance"
 
 
+class ResolveAmbiguousAttributeRequest(BaseModel):
+    """POST /api/projects/{id}/alerts/{id}/resolve-attribute"""
+    entity_id: Optional[int] = None  # None = "No asignar"
+
+
 class SuppressionRuleRequest(BaseModel):
     """POST /api/projects/{id}/alerts/suppression-rules"""
     rule_type: str = Field(..., pattern=r"^(alert_type|category|entity|source_module)$")
