@@ -12,7 +12,7 @@
 import { ref, type Ref } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import type { Entity, EntityAttribute } from '@/types'
-import { api } from '@/services/api'
+import { api } from '@/services/apiClient'
 import { getAttributeCategoriesForEntityType } from '@/config/attributes'
 
 export interface UseEntityCrudOptions {
