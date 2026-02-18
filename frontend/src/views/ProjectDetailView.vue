@@ -298,6 +298,7 @@
               @alert-dismiss="onAlertDismiss"
               @refresh="loadAlerts(project.id)"
               @resolve-all="onResolveAll"
+              @batch-resolve-ambiguous="onBatchResolveAmbiguous"
               @open-correction-config="correctionConfigModalRef?.show()"
               @filter-change="onDashboardFilterChange"
             />
@@ -1044,6 +1045,30 @@ const onResolveAll = async () => {
     toast.add({ severity: 'success', summary: 'Resueltas', detail: 'Todas las alertas activas han sido resueltas', life: 3000 })
   } catch (err) {
     console.error('Error resolving all alerts:', err)
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron resolver las alertas', life: 3000 })
+  }
+}
+
+const onBatchResolveAmbiguous = async (alertsToResolve: Alert[]) => {
+  try {
+    const projectId = project.value!.id
+    const resolutions = alertsToResolve.map(a => ({
+      alert_id: a.id,
+      entity_id: a.extraData?.suggestedEntityId ?? null
+    }))
+    await api.postRaw(`/api/projects/${projectId}/alerts/batch-resolve-attributes`, {
+      resolutions
+    })
+    await loadAlerts(projectId)
+    selectionStore.clearAll()
+    toast.add({
+      severity: 'success',
+      summary: 'Resueltas',
+      detail: `${alertsToResolve.length} alertas ambiguas resueltas con sugerencia`,
+      life: 3000
+    })
+  } catch (err) {
+    console.error('Error batch resolving ambiguous alerts:', err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron resolver las alertas', life: 3000 })
   }
 }

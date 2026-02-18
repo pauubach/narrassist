@@ -53,6 +53,7 @@ const emit = defineEmits<{
   'alert-reopen': [alert: Alert]
   'alert-navigate': [alert: Alert, source?: AlertSource]
   'resolve-all': []
+  'batch-resolve-ambiguous': [alerts: Alert[]]
   'refresh': []
   'open-correction-config': []
   /** Emite las alertas filtradas para que el parent las pase al sidebar */
@@ -108,6 +109,25 @@ const sequentialMode = useSequentialMode(
     }
   }
 )
+
+// Batch resolve ambiguous
+const ambiguousWithSuggestion = computed(() =>
+  props.alerts.filter(a =>
+    a.alertType === 'ambiguous_attribute' &&
+    a.status === 'active' &&
+    a.extraData?.suggestedEntityId != null
+  )
+)
+const showBatchAmbiguousDialog = ref(false)
+
+function handleBatchResolveAmbiguous() {
+  showBatchAmbiguousDialog.value = true
+}
+
+function confirmBatchResolveAmbiguous() {
+  showBatchAmbiguousDialog.value = false
+  emit('batch-resolve-ambiguous', ambiguousWithSuggestion.value)
+}
 
 // Estado para diálogos
 const showResolveAllDialog = ref(false)
@@ -333,6 +353,17 @@ defineExpose({ focusSearch })
         <Menu ref="exportMenuRef" :model="exportMenuItems" :popup="true" />
 
         <Button
+          v-if="ambiguousWithSuggestion.length > 0"
+          v-tooltip="`Resolver ${ambiguousWithSuggestion.length} ambiguas con sugerencia`"
+          icon="pi pi-bolt"
+          text
+          rounded
+          size="small"
+          severity="warn"
+          @click="handleBatchResolveAmbiguous"
+        />
+
+        <Button
           v-tooltip="'Resolver todas las activas'"
           icon="pi pi-check-circle"
           text
@@ -433,6 +464,27 @@ defineExpose({ focusSearch })
       <template #footer>
         <Button label="Cancelar" text @click="showResolveAllDialog = false" />
         <Button label="Resolver todas" severity="success" @click="confirmResolveAll" />
+      </template>
+    </Dialog>
+
+    <!-- Diálogo de batch resolve ambiguous -->
+    <Dialog
+      :visible="showBatchAmbiguousDialog"
+      header="Resolver alertas ambiguas con sugerencia"
+      :modal="true"
+      :style="{ width: '450px' }"
+      @update:visible="showBatchAmbiguousDialog = $event"
+    >
+      <p>
+        Se resolverán <strong>{{ ambiguousWithSuggestion.length }}</strong> alertas de atributos
+        ambiguos usando la sugerencia automática (basada en atributos ya asignados).
+      </p>
+      <p class="text-secondary text-sm">
+        Solo se afectan alertas con candidato recomendado. Puedes revisar cada una después.
+      </p>
+      <template #footer>
+        <Button label="Cancelar" text @click="showBatchAmbiguousDialog = false" />
+        <Button label="Resolver con sugerencia" severity="warn" icon="pi pi-bolt" @click="confirmBatchResolveAmbiguous" />
       </template>
     </Dialog>
 
