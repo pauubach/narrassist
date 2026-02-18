@@ -4,16 +4,38 @@ Esta carpeta contiene la documentación de referencia de todas las APIs, modelos
 
 ## Estructura
 
+### Backend Python
+
 | Archivo | Descripción |
 |---------|-------------|
+| [backend-core.md](backend-core.md) | Core: Result pattern, errores, configuración |
 | [backend-persistence.md](backend-persistence.md) | Clases de persistencia: Database, Project, Session, Chapter |
 | [backend-entities.md](backend-entities.md) | Modelos y repositorio de entidades |
 | [backend-nlp.md](backend-nlp.md) | Pipeline NLP: NER, atributos, embeddings |
 | [backend-alerts.md](backend-alerts.md) | Sistema de alertas |
-| [backend-core.md](backend-core.md) | Core: Result pattern, errores, configuración |
-| [frontend-types.md](frontend-types.md) | Tipos TypeScript del frontend |
-| [frontend-stores.md](frontend-stores.md) | Pinia stores |
-| [http-endpoints.md](http-endpoints.md) | Endpoints HTTP del API server |
+
+### Frontend TypeScript
+
+| Archivo | Descripción |
+|---------|-------------|
+| [frontend-stores.md](frontend-stores.md) | Pinia stores (projects, entities, alerts, collections) |
+
+### HTTP API
+
+| Archivo | Descripción |
+|---------|-------------|
+| [http-endpoints.md](http-endpoints.md) | ~70 endpoints principales (170+ en total) |
+
+**Endpoints por módulo**:
+- Proyectos: CRUD, análisis, progreso
+- Entidades: Listado, fusión, atributos
+- Alertas: CRUD, resolución, filtrado
+- Capítulos: Listado, estructura
+- Relaciones: Grafos, asimetrías, clusters
+- **Colecciones**: Cross-book, entity links, inconsistencias
+- **Eventos**: Timeline, stats, export
+- **Voz y Estilo**: Perfiles, desviaciones, POV, focalización
+- Servicios: LLM config, Ollama status
 
 ## Uso
 
@@ -60,8 +82,26 @@ Esta carpeta contiene la documentación de referencia de todas las APIs, modelos
   import type { Project, Entity, Alert } from '@/types'
   ```
 
+## Novedades
+
+### v0.10.9+ (2026-02-06)
+
+- **Colecciones cross-book**: Análisis de sagas/series completas
+- **Entity linking**: Vinculación de personajes entre libros
+- **Eventos narrativos**: 48 tipos de eventos en 3 tiers
+- **Voz y estilo**: Perfiles de habla, desviaciones, POV
+
+### Arquitectura
+
+El sistema sigue los patrones documentados en [docs/adr/](../adr/):
+- SQLite local (ADR-001)
+- LLM local con Ollama (ADR-002)
+- NER multi-modelo con votación (ADR-003)
+- Offline-first architecture (ADR-004)
+- PrimeVue UI components (ADR-005)
+
 ## Última actualización
 
-2026-02-04
+2026-02-18
 
-> **Nota**: La API cuenta con 170+ endpoints. Para el listado completo, ver [http-endpoints.md](http-endpoints.md).
+> **Nota**: La API cuenta con 170+ endpoints. Esta referencia cubre los ~70 principales. Para detalles de endpoints específicos, ver [http-endpoints.md](http-endpoints.md).
