@@ -127,7 +127,7 @@
           class="chapter-section"
         >
           <h2 class="chapter-title">
-            {{ chapter.title }}
+            {{ chapter.chapterNumber }}. {{ chapter.title }}
           </h2>
 
           <!-- Contenido del capítulo con entidades resaltadas (lazy loaded) -->

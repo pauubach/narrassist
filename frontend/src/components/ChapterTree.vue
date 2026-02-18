@@ -30,7 +30,7 @@
         <div class="chapter-header" @click="selectChapter(chapter.id)">
           <div class="chapter-info">
             <i class="pi pi-book chapter-icon"></i>
-            <span class="chapter-title">{{ chapter.title }}</span>
+            <span class="chapter-title">{{ chapter.chapterNumber }}. {{ chapter.title }}</span>
           </div>
           <div class="chapter-meta">
             <span v-tooltip.left="'Palabras'" class="chapter-words">
@@ -42,7 +42,7 @@
         <!-- Secciones del capítulo (H2, H3, H4) -->
         <div v-if="chapter.sections && chapter.sections.length > 0" class="sections-list">
           <div
-            v-for="section in chapter.sections"
+            v-for="(section, sIdx) in chapter.sections"
             :key="`section-${section.id}`"
             class="section-tree"
           >
@@ -52,33 +52,33 @@
               @click.stop="selectSection(chapter.id, section.id, section.startChar)"
             >
               <i class="pi pi-list section-icon"></i>
-              <span class="section-title">{{ section.title || `Sección ${section.sectionNumber}` }}</span>
+              <span class="section-title">{{ chapter.chapterNumber }}.{{ sIdx + 1 }}. {{ section.title || `Sección ${section.sectionNumber}` }}</span>
             </div>
 
             <!-- Subsecciones recursivas -->
             <template v-if="section.subsections && section.subsections.length > 0">
               <div
-                v-for="sub in section.subsections"
+                v-for="(sub, subIdx) in section.subsections"
                 :key="`sub-${sub.id}`"
                 class="section-item"
                 :class="[`level-${sub.headingLevel}`, { 'section-active': activeSectionId === sub.id }]"
                 @click.stop="selectSection(chapter.id, sub.id, sub.startChar)"
               >
                 <i class="pi pi-minus section-icon"></i>
-                <span class="section-title">{{ sub.title || `Subsección ${sub.sectionNumber}` }}</span>
+                <span class="section-title">{{ chapter.chapterNumber }}.{{ sIdx + 1 }}.{{ subIdx + 1 }}. {{ sub.title || `Subsección ${sub.sectionNumber}` }}</span>
               </div>
 
               <!-- Nivel 4 (si existe) -->
-              <template v-for="sub in section.subsections">
+              <template v-for="(sub, subIdx2) in section.subsections">
                 <div
-                  v-for="sub4 in sub.subsections || []"
+                  v-for="(sub4, sub4Idx) in sub.subsections || []"
                   :key="`sub4-${sub.id}-${sub4.id}`"
                   class="section-item"
                   :class="[`level-${sub4.headingLevel}`, { 'section-active': activeSectionId === sub4.id }]"
                   @click.stop="selectSection(chapter.id, sub4.id, sub4.startChar)"
                 >
                   <i class="pi pi-circle-fill section-icon tiny"></i>
-                  <span class="section-title">{{ sub4.title || `Subsección ${sub4.sectionNumber}` }}</span>
+                  <span class="section-title">{{ chapter.chapterNumber }}.{{ sIdx + 1 }}.{{ subIdx2 + 1 }}.{{ sub4Idx + 1 }}. {{ sub4.title || `Subsección ${sub4.sectionNumber}` }}</span>
                 </div>
               </template>
             </template>
