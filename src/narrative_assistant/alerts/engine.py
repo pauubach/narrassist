@@ -1400,13 +1400,55 @@ class AlertEngine:
         except Exception as e:
             logger.debug(f"Error buscando sugerencia contextual: {e}")
 
+        # FEATURE: Filtrado por género gramatical
+        # Si el atributo tiene género (ej: "rubia" → Fem), eliminar candidatos
+        # con género incompatible
+        gender_filtered_candidates = candidates
+        try:
+            attr_gender = self._detect_attribute_gender(attribute_value)
+            if attr_gender:
+                compatible = []
+                for c in candidates:
+                    entity_gender = self._get_entity_gender(c.get("entity_id"), c.get("entity_name", ""))
+                    if entity_gender is None or entity_gender == attr_gender:
+                        compatible.append(c)
+                    else:
+                        logger.info(
+                            f"Género incompatible: '{c['entity_name']}' ({entity_gender}) vs "
+                            f"atributo '{attribute_value}' ({attr_gender})"
+                        )
+
+                if len(compatible) == 1:
+                    # Solo queda un candidato: asignar directamente sin alerta
+                    logger.info(
+                        f"Género resuelve ambigüedad: '{compatible[0]['entity_name']}' "
+                        f"es el único candidato {attr_gender} para '{attribute_value}'"
+                    )
+                    return self._auto_assign_attribute(
+                        project_id=project_id,
+                        entity_id=compatible[0]["entity_id"],
+                        entity_name=compatible[0]["entity_name"],
+                        attribute_key=attribute_key,
+                        attribute_value=attribute_value,
+                        confidence=0.75,
+                        source="gender_filter",
+                    )
+                elif len(compatible) > 1:
+                    gender_filtered_candidates = compatible
+        except Exception as e:
+            logger.debug(f"Error en filtrado por género: {e}")
+
         # Marcar candidato sugerido en la lista
         candidates_with_suggestion = []
-        for c in candidates:
+        for c in gender_filtered_candidates:
             candidate_copy = c.copy()
             if suggested_entity_id and c["entity_id"] == suggested_entity_id:
                 candidate_copy["suggested"] = True
             candidates_with_suggestion.append(candidate_copy)
+
+        # Recalcular nombres tras filtrado
+        candidate_names = [c["entity_name"] for c in gender_filtered_candidates]
+        candidates_str = ", ".join(candidate_names)
 
         return self.create_alert(
             project_id=project_id,
@@ -1431,6 +1473,137 @@ class AlertEngine:
                 "suggested_entity_id": suggested_entity_id,  # Para UI
                 "source_text": source_text,
                 **(extra_data or {}),
+            },
+        )
+
+    def _detect_attribute_gender(self, attribute_value: str) -> str | None:
+        """
+        Detecta el género gramatical de un valor de atributo usando spaCy.
+
+        Args:
+            attribute_value: Valor del atributo ("rubia", "alto", "morena")
+
+        Returns:
+            "Fem", "Masc", o None si no se puede determinar
+        """
+        try:
+            from ..nlp.spacy_gpu import load_spacy_model
+            nlp = load_spacy_model()
+            doc = nlp(attribute_value)
+            for token in doc:
+                gender = token.morph.get("Gender")
+                if gender:
+                    g = gender[0] if isinstance(gender, list) else gender
+                    if g in ("Fem", "Masc"):
+                        return g
+        except Exception:
+            pass
+        return None
+
+    def _get_entity_gender(self, entity_id: int | None, entity_name: str) -> str | None:
+        """
+        Obtiene el género de una entidad a partir de sus atributos o nombre.
+
+        Args:
+            entity_id: ID de la entidad
+            entity_name: Nombre de la entidad
+
+        Returns:
+            "Fem", "Masc", o None si no se puede determinar
+        """
+        # Intentar obtener de atributos almacenados
+        if entity_id:
+            try:
+                from ..entities.repository import get_entity_repository
+                repo = get_entity_repository()
+                attrs = repo.get_attributes_by_entity(entity_id)
+                for attr in attrs:
+                    if attr.attribute_key == "gender":
+                        val = attr.attribute_value.lower().strip()
+                        if val in ("masculino", "masc", "m", "male"):
+                            return "Masc"
+                        elif val in ("femenino", "fem", "f", "female"):
+                            return "Fem"
+            except Exception:
+                pass
+
+        # Intentar inferir del nombre con spaCy
+        try:
+            from ..nlp.spacy_gpu import load_spacy_model
+            nlp = load_spacy_model()
+            doc = nlp(entity_name)
+            for token in doc:
+                gender = token.morph.get("Gender")
+                if gender:
+                    g = gender[0] if isinstance(gender, list) else gender
+                    if g in ("Fem", "Masc"):
+                        return g
+        except Exception:
+            pass
+
+        return None
+
+    def _auto_assign_attribute(
+        self,
+        project_id: int,
+        entity_id: int,
+        entity_name: str,
+        attribute_key: str,
+        attribute_value: str,
+        confidence: float = 0.75,
+        source: str = "gender_filter",
+    ) -> Result[Alert]:
+        """
+        Asigna un atributo directamente sin generar alerta interactiva.
+
+        Usado cuando el filtrado por género resuelve la ambigüedad.
+        Crea una alerta informativa (auto-resuelta) en lugar de interactiva.
+
+        Returns:
+            Result con alerta informativa ya resuelta
+        """
+        try:
+            from ..entities.repository import get_entity_repository
+            entity_repo = get_entity_repository()
+            entity_repo.create_attribute(
+                entity_id=entity_id,
+                attribute_key=attribute_key,
+                attribute_value=attribute_value,
+                confidence=confidence,
+                source=source,
+            )
+            logger.info(
+                f"Auto-asignado por género: {entity_name}.{attribute_key} = "
+                f"'{attribute_value}' (confianza={confidence})"
+            )
+        except Exception as e:
+            logger.warning(f"Error auto-asignando atributo: {e}")
+
+        # Crear alerta informativa (ya resuelta) para que el usuario sepa qué se hizo
+        attr_display = get_attribute_display_name(attribute_key)
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.CONSISTENCY,
+            severity=AlertSeverity.INFO,
+            alert_type="ambiguous_attribute_auto_resolved",
+            title=f"Atributo asignado automáticamente: {entity_name}",
+            description=(
+                f"{attr_display} «{attribute_value}» asignado a {entity_name} "
+                f"por concordancia de género gramatical."
+            ),
+            explanation=(
+                f"El atributo «{attribute_value}» tiene género que solo concuerda con "
+                f"{entity_name}, lo cual resolvió la ambigüedad automáticamente."
+            ),
+            suggestion="Si la asignación es incorrecta, edite el atributo manualmente.",
+            entity_ids=[entity_id],
+            confidence=confidence,
+            source_module="attribute_extraction",
+            extra_data={
+                "attribute_key": attribute_key,
+                "attribute_value": attribute_value,
+                "resolved_entity": entity_name,
+                "resolution_method": source,
             },
         )
 
