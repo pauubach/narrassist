@@ -158,25 +158,8 @@ interface TypeInfo {
   subtypes: Array<{ code: string; name: string }>
 }
 
-interface CorrectionConfig {
-  type_code: string
-  type_name: string
-  subtype_code: string | null
-  subtype_name: string | null
-  dialog: { enabled: boolean }
-  repetition: { tolerance: string; flag_lack_of_repetition: boolean }
-  sentence: { max_length_words: number | null }
-  style: { enabled: boolean }
-  structure: {
-    timeline_enabled: boolean
-    relationships_enabled: boolean
-  }
-  readability: {
-    enabled: boolean
-    target_age_min: number | null
-    target_age_max: number | null
-  }
-}
+// Importar tipo desde corrections.ts
+import type { DetailedCorrectionConfig as CorrectionConfig } from '@/types'
 
 const props = defineProps<{
   projectId: number

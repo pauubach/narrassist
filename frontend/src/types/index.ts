@@ -39,17 +39,6 @@ export * as Api from './api'
 export * from './transformers'
 
 // =============================================================================
-// API Response (común)
-// =============================================================================
-
-export interface ApiResponse<T = unknown> {
-  success: boolean
-  data?: T
-  error?: string
-  message?: string
-}
-
-// =============================================================================
 // Character types (para CharacterSheet y CharacterView)
 // =============================================================================
 

@@ -3,9 +3,10 @@ import { watchDebounced } from '@vueuse/core'
 import { defineStore } from 'pinia'
 
 /**
- * Tipos de relación disponibles
+ * Tipos de relación disponibles para el grafo visual
+ * (notación UPPERCASE para distinguir del dominio)
  */
-export type RelationshipType =
+export type GraphRelationshipType =
   | 'FAMILY'
   | 'ROMANTIC'
   | 'FRIENDSHIP'
@@ -30,7 +31,7 @@ export type RelationshipValence = 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL'
  * Estado de los filtros del grafo
  */
 export interface RelationshipGraphFilters {
-  relationshipTypes: RelationshipType[]
+  relationshipTypes: GraphRelationshipType[]
   strengthLevels: RelationshipStrength[]
   valences: RelationshipValence[]
   showOnlyConfirmed: boolean
@@ -55,7 +56,7 @@ const STORAGE_KEY = 'narrative_assistant_relationship_graph_filters'
  */
 export const useRelationshipGraphStore = defineStore('relationshipGraph', () => {
   // Opciones de tipos de relación
-  const relationshipTypeOptions: FilterOption<RelationshipType>[] = [
+  const relationshipTypeOptions: FilterOption<GraphRelationshipType>[] = [
     { label: 'Familiar', value: 'FAMILY', color: '#8b5cf6', icon: 'pi pi-users' },
     { label: 'Romántica', value: 'ROMANTIC', color: '#ec4899', icon: 'pi pi-heart' },
     { label: 'Amistad', value: 'FRIENDSHIP', color: '#10b981', icon: 'pi pi-heart-fill' },
@@ -158,7 +159,7 @@ export const useRelationshipGraphStore = defineStore('relationshipGraph', () => 
   })
 
   // Acciones
-  const setRelationshipTypes = (types: RelationshipType[]) => {
+  const setRelationshipTypes = (types: GraphRelationshipType[]) => {
     filters.value.relationshipTypes = types
   }
 
@@ -219,7 +220,7 @@ export const useRelationshipGraphStore = defineStore('relationshipGraph', () => 
   /**
    * Obtiene el color para un tipo de relación
    */
-  const getRelationshipTypeColor = (type: RelationshipType): string => {
+  const getRelationshipTypeColor = (type: GraphRelationshipType): string => {
     const option = relationshipTypeOptions.find((o) => o.value === type)
     return option?.color || '#6b7280'
   }

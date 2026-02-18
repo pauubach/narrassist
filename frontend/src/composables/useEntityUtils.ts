@@ -224,7 +224,144 @@ export function useEntityUtils() {
     ).map(([value, config]) => ({ value, ...config }))
   }
 
+  // === PrimeVue severity mappings ===
+
+  function getTypeSeverity(type: string): string {
+    const severities: Record<string, string> = {
+      character: 'success', location: 'danger', organization: 'info',
+      object: 'warning', event: 'secondary', concept: 'contrast', other: 'secondary'
+    }
+    return severities[type] || 'secondary'
+  }
+
+  function getImportanceSeverity(importance: string): string {
+    const severities: Record<string, string> = {
+      main: 'success', secondary: 'info', minor: 'secondary'
+    }
+    return severities[importance] || 'secondary'
+  }
+
+  function getImportanceBadgeSeverity(importance: string): 'critical' | 'high' | 'medium' | 'low' | 'info' {
+    const map: Record<string, 'critical' | 'high' | 'medium' | 'low' | 'info'> = {
+      main: 'high', principal: 'high', high: 'medium',
+      secondary: 'low', medium: 'low',
+      minor: 'info', low: 'info', minimal: 'info'
+    }
+    return map[importance] || 'info'
+  }
+
+  function getImportanceLabel(importance: string): string {
+    const labels: Record<string, string> = { main: 'Principal', secondary: 'Secundario', minor: 'Menor' }
+    return labels[importance] || importance
+  }
+
+  // === Colores extendidos (15 tipos + subtipos) ===
+
+  function getTypeBackgroundColor(type: string): string {
+    const colors: Record<string, string> = {
+      character: 'var(--ds-entity-character-bg)', location: 'var(--ds-entity-location-bg)',
+      organization: 'var(--ds-entity-organization-bg)', object: 'var(--ds-entity-object-bg)',
+      event: 'var(--ds-entity-event-bg)', concept: 'var(--ds-entity-concept-bg)',
+      animal: 'var(--ds-entity-animal-bg)', creature: 'var(--ds-entity-creature-bg)',
+      building: 'var(--ds-entity-building-bg)', region: 'var(--ds-entity-region-bg)',
+      vehicle: 'var(--ds-entity-vehicle-bg)', faction: 'var(--ds-entity-faction-bg)',
+      family: 'var(--ds-entity-family-bg)', time_period: 'var(--ds-entity-time-period-bg)',
+      other: 'var(--ds-entity-other-bg)'
+    }
+    return colors[type] || colors.other
+  }
+
+  function getTypeTextColor(type: string): string {
+    const colors: Record<string, string> = {
+      character: 'var(--ds-entity-character)', location: 'var(--ds-entity-location)',
+      organization: 'var(--ds-entity-organization)', object: 'var(--ds-entity-object)',
+      event: 'var(--ds-entity-event)', concept: 'var(--ds-entity-concept)',
+      animal: 'var(--ds-entity-animal)', creature: 'var(--ds-entity-creature)',
+      building: 'var(--ds-entity-building)', region: 'var(--ds-entity-region)',
+      vehicle: 'var(--ds-entity-vehicle)', faction: 'var(--ds-entity-faction)',
+      family: 'var(--ds-entity-family)', time_period: 'var(--ds-entity-time-period)',
+      other: 'var(--ds-entity-other)'
+    }
+    return colors[type] || colors.other
+  }
+
+  // === Relaciones ===
+
+  function getRelationshipIcon(type: string): string {
+    const icons: Record<string, string> = {
+      family: 'pi pi-users', friend: 'pi pi-heart', friendship: 'pi pi-heart',
+      enemy: 'pi pi-bolt', rival: 'pi pi-bolt',
+      romantic: 'pi pi-heart-fill',
+      professional: 'pi pi-briefcase',
+      mentor: 'pi pi-graduation-cap', student: 'pi pi-book',
+      ally: 'pi pi-shield', member_of: 'pi pi-sitemap',
+      owns: 'pi pi-key', located_in: 'pi pi-map-marker',
+      other: 'pi pi-link'
+    }
+    return icons[type] || icons.other
+  }
+
+  function getRelationshipLabel(type: string): string {
+    const labels: Record<string, string> = {
+      family: 'Familiar', friend: 'Amistad', friendship: 'Amistad',
+      enemy: 'Enemigo', rival: 'Rival',
+      romantic: 'Romántica',
+      professional: 'Profesional',
+      mentor: 'Mentor', student: 'Estudiante',
+      ally: 'Aliado', member_of: 'Miembro de',
+      owns: 'Posee', located_in: 'Ubicado en',
+      other: 'Otra'
+    }
+    return labels[type] || type
+  }
+
+  // === Opciones para edición ===
+
+  function getEntityTypeOptions(): Array<{ label: string; value: string }> {
+    return [
+      { label: 'Personaje', value: 'character' },
+      { label: 'Lugar', value: 'location' },
+      { label: 'Organización', value: 'organization' },
+      { label: 'Objeto', value: 'object' },
+      { label: 'Evento', value: 'event' },
+      { label: 'Concepto', value: 'concept' },
+      { label: 'Otro', value: 'other' }
+    ]
+  }
+
+  function getImportanceEditOptions(): Array<{ label: string; value: string }> {
+    return [
+      { label: 'Menor', value: 'minor' },
+      { label: 'Secundario', value: 'secondary' },
+      { label: 'Principal', value: 'main' }
+    ]
+  }
+
+  function getEntitySheetTitle(type: string): string {
+    const titles: Record<string, string> = {
+      character: 'Ficha de Personaje', location: 'Ficha de Lugar',
+      object: 'Ficha de Objeto', organization: 'Ficha de Organización',
+      event: 'Ficha de Evento', concept: 'Ficha de Concepto',
+      other: 'Ficha de Entidad'
+    }
+    return titles[type] || titles.other
+  }
+
+  // === Relevancia ===
+
+  function formatRelevance(score: number): string {
+    return `${Math.round(score * 100)}%`
+  }
+
+  function getRelevanceClass(score: number): string {
+    if (score >= 0.5) return 'relevance-high'
+    if (score >= 0.2) return 'relevance-medium'
+    if (score >= 0.1) return 'relevance-low'
+    return 'relevance-very-low'
+  }
+
   return {
+    // Existing
     getTypeConfig,
     getImportanceConfig,
     getEntityColor,
@@ -237,5 +374,28 @@ export function useEntityUtils() {
     filterEntities,
     getAllTypeConfigs,
     getAllImportanceConfigs,
+
+    // PrimeVue severity
+    getTypeSeverity,
+    getImportanceSeverity,
+    getImportanceBadgeSeverity,
+    getImportanceLabel,
+
+    // Extended colors
+    getTypeBackgroundColor,
+    getTypeTextColor,
+
+    // Relationships
+    getRelationshipIcon,
+    getRelationshipLabel,
+
+    // Edit options
+    getEntityTypeOptions,
+    getImportanceEditOptions,
+    getEntitySheetTitle,
+
+    // Relevance
+    formatRelevance,
+    getRelevanceClass,
   }
 }

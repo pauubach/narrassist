@@ -95,7 +95,15 @@ export const ATTRIBUTE_TRANSLATIONS: Record<string, string> = {
   strength: 'Fortaleza',
   hobby: 'Pasatiempo',
 
+  // Lugares (extendido)
+  location_type: 'Tipo de lugar',
+  atmosphere: 'Atmósfera',
+
+  // Objetos (extendido)
+  function: 'Función',
+
   // Genérico
+  notes: 'Notas',
   other: 'Otro',
   name: 'Nombre',
   alias: 'Alias',

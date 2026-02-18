@@ -7,8 +7,15 @@
 export { useEntityUtils } from './useEntityUtils'
 export type { EntityTypeConfig, EntityImportanceConfig } from './useEntityUtils'
 
+export { useEntityCrud } from './useEntityCrud'
+export type { UseEntityCrudOptions, UseEntityCrudReturn } from './useEntityCrud'
+
 export { useAlertUtils } from './useAlertUtils'
 export type { SeverityConfig, CategoryConfig, StatusConfig } from './useAlertUtils'
+
+export { useAlertExport } from './useAlertExport'
+
+export { useAlertFiltering } from './useAlertFiltering'
 
 export {
   useHighlight,
@@ -38,8 +45,6 @@ export type { Mention, MentionNavigationState } from './useMentionNavigation'
 
 export { useDocumentTypeConfig } from './useDocumentTypeConfig'
 export type { DocumentTypeUIConfig } from './useDocumentTypeConfig'
-
-export { useAttributeLabels, getAttributeLabel } from './useAttributeLabels'
 
 export { ensureBackendReady } from './useBackendReady'
 
