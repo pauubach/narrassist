@@ -424,5 +424,100 @@ Cuando el detective interrogó al sospechoso tenía los ojos inyectados en sangr
 
 ---
 
+## Mejoras Post-Implementación
+
+Después del Sprint S20 (implementación inicial), se añadieron 3 mejoras para optimizar la experiencia de usuario:
+
+### 1. Sugerencia Contextual Basada en Atributos Existentes
+
+**Problema**: El usuario debe revisar todos los candidatos sin contexto previo.
+
+**Solución**: Si un candidato ya tiene el mismo atributo asignado (ej: `Juan.eye_color = "azules"`), se marca como sugerido.
+
+**Implementación**:
+- En `create_from_ambiguous_attribute()` ([alerts/engine.py](../src/narrative_assistant/alerts/engine.py)):
+  - Consulta `entity_repository.get_attributes_by_entity()` para cada candidato
+  - Compara `attribute_key` y `attribute_value` (normalizado)
+  - Marca candidato con `suggested: true` si coincide
+  - Agrega `suggested_entity_id` a `extra_data`
+- Frontend ordena candidatos sugeridos primero
+- UI muestra "(Recomendado)" con severidad `success`
+
+**Beneficio**: Reduce carga cognitiva, especialmente cuando un personaje ya tiene el atributo definido.
+
+**Test**: `test_ambiguous_enhancements.py::TestContextualSuggestion`
+
+---
+
+### 2. Batch Resolution de Alertas Ambiguas
+
+**Problema**: Resolver alertas una por una es tedioso en manuscritos con muchas ambigüedades.
+
+**Solución**: Endpoint `POST /api/projects/{id}/alerts/batch-resolve-attributes` permite resolver múltiples alertas en una sola petición.
+
+**Implementación**:
+- Nuevos modelos Pydantic en [api-server/deps.py](../api-server/deps.py):
+  ```python
+  class AmbiguousAttributeResolution(BaseModel):
+      alert_id: int
+      entity_id: int | None  # None = "No asignar"
+
+  class BatchResolveAmbiguousAttributesRequest(BaseModel):
+      resolutions: list[AmbiguousAttributeResolution] = Field(..., min_length=1)
+  ```
+- Endpoint en [api-server/routers/alerts.py](../api-server/routers/alerts.py):
+  - Itera sobre `resolutions`
+  - Valida cada alerta (ownership, tipo, candidatos)
+  - Crea atributos con `confidence=0.9`
+  - Marca alertas como `RESOLVED`
+  - Retorna estadísticas: `{resolved: N, skipped: M, errors: [...]}`
+
+**Beneficio**: Permite workflows futuros como "Resolver todas las seleccionadas" o "Resolver todas con sugerencia automática".
+
+**Test**: `test_ambiguous_enhancements.py::TestBatchResolution`
+
+---
+
+### 3. Desambiguación Semántica con LLM (Ollama)
+
+**Problema**: Los 3 patrones sintácticos no cubren TODOS los casos de ambigüedad. Algunos casos requieren análisis semántico.
+
+**Solución**: Usar Ollama (si disponible) para desambiguar casos complejos antes de generar alerta.
+
+**Implementación**:
+- Nuevo método `_llm_semantic_disambiguation()` en [scope_resolver.py](../src/narrative_assistant/nlp/scope_resolver.py):
+  1. Verifica disponibilidad de Ollama con `get_llm_client().is_available()`
+  2. Extrae contexto de 300 caracteres antes/después
+  3. Identifica texto del atributo (span de 2-5 tokens)
+  4. Limita a 2-3 candidatos más probables por proximidad
+  5. Envía prompt a LLM: *"¿A quién se refiere 'ojos azules'? Candidatos: Juan, María"*
+  6. Procesa respuesta: si LLM responde con nombre de candidato → `(entity_name, 0.65)`
+  7. Si LLM responde "AMBIGUO" o no hay match → `None`
+- Integrado en `find_nearest_entity_by_scope()` en 2 puntos:
+  - **Después de paragraph scope**: Si `confidence < 0.6`, intenta LLM antes de fallar
+  - **Antes de fallback final**: Si no hay candidatos claros, intenta LLM como último recurso
+- **Graceful degradation**: Si Ollama no disponible, retorna `None` sin crashear
+
+**Configuración**:
+- Requiere Ollama corriendo (`ollama serve`)
+- Modelo recomendado: `llama3.2` (3B, funciona en CPU)
+- Para hardware limitado: usar `scripts/start_ollama_cpu.bat` (fuerza CPU)
+
+**Beneficio**: Mejora precisión en casos donde sintaxis no es suficiente, pero NO genera alertas si LLM no está disponible (respeta limitaciones de hardware).
+
+**Test**: `test_ambiguous_enhancements.py::TestLLMSemanticDisambiguation`
+
+---
+
+## ROI de las Mejoras
+
+| Mejora | Complejidad | Impacto | ROI |
+|--------|-------------|---------|-----|
+| Sugerencia contextual | Baja (1 consulta DB) | Alto (reduce decisiones) | ⭐⭐⭐⭐⭐ |
+| Batch resolution | Media (nuevo endpoint) | Medio (workflow futuro) | ⭐⭐⭐⭐ |
+| LLM semántico | Alta (integración LLM) | Medio (casos edge) | ⭐⭐⭐ |
+
+---
+
 **Última actualización**: 2026-02-18
-**Versión**: 0.6.1 (post-implementación de atributos ambiguos)
+**Versión**: 0.6.1 (post-implementación de atributos ambiguos + 3 mejoras)
