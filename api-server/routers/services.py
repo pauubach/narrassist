@@ -1066,7 +1066,7 @@ def get_correction_presets() -> ApiResponse:
 # =============================================================================
 
 
-@router.get("/llm/hardware")
+@router.get("/api/services/llm/hardware")
 async def get_llm_hardware():
     """Detecta capacidad de hardware y recomienda nivel de calidad."""
     try:
@@ -1108,7 +1108,7 @@ async def get_llm_hardware():
         return ApiResponse(success=False, error=str(e))
 
 
-@router.get("/llm/config")
+@router.get("/api/services/llm/config")
 async def get_llm_config():
     """Obtiene configuración LLM actual (nivel + sensibilidad)."""
     try:
@@ -1133,7 +1133,7 @@ async def get_llm_config():
         return ApiResponse(success=True, data={"qualityLevel": "rapida", "sensitivity": 5.0})
 
 
-@router.put("/llm/config")
+@router.put("/api/services/llm/config")
 async def update_llm_config(request: dict):
     """Actualiza nivel de calidad y/o sensibilidad. Trigger auto-download si es necesario."""
     try:
@@ -1190,7 +1190,7 @@ async def update_llm_config(request: dict):
         return ApiResponse(success=False, error=str(e))
 
 
-@router.get("/llm/models")
+@router.get("/api/services/llm/models")
 async def get_llm_models():
     """Lista modelos con estado (installed, available, legacy)."""
     try:
@@ -1220,7 +1220,7 @@ async def get_llm_models():
         return ApiResponse(success=False, error=str(e))
 
 
-@router.get("/llm/estimates")
+@router.get("/api/services/llm/estimates")
 async def get_llm_estimates(word_count: int = 50000):
     """Estimaciones de tiempo por nivel y conteo de palabras."""
     try:
