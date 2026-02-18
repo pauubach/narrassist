@@ -25,7 +25,7 @@ const props = withDefaults(defineProps<{
   layout: 'auto'
 })
 
-const { segments } = useWordDiff(
+const { segments, isDiffMeaningful } = useWordDiff(
   toRef(props, 'excerpt'),
   toRef(props, 'suggestion')
 )
@@ -53,8 +53,30 @@ const showOriginal = ref(false)
     class="alert-diff-view"
     :class="[`layout-${effectiveLayout}`]"
   >
+    <!-- ══════════ Non-diff fallback (suggestion is an instruction, not a rewrite) ══════════ -->
+    <template v-if="!isDiffMeaningful">
+      <div class="diff-panel diff-original">
+        <div class="diff-label">
+          <i class="pi pi-file-edit"></i>
+          Original
+        </div>
+        <div class="diff-content diff-content--remove">
+          <p class="diff-text">{{ excerpt }}</p>
+        </div>
+      </div>
+      <div class="diff-panel diff-proposed">
+        <div class="diff-label">
+          <i class="pi pi-lightbulb"></i>
+          Sugerencia
+        </div>
+        <div class="diff-content diff-content--add">
+          <p class="diff-text">{{ suggestion }}</p>
+        </div>
+      </div>
+    </template>
+
     <!-- ══════════ Inline (unified) ══════════ -->
-    <div v-if="effectiveLayout === 'inline'" class="diff-inline-panel">
+    <div v-else-if="effectiveLayout === 'inline'" class="diff-inline-panel">
       <div class="diff-label diff-label--inline">
         <i class="pi pi-arrows-h"></i>
         Cambios

@@ -418,15 +418,7 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
             :loading="updating"
             class="action-btn"
             @click="emit('resolve')"
-          >
-            <template #default>
-              <span class="btn-content">
-                <i class="pi pi-check"></i>
-                <span>Aceptar</span>
-                <kbd>A</kbd>
-              </span>
-            </template>
-          </Button>
+          />
 
           <Button
             v-tooltip.bottom="'Descartar alerta (D)'"
@@ -436,15 +428,7 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
             :disabled="updating || isDismissed"
             class="action-btn"
             @click="emit('dismiss')"
-          >
-            <template #default>
-              <span class="btn-content">
-                <i class="pi pi-times"></i>
-                <span>Descartar</span>
-                <kbd>D</kbd>
-              </span>
-            </template>
-          </Button>
+          />
 
           <Button
             v-tooltip.bottom="'Saltar sin acción (S)'"
@@ -455,15 +439,7 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
             :disabled="updating"
             class="action-btn"
             @click="emit('skip')"
-          >
-            <template #default>
-              <span class="btn-content">
-                <i class="pi pi-forward"></i>
-                <span>Saltar</span>
-                <kbd>S</kbd>
-              </span>
-            </template>
-          </Button>
+          />
 
           <Button
             v-tooltip.bottom="'Marcar para revisar después (F)'"
@@ -474,15 +450,7 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
             :disabled="updating"
             class="action-btn"
             @click="emit('flag')"
-          >
-            <template #default>
-              <span class="btn-content">
-                <i class="pi pi-flag"></i>
-                <span>Marcar</span>
-                <kbd>F</kbd>
-              </span>
-            </template>
-          </Button>
+          />
         </div>
 
         <!-- Navigation -->
@@ -859,21 +827,6 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
   min-width: 120px;
 }
 
-.action-btn .btn-content {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.action-btn kbd {
-  font-size: 0.6875rem;
-  padding: 2px 6px;
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: var(--app-radius-sm);
-  font-family: monospace;
-  margin-left: 0.25rem;
-}
-
 .navigation-actions {
   display: flex;
   gap: 1rem;
@@ -1034,7 +987,4 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
   background: var(--p-surface-700);
 }
 
-:global(.dark) .action-btn kbd {
-  background: rgba(255, 255, 255, 0.1);
-}
 </style>
