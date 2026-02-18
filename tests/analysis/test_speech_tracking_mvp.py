@@ -186,7 +186,7 @@ def test_change_detector_no_change():
     )
 
     # Cambio relativo < threshold (15%) → NO significativo
-    assert result.is_significant is False
+    assert not result.is_significant
 
 
 def test_change_detector_significant_change():
