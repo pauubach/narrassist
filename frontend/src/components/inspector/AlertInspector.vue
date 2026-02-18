@@ -169,6 +169,16 @@ const ambiguousCandidates = computed(() => {
   return props.alert.extraData?.candidates || []
 })
 
+// Ordenar candidatos: sugerido primero
+const sortedCandidates = computed(() => {
+  const candidates = [...ambiguousCandidates.value]
+  return candidates.sort((a, b) => {
+    if (a.suggested && !b.suggested) return -1
+    if (!a.suggested && b.suggested) return 1
+    return 0
+  })
+})
+
 function resolveWithCandidate(entityId: number) {
   emit('resolveAmbiguousAttribute', entityId)
 }
@@ -339,12 +349,12 @@ function resolveAsUnassigned() {
         <div class="ambiguous-label">¿Quién tiene este atributo?</div>
         <div class="candidate-buttons">
           <Button
-            v-for="candidate in ambiguousCandidates"
+            v-for="candidate in sortedCandidates"
             :key="candidate.entityId"
-            :label="candidate.entityName"
+            :label="candidate.suggested ? `${candidate.entityName} (Recomendado)` : candidate.entityName"
             size="small"
-            severity="info"
-            outlined
+            :severity="candidate.suggested ? 'success' : 'info'"
+            :outlined="!candidate.suggested"
             @click="resolveWithCandidate(candidate.entityId)"
           />
           <Button

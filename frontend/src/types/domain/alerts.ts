@@ -43,7 +43,9 @@ export interface AlertExtraData {
   /** Valor del atributo (para atributos ambiguos) */
   attributeValue?: string
   /** Candidatos para atributos ambiguos */
-  candidates?: Array<{ entityName: string; entityId: number }>
+  candidates?: Array<{ entityName: string; entityId: number; suggested?: boolean }>
+  /** ID de entidad sugerida (si hay sugerencia contextual) */
+  suggestedEntityId?: number
   /** Texto de contexto para atributos ambiguos */
   sourceText?: string
   /** Otros datos específicos del tipo de alerta */

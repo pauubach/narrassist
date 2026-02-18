@@ -1369,6 +1369,45 @@ class AlertEngine:
         candidate_names = [c["entity_name"] for c in candidates]
         candidates_str = ", ".join(candidate_names)
 
+        # FEATURE: Sugerencia contextual basada en atributos ya asignados
+        suggested_entity_id = None
+        try:
+            from ..entities.repository import get_entity_repository
+            entity_repo = get_entity_repository()
+
+            # Buscar si algún candidato YA tiene este atributo asignado
+            for candidate in candidates:
+                entity_id = candidate["entity_id"]
+                attributes = entity_repo.get_attributes_by_entity(entity_id)
+
+                # Verificar si tiene el mismo atributo con valor similar
+                for attr in attributes:
+                    if attr.attribute_key == attribute_key:
+                        # Comparación case-insensitive y normalizada
+                        existing_value = attr.attribute_value.lower().strip()
+                        new_value = attribute_value.lower().strip()
+
+                        if existing_value == new_value or existing_value in new_value or new_value in existing_value:
+                            suggested_entity_id = entity_id
+                            logger.info(
+                                f"Sugerencia contextual: {candidate['entity_name']} ya tiene "
+                                f"{attribute_key}={attr.attribute_value} (confianza={attr.confidence:.2f})"
+                            )
+                            break
+
+                if suggested_entity_id:
+                    break
+        except Exception as e:
+            logger.debug(f"Error buscando sugerencia contextual: {e}")
+
+        # Marcar candidato sugerido en la lista
+        candidates_with_suggestion = []
+        for c in candidates:
+            candidate_copy = c.copy()
+            if suggested_entity_id and c["entity_id"] == suggested_entity_id:
+                candidate_copy["suggested"] = True
+            candidates_with_suggestion.append(candidate_copy)
+
         return self.create_alert(
             project_id=project_id,
             category=AlertCategory.CONSISTENCY,
@@ -1388,7 +1427,8 @@ class AlertEngine:
             extra_data={
                 "attribute_key": attribute_key,
                 "attribute_value": attribute_value,
-                "candidates": candidates,  # Incluye entity_id para resolución
+                "candidates": candidates_with_suggestion,  # Con flag 'suggested' si aplica
+                "suggested_entity_id": suggested_entity_id,  # Para UI
                 "source_text": source_text,
                 **(extra_data or {}),
             },
