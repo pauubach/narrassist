@@ -195,6 +195,7 @@ class RepetitionDetector(BaseDetector):
     def __init__(self, config: RepetitionConfig | None = None):
         self.config = config or RepetitionConfig()
         self._spacy_doc = None
+        self._thesaurus = None  # Lazy-loaded DictionaryManager for synonyms
 
         # Mapear sensibilidad a distancia real
         self._distance_map = {
@@ -298,15 +299,34 @@ class RepetitionDetector(BaseDetector):
                         continue
                     reported_pairs.add(pair_key)
 
-                    # Sugerencia específica para verbos dicendi
+                    # Obtener sinónimos del thesaurus
+                    synonyms = self._get_synonyms(lemma)
+
+                    # Sugerencia con sinónimos si están disponibles
                     suggestion = None
-                    if is_narrative:
+                    if synonyms:
+                        alt_text = ", ".join(synonyms[:5])
+                        suggestion = (
+                            f"'{token['text']}' aparece repetida. "
+                            f"Alternativas: {alt_text}"
+                        )
+                    elif is_narrative:
                         suggestion = (
                             f"Se usa '{token['text']}' repetidamente. "
                             f"Considerar variar con sinónimos o reformular."
                         )
 
                     # Reportar — posición solo del primer token (no del span entre ambos)
+                    extra = {
+                        "word": token["text"],
+                        "lemma": lemma,
+                        "distance": word_distance,
+                        "first_pos": token["start"],
+                        "second_pos": other["start"],
+                    }
+                    if synonyms:
+                        extra["synonyms"] = synonyms[:8]
+
                     issues.append(
                         CorrectionIssue(
                             category=self.category.value,
@@ -323,17 +343,27 @@ class RepetitionDetector(BaseDetector):
                             context=self._extract_context(text, token["start"], token["end"]),
                             chapter_index=chapter_index,
                             rule_id="REP_LEXICAL",
-                            extra_data={
-                                "word": token["text"],
-                                "lemma": lemma,
-                                "distance": word_distance,
-                                "first_pos": token["start"],
-                                "second_pos": other["start"],
-                            },
+                            extra_data=extra,
                         )
                     )
 
         return issues
+
+    def _get_synonyms(self, lemma: str) -> list[str]:
+        """Obtiene sinónimos vía DictionaryManager (lazy load, graceful fallback)."""
+        if self._thesaurus is False:
+            return []
+        if self._thesaurus is None:
+            try:
+                from narrative_assistant.dictionaries import get_dictionary_manager
+                self._thesaurus = get_dictionary_manager()
+            except Exception:
+                self._thesaurus = False  # Sentinel: don't retry
+                return []
+        try:
+            return self._thesaurus.get_synonyms(lemma)
+        except Exception:
+            return []
 
     def _detect_sentence_starts(
         self, text: str, chapter_index: int | None

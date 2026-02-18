@@ -50,6 +50,12 @@ const selectedAlert = computed<Alert | null>(() => {
   return null
 })
 
+// Sinónimos del thesaurus (para alertas de repetición)
+const alertSynonyms = computed<string[]>(() => {
+  const syns = selectedAlert.value?.extraData?.synonyms
+  return Array.isArray(syns) ? syns : []
+})
+
 // Atributos agrupados por categoría
 const groupedAttributes = computed(() => {
   if (!props.entityAttributes) return new Map()
@@ -223,6 +229,15 @@ function getAlertMessage(alert: Alert): string {
         <h3 class="detail-panel__section-title">Sugerencia</h3>
         <DsCard variant="outlined" padding="sm">
           <p class="detail-panel__suggestion">{{ selectedAlert.suggestion }}</p>
+          <!-- Synonym chips (thesaurus) -->
+          <div v-if="alertSynonyms.length" class="detail-panel__synonyms">
+            <span class="detail-panel__synonyms-label">Alternativas:</span>
+            <span
+              v-for="syn in alertSynonyms"
+              :key="syn"
+              class="detail-panel__synonym-chip"
+            >{{ syn }}</span>
+          </div>
         </DsCard>
       </section>
 
@@ -419,6 +434,29 @@ function getAlertMessage(alert: Alert): string {
   font-size: var(--ds-font-size-sm);
   color: var(--ds-color-text);
   line-height: var(--ds-line-height-relaxed);
+}
+
+.detail-panel__synonyms {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-1);
+  margin-top: var(--ds-space-2);
+}
+
+.detail-panel__synonyms-label {
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-text-muted);
+  font-weight: var(--ds-font-weight-medium);
+}
+
+.detail-panel__synonym-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-info);
+  background-color: color-mix(in srgb, var(--ds-color-info) 12%, transparent);
+  border-radius: var(--ds-radius-full, 9999px);
 }
 
 .detail-panel__location {

@@ -132,13 +132,63 @@ class DictionaryManager:
         wiktionary_db = self.data_dir / "wiktionary.db"
         self._sources[DictionarySource.WIKTIONARY] = WiktionarySource(wiktionary_db)
 
-        # Sinónimos
+        # Sinónimos (auto-build from WordNet if empty)
         synonyms_db = self.data_dir / "synonyms.db"
+        self._ensure_synonyms_db(synonyms_db)
         self._sources[DictionarySource.SYNONYMS] = SynonymSource(synonyms_db)
 
         # Diccionario personalizado
         custom_path = self.data_dir / "custom_dictionary.json"
         self._sources[DictionarySource.CUSTOM] = CustomDictionarySource(custom_path)
+
+    def _ensure_synonyms_db(self, db_path: Path) -> None:
+        """Auto-build synonyms.db from WordNet OMW 1.4 if empty or missing."""
+        try:
+            count = 0
+            if db_path.exists():
+                conn = sqlite3.connect(str(db_path))
+                try:
+                    count = conn.execute("SELECT COUNT(*) FROM synonyms").fetchone()[0]
+                except Exception:
+                    count = 0
+                finally:
+                    conn.close()
+
+            if count >= 100:
+                return  # Already populated
+
+            logger.info("synonyms.db vacío o no existe. Intentando auto-build desde WordNet OMW 1.4...")
+            try:
+                from scripts.build_thesaurus_db import build
+                build(force=True)
+                logger.info("synonyms.db generado exitosamente desde WordNet.")
+            except ImportError:
+                # Try direct import path
+                try:
+                    import importlib.util
+                    import sys
+                    # Find scripts/build_thesaurus_db.py relative to project root
+                    script_candidates = [
+                        Path(__file__).parent.parent.parent.parent / "scripts" / "build_thesaurus_db.py",
+                        Path.cwd() / "scripts" / "build_thesaurus_db.py",
+                    ]
+                    for script_path in script_candidates:
+                        if script_path.exists():
+                            spec = importlib.util.spec_from_file_location("build_thesaurus_db", str(script_path))
+                            if spec and spec.loader:
+                                mod = importlib.util.module_from_spec(spec)
+                                spec.loader.exec_module(mod)
+                                mod.build(force=True)
+                                logger.info("synonyms.db generado exitosamente desde WordNet.")
+                                return
+                    logger.warning(
+                        "No se encontró scripts/build_thesaurus_db.py. "
+                        "Ejecuta manualmente: python scripts/build_thesaurus_db.py"
+                    )
+                except Exception as e:
+                    logger.warning(f"Auto-build de synonyms.db falló: {e}. La app funcionará sin sinónimos.")
+            except Exception as e:
+                logger.warning(f"Auto-build de synonyms.db falló: {e}. La app funcionará sin sinónimos.")
 
     def lookup(
         self,
