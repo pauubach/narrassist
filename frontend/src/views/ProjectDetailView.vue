@@ -156,10 +156,10 @@
                   @refresh="loadChapters(project.id)"
                 />
 
-                <!-- Panel Alertas rápidas -->
+                <!-- Panel Alertas (muestra alertas filtradas por el dashboard cuando está activo) -->
                 <AlertsPanel
                   v-show="sidebarTab === 'alerts'"
-                  :alerts="alerts"
+                  :alerts="workspaceStore.activeTab === 'alerts' && dashboardFilteredAlerts.length > 0 ? dashboardFilteredAlerts : alerts"
                   @navigate="navigateToAlerts"
                   @filter-severity="handleFilterSeverity"
                   @alert-click="onAlertSelect"
@@ -279,14 +279,14 @@
             />
           </AnalysisRequired>
 
-          <!-- Tab Alertas -->
+          <!-- Tab Alertas (Dashboard en centro, lista en sidebar, detalle en panel dcho) -->
           <template v-else-if="workspaceStore.activeTab === 'alerts'">
             <ComparisonBanner
               :project-id="project.id"
               :analysis-completed="project.analysisStatus === 'completed'"
             />
-            <AlertsTab
-              ref="alertsTabRef"
+            <AlertsDashboard
+              ref="alertsDashboardRef"
               :alerts="alerts"
               :chapters="chapters"
               :loading="loading"
@@ -296,7 +296,9 @@
               @alert-resolve="onAlertResolve"
               @alert-dismiss="onAlertDismiss"
               @refresh="loadAlerts(project.id)"
+              @resolve-all="onResolveAll"
               @open-correction-config="correctionConfigModalRef?.show()"
+              @filter-change="onDashboardFilterChange"
             />
           </template>
 
@@ -472,7 +474,7 @@ import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
 import ExportDialog from '@/components/ExportDialog.vue'
 import StatusBar from '@/components/layout/StatusBar.vue'
-import { WorkspaceTabs, TextTab, AlertsTab, EntitiesTab, RelationsTab, StyleTab, GlossaryTab, ResumenTab, PanelResizer } from '@/components/workspace'
+import { WorkspaceTabs, TextTab, AlertsDashboard, EntitiesTab, RelationsTab, StyleTab, GlossaryTab, ResumenTab, PanelResizer } from '@/components/workspace'
 import { AnalysisRequired } from '@/components/analysis'
 import { TimelineView } from '@/components/timeline'
 import { ChaptersPanel, AlertsPanel, CharactersPanel, AssistantPanel, HistoryPanel, InconsistenciesPanel, SemanticSearchPanel } from '@/components/sidebar'
@@ -552,8 +554,15 @@ const exportingStyleGuide = ref(false)
 // Refs to tab components (for Ctrl+F routing)
 const textTabRef = ref<InstanceType<typeof TextTab> | null>(null)
 const entitiesTabRef = ref<InstanceType<typeof EntitiesTab> | null>(null)
-const alertsTabRef = ref<InstanceType<typeof AlertsTab> | null>(null)
+const alertsDashboardRef = ref<InstanceType<typeof AlertsDashboard> | null>(null)
 const glossaryTabRef = ref<InstanceType<typeof GlossaryTab> | null>(null)
+
+// Alertas filtradas por el dashboard (se pasan al sidebar)
+const dashboardFilteredAlerts = ref<Alert[]>([])
+
+function onDashboardFilterChange(filtered: Alert[]) {
+  dashboardFilteredAlerts.value = filtered
+}
 
 // Estado para sincronización
 const activeChapterId = ref<number | null>(null)
@@ -683,7 +692,7 @@ const handleFind = () => {
       entitiesTabRef.value?.focusSearch()
       break
     case 'alerts':
-      alertsTabRef.value?.focusSearch()
+      alertsDashboardRef.value?.focusSearch()
       break
     case 'glossary':
       glossaryTabRef.value?.focusSearch()
@@ -1004,6 +1013,19 @@ const onAlertDismiss = async (alert: Alert) => {
   }
 }
 
+const onResolveAll = async () => {
+  try {
+    const projectId = project.value!.id
+    await api.postRaw(`/api/projects/${projectId}/alerts/resolve-all`)
+    await loadAlerts(projectId)
+    selectionStore.clearAll()
+    toast.add({ severity: 'success', summary: 'Resueltas', detail: 'Todas las alertas activas han sido resueltas', life: 3000 })
+  } catch (err) {
+    console.error('Error resolving all alerts:', err)
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron resolver las alertas', life: 3000 })
+  }
+}
+
 const navigateToAlerts = () => {
   workspaceStore.setActiveTab('alerts')
 }
@@ -1227,6 +1249,11 @@ watch(() => workspaceStore.activeTab, async (newTab) => {
   if (newTab === 'text' && workspaceStore.scrollToPosition !== null) {
     console.log('[ProjectDetailView] Navigating to text with pending scroll, ensuring chapters loaded...')
     await loadChapters(project.value.id, project.value)  // Usa cache si ya están cargados
+  }
+
+  // Cambiar sidebar a 'alerts' cuando entramos en el tab de alertas
+  if (newTab === 'alerts') {
+    sidebarTab.value = 'alerts'
   }
 
   // Cargas lazy con cache para otros tabs

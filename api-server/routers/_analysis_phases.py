@@ -2937,8 +2937,8 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
 
                     # Obtener document fingerprint
                     # Obtener fingerprint del proyecto (campo de BD, NO de ctx)
-    _fp_project = ctx.get("project")
-    document_fingerprint = getattr(_fp_project, "document_fingerprint", "") if _fp_project else ""
+                    _fp_project = ctx.get("project")
+                    document_fingerprint = getattr(_fp_project, "document_fingerprint", "") if _fp_project else ""
 
                     speech_alerts = tracker_speech.detect_changes(
                         character_id=entity.id,

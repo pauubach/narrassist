@@ -4,6 +4,7 @@ Router: events
 Endpoints para detección y export de eventos narrativos.
 
 Endpoints:
+- GET /api/projects/{project_id}/chapters/{chapter_number}/events - Eventos de un capítulo
 - GET /api/projects/{project_id}/events/export - Exportar eventos (CSV/JSON)
 - GET /api/projects/{project_id}/events/stats - Estadísticas de eventos
 """
@@ -24,6 +25,95 @@ from fastapi.responses import StreamingResponse
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ============================================================================
+# Chapter Events Endpoint
+# ============================================================================
+
+@router.get("/api/projects/{project_id}/chapters/{chapter_number}/events", response_model=ApiResponse)
+def get_chapter_events(project_id: int, chapter_number: int):
+    """
+    Obtiene eventos narrativos detectados en un capítulo específico.
+
+    Args:
+        project_id: ID del proyecto
+        chapter_number: Número de capítulo
+
+    Returns:
+        ApiResponse con eventos agrupados por tier
+    """
+    try:
+        if not deps.project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = deps.project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        if not deps.chapter_repository:
+            return ApiResponse(success=False, error="Chapter repository not initialized")
+
+        chapters = deps.chapter_repository.get_by_project(project_id)
+        chapter = next((ch for ch in chapters if ch.chapter_number == chapter_number), None)
+
+        if not chapter:
+            raise HTTPException(status_code=404, detail=f"Capítulo {chapter_number} no encontrado")
+
+        from narrative_assistant.analysis.event_detection import detect_events_in_chapter
+        from narrative_assistant.analysis.event_types import EVENT_TIER_MAP, EventTier
+        from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+
+        nlp = load_spacy_model()
+
+        # Get previous chapter text for POV change detection
+        prev_chapter_text = None
+        if chapter_number > 1:
+            prev_ch = next((ch for ch in chapters if ch.chapter_number == chapter_number - 1), None)
+            if prev_ch:
+                prev_chapter_text = prev_ch.content
+
+        events = detect_events_in_chapter(
+            text=chapter.content,
+            chapter_number=chapter_number,
+            nlp=nlp,
+            enable_llm=False,
+            prev_chapter_text=prev_chapter_text
+        )
+
+        def event_to_dict(e):
+            return {
+                "event_type": e.event_type.value,
+                "description": e.description,
+                "confidence": round(e.confidence, 2),
+                "start_char": e.start_char,
+                "end_char": e.end_char,
+                "entity_ids": e.entity_ids,
+                "metadata": e.metadata,
+            }
+
+        tier1 = [event_to_dict(e) for e in events if EVENT_TIER_MAP.get(e.event_type) == EventTier.TIER_1]
+        tier2 = [event_to_dict(e) for e in events if EVENT_TIER_MAP.get(e.event_type) == EventTier.TIER_2]
+        tier3 = [event_to_dict(e) for e in events if EVENT_TIER_MAP.get(e.event_type) == EventTier.TIER_3]
+
+        events_by_type = Counter(e.event_type.value for e in events)
+
+        return ApiResponse(success=True, data={
+            "project_id": project_id,
+            "chapter_number": chapter_number,
+            "chapter_title": getattr(chapter, "title", None),
+            "total_events": len(events),
+            "tier1_events": tier1,
+            "tier2_events": tier2,
+            "tier3_events": tier3,
+            "events_by_type": dict(events_by_type),
+        })
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error detecting events for project {project_id} chapter {chapter_number}: {e}", exc_info=True)
+        return ApiResponse(success=False, error=f"Error interno del servidor: {str(e)}")
 
 
 # ============================================================================

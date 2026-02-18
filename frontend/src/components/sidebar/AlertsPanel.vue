@@ -1,89 +1,136 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { Alert, AlertSeverity } from '@/types'
-import { useAlertUtils } from '@/composables/useAlertUtils'
+import { useAlertUtils, META_CATEGORIES, type MetaCategoryKey } from '@/composables/useAlertUtils'
 import { useListKeyboardNav } from '@/composables/useListKeyboardNav'
+import { useSelectionStore } from '@/stores/selection'
 
 /**
- * AlertsPanel - Panel compacto de alertas para el sidebar.
+ * AlertsPanel - Panel de alertas para el sidebar.
  *
- * Muestra las alertas directamente ordenadas por severidad.
- * Click en una alerta navega al tab de alertas con esa alerta seleccionada.
+ * Muestra alertas ordenadas por severidad con filtro rápido por meta-categoría.
+ * Click en una alerta la selecciona en el inspector (panel dcho).
  */
 
 const props = defineProps<{
-  /** Lista de alertas */
+  /** Lista de alertas (ya filtradas por el parent si aplica) */
   alerts: Alert[]
 }>()
 
 const emit = defineEmits<{
-  /** Cuando se hace click para navegar a pantalla de alertas */
   (e: 'navigate'): void
-  /** Cuando se selecciona una severidad específica */
   (e: 'filter-severity', severity: AlertSeverity): void
-  /** Cuando se hace click en una alerta específica - navega al texto */
   (e: 'alert-click', alert: Alert): void
-  /** Cuando se quiere navegar al texto donde está la alerta */
   (e: 'alert-navigate', alert: Alert): void
 }>()
 
-const { getSeverityColor } = useAlertUtils()
+const selectionStore = useSelectionStore()
+const { getSeverityColor, getCategoryConfig } = useAlertUtils()
 const { setItemRef: setAlertRef, getTabindex: getAlertTabindex, onKeydown: onAlertListKeydown, focusedIndex: alertFocusedIndex } = useListKeyboardNav()
 
-/** Orden de severidad para ordenar alertas */
+/** Filtro activo por meta-categoría */
+const activeFilter = ref<MetaCategoryKey | null>(null)
+
+/** Orden de severidad */
 const severityOrder: Record<AlertSeverity, number> = {
-  critical: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
-  info: 4
+  critical: 0, high: 1, medium: 2, low: 3, info: 4
 }
 
-/** Total de alertas */
-const totalCount = computed(() => props.alerts.length)
-
-/** Alertas ordenadas por severidad (sin límite) */
-const sortedAlerts = computed(() => {
-  return [...props.alerts]
-    .sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity])
+/** Conteo por meta-categoría */
+const metaCounts = computed(() => {
+  const counts: Record<MetaCategoryKey, number> = { errors: 0, inconsistencies: 0, suggestions: 0 }
+  for (const alert of props.alerts) {
+    if (alert.status !== 'active') continue
+    for (const [key, meta] of Object.entries(META_CATEGORIES)) {
+      if (meta.categories.includes(alert.category as never)) {
+        counts[key as MetaCategoryKey]++
+        break
+      }
+    }
+  }
+  return counts
 })
 
-/** Truncar título si es muy largo */
-function truncateTitle(title: string, maxLen = 45): string {
+/** Alertas filtradas y ordenadas */
+const filteredAlerts = computed(() => {
+  let list = props.alerts
+  if (activeFilter.value) {
+    const cats = META_CATEGORIES[activeFilter.value].categories
+    list = list.filter(a => cats.includes(a.category as never))
+  }
+  return [...list].sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity])
+})
+
+/** Total visible */
+const visibleCount = computed(() => filteredAlerts.value.length)
+const totalCount = computed(() => props.alerts.length)
+
+/** Toggle filtro */
+function toggleFilter(key: MetaCategoryKey) {
+  activeFilter.value = activeFilter.value === key ? null : key
+}
+
+/** Truncar título */
+function truncateTitle(title: string, maxLen = 40): string {
   if (title.length <= maxLen) return title
   return title.slice(0, maxLen - 3) + '...'
 }
 
+/** Check si una alerta está seleccionada */
+function isSelected(alert: Alert): boolean {
+  return selectionStore.selectedAlertIds.includes(alert.id)
+}
+
 function handleAlertClick(alert: Alert) {
   emit('alert-click', alert)
-  // Navegar al texto donde está la alerta, no a la pantalla de alertas
-  emit('alert-navigate', alert)
 }
 </script>
 
 <template>
   <div class="alerts-panel">
+    <!-- Header -->
     <div class="panel-header">
       <span class="panel-title">Alertas</span>
-      <span class="panel-count">{{ totalCount }}</span>
+      <span class="panel-count">
+        {{ activeFilter ? `${visibleCount}/${totalCount}` : totalCount }}
+      </span>
     </div>
 
-    <div v-if="alerts.length === 0" class="empty-state">
+    <!-- Filtros rápidos por meta-categoría -->
+    <div class="meta-filters">
+      <button
+        v-for="(meta, key) in META_CATEGORIES"
+        :key="key"
+        class="meta-filter"
+        :class="{ 'meta-filter--active': activeFilter === key }"
+        :style="{ '--meta-color': meta.color }"
+        :title="`${meta.label} (${metaCounts[key as MetaCategoryKey]})`"
+        @click="toggleFilter(key as MetaCategoryKey)"
+      >
+        <i :class="meta.icon" class="meta-filter-icon"></i>
+        <span class="meta-filter-count">{{ metaCounts[key as MetaCategoryKey] }}</span>
+      </button>
+    </div>
+
+    <!-- Empty state -->
+    <div v-if="filteredAlerts.length === 0" class="empty-state">
       <i class="pi pi-check-circle"></i>
-      <span>Sin alertas</span>
+      <span>{{ activeFilter ? 'Sin alertas de este tipo' : 'Sin alertas' }}</span>
     </div>
 
+    <!-- Lista de alertas -->
     <div v-else class="alerts-list" role="listbox" aria-label="Alertas" @keydown="onAlertListKeydown">
       <button
-        v-for="(alert, index) in sortedAlerts"
+        v-for="(alert, index) in filteredAlerts"
         :key="alert.id"
         :ref="el => setAlertRef(el, index)"
         type="button"
         role="option"
         class="alert-row"
+        :class="{ 'alert-row--selected': isSelected(alert), 'alert-row--resolved': alert.status !== 'active' }"
         :tabindex="getAlertTabindex(index)"
-        :title="alert.title"
-        :aria-selected="alertFocusedIndex === index"
+        :aria-selected="isSelected(alert)"
+        :aria-label="`${alert.severity}: ${alert.title}${alert.chapter ? `, Cap. ${alert.chapter}` : ''}`"
         @click="handleAlertClick(alert)"
         @keydown.enter.stop="handleAlertClick(alert)"
         @focus="alertFocusedIndex = index"
@@ -93,6 +140,17 @@ function handleAlertClick(alert: Alert) {
           :style="{ backgroundColor: getSeverityColor(alert.severity) }"
         ></span>
         <span class="alert-title">{{ truncateTitle(alert.title) }}</span>
+        <span v-if="alert.chapter" class="alert-chapter">{{ alert.chapter }}</span>
+        <i
+          v-if="alert.status === 'resolved'"
+          class="pi pi-check status-icon status-icon--resolved"
+          title="Resuelta"
+        ></i>
+        <i
+          v-else-if="alert.status === 'dismissed'"
+          class="pi pi-minus-circle status-icon status-icon--dismissed"
+          title="Descartada"
+        ></i>
       </button>
     </div>
   </div>
@@ -127,6 +185,47 @@ function handleAlertClick(alert: Alert) {
   border-radius: var(--ds-radius-full);
 }
 
+/* Meta-category filters */
+.meta-filters {
+  display: flex;
+  gap: var(--ds-space-1);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border-bottom: 1px solid var(--ds-surface-border);
+}
+
+.meta-filter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--ds-surface-border);
+  border-radius: var(--ds-radius-full);
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-text-secondary);
+  transition: all var(--ds-transition-fast);
+}
+
+.meta-filter:hover {
+  background: var(--ds-surface-hover);
+}
+
+.meta-filter--active {
+  background: var(--meta-color);
+  color: white;
+  border-color: var(--meta-color);
+}
+
+.meta-filter-icon {
+  font-size: 0.7rem;
+}
+
+.meta-filter-count {
+  font-weight: var(--ds-font-weight-semibold);
+}
+
+/* Empty state */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -135,37 +234,50 @@ function handleAlertClick(alert: Alert) {
   gap: var(--ds-space-2);
   padding: var(--ds-space-6);
   color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-size-sm);
 }
 
 .empty-state i {
-  font-size: 2rem;
+  font-size: 1.5rem;
   color: var(--ds-color-success);
 }
 
+/* Alerts list */
 .alerts-list {
   display: flex;
   flex-direction: column;
-  padding: var(--ds-space-2);
+  padding: var(--ds-space-1);
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
 }
 
 .alert-row {
   display: flex;
   align-items: center;
   gap: var(--ds-space-2);
-  padding: var(--ds-space-2) var(--ds-space-3);
+  padding: 6px var(--ds-space-2);
   border: none;
+  border-left: 3px solid transparent;
   background: transparent;
-  border-radius: var(--ds-radius-md);
+  border-radius: 0 var(--ds-radius-md) var(--ds-radius-md) 0;
   cursor: pointer;
-  transition: background-color var(--ds-transition-fast);
+  transition: background-color var(--ds-transition-fast), border-color var(--ds-transition-fast);
   width: 100%;
   text-align: left;
 }
 
 .alert-row:hover {
   background: var(--ds-surface-hover);
+}
+
+.alert-row--selected {
+  border-left-color: var(--ds-color-primary, var(--primary-color));
+  background: var(--surface-100, rgba(0, 0, 0, 0.04));
+}
+
+.alert-row--resolved {
+  opacity: 0.55;
 }
 
 .severity-dot {
@@ -182,5 +294,37 @@ function handleAlertClick(alert: Alert) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+}
+
+.alert-chapter {
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  color: var(--ds-color-text-secondary);
+  background: var(--ds-surface-hover);
+  padding: 1px 6px;
+  border-radius: var(--ds-radius-full);
+}
+
+.status-icon {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+}
+
+.status-icon--resolved {
+  color: var(--ds-color-success, var(--green-500));
+}
+
+.status-icon--dismissed {
+  color: var(--ds-color-text-secondary);
+}
+
+/* Dark mode */
+:global(.dark) .alert-row--selected {
+  background: var(--surface-700, rgba(255, 255, 255, 0.08));
+}
+
+:global(.dark) .meta-filter {
+  border-color: var(--surface-600);
 }
 </style>

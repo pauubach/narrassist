@@ -13,7 +13,7 @@ from deps import (
     _verify_entity_ownership,
     logger,
 )
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Body, HTTPException, Query
 
 router = APIRouter()
 
@@ -1828,6 +1828,76 @@ def list_rejected_entities(project_id: int):
         logger.error(
             f"Error listing rejected entities for project {project_id}: {e}",
             exc_info=True,
+        )
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.post("/api/projects/{project_id}/entities/{entity_id}/reject", response_model=ApiResponse)
+def reject_entity_by_id(project_id: int, entity_id: int, body: dict = Body(default={})):
+    """
+    Rechaza una entidad por su ID.
+
+    Busca la entidad, obtiene su texto canónico y la rechaza
+    para que no se vuelva a detectar en futuros análisis.
+
+    Args:
+        project_id: ID del proyecto
+        entity_id: ID de la entidad
+        body: Opcional, con campo 'reason'
+    """
+    try:
+        from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.nlp.entity_validator import get_entity_validator
+
+        entity_repo = get_entity_repository()
+        entity = entity_repo.get_entity(entity_id)
+
+        if not entity:
+            raise HTTPException(status_code=404, detail="Entidad no encontrada")
+
+        entity_text = entity.canonical_name
+        reason = body.get("reason", "") if isinstance(body, dict) else ""
+
+        validator = get_entity_validator(db=deps.get_database())  # type: ignore[misc]
+        success = validator.reject_entity(project_id, entity_text)
+
+        if success:
+            if reason:
+                db = deps.get_database()  # type: ignore[misc]
+                db.execute(
+                    """
+                    UPDATE rejected_entities
+                    SET rejection_reason = ?
+                    WHERE project_id = ? AND entity_text = ?
+                    """,
+                    (reason, project_id, entity_text.lower().strip()),
+                )
+
+            try:
+                from routers._invalidation import emit_invalidation_event
+
+                emit_invalidation_event(
+                    deps.get_database(),  # type: ignore[misc]
+                    project_id,
+                    "reject",
+                    [],
+                    detail={"entity_text": entity_text, "entity_id": entity_id},
+                )
+            except Exception:
+                pass
+
+            return ApiResponse(
+                success=True,
+                data={"message": f"Entidad '{entity_text}' rechazada correctamente"},
+            )
+        else:
+            return ApiResponse(success=False, error="Error al rechazar entidad")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error rejecting entity {entity_id} for project {project_id}: {e}", exc_info=True
         )
         return ApiResponse(success=False, error="Error interno del servidor")
 

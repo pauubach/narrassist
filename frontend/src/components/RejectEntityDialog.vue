@@ -111,11 +111,6 @@ function selectScope(value: string) {
         </div>
       </Message>
 
-      <Message severity="info" :closable="false" class="mb-4">
-        El sistema no volverá a detectar este texto como entidad en futuros análisis.
-        Puedes revertirlo en Configuración.
-      </Message>
-
       <div class="scope-selection">
         <label class="scope-label">Aplicar en:</label>
 
@@ -141,6 +136,13 @@ function selectScope(value: string) {
             </div>
           </div>
         </div>
+
+        <Message severity="info" :closable="false" class="scope-hint">
+          {{ selectedScope === 'global'
+            ? 'El sistema no volverá a detectar este texto como entidad en ningún proyecto.'
+            : 'El sistema no volverá a detectar este texto como entidad en este proyecto.'
+          }}
+        </Message>
       </div>
 
       <div class="reason-input mt-4">
@@ -178,33 +180,33 @@ function selectScope(value: string) {
 .reject-entity-content {
   display: flex;
   flex-direction: column;
-  gap: var(--ds-spacing-md);
+  gap: var(--ds-space-4);
 }
 
 .scope-selection {
   display: flex;
   flex-direction: column;
-  gap: var(--ds-spacing-sm);
+  gap: var(--ds-space-2);
 }
 
 .scope-label {
   font-weight: 600;
-  color: var(--ds-color-text-primary);
-  margin-bottom: var(--ds-spacing-xs);
+  color: var(--ds-color-text);
+  margin-bottom: var(--ds-space-1);
 }
 
 .scope-options {
   display: flex;
   flex-direction: column;
-  gap: var(--ds-spacing-sm);
+  gap: var(--ds-space-2);
 }
 
 .scope-option {
   display: flex;
   align-items: flex-start;
-  gap: var(--ds-spacing-sm);
-  padding: var(--ds-spacing-md);
-  border: 1px solid var(--ds-color-border);
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-3);
+  border: 1px solid var(--ds-surface-border);
   border-radius: var(--ds-radius-md);
   cursor: pointer;
   transition: all 0.15s ease;
@@ -212,7 +214,7 @@ function selectScope(value: string) {
 
 .scope-option:hover {
   border-color: var(--ds-color-primary);
-  background-color: var(--ds-color-surface-hover);
+  background-color: var(--ds-surface-hover);
 }
 
 .scope-option.selected {
@@ -230,14 +232,14 @@ function selectScope(value: string) {
 
 .scope-option-label {
   font-weight: 500;
-  color: var(--ds-color-text-primary);
+  color: var(--ds-color-text);
   cursor: pointer;
   display: block;
-  margin-bottom: var(--ds-spacing-xs);
+  margin-bottom: var(--ds-space-1);
 }
 
 .scope-option-description {
-  font-size: var(--ds-font-size-sm);
+  font-size: var(--ds-font-sm);
   color: var(--ds-color-text-secondary);
   margin: 0;
   line-height: 1.4;
@@ -246,23 +248,27 @@ function selectScope(value: string) {
 .reason-input {
   display: flex;
   flex-direction: column;
-  gap: var(--ds-spacing-xs);
+  gap: var(--ds-space-1);
 }
 
 .reason-label {
-  font-size: var(--ds-font-size-sm);
+  font-size: var(--ds-font-sm);
   color: var(--ds-color-text-secondary);
 }
 
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
-  gap: var(--ds-spacing-sm);
+  gap: var(--ds-space-2);
 }
 
 /* Message override */
 :deep(.p-message) {
   margin: 0;
+}
+
+.scope-hint :deep(.p-message) {
+  margin-top: var(--ds-space-1);
 }
 
 .frequent-warning {
