@@ -470,6 +470,127 @@ def resolve_ambiguous_attribute(
         return ApiResponse(success=False, error=f"Error al crear atributo: {str(e)}")
 
 
+@router.post("/api/projects/{project_id}/alerts/batch-resolve-attributes", response_model=ApiResponse)
+def batch_resolve_ambiguous_attributes(
+    project_id: int,
+    body: deps.BatchResolveAmbiguousAttributesRequest
+):
+    """
+    Resuelve múltiples alertas de atributos ambiguos en batch.
+
+    Permite al usuario resolver varias alertas simultáneamente,
+    asignando cada atributo a la entidad seleccionada o marcándolo como no asignable.
+
+    Args:
+        project_id: ID del proyecto
+        body: Lista de resoluciones [{"alert_id": int, "entity_id": int | null}, ...]
+
+    Returns:
+        Respuesta con estadísticas de resolución
+    """
+    from narrative_assistant.entities.repository import get_entity_repository
+
+    entity_repo = get_entity_repository()
+    resolved_count = 0
+    skipped_count = 0
+    errors = []
+
+    for resolution in body.resolutions:
+        alert_id = resolution.alert_id
+        entity_id = resolution.entity_id
+
+        try:
+            # Verificar ownership y tipo de alerta
+            alert, error = _verify_alert_ownership(alert_id, project_id)
+            if error:
+                skipped_count += 1
+                errors.append(f"Alert {alert_id}: ownership error")
+                continue
+
+            if alert.alert_type != "ambiguous_attribute":
+                skipped_count += 1
+                errors.append(f"Alert {alert_id}: not ambiguous_attribute type")
+                continue
+
+            # Obtener datos del atributo
+            extra_data = alert.extra_data
+            if not extra_data:
+                skipped_count += 1
+                errors.append(f"Alert {alert_id}: empty extra_data")
+                continue
+
+            attribute_key = extra_data.get("attribute_key")
+            attribute_value = extra_data.get("attribute_value")
+            candidates = extra_data.get("candidates", [])
+
+            if not attribute_key or not attribute_value:
+                skipped_count += 1
+                errors.append(f"Alert {alert_id}: incomplete attribute data")
+                continue
+
+            # Si entity_id es None, marcar como "No asignar"
+            if entity_id is None:
+                alert.status = AlertStatus.RESOLVED
+                alert.resolution_note = "Usuario eligió no asignar (batch)"
+                deps.alert_repository.update(alert)  # type: ignore[attr-defined]
+                resolved_count += 1
+                continue
+
+            # Verificar que entity_id está entre los candidatos
+            entity_ids = [c["entity_id"] for c in candidates]
+            if entity_id not in entity_ids:
+                skipped_count += 1
+                errors.append(f"Alert {alert_id}: invalid entity_id {entity_id}")
+                continue
+
+            # Crear el atributo
+            category_map = {
+                "eye_color": "physical",
+                "hair_color": "physical",
+                "hair_type": "physical",
+                "height": "physical",
+                "build": "physical",
+                "facial_hair": "physical",
+                "skin_tone": "physical",
+                "age": "physical",
+            }
+            category = category_map.get(attribute_key, "physical")
+
+            entity_repo.create_attribute(  # type: ignore[attr-defined]
+                entity_id=entity_id,
+                attribute_type=category,
+                attribute_key=attribute_key,
+                attribute_value=attribute_value,
+                confidence=0.9,
+                chapter_id=alert.chapter,
+            )
+
+            # Marcar alerta como resuelta
+            alert.status = AlertStatus.RESOLVED
+            alert.resolution_note = f"Atributo asignado (batch) a entidad {entity_id}"
+            deps.alert_repository.update(alert)  # type: ignore[attr-defined]
+            resolved_count += 1
+
+        except Exception as e:
+            skipped_count += 1
+            errors.append(f"Alert {alert_id}: {str(e)}")
+            logger.error(f"Error resolviendo alert {alert_id}: {e}")
+
+    message = f"Resueltas {resolved_count} alertas"
+    if skipped_count > 0:
+        message += f", omitidas {skipped_count}"
+
+    return ApiResponse(
+        success=True,
+        message=message,
+        data={
+            "resolved": resolved_count,
+            "skipped": skipped_count,
+            "errors": errors if errors else None
+        }
+    )
+
+
 @router.post("/api/projects/{project_id}/alerts/resolve-all", response_model=ApiResponse)
 def resolve_all_alerts(project_id: int):
     """

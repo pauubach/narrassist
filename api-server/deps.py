@@ -402,6 +402,17 @@ class ResolveAmbiguousAttributeRequest(BaseModel):
     entity_id: Optional[int] = None  # None = "No asignar"
 
 
+class AmbiguousAttributeResolution(BaseModel):
+    """Resolución individual para batch resolve de alertas ambiguas"""
+    alert_id: int
+    entity_id: Optional[int] = None  # None = "No asignar"
+
+
+class BatchResolveAmbiguousAttributesRequest(BaseModel):
+    """POST /api/projects/{id}/alerts/batch-resolve-attributes"""
+    resolutions: list[AmbiguousAttributeResolution] = Field(..., min_length=1)
+
+
 class SuppressionRuleRequest(BaseModel):
     """POST /api/projects/{id}/alerts/suppression-rules"""
     rule_type: str = Field(..., pattern=r"^(alert_type|category|entity|source_module)$")
