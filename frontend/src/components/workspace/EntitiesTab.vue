@@ -848,13 +848,13 @@ defineExpose({ focusSearch })
                   v-model="newAttribute.name"
                   placeholder="Nombre (ej: color_ojos)"
                   class="attr-form-input"
-                  @keyup.enter="createAttribute"
+                  @keyup.enter="onCreateAttribute"
                 />
                 <InputText
                   v-model="newAttribute.value"
                   placeholder="Valor (ej: azules)"
                   class="attr-form-input"
-                  @keyup.enter="createAttribute"
+                  @keyup.enter="onCreateAttribute"
                 />
                 <div class="attr-form-actions">
                   <Button

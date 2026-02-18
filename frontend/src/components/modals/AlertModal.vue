@@ -285,9 +285,9 @@ function resolveAsUnassigned() {
         <!-- Botones para atributo ambiguo -->
         <div v-if="isActive && isAmbiguousAttribute" class="ambiguous-actions">
           <!-- Mostrar contexto ambiguo si está disponible -->
-          <div v-if="alert.extraData?.sourceText" class="ambiguous-context">
+          <div v-if="alert?.extraData?.sourceText" class="ambiguous-context">
             <i class="pi pi-info-circle"></i>
-            <span class="context-text">{{ alert.extraData.sourceText }}</span>
+            <span class="context-text">{{ alert?.extraData?.sourceText }}</span>
           </div>
           <p class="ambiguous-label">¿Quién tiene este atributo?</p>
           <div class="candidate-buttons">

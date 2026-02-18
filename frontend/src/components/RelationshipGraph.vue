@@ -399,7 +399,7 @@ import { api } from '@/services/apiClient'
 import {
   useRelationshipGraphStore,
   type RelationshipValence,
-  type RelationshipType
+  type GraphRelationshipType as RelationshipType
 } from '@/stores/relationshipGraph'
 
 // Store para persistir filtros

@@ -40,7 +40,7 @@
 
       <!-- Tabs -->
       <TabView class="detail-tabs">
-        <TabPanel header="Libros">
+        <TabPanel value="books" header="Libros">
           <CollectionBookList
             :collection="collection"
             @add-project="handleAddProject"
@@ -48,14 +48,14 @@
           />
         </TabPanel>
 
-        <TabPanel header="Entity Links">
+        <TabPanel value="entity-links" header="Entity Links">
           <EntityLinkPanel
             :collection-id="collection.id"
             :projects="collection.projects"
           />
         </TabPanel>
 
-        <TabPanel header="Análisis Cross-Book">
+        <TabPanel value="cross-book" header="Análisis Cross-Book">
           <CrossBookReport :collection-id="collection.id" />
         </TabPanel>
       </TabView>

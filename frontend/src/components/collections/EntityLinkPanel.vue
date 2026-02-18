@@ -2,7 +2,7 @@
   <div class="entity-link-panel">
     <TabView>
       <!-- Suggestions tab -->
-      <TabPanel header="Sugerencias">
+      <TabPanel value="suggestions" header="Sugerencias">
         <div class="suggestions-header">
           <div class="threshold-control">
             <label>Umbral de similitud: {{ (threshold * 100).toFixed(0) }}%</label>
@@ -93,7 +93,7 @@
       </TabPanel>
 
       <!-- Confirmed links tab -->
-      <TabPanel header="Confirmados">
+      <TabPanel value="confirmed" header="Confirmados">
         <div v-if="!collectionsStore.entityLinks.length" class="empty-state">
           <i class="pi pi-check-circle empty-icon"></i>
           <p>No hay enlaces confirmados</p>
@@ -151,7 +151,7 @@
       </TabPanel>
 
       <!-- Manual linking tab -->
-      <TabPanel header="Enlace Manual">
+      <TabPanel value="manual" header="Enlace Manual">
         <div class="manual-link-form">
           <div class="link-side">
             <h4>Libro A</h4>

@@ -15,6 +15,7 @@ import InputText from 'primevue/inputtext'
 import Tag from 'primevue/tag'
 import { api } from '@/services/apiClient'
 import { useToast } from 'primevue/usetoast'
+import type { ApiResponse } from '@/types/api'
 import type { SuppressionRuleType, SuppressionRule } from '@/types'
 
 interface Props {
@@ -79,9 +80,9 @@ async function loadRules() {
   if (!props.projectId) return
   loading.value = true
   try {
-    const res = await api.get(`/api/projects/${props.projectId}/suppression-rules`)
+    const res = await api.get<ApiResponse>(`/api/projects/${props.projectId}/suppression-rules`)
     if (res.success && Array.isArray(res.data)) {
-      rules.value = res.data.map(transformRule)
+      rules.value = (res.data as Record<string, unknown>[]).map(transformRule)
     }
   } catch (e) {
     console.error('Error loading suppression rules:', e)
@@ -104,7 +105,7 @@ async function createRule() {
     if (newReason.value.trim()) {
       body.reason = newReason.value.trim()
     }
-    const res = await api.post(`/api/projects/${props.projectId}/suppression-rules`, body)
+    const res = await api.post<ApiResponse>(`/api/projects/${props.projectId}/suppression-rules`, body)
     if (res.success) {
       toast.add({ severity: 'success', summary: 'Regla creada', life: 2000 })
       newPattern.value = ''
@@ -124,7 +125,7 @@ async function createRule() {
 
 async function deleteRule(ruleId: number) {
   try {
-    const res = await api.del(`/api/projects/${props.projectId}/suppression-rules/${ruleId}`)
+    const res = await api.del<ApiResponse>(`/api/projects/${props.projectId}/suppression-rules/${ruleId}`)
     if (res.success) {
       toast.add({ severity: 'info', summary: 'Regla eliminada', life: 2000 })
       await loadRules()

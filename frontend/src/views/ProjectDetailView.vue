@@ -395,11 +395,11 @@
                   v-else-if="selectedAlert"
                   :alert="selectedAlert"
                   :chapters="chapters"
-                  @navigate="onAlertNavigate(selectedAlert, $event)"
-                  @navigate-to-position="(s, e, t) => onAlertNavigateToPosition(selectedAlert, s, e, t)"
-                  @resolve="onAlertResolve(selectedAlert)"
-                  @dismiss="onAlertDismiss(selectedAlert)"
-                  @resolve-ambiguous-attribute="(entityId) => onResolveAmbiguousAttribute(selectedAlert, entityId)"
+                  @navigate="selectedAlert && onAlertNavigate(selectedAlert, $event)"
+                  @navigate-to-position="(s, e, t) => selectedAlert && onAlertNavigateToPosition(selectedAlert, s, e, t)"
+                  @resolve="selectedAlert && onAlertResolve(selectedAlert)"
+                  @dismiss="selectedAlert && onAlertDismiss(selectedAlert)"
+                  @resolve-ambiguous-attribute="(entityId) => selectedAlert && onResolveAmbiguousAttribute(selectedAlert, entityId)"
                   @close="selectionStore.clearAll()"
                 />
 

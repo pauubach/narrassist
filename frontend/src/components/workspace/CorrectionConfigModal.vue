@@ -908,7 +908,7 @@ import InheritanceIndicator from './InheritanceIndicator.vue'
 import { api } from '@/services/apiClient'
 
 // Tipos importados de corrections.ts
-import type { DetailedCorrectionConfig } from '@/types'
+import type { DetailedCorrectionConfig, EditorialRule } from '@/types'
 
 // Alias local para facilitar migración
 type CorrectionConfig = DetailedCorrectionConfig
