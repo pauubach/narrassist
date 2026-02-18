@@ -714,7 +714,7 @@ defineExpose({ focusSearch })
       :closable="false"
       :show-header="false"
       :style="{ width: '95vw', maxWidth: '1000px', height: '90vh' }"
-      :content-style="{ padding: 0, height: '100%', display: 'flex', flexDirection: 'column' }"
+      :content-style="{ padding: 0, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }"
       :pt="{ root: { class: 'sequential-dialog' } }"
       @update:visible="!$event && sequentialMode.exit()"
     >

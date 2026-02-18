@@ -548,6 +548,7 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   background: var(--p-surface-0);
   border-radius: var(--app-radius-lg);
   overflow: hidden;
@@ -628,6 +629,7 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
 /* Main Content */
 .sequential-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 1.5rem;
   display: flex;
