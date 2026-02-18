@@ -136,7 +136,7 @@ Los badges filled en dark mode deben usar texto oscuro (#1a1a1a o similar) en lu
 |-------|-------------|----------|-----------|--------|
 | High | var(--green-500) #22c55e | var(--green-50) #f0fdf4 | **3.1:1** | FAIL |
 | Medium | var(--yellow-500) #eab308 | var(--yellow-50) #fefce8 | **1.9:1** | FAIL |
-| Low | var(--red-500) #ef4444 | var(--red-50) #fef2f2 | **3.8:1** | FAIL |
+| Low | var(--ds-color-danger, #ef4444) #ef4444 | var(--red-50) #fef2f2 | **3.8:1** | FAIL |
 
 **PROBLEMA:** Los badges de confianza no cumplen WCAG AA para texto normal (4.5:1).
 
@@ -268,26 +268,26 @@ Los siguientes archivos usan `color: var(--{color}-500)` para texto, que puede n
 
 | Archivo | Uso | Prioridad |
 |---------|-----|-----------|
-| `TimelineView.vue` | color: var(--red-500) | Media |
-| `PacingAnalysisTab.vue` | color: var(--green-500), var(--red-500) | Media |
+| `TimelineView.vue` | color: var(--ds-color-danger, #ef4444) | Media |
+| `PacingAnalysisTab.vue` | color: var(--green-500), var(--ds-color-danger, #ef4444) | Media |
 | `HomeView.vue` | color: var(--green-500) | Alta |
-| `EmotionalAnalysisTab.vue` | color: var(--green-500), var(--red-500) | Media |
+| `EmotionalAnalysisTab.vue` | color: var(--green-500), var(--ds-color-danger, #ef4444) | Media |
 | `SettingsView.vue` | color: var(--green-500), var(--yellow-500), var(--blue-500) | Alta |
-| `RegisterAnalysisTab.vue` | color: var(--red-500), var(--green-500) | Media |
-| `AlertsView.vue` | color: var(--red-500), var(--blue-500) | Media |
-| `CharacterKnowledgeAnalysis.vue` | color: var(--red-500) | Media |
+| `RegisterAnalysisTab.vue` | color: var(--ds-color-danger, #ef4444), var(--green-500) | Media |
+| `AlertsView.vue` | color: var(--ds-color-danger, #ef4444), var(--blue-500) | Media |
+| `CharacterKnowledgeAnalysis.vue` | color: var(--ds-color-danger, #ef4444) | Media |
 | `TutorialDialog.vue` | color: var(--green-500) | Baja |
 | `AboutDialog.vue` | color: var(--green-500) | Baja |
 | `AnalysisProgress.vue` | color: var(--yellow-500) | Media |
-| `EmotionalAnalysis.vue` | color: var(--red-500), var(--green-500) | Media |
-| `DialogueAttributionPanel.vue` | color: var(--green-500), var(--red-500) | Media |
-| `BehaviorExpectations.vue` | color: var(--green-500), var(--red-500) | Media |
+| `EmotionalAnalysis.vue` | color: var(--ds-color-danger, #ef4444), var(--green-500) | Media |
+| `DialogueAttributionPanel.vue` | color: var(--green-500), var(--ds-color-danger, #ef4444) | Media |
+| `BehaviorExpectations.vue` | color: var(--green-500), var(--ds-color-danger, #ef4444) | Media |
 | `AlertList.vue` | color: var(--green-500) | Alta |
-| `DocumentViewer.vue` | color: var(--red-500), var(--blue-500) | Alta |
-| `EntitiesTab.vue` | color: var(--red-500) | Media |
-| `CorrectionDefaultsManager.vue` | color: var(--red-500) | Media |
-| `StatusBar.vue` | color: var(--green-500), var(--red-500) | Alta |
-| `VoiceProfile.vue` | color: var(--red-500) | Media |
+| `DocumentViewer.vue` | color: var(--ds-color-danger, #ef4444), var(--blue-500) | Alta |
+| `EntitiesTab.vue` | color: var(--ds-color-danger, #ef4444) | Media |
+| `CorrectionDefaultsManager.vue` | color: var(--ds-color-danger, #ef4444) | Media |
+| `StatusBar.vue` | color: var(--green-500), var(--ds-color-danger, #ef4444) | Alta |
+| `VoiceProfile.vue` | color: var(--ds-color-danger, #ef4444) | Media |
 | `ChapterProgressTab.vue` | color: var(--yellow-500), var(--green-500) | Media |
 
 ### Solución Recomendada

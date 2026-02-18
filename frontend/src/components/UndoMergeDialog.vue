@@ -281,7 +281,7 @@ const getEntityIcon = (type: string): string => {
 }
 
 .restore-icon {
-  color: var(--green-600);
+  color: var(--ds-color-success, #16a34a);
 }
 
 .restore-name {

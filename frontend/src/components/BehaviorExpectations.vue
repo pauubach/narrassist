@@ -1133,7 +1133,7 @@ const deleteExpectation = (index: number) => {
   padding: 1rem;
   background: var(--surface-50);
   border-radius: var(--app-radius);
-  border-left: 4px solid var(--red-500);
+  border-left: 4px solid var(--ds-color-danger, #ef4444);
   margin-bottom: 0.75rem;
 }
 

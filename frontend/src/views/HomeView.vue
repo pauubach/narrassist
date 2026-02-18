@@ -282,7 +282,7 @@ const goToSettings = () => {
 
 .status-value.status-ok {
   background: var(--green-50);
-  color: var(--green-600);
+  color: var(--ds-color-success, #16a34a);
 }
 
 .status-value.status-error {

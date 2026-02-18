@@ -162,7 +162,7 @@
 }
 
 .p-tag.p-tag-danger {
-  background: var(--red-500) !important;
+  background: var(--ds-color-danger, #ef4444) !important;
   color: white !important;
 }
 
@@ -257,7 +257,7 @@ html.dark .p-tag.p-tag-danger {
 
 .p-badge.p-badge-danger,
 .p-badge-danger {
-  background: var(--red-500) !important;
+  background: var(--ds-color-danger, #ef4444) !important;
   color: white !important;
 }
 

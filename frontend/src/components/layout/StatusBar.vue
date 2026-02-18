@@ -459,7 +459,7 @@ function toggleDetails() {
 }
 
 .stat-review {
-  color: var(--green-600);
+  color: var(--ds-color-success, #16a34a);
   gap: 0.25rem !important;
 }
 
@@ -503,7 +503,7 @@ function toggleDetails() {
 }
 
 .status-completed {
-  color: var(--green-600);
+  color: var(--ds-color-success, #16a34a);
   background: var(--green-50);
 }
 

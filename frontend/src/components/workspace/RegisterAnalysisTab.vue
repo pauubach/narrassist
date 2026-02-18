@@ -1113,11 +1113,11 @@ watch(() => props.projectId, (newId) => {
 }
 
 .overview-consistency.consistency-high {
-  color: var(--green-600);
+  color: var(--ds-color-success, #16a34a);
 }
 
 .overview-consistency.consistency-medium {
-  color: var(--yellow-600);
+  color: var(--ds-color-warning, #d97706);
 }
 
 .overview-consistency.consistency-low {

@@ -172,7 +172,7 @@ function handleGutterMarkerClick(marker: typeof gutterMarkers.value[0]) {
 // Colores de severidad para el gutter
 function getSeverityColor(severity: string): string {
   const colors: Record<string, string> = {
-    critical: 'var(--red-500)',
+    critical: 'var(--ds-color-danger, #ef4444)',
     high: 'var(--orange-500)',
     medium: 'var(--yellow-500)',
     low: 'var(--blue-500)',

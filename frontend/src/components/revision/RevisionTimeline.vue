@@ -117,7 +117,7 @@ const trend = computed(() => {
   font-weight: 600;
 }
 
-.entry-count.improving { color: var(--green-600); }
+.entry-count.improving { color: var(--ds-color-success, #16a34a); }
 .entry-count.worsening { color: var(--orange-600); }
 .entry-count.neutral { color: var(--text-color); }
 

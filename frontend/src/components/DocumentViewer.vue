@@ -1992,7 +1992,7 @@ defineExpose({
 }
 
 .chapter-text :deep(.annotation.spelling-error) {
-  border-color: var(--red-500);
+  border-color: var(--ds-color-danger, #ef4444);
   background: rgba(239, 68, 68, 0.08);
 }
 
@@ -2013,8 +2013,8 @@ defineExpose({
 
 /* Toggle de errores de ortografia activo */
 .spelling-toggle-active {
-  color: var(--red-500) !important;
-  border-color: var(--red-500) !important;
+  color: var(--ds-color-danger, #ef4444) !important;
+  border-color: var(--ds-color-danger, #ef4444) !important;
 }
 
 /* Toggle de errores de gramatica activo */
@@ -2057,7 +2057,7 @@ defineExpose({
 
 .chapter-text :deep(.dialogue-highlight.dialogue-confidence-low) {
   background: rgba(239, 68, 68, 0.15);
-  border-bottom: 2px solid var(--red-500);
+  border-bottom: 2px solid var(--ds-color-danger, #ef4444);
   color: inherit;
 }
 
@@ -2076,7 +2076,7 @@ defineExpose({
 
 .spelling-icon {
   text-decoration: underline wavy;
-  text-decoration-color: var(--red-500);
+  text-decoration-color: var(--ds-color-danger, #ef4444);
   text-underline-offset: 2px;
 }
 

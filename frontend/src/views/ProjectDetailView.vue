@@ -1508,7 +1508,7 @@ const startReanalysis = async () => {
   height: 16px;
   font-size: 0.625rem;
   font-weight: 600;
-  background: var(--red-500);
+  background: var(--ds-color-danger, #ef4444);
   color: white;
   border-radius: var(--app-radius);
   display: flex;
@@ -1578,7 +1578,7 @@ const startReanalysis = async () => {
   border-radius: 50%;
 }
 
-.dot-critical { background: var(--red-500); }
+.dot-critical { background: var(--ds-color-danger, #ef4444); }
 .dot-high { background: var(--orange-500); }
 .dot-medium { background: var(--yellow-500); }
 .dot-low { background: var(--blue-500); }

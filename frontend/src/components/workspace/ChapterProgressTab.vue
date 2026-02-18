@@ -898,7 +898,7 @@ onMounted(() => {
 
 .character-chip i {
   font-size: 0.8rem;
-  color: var(--yellow-600);
+  color: var(--ds-color-warning, #d97706);
 }
 
 .events-list {
@@ -935,7 +935,7 @@ onMounted(() => {
 }
 
 .interactions-stats .positive {
-  color: var(--green-600);
+  color: var(--ds-color-success, #16a34a);
 }
 
 .interactions-stats .negative {

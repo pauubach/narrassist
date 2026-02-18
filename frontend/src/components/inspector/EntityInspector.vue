@@ -1089,7 +1089,7 @@ function onChapterClick(chapterNumber: number) {
 }
 
 .meter-fill--high {
-  background: linear-gradient(90deg, var(--green-500), var(--green-600));
+  background: linear-gradient(90deg, var(--green-500), var(--ds-color-success, #16a34a));
 }
 
 .meter-fill--medium {

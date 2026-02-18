@@ -21,7 +21,7 @@
   --app-bg-card: var(--p-surface-card, var(--color-white));
 
   /* Fondo de overlays (dropdowns, menus, tooltips) */
-  --app-bg-overlay: var(--p-surface-overlay, var(--color-white));
+  --app-bg-overlay: var(--p-surface-overlay, var(--ds-surface-0, #ffffff));
 
   /* Fondo elevado (headers sticky, elementos prominentes) */
   --app-bg-elevated: var(--p-surface-0, var(--color-white));

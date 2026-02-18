@@ -926,7 +926,7 @@ onUnmounted(() => {
 
 .review-value {
   font-weight: 600;
-  color: var(--green-600);
+  color: var(--ds-color-success, #16a34a);
 }
 
 .review-bar-track {
@@ -1035,7 +1035,7 @@ onUnmounted(() => {
 }
 
 .list-review {
-  color: var(--green-600);
+  color: var(--ds-color-success, #16a34a);
   font-weight: 600;
 }
 

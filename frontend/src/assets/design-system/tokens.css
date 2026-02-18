@@ -372,6 +372,95 @@
   --ds-z-popover: 1060;
   --ds-z-tooltip: 1070;
   --ds-z-toast: 1080;
+
+  /* =============================================================================
+     8. LEGACY PRIMEVUE PALETTE COMPATIBILITY
+     Aliases para código que usa colores sin prefijo --p-
+     ============================================================================= */
+
+  /* Red */
+  --red-50: var(--p-red-50, #fef2f2);
+  --red-100: var(--p-red-100, #fee2e2);
+  --red-200: var(--p-red-200, #fecaca);
+  --red-300: var(--p-red-300, #fca5a5);
+  --red-400: var(--p-red-400, #f87171);
+  --red-500: var(--p-red-500, #ef4444);
+  --red-600: var(--p-red-600, #dc2626);
+  --red-700: var(--p-red-700, #b91c1c);
+  --red-800: var(--p-red-800, #991b1b);
+  --red-900: var(--p-red-900, #7f1d1d);
+  --red-950: var(--p-red-950, #450a0a);
+
+  /* Yellow */
+  --yellow-50: var(--p-yellow-50, #fefce8);
+  --yellow-100: var(--p-yellow-100, #fef9c3);
+  --yellow-200: var(--p-yellow-200, #fef08a);
+  --yellow-300: var(--p-yellow-300, #fde047);
+  --yellow-400: var(--p-yellow-400, #facc15);
+  --yellow-500: var(--p-yellow-500, #eab308);
+  --yellow-600: var(--p-yellow-600, #ca8a04);
+  --yellow-700: var(--p-yellow-700, #a16207);
+  --yellow-800: var(--p-yellow-800, #854d0e);
+  --yellow-900: var(--p-yellow-900, #713f12);
+  --yellow-950: var(--p-yellow-950, #422006);
+
+  /* Green */
+  --green-50: var(--p-green-50, #f0fdf4);
+  --green-100: var(--p-green-100, #dcfce7);
+  --green-200: var(--p-green-200, #bbf7d0);
+  --green-300: var(--p-green-300, #86efac);
+  --green-400: var(--p-green-400, #4ade80);
+  --green-500: var(--p-green-500, #22c55e);
+  --green-600: var(--p-green-600, #16a34a);
+  --green-700: var(--p-green-700, #15803d);
+  --green-800: var(--p-green-800, #166534);
+  --green-900: var(--p-green-900, #14532d);
+  --green-950: var(--p-green-950, #052e16);
+
+  /* Blue */
+  --blue-50: var(--p-blue-50, #eff6ff);
+  --blue-100: var(--p-blue-100, #dbeafe);
+  --blue-200: var(--p-blue-200, #bfdbfe);
+  --blue-300: var(--p-blue-300, #93c5fd);
+  --blue-400: var(--p-blue-400, #60a5fa);
+  --blue-500: var(--p-blue-500, #3b82f6);
+  --blue-600: var(--p-blue-600, #2563eb);
+  --blue-700: var(--p-blue-700, #1d4ed8);
+  --blue-800: var(--p-blue-800, #1e40af);
+  --blue-900: var(--p-blue-900, #1e3a8a);
+  --blue-950: var(--p-blue-950, #172554);
+
+  /* Orange */
+  --orange-50: var(--p-orange-50, #fff7ed);
+  --orange-100: var(--p-orange-100, #ffedd5);
+  --orange-200: var(--p-orange-200, #fed7aa);
+  --orange-300: var(--p-orange-300, #fdba74);
+  --orange-400: var(--p-orange-400, #fb923c);
+  --orange-500: var(--p-orange-500, #f97316);
+  --orange-600: var(--p-orange-600, #ea580c);
+  --orange-700: var(--p-orange-700, #c2410c);
+  --orange-800: var(--p-orange-800, #9a3412);
+  --orange-900: var(--p-orange-900, #7c2d12);
+  --orange-950: var(--p-orange-950, #431407);
+
+  /* Gray */
+  --gray-100: var(--p-gray-100, #f3f4f6);
+  --gray-200: var(--p-gray-200, #e5e7eb);
+  --gray-300: var(--p-gray-300, #d1d5db);
+  --gray-400: var(--p-gray-400, #9ca3af);
+  --gray-700: var(--p-gray-700, #374151);
+  --gray-800: var(--p-gray-800, #1f2937);
+  --gray-900: var(--p-gray-900, #111827);
+
+  /* Purple, Teal, Cyan, Indigo, Pink */
+  --purple-50: var(--p-purple-50, #faf5ff);
+  --purple-500: var(--p-purple-500, #a855f7);
+  --purple-900: var(--p-purple-900, #581c87);
+  --teal-600: var(--p-teal-600, #0d9488);
+  --cyan-500: var(--p-cyan-500, #06b6d4);
+  --cyan-600: var(--p-cyan-600, #0891b2);
+  --indigo-500: var(--p-indigo-500, #6366f1);
+  --pink-500: var(--p-pink-500, #ec4899);
 }
 
 /* =============================================================================

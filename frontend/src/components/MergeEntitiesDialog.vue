@@ -743,7 +743,7 @@ const getSimilarityColor = (similarity: number): string => {
   if (similarity >= 0.7) return 'var(--green-500)'
   if (similarity >= 0.5) return 'var(--yellow-500)'
   if (similarity >= 0.3) return 'var(--orange-500)'
-  return 'var(--red-500)'
+  return 'var(--ds-color-danger, #ef4444)'
 }
 
 const _getSimilarityLabel = (similarity: number): string => {
@@ -1526,7 +1526,7 @@ watch(() => props.visible, (isVisible) => {
 }
 
 .progress-very-low :deep(.p-progressbar-value) {
-  background: var(--red-500) !important;
+  background: var(--ds-color-danger, #ef4444) !important;
 }
 
 /* Score details breakdown */

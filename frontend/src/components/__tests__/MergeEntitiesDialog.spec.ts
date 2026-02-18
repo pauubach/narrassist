@@ -175,7 +175,7 @@ function getSimilarityColor(similarity: number): string {
   if (similarity >= 0.7) return 'var(--green-500)'
   if (similarity >= 0.5) return 'var(--yellow-500)'
   if (similarity >= 0.3) return 'var(--orange-500)'
-  return 'var(--red-500)'
+  return 'var(--ds-color-danger, #ef4444)'
 }
 
 function getRecommendationText(recommendation: string): string {
@@ -572,8 +572,8 @@ describe('MergeEntitiesDialog: getSimilarityColor', () => {
   })
 
   it('should return red for very low similarity (<0.3)', () => {
-    expect(getSimilarityColor(0.0)).toBe('var(--red-500)')
-    expect(getSimilarityColor(0.29)).toBe('var(--red-500)')
+    expect(getSimilarityColor(0.0)).toBe('var(--ds-color-danger, #ef4444)')
+    expect(getSimilarityColor(0.29)).toBe('var(--ds-color-danger, #ef4444)')
   })
 })
 

@@ -272,7 +272,7 @@
 .p-menu,
 .p-contextmenu,
 .p-tieredmenu {
-  background: var(--app-bg-overlay);
+  background: var(--app-bg-overlay, #ffffff);
   border: 1px solid var(--app-border-base);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);

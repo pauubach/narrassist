@@ -2402,7 +2402,7 @@ const handleScroll = () => {
 :global(.dark) .method-card .method-tag.p-tag-warning {
   background: var(--yellow-900) !important;
   color: var(--yellow-200) !important;
-  border: 1px solid var(--yellow-600) !important;
+  border: 1px solid var(--ds-color-warning, #d97706) !important;
 }
 
 :global(.dark) .method-card .method-tag.p-tag-danger {
@@ -2471,7 +2471,7 @@ const handleScroll = () => {
 
 .ollama-action-content > i {
   font-size: 1.25rem;
-  color: var(--yellow-600);
+  color: var(--ds-color-warning, #d97706);
   flex-shrink: 0;
 }
 

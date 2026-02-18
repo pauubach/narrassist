@@ -271,7 +271,7 @@ const showOriginal = ref(false)
   background: var(--red-200);
   color: var(--red-900);
   text-decoration: line-through;
-  text-decoration-color: var(--red-500);
+  text-decoration-color: var(--ds-color-danger, #ef4444);
   border-radius: 3px;
   padding: 1px 3px;
 }

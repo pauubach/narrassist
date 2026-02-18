@@ -410,7 +410,7 @@ onMounted(() => {
 }
 
 .mismatch-warning i {
-  color: var(--yellow-600);
+  color: var(--ds-color-warning, #d97706);
 }
 
 /* Two column selector */
@@ -538,9 +538,9 @@ onMounted(() => {
   color: var(--text-color-secondary);
 }
 
-.tolerance-very_high { color: var(--green-600); }
+.tolerance-very_high { color: var(--ds-color-success, #16a34a); }
 .tolerance-high { color: var(--teal-600); }
-.tolerance-medium { color: var(--yellow-600); }
+.tolerance-medium { color: var(--ds-color-warning, #d97706); }
 .tolerance-low { color: var(--red-600); }
 
 .inverted-flag {

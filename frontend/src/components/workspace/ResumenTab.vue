@@ -173,7 +173,7 @@ const entityColors = [
 
 // Severity colors for donut
 const severityColors: Record<string, string> = {
-  critical: 'var(--red-500)',
+  critical: 'var(--ds-color-danger, #ef4444)',
   high: 'var(--orange-500)',
   medium: 'var(--yellow-500)',
   low: 'var(--blue-500)',
@@ -709,7 +709,7 @@ const originalDocumentName = computed(() => {
 .review-percent {
   font-size: 2rem;
   font-weight: 700;
-  color: var(--green-600);
+  color: var(--ds-color-success, #16a34a);
   line-height: 1;
 }
 
@@ -821,7 +821,7 @@ const originalDocumentName = computed(() => {
   align-items: center;
   gap: 0.5rem;
   padding: 2rem 0;
-  color: var(--green-600);
+  color: var(--ds-color-success, #16a34a);
 }
 
 .empty-donut i {
@@ -977,7 +977,7 @@ const originalDocumentName = computed(() => {
   transition: width 0.3s ease;
 }
 
-.density-critical { background: var(--red-500); }
+.density-critical { background: var(--ds-color-danger, #ef4444); }
 .density-high { background: var(--orange-500); }
 .density-medium { background: var(--yellow-500); }
 .density-low { background: var(--blue-500); }
@@ -1014,7 +1014,7 @@ const originalDocumentName = computed(() => {
   border-radius: 2px;
 }
 
-.legend-critical { background: var(--red-500); }
+.legend-critical { background: var(--ds-color-danger, #ef4444); }
 .legend-high { background: var(--orange-500); }
 .legend-medium { background: var(--yellow-500); }
 .legend-low { background: var(--blue-500); }

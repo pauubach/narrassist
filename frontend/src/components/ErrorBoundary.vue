@@ -104,7 +104,7 @@ function goHome() {
 
 .error-boundary__icon {
   font-size: 4rem;
-  color: var(--red-500);
+  color: var(--ds-color-danger, #ef4444);
   margin-bottom: var(--ds-spacing-4);
 }
 

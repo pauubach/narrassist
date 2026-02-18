@@ -521,7 +521,7 @@ function getCategoryLabel(category: string): string {
 }
 
 .alert-critical {
-  border-left-color: var(--red-500);
+  border-left-color: var(--ds-color-danger, #ef4444);
 }
 
 .alert-high {

@@ -611,7 +611,7 @@ onMounted(async () => {
 }
 
 .stat-item.warning i {
-  color: var(--yellow-600);
+  color: var(--ds-color-warning, #d97706);
 }
 
 .stat-item.info i {

@@ -264,7 +264,7 @@ watch(() => props.projectId, loadDetail)
   color: var(--text-color-secondary);
 }
 
-.error-state { color: var(--red-500); }
+.error-state { color: var(--ds-color-danger, #ef4444); }
 
 .tab-badge { margin-left: 6px; }
 

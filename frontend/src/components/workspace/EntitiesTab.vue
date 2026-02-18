@@ -1764,7 +1764,7 @@ defineExpose({ focusSearch })
 }
 
 /* Relevancia */
-.relevance-high { color: var(--green-600); }
+.relevance-high { color: var(--ds-color-success, #16a34a); }
 .relevance-medium { color: var(--blue-600); }
 .relevance-low { color: var(--orange-600); }
 .relevance-very-low { color: var(--ds-text-danger); }

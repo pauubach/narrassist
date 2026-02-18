@@ -751,7 +751,7 @@ watch(() => props.alerts, () => {
 
 /* Domain severity colors */
 .alert-severity-bar.severity-critical {
-  background: var(--ds-alert-critical, var(--red-500));
+  background: var(--ds-alert-critical, var(--ds-color-danger, #ef4444));
 }
 
 .alert-severity-bar.severity-high {
