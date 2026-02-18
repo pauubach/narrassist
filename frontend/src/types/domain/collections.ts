@@ -85,3 +85,31 @@ export interface CrossBookInconsistency {
   bookBName: string
   confidence: number
 }
+
+/** Contradicción de eventos entre libros */
+export interface EventContradiction {
+  rule: string
+  entityName: string
+  description: string
+  eventAType: string
+  eventBType: string
+  bookAName: string
+  bookBName: string
+  bookAChapter: number | null
+  bookBChapter: number | null
+  confidence: number
+  metadata: Record<string, unknown>
+}
+
+/** Informe de contradicciones de eventos cross-book */
+export interface CrossBookEventReport {
+  collectionId: number
+  collectionName: string
+  contradictions: EventContradiction[]
+  entityLinksAnalyzed: number
+  projectsAnalyzed: number
+  summary: {
+    totalContradictions: number
+    byRule: Record<string, number>
+  }
+}

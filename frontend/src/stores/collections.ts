@@ -8,15 +8,17 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import type {
-  Collection, CollectionDetail, EntityLink, LinkSuggestion, CrossBookReport,
+  Collection, CollectionDetail, EntityLink, LinkSuggestion,
+  CrossBookReport, CrossBookEventReport,
 } from '@/types'
 import type {
   ApiCollection, ApiCollectionDetail, ApiEntityLink,
-  ApiLinkSuggestion, ApiCrossBookReport,
+  ApiLinkSuggestion, ApiCrossBookReport, ApiCrossBookEventReport,
 } from '@/types/api'
 import {
   transformCollection, transformCollections, transformCollectionDetail,
   transformEntityLinks, transformLinkSuggestions, transformCrossBookReport,
+  transformCrossBookEventReport,
 } from '@/types/transformers'
 import { api } from '@/services/apiClient'
 import { ensureBackendReady } from '@/composables/useBackendReady'
@@ -27,6 +29,7 @@ export const useCollectionsStore = defineStore('collections', () => {
   const entityLinks = ref<EntityLink[]>([])
   const linkSuggestions = ref<LinkSuggestion[]>([])
   const crossBookReport = ref<CrossBookReport | null>(null)
+  const crossBookEventReport = ref<CrossBookEventReport | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -202,11 +205,27 @@ export const useCollectionsStore = defineStore('collections', () => {
     }
   }
 
+  async function fetchCrossBookEventAnalysis(collectionId: number, validateLlm: boolean = false) {
+    loading.value = true
+    try {
+      const url = `/api/collections/${collectionId}/cross-book-events?validate_llm=${validateLlm}`
+      const data = await api.getRaw<ApiCrossBookEventReport>(url, { timeout: 120000 })
+      crossBookEventReport.value = transformCrossBookEventReport(data)
+    } catch (err) {
+      console.error('Failed to fetch cross-book event analysis:', err)
+      crossBookEventReport.value = null
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   function clearCurrentCollection() {
     currentCollection.value = null
     entityLinks.value = []
     linkSuggestions.value = []
     crossBookReport.value = null
+    crossBookEventReport.value = null
   }
 
   return {
@@ -216,6 +235,7 @@ export const useCollectionsStore = defineStore('collections', () => {
     entityLinks,
     linkSuggestions,
     crossBookReport,
+    crossBookEventReport,
     loading,
     error,
 
@@ -242,6 +262,7 @@ export const useCollectionsStore = defineStore('collections', () => {
 
     // Cross-book analysis
     fetchCrossBookAnalysis,
+    fetchCrossBookEventAnalysis,
 
     // Utils
     clearCurrentCollection,

@@ -8,11 +8,13 @@ import type {
   ApiCollection, ApiCollectionDetail, ApiCollectionProject,
   ApiEntityLink, ApiLinkSuggestion,
   ApiCrossBookReport, ApiCrossBookInconsistency,
+  ApiEventContradiction, ApiCrossBookEventReport,
 } from '../api/collections'
 import type {
   Collection, CollectionDetail, CollectionProject,
   EntityLink, LinkSuggestion,
   CrossBookReport, CrossBookInconsistency,
+  EventContradiction, CrossBookEventReport,
 } from '../domain/collections'
 import { safeDate } from './projects'
 
@@ -118,6 +120,36 @@ export function transformCrossBookReport(api: ApiCrossBookReport): CrossBookRepo
     summary: {
       totalInconsistencies: api.summary.total_inconsistencies,
       byType: api.summary.by_type,
+    },
+  }
+}
+
+function transformEventContradiction(api: ApiEventContradiction): EventContradiction {
+  return {
+    rule: api.rule,
+    entityName: api.entity_name,
+    description: api.description,
+    eventAType: api.event_a_type,
+    eventBType: api.event_b_type,
+    bookAName: api.book_a_name,
+    bookBName: api.book_b_name,
+    bookAChapter: api.book_a_chapter,
+    bookBChapter: api.book_b_chapter,
+    confidence: api.confidence,
+    metadata: api.metadata || {},
+  }
+}
+
+export function transformCrossBookEventReport(api: ApiCrossBookEventReport): CrossBookEventReport {
+  return {
+    collectionId: api.collection_id,
+    collectionName: api.collection_name,
+    contradictions: (api.contradictions || []).map(transformEventContradiction),
+    entityLinksAnalyzed: api.entity_links_analyzed,
+    projectsAnalyzed: api.projects_analyzed,
+    summary: {
+      totalContradictions: api.summary.total_contradictions,
+      byRule: api.summary.by_rule,
     },
   }
 }

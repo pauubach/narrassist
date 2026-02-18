@@ -87,3 +87,31 @@ export interface ApiCrossBookInconsistency {
   book_b_name: string
   confidence: number
 }
+
+/** Contradicción de eventos entre libros */
+export interface ApiEventContradiction {
+  rule: string
+  entity_name: string
+  description: string
+  event_a_type: string
+  event_b_type: string
+  book_a_name: string
+  book_b_name: string
+  book_a_chapter: number | null
+  book_b_chapter: number | null
+  confidence: number
+  metadata: Record<string, unknown>
+}
+
+/** Informe de contradicciones de eventos cross-book */
+export interface ApiCrossBookEventReport {
+  collection_id: number
+  collection_name: string
+  contradictions: ApiEventContradiction[]
+  entity_links_analyzed: number
+  projects_analyzed: number
+  summary: {
+    total_contradictions: number
+    by_rule: Record<string, number>
+  }
+}
