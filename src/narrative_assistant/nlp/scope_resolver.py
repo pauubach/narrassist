@@ -1068,7 +1068,29 @@ class ScopeResolver:
                 candidates_in_paragraph,
                 key=lambda x: abs(x[1] - position),
             )
+            # Si la confianza es baja, intentar análisis LLM antes de fallback final
+            if 0.45 < 0.6:  # Confianza baja
+                llm_result = self._llm_semantic_disambiguation(
+                    position, candidates_in_paragraph
+                )
+                if llm_result:
+                    return llm_result
             return (best[0], 0.45)  # Baja confianza: mismo párrafo pero lejos
+
+        # Paso 5.5: Análisis LLM si no hay candidatos claros en párrafo
+        # pero hay candidatos en fallback range
+        fallback_candidates_temp = [
+            (name, start, end, etype)
+            for name, start, end, etype in filtered_mentions
+            if abs(start - position) < MAX_CHAR_FALLBACK
+            and not (start > position and self._is_object_complement(start))
+        ]
+        if fallback_candidates_temp:
+            llm_result = self._llm_semantic_disambiguation(
+                position, fallback_candidates_temp
+            )
+            if llm_result:
+                return llm_result
 
         # Paso 6: Fallback con límite de seguridad
         fallback_candidates = [
@@ -1279,6 +1301,96 @@ class ScopeResolver:
             if token.idx <= char_position < token.idx + len(token.text):
                 return token
         return None
+
+    def _llm_semantic_disambiguation(
+        self,
+        position: int,
+        candidates: list[tuple[str, int, int, str]],
+    ) -> tuple[str, float] | None:
+        """
+        Usa LLM para desambiguar semánticamente cuando la sintaxis no es suficiente.
+
+        Solo se invoca cuando:
+        - La confianza sintáctica es baja (<0.6)
+        - Hay múltiples candidatos potenciales
+        - Ollama está disponible y funcional
+
+        Args:
+            position: Posición del atributo en el texto
+            candidates: Lista de (entity_name, start, end, entity_type)
+
+        Returns:
+            (entity_name, confidence) si LLM puede sugerir, None si no está disponible
+        """
+        # Verificar que Ollama esté disponible
+        try:
+            from ..llm.client import get_llm_client
+
+            llm = get_llm_client()
+            if not llm.is_available():
+                logger.debug("LLM no disponible para desambiguación semántica")
+                return None
+        except Exception as e:
+            logger.debug(f"Error inicializando LLM: {e}")
+            return None
+
+        # Extraer contexto relevante (oración actual + anterior + siguiente)
+        context_start = max(0, position - 300)
+        context_end = min(len(self.doc.text), position + 300)
+        context = self.doc.text[context_start:context_end].strip()
+
+        # Encontrar el fragmento del atributo
+        token_at_pos = self._token_at_position(position)
+        if not token_at_pos:
+            return None
+
+        # Buscar hasta 5 tokens alrededor para capturar el atributo completo
+        attr_start_idx = max(0, token_at_pos.i - 2)
+        attr_end_idx = min(len(self.doc), token_at_pos.i + 3)
+        attr_span = self.doc[attr_start_idx:attr_end_idx]
+        attribute_text = attr_span.text.strip()
+
+        # Limitar a 2-3 candidatos más probables por proximidad
+        sorted_candidates = sorted(candidates, key=lambda x: abs(x[1] - position))[:3]
+        candidate_names = [c[0] for c in sorted_candidates]
+
+        # Prompt para LLM
+        prompt = f"""Dado el siguiente contexto en español, ¿a quién se refiere "{attribute_text}"?
+
+Contexto: {context}
+
+Candidatos posibles: {', '.join(candidate_names)}
+
+Responde SOLO con el nombre del candidato más probable, o "AMBIGUO" si no puedes determinarlo con certeza."""
+
+        try:
+            response = llm.generate(prompt, max_tokens=50, temperature=0.1)
+            if not response:
+                return None
+
+            # Parsear respuesta
+            answer = response.strip().lower()
+
+            # Si dice "ambiguo", no sugerir
+            if "ambiguo" in answer or "ambigua" in answer:
+                logger.debug("LLM indica ambigüedad genuina")
+                return None
+
+            # Buscar si menciona algún candidato
+            for candidate_name in candidate_names:
+                if candidate_name.lower() in answer:
+                    logger.info(
+                        f"LLM sugiere '{candidate_name}' para '{attribute_text}' "
+                        f"(confianza=0.65, semántico)"
+                    )
+                    return (candidate_name, 0.65)  # Confianza media-alta
+
+            logger.debug(f"LLM no identificó candidato claro: {answer}")
+            return None
+
+        except Exception as e:
+            logger.debug(f"Error en desambiguación LLM: {e}")
+            return None
 
 
 def find_subject_in_scope(doc, token) -> str | None:
