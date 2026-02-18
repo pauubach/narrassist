@@ -101,6 +101,7 @@ const isInProject = computed(() => {
 
 const menus = computed<Menu[]>(() => {
   const viewItems: MenuItem[] = [
+    { label: 'Inicio', action: 'viewHome', icon: 'home' },
     { label: 'Proyectos', action: 'viewProjects', icon: 'folder' },
     { label: 'Colecciones', action: 'viewCollections', icon: 'folder' }
   ]
@@ -296,6 +297,9 @@ const handleMenuAction = (item: MenuItem) => {
     case 'openProject':
       router.push('/projects')
       break
+    case 'closeProject':
+      router.push('/')
+      break
     case 'export':
       // Trigger export dialog
       window.dispatchEvent(new CustomEvent('menubar:export'))
@@ -308,6 +312,9 @@ const handleMenuAction = (item: MenuItem) => {
       break
     case 'find':
       window.dispatchEvent(new CustomEvent('menubar:find'))
+      break
+    case 'viewHome':
+      router.push('/')
       break
     case 'viewProjects':
       router.push('/projects')

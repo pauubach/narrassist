@@ -3,6 +3,8 @@ import { computed } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 // import DsBadge from '@/components/ds/DsBadge.vue'  // Reserved
+import VersionSparkline from '@/components/project/VersionSparkline.vue'
+import VersionHistory from '@/components/project/VersionHistory.vue'
 import type { Project, Entity, Alert, Chapter } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 
@@ -288,6 +290,16 @@ const originalDocumentName = computed(() => {
             <span class="stat-label">Alertas activas</span>
           </div>
         </div>
+
+        <div class="stat-card stat-trend">
+          <div class="stat-icon-bg">
+            <i class="pi pi-chart-line"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">Tendencia</span>
+            <VersionSparkline :project-id="project.id" :width="100" :height="28" />
+          </div>
+        </div>
       </div>
 
       <!-- Review Progress (solo si hay alertas) -->
@@ -475,6 +487,14 @@ const originalDocumentName = computed(() => {
         </template>
       </Card>
 
+      <!-- Row 3b: Version History -->
+      <Card v-if="project" class="chart-card version-history-card">
+        <template #title><i class="pi pi-history"></i> Historial de Versiones</template>
+        <template #content>
+          <VersionHistory :project-id="project.id" />
+        </template>
+      </Card>
+
       <!-- Row 4: Top characters + Info + Actions (three columns) -->
       <div class="bottom-row">
         <!-- Top characters -->
@@ -610,7 +630,7 @@ const originalDocumentName = computed(() => {
 /* ── Row 1: Stat cards ── */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 1rem;
 }
 
@@ -651,6 +671,8 @@ const originalDocumentName = computed(() => {
 .stat-entities .stat-icon-bg i { color: var(--purple-600); }
 .stat-alerts .stat-icon-bg { background: var(--orange-50); }
 .stat-alerts .stat-icon-bg i { color: var(--orange-600); }
+.stat-trend .stat-icon-bg { background: var(--cyan-50); }
+.stat-trend .stat-icon-bg i { color: var(--cyan-600); }
 
 .stat-info {
   display: flex;

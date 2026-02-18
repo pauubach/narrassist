@@ -12,6 +12,7 @@ import DsEmptyState from '@/components/ds/DsEmptyState.vue'
 import ChapterRangeSelector from '@/components/alerts/ChapterRangeSelector.vue'
 import AlertsAnalytics from '@/components/alerts/AlertsAnalytics.vue'
 import SequentialCorrectionMode from './SequentialCorrectionMode.vue'
+import SuppressionRulesDialog from '@/components/alerts/SuppressionRulesDialog.vue'
 import type { Alert, AlertSeverity, AlertStatus, AlertSource } from '@/types'
 import { useAlertUtils, type MetaCategoryKey } from '@/composables/useAlertUtils'
 import { useAlertExport } from '@/composables/useAlertExport'
@@ -57,6 +58,7 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const showSuppressionRules = ref(false)
 const { getSeverityLabel, getCategoryConfig } = useAlertUtils()
 const workspaceStore = useWorkspaceStore()
 
@@ -263,6 +265,15 @@ defineExpose({ focusSearch })
         <div class="toolbar-spacer"></div>
 
         <Button
+          v-tooltip="'Reglas de supresión'"
+          icon="pi pi-filter-slash"
+          text
+          rounded
+          size="small"
+          @click="showSuppressionRules = true"
+        />
+
+        <Button
           v-tooltip="'Configurar detectores'"
           icon="pi pi-sliders-h"
           text
@@ -428,6 +439,13 @@ defineExpose({ focusSearch })
         @navigate-to-text="handleNavigateFromSequential($event)"
       />
     </Dialog>
+
+    <SuppressionRulesDialog
+      :visible="showSuppressionRules"
+      :project-id="props.projectId"
+      @update:visible="showSuppressionRules = $event"
+      @rules-changed="emit('refresh')"
+    />
   </div>
 </template>
 

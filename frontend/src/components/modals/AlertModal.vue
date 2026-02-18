@@ -274,6 +274,11 @@ function resolveAsUnassigned() {
 
         <!-- Botones para atributo ambiguo -->
         <div v-if="isActive && isAmbiguousAttribute" class="ambiguous-actions">
+          <!-- Mostrar contexto ambiguo si está disponible -->
+          <div v-if="alert.extraData?.sourceText" class="ambiguous-context">
+            <i class="pi pi-info-circle"></i>
+            <span class="context-text">{{ alert.extraData.sourceText }}</span>
+          </div>
           <p class="ambiguous-label">¿Quién tiene este atributo?</p>
           <div class="candidate-buttons">
             <Button
@@ -520,6 +525,31 @@ function resolveAsUnassigned() {
   flex-direction: column;
   gap: var(--ds-space-3);
   flex: 1;
+}
+
+.ambiguous-context {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-3);
+  background: var(--ds-surface-section);
+  border-radius: var(--ds-radius-md);
+  border-left: 3px solid var(--ds-color-warn);
+}
+
+.ambiguous-context i {
+  color: var(--ds-color-warn);
+  font-size: 0.875rem;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.context-text {
+  flex: 1;
+  font-size: var(--ds-font-size-sm);
+  color: var(--ds-color-text);
+  font-style: italic;
+  line-height: 1.5;
 }
 
 .ambiguous-label {

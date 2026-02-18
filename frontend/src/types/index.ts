@@ -26,6 +26,7 @@ export * from './domain/corrections'
 export * from './domain/voice'
 export * from './domain/workspace'
 export * from './domain/collections'
+export * from './domain/suppressionRules'
 
 // =============================================================================
 // API Types (namespace para claridad)

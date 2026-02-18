@@ -4,7 +4,11 @@ import type { RouteRecordRaw } from 'vue-router'
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/projects'
+    name: 'home',
+    component: () => import('../views/HomeView.vue'),
+    meta: {
+      title: 'Narrative Assistant'
+    }
   },
   {
     path: '/projects',

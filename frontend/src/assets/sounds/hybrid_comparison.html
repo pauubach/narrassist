@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Híbridos con Voces - Chispa + Enya</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            padding: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: #fff;
+            border-radius: 20px;
+            padding: 50px;
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6);
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 38px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 45px;
+            font-size: 17px;
+            line-height: 1.7;
+        }
+
+        .intro {
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+            padding: 28px;
+            border-radius: 14px;
+            border-left: 5px solid #27ae60;
+            margin-bottom: 40px;
+        }
+
+        .intro-title {
+            font-weight: 900;
+            color: #27ae60;
+            margin-bottom: 15px;
+            font-size: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+        }
+
+        .intro-text {
+            color: #2c3e50;
+            font-size: 14px;
+            line-height: 1.9;
+        }
+
+        .intro-text strong {
+            color: #27ae60;
+            font-weight: 800;
+        }
+
+        .section {
+            margin-bottom: 45px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 22px;
+        }
+
+        .section-header::before {
+            content: '';
+            width: 5px;
+            height: 34px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 3px;
+        }
+
+        .section-title {
+            font-weight: 900;
+            color: #2c3e50;
+            font-size: 19px;
+        }
+
+        .section-desc {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-left: 20px;
+            margin-bottom: 22px;
+            line-height: 1.7;
+        }
+
+        .sounds-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        .sound-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 28px;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            border: 3px solid transparent;
+            position: relative;
+        }
+
+        .sound-card.hybrid {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+        }
+
+        .sound-card.reference {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            opacity: 0.9;
+        }
+
+        .sound-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.2);
+        }
+
+        .sound-card.playing {
+            transform: translateY(-6px) scale(1.04);
+            box-shadow: 0 22px 55px rgba(102, 126, 234, 0.6);
+        }
+
+        .sound-card.hybrid.playing {
+            border-color: #764ba2;
+        }
+
+        .badge {
+            position: absolute;
+            top: -12px;
+            right: -12px;
+            padding: 6px 16px;
+            border-radius: 16px;
+            font-size: 11px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: white;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+        }
+
+        .badge.hybrid-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .badge.top-badge {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+        }
+
+        .play-btn {
+            width: 85px;
+            height: 85px;
+            border-radius: 50%;
+            background: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 34px;
+            transition: all 0.2s;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.18);
+        }
+
+        .sound-card.playing .play-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 10px 32px rgba(102, 126, 234, 0.6);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .play-btn:hover {
+            transform: scale(1.15);
+        }
+
+        .sound-name {
+            font-weight: 900;
+            margin-bottom: 8px;
+            font-size: 18px;
+            text-align: center;
+            color: #2c3e50;
+        }
+
+        .sound-card.playing .sound-name {
+            color: #667eea;
+        }
+
+        .sound-desc {
+            font-size: 13px;
+            opacity: 0.75;
+            text-align: center;
+            line-height: 1.6;
+            color: #555;
+            margin-bottom: 12px;
+            min-height: 60px;
+        }
+
+        .characteristics {
+            width: 100%;
+            background: rgba(102, 126, 234, 0.08);
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 12px;
+            line-height: 1.8;
+            color: #555;
+        }
+
+        .char-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+
+        .char-label {
+            font-weight: 700;
+            color: #444;
+        }
+
+        .char-value {
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .duration-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 6px 16px;
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .recommendation {
+            background: linear-gradient(135deg, #fef5e7 0%, #fdebd0 100%);
+            padding: 32px;
+            border-radius: 16px;
+            border-left: 6px solid #f39c12;
+            margin-top: 40px;
+        }
+
+        .rec-title {
+            font-weight: 900;
+            color: #f39c12;
+            margin-bottom: 20px;
+            font-size: 19px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        .rec-content {
+            color: #2c3e50;
+            font-size: 16px;
+            line-height: 2.1;
+        }
+
+        .rec-content strong {
+            color: #f39c12;
+            font-weight: 900;
+        }
+
+        audio {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Híbridos con Voces</h1>
+        <p class="subtitle">
+            Fusión perfecta entre Chispa Brillante y Enya, con voces sintéticas de coro.<br>
+            Lo mejor de ambos mundos: brillante, etéreo y con alma vocal.
+        </p>
+
+        <div class="intro">
+            <div class="intro-title">🎵 Síntesis Vocal de Formantes</div>
+            <div class="intro-text">
+                He creado <strong>voces de coro sintéticas</strong> usando síntesis de formantes vocales:<br>
+                • <strong>Vocal "Ah"</strong> (brillante, celestial) para V1 y V3<br>
+                • <strong>Vocal "Oo"</strong> (suave, mística) para V2<br>
+                • Múltiples voces superpuestas (soprano, alto) para efecto coral<br>
+                • Combinadas con arpeggio brillante + texturas etéreas
+            </div>
+        </div>
+
+        <!-- HÍBRIDOS -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-title">🆕 Híbridos con Voces de Coro</div>
+            </div>
+            <div class="section-desc">
+                3 variaciones que combinan lo mejor de Chispa Brillante (arpeggio dinámico)
+                y Enya (textura etérea), añadiendo voces sintéticas para mayor calidez.
+            </div>
+
+            <div class="sounds-grid">
+                <div class="sound-card hybrid" onclick="playSound('success_hybrid_vocal_v1.wav', this)">
+                    <div class="badge hybrid-badge">NUEVO</div>
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">V1 - Sparkle Etéreo</div>
+                    <div class="sound-desc">
+                        60% Chispa, 40% Enya<br>
+                        Voces "Ah" (soprano + alto)<br>
+                        Arpeggio Do Mayor + coro celestial
+                    </div>
+                    <div class="characteristics">
+                        <div class="char-row"><span class="char-label">Balance:</span> <span class="char-value">60/40</span></div>
+                        <div class="char-row"><span class="char-label">Voces:</span> <span class="char-value">"Ah" 2 capas</span></div>
+                        <div class="char-row"><span class="char-label">Tono:</span> <span class="char-value">Do Mayor</span></div>
+                    </div>
+                    <div class="duration-badge">750ms</div>
+                </div>
+                <audio id="audio-success_hybrid_vocal_v1.wav" src="success_hybrid_vocal_v1.wav"></audio>
+
+                <div class="sound-card hybrid" onclick="playSound('success_hybrid_vocal_v2.wav', this)">
+                    <div class="badge top-badge">RECOMENDADO</div>
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">V2 - Etéreo Brillante</div>
+                    <div class="sound-desc">
+                        50% Chispa, 50% Enya<br>
+                        Coro "Oo" (3 voces superpuestas)<br>
+                        Máximo equilibrio + textura vocal rica
+                    </div>
+                    <div class="characteristics">
+                        <div class="char-row"><span class="char-label">Balance:</span> <span class="char-value">50/50 ⭐</span></div>
+                        <div class="char-row"><span class="char-label">Voces:</span> <span class="char-value">"Oo" 3 capas</span></div>
+                        <div class="char-row"><span class="char-label">Estilo:</span> <span class="char-value">Más místico</span></div>
+                    </div>
+                    <div class="duration-badge">800ms</div>
+                </div>
+                <audio id="audio-success_hybrid_vocal_v2.wav" src="success_hybrid_vocal_v2.wav"></audio>
+
+                <div class="sound-card hybrid" onclick="playSound('success_hybrid_vocal_v3.wav', this)">
+                    <div class="badge hybrid-badge">NUEVO</div>
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">V3 - Cascada Vocal</div>
+                    <div class="sound-desc">
+                        Voces ascendentes "Ah"<br>
+                        4 notas escalonadas (G4→B4→D5→G5)<br>
+                        Más dinámico y progresivo
+                    </div>
+                    <div class="characteristics">
+                        <div class="char-row"><span class="char-label">Patrón:</span> <span class="char-value">Ascendente</span></div>
+                        <div class="char-row"><span class="char-label">Voces:</span> <span class="char-value">"Ah" cascada</span></div>
+                        <div class="char-row"><span class="char-label">Duración:</span> <span class="char-value">Más corto ⚡</span></div>
+                    </div>
+                    <div class="duration-badge">700ms</div>
+                </div>
+                <audio id="audio-success_hybrid_vocal_v3.wav" src="success_hybrid_vocal_v3.wav"></audio>
+            </div>
+        </div>
+
+        <!-- REFERENCIAS -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-title">📚 Referencias Originales</div>
+            </div>
+            <div class="section-desc">
+                Los dos sonidos base que inspiraron estos híbridos.
+            </div>
+
+            <div class="sounds-grid">
+                <div class="sound-card reference" onclick="playSound('success_sparkle_brief.wav', this)">
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Chispa Brillante</div>
+                    <div class="sound-desc">
+                        Arpeggio puro sin voces<br>
+                        Muy brillante y rápido<br>
+                        Base para híbridos
+                    </div>
+                    <div class="characteristics">
+                        <div class="char-row"><span class="char-label">Carácter:</span> <span>Brillante puro</span></div>
+                        <div class="char-row"><span class="char-label">Brillo:</span> <span>>3000Hz</span></div>
+                    </div>
+                    <div class="duration-badge">650ms</div>
+                </div>
+                <audio id="audio-success_sparkle_brief.wav" src="success_sparkle_brief.wav"></audio>
+
+                <div class="sound-card reference" onclick="playSound('success_enya.wav', this)">
+                    <button class="play-btn">▶</button>
+                    <div class="sound-name">Enya Rhapsody (Original)</div>
+                    <div class="sound-desc">
+                        Etéreo y cálido<br>
+                        Sin voces sintéticas<br>
+                        Inspiración Enya
+                    </div>
+                    <div class="characteristics">
+                        <div class="char-row"><span class="char-label">Carácter:</span> <span>Etéreo puro</span></div>
+                        <div class="char-row"><span class="char-label">Brillo:</span> <span>1262Hz</span></div>
+                    </div>
+                    <div class="duration-badge">1200ms</div>
+                </div>
+                <audio id="audio-success_enya.wav" src="success_enya.wav"></audio>
+            </div>
+        </div>
+
+        <div class="recommendation">
+            <div class="rec-title">🎯 Recomendación Final</div>
+            <div class="rec-content">
+                <strong>V2 - Etéreo Brillante (800ms)</strong> es la mejor opción:<br><br>
+
+                ✅ <strong>Balance perfecto 50/50</strong> entre brillante (Chispa) y etéreo (Enya)<br>
+                ✅ <strong>Coro "Oo" con 3 voces</strong> superpuestas = textura vocal rica y envolvente<br>
+                ✅ <strong>Duración ideal (800ms)</strong> = igual que Cinema Fairy G actual<br>
+                ✅ <strong>Más mágico</strong> que los originales gracias a las voces sintéticas<br>
+                ✅ <strong>Profesional</strong> = equilibrio entre celebración y discreción<br><br>
+
+                <strong>Alternativas:</strong><br>
+                • <strong>V1</strong> si prefieres más brillante (60%) y menos etéreo<br>
+                • <strong>V3</strong> si quieres más corto (700ms) y progresivo<br><br>
+
+                <strong>¿Por qué añadir voces?</strong><br>
+                Las voces de coro añaden <strong>calidez humana</strong> sin perder la magia sintética.
+                Es el punto medio perfecto entre lo técnico y lo emotivo.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentAudio = null;
+        let currentCard = null;
+
+        function playSound(file, card) {
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+            }
+
+            if (currentCard) {
+                currentCard.classList.remove('playing');
+                const btn = currentCard.querySelector('.play-btn');
+                btn.textContent = '▶';
+            }
+
+            const audio = document.getElementById('audio-' + file);
+            if (!audio) {
+                console.error('Audio not found:', file);
+                return;
+            }
+
+            currentAudio = audio;
+            currentCard = card;
+
+            card.classList.add('playing');
+            const btn = card.querySelector('.play-btn');
+            btn.textContent = '⏸';
+
+            audio.play();
+
+            audio.onended = function() {
+                card.classList.remove('playing');
+                btn.textContent = '▶';
+                currentAudio = null;
+                currentCard = null;
+            };
+        }
+    </script>
+</body>
+</html>

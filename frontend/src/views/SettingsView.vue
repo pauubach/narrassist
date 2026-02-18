@@ -50,6 +50,12 @@
               <span>Datos y Mantenimiento</span>
             </a>
           </li>
+          <li>
+            <a href="#licencia" :class="{ active: activeSection === 'licencia' }" @click.prevent="scrollToSection('licencia')">
+              <i class="pi pi-key"></i>
+              <span>Licencia</span>
+            </a>
+          </li>
         </ul>
       </nav>
 
@@ -978,6 +984,56 @@
             </div>
           </template>
         </Card>
+
+        <!-- Licencia -->
+        <Card id="licencia">
+          <template #title>
+            <div class="section-title">
+              <i class="pi pi-key"></i>
+              <span>Licencia</span>
+            </div>
+          </template>
+          <template #content>
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Estado de licencia</label>
+                <p class="setting-description">
+                  {{ licenseStore.isLicensed
+                    ? `Plan ${licenseStore.tierDisplayName} activo`
+                    : 'Sin licencia activa' }}
+                </p>
+              </div>
+              <div class="setting-control">
+                <Button
+                  :label="licenseStore.isLicensed ? 'Gestionar licencia' : 'Activar licencia'"
+                  :icon="licenseStore.isLicensed ? 'pi pi-cog' : 'pi pi-key'"
+                  :severity="licenseStore.isLicensed ? 'secondary' : undefined"
+                  outlined
+                  @click="showLicenseDialog = true"
+                />
+              </div>
+            </div>
+
+            <div v-if="licenseStore.isLicensed && licenseStore.quotaStatus" class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Uso del periodo</label>
+                <p class="setting-description">
+                  {{ licenseStore.quotaStatus.unlimited
+                    ? 'Páginas ilimitadas'
+                    : `${licenseStore.quotaStatus.pages_used} / ${licenseStore.quotaStatus.pages_max} páginas` }}
+                </p>
+              </div>
+              <div class="setting-control">
+                <Tag
+                  :value="licenseStore.quotaWarningLevel === 'none' ? 'OK' : licenseStore.quotaWarningLevel"
+                  :severity="licenseStore.quotaWarningLevel === 'none' ? 'success'
+                    : licenseStore.quotaWarningLevel === 'warning' ? 'warn'
+                    : 'danger'"
+                />
+              </div>
+            </div>
+          </template>
+        </Card>
       </div>
     </div>
 
@@ -1051,6 +1107,8 @@
         />
       </template>
     </Dialog>
+
+    <LicenseDialog :visible="showLicenseDialog" @update:visible="showLicenseDialog = $event" @activated="onLicenseActivated" />
   </div>
 </template>
 
@@ -1073,6 +1131,8 @@ import { useToast } from 'primevue/usetoast'
 import CorrectionDefaultsManager from '@/components/settings/CorrectionDefaultsManager.vue'
 import AppearanceSection from '@/components/settings/AppearanceSection.vue'
 import { useSystemStore, type LTState } from '@/stores/system'
+import { useLicenseStore } from '@/stores/license'
+import LicenseDialog from '@/components/LicenseDialog.vue'
 import type { CorrectionConfig } from '@/types'
 
 // Composables
@@ -1092,6 +1152,12 @@ import { safeSetItem, safeGetItem } from '@/utils/safeStorage'
 const router = useRouter()
 const toast = useToast()
 const systemStore = useSystemStore()
+const licenseStore = useLicenseStore()
+const showLicenseDialog = ref(false)
+
+function onLicenseActivated() {
+  toast.add({ severity: 'success', summary: 'Licencia activada', detail: `Plan ${licenseStore.tierDisplayName} activado`, life: 3000 })
+}
 
 // ── Composable wiring ──────────────────────────────────────
 
@@ -1690,7 +1756,7 @@ const scrollToSection = (sectionId: string) => {
 const handleScroll = () => {
   if (!contentArea.value) return
 
-  const sections = ['apariencia', 'analisis', 'analizador-ia', 'metodos-nlp', 'correcciones', 'datos-mantenimiento']
+  const sections = ['apariencia', 'analisis', 'analizador-ia', 'metodos-nlp', 'correcciones', 'datos-mantenimiento', 'licencia']
   const scrollPosition = contentArea.value.scrollTop + 100
 
   for (const sectionId of sections) {
