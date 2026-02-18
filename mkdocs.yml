@@ -1,0 +1,101 @@
+site_name: Narrative Assistant - Manual de Usuario
+site_description: Asistente de Corrección Narrativa para Escritores y Editores Profesionales
+site_author: Pau Ubach
+repo_url: https://github.com/pauubach/narrassist
+repo_name: pauubach/narrassist
+
+theme:
+  name: material
+  language: es
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Cambiar a modo oscuro
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Cambiar a modo claro
+
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search:
+      lang: es
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - tables
+  - attr_list
+  - md_in_html
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+nav:
+  - Inicio: index.md
+  - Manual de Usuario:
+    - Introducción: user-manual/introduction.md
+    - Primer Análisis: user-manual/first-analysis.md
+    - Gestión de Entidades: user-manual/entities.md
+    - Alertas de Inconsistencia: user-manual/alerts.md
+    - Timeline y Eventos: user-manual/timeline-events.md
+    - Colecciones y Sagas: user-manual/collections-sagas.md
+    - Configuración: user-manual/settings.md
+    - Casos de Uso: user-manual/use-cases.md
+  - Referencia API:
+    - Endpoints: api-reference/endpoints.md
+    - Proyectos: api-reference/projects.md
+    - Entidades: api-reference/entities.md
+    - Alertas: api-reference/alerts.md
+    - Colecciones: api-reference/collections.md
+    - Eventos: api-reference/events.md
+    - Timeline: api-reference/timeline.md
+    - Configuración: api-reference/configuration.md
+  - Desarrollo:
+    - Arquitectura: architecture/README.md
+    - ADRs: architecture/adr/README.md
+    - Changelog: CHANGELOG.md
+    - FAQ: FAQ.md
+
+extra:
+  version:
+    provider: mike
+    default: latest
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/pauubach/narrassist
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/pauubach
+
+copyright: Copyright &copy; 2024-2026 Pau Ubach
