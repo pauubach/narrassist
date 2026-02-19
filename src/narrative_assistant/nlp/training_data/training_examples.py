@@ -19,8 +19,23 @@ import logging
 import random
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import TypedDict
 
 logger = logging.getLogger(__name__)
+
+
+class ScenarioExampleData(TypedDict):
+    text: str
+    entity: str
+    key: str
+    value: str
+    scores: dict[str, float]
+    is_correct: bool
+
+
+class ScenarioData(TypedDict):
+    description: str
+    examples: list[ScenarioExampleData]
 
 
 @dataclass
@@ -47,7 +62,7 @@ class TrainingExample:
     text_context: str
 
     # Scores de cada método (0.0-1.0)
-    scores: dict = field(default_factory=dict)
+    scores: dict[str, float] = field(default_factory=dict)
 
     # Ground truth
     is_correct: bool = True
@@ -56,19 +71,35 @@ class TrainingExample:
     scenario: str = ""
     notes: str = ""
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict) -> "TrainingExample":
-        return cls(**data)
+    def from_dict(cls, data: dict[str, object]) -> "TrainingExample":
+        raw_scores = data.get("scores", {})
+        scores: dict[str, float] = {}
+        if isinstance(raw_scores, dict):
+            for key, value in raw_scores.items():
+                if isinstance(key, str) and isinstance(value, (int, float)):
+                    scores[key] = float(value)
+
+        return cls(
+            entity_name=str(data.get("entity_name", "")),
+            attribute_key=str(data.get("attribute_key", "")),
+            attribute_value=str(data.get("attribute_value", "")),
+            text_context=str(data.get("text_context", "")),
+            scores=scores,
+            is_correct=bool(data.get("is_correct", False)),
+            scenario=str(data.get("scenario", "")),
+            notes=str(data.get("notes", "")),
+        )
 
 
 # =============================================================================
 # Escenarios de entrenamiento
 # =============================================================================
 
-SCENARIOS = {
+SCENARIOS: dict[str, ScenarioData] = {
     # Escenario 1: Todos los métodos coinciden (caso ideal)
     "all_agree": {
         "description": "Todos los métodos detectan correctamente el atributo",
@@ -448,14 +479,15 @@ def generate_synthetic_dataset(
     Returns:
         Lista de TrainingExample
     """
-    examples = []
+    examples: list[TrainingExample] = []
 
     for scenario_name, scenario_data in SCENARIOS.items():
-        base_examples = scenario_data.get("examples", [])
+        base_examples = scenario_data["examples"]
+        scenario_description = scenario_data["description"]
 
         for base in base_examples:
             # Crear ejemplo base
-            scores = dict(base.get("scores", {}))
+            scores: dict[str, float] = dict(base["scores"])
 
             # Añadir ruido si está habilitado
             if add_noise:
@@ -464,14 +496,14 @@ def generate_synthetic_dataset(
                     scores[method] = max(0.0, min(1.0, scores[method] + noise))
 
             example = TrainingExample(
-                entity_name=base.get("entity", ""),
-                attribute_key=base.get("key", ""),
-                attribute_value=base.get("value", ""),
-                text_context=base.get("text", ""),
+                entity_name=base["entity"],
+                attribute_key=base["key"],
+                attribute_value=base["value"],
+                text_context=base["text"],
                 scores=scores,
-                is_correct=base.get("is_correct", False),
+                is_correct=base["is_correct"],
                 scenario=scenario_name,
-                notes=scenario_data.get("description", ""),
+                notes=scenario_description,
             )
             examples.append(example)
 
@@ -481,19 +513,19 @@ def generate_synthetic_dataset(
                 # Elegir un ejemplo base aleatorio y variar scores
                 base = random.choice(base_examples)
                 scores = {}
-                for method, score in base.get("scores", {}).items():
+                for method, score in base["scores"].items():
                     variation = random.uniform(-0.15, 0.15)
                     scores[method] = max(0.0, min(1.0, score + variation))
 
                 example = TrainingExample(
-                    entity_name=base.get("entity", ""),
-                    attribute_key=base.get("key", ""),
-                    attribute_value=base.get("value", ""),
-                    text_context=base.get("text", ""),
+                    entity_name=base["entity"],
+                    attribute_key=base["key"],
+                    attribute_value=base["value"],
+                    text_context=base["text"],
                     scores=scores,
-                    is_correct=base.get("is_correct", False),
+                    is_correct=base["is_correct"],
                     scenario=scenario_name,
-                    notes=f"Variación de: {scenario_data.get('description', '')}",
+                    notes=f"Variación de: {scenario_description}",
                 )
                 examples.append(example)
 
@@ -531,12 +563,15 @@ def load_training_data(path: Path) -> list[TrainingExample]:
     Returns:
         Lista de TrainingExample
     """
-    examples = []
+    examples: list[TrainingExample] = []
 
     with open(path, encoding="utf-8") as f:
         for line in f:
             if line.strip():
-                data = json.loads(line)
+                data_raw = json.loads(line)
+                if not isinstance(data_raw, dict):
+                    continue
+                data = {str(k): v for k, v in data_raw.items()}
                 examples.append(TrainingExample.from_dict(data))
 
     logger.info(f"Cargados {len(examples)} ejemplos desde {path}")
@@ -548,55 +583,47 @@ def load_training_data(path: Path) -> list[TrainingExample]:
 # =============================================================================
 
 
-def analyze_dataset(examples: list[TrainingExample]) -> dict:
+def analyze_dataset(examples: list[TrainingExample]) -> dict[str, object]:
     """
     Analiza un dataset de entrenamiento.
 
     Returns:
         Estadísticas del dataset
     """
-    stats = {
-        "total_examples": len(examples),
-        "correct_examples": sum(1 for e in examples if e.is_correct),
-        "incorrect_examples": sum(1 for e in examples if not e.is_correct),
-        "by_scenario": {},
-        "by_attribute": {},
-        "method_avg_scores": {
-            "llm": [],
-            "embeddings": [],
-            "dependency": [],
-            "patterns": [],
-        },
+    by_scenario: dict[str, dict[str, int]] = {}
+    by_attribute: dict[str, dict[str, int]] = {}
+    method_scores: dict[str, list[float]] = {
+        "llm": [],
+        "embeddings": [],
+        "dependency": [],
+        "patterns": [],
     }
 
     for example in examples:
-        # Por escenario
-        scenario = getattr(example, "scenario", None)
-        if scenario not in stats["by_scenario"]:
-            stats["by_scenario"][scenario] = {"total": 0, "correct": 0}
-        stats["by_scenario"][scenario]["total"] += 1
-        if getattr(example, "is_correct", False):
-            stats["by_scenario"][scenario]["correct"] += 1
+        scenario_bucket = by_scenario.setdefault(example.scenario, {"total": 0, "correct": 0})
+        scenario_bucket["total"] += 1
+        if example.is_correct:
+            scenario_bucket["correct"] += 1
 
-        # Por atributo
-        attribute_key = getattr(example, "attribute_key", None)
-        if attribute_key not in stats["by_attribute"]:
-            stats["by_attribute"][attribute_key] = {"total": 0, "correct": 0}
-        stats["by_attribute"][attribute_key]["total"] += 1
-        if getattr(example, "is_correct", False):
-            stats["by_attribute"][attribute_key]["correct"] += 1
+        attr_bucket = by_attribute.setdefault(example.attribute_key, {"total": 0, "correct": 0})
+        attr_bucket["total"] += 1
+        if example.is_correct:
+            attr_bucket["correct"] += 1
 
-        # Scores promedio
-        for method, score in getattr(example, "scores", {}).items():
-            if method in stats["method_avg_scores"]:
-                stats["method_avg_scores"][method].append(score)
+        for method, score in example.scores.items():
+            if method in method_scores:
+                method_scores[method].append(score)
 
-    # Calcular promedios
-    for method in stats["method_avg_scores"]:
-        scores = stats["method_avg_scores"][method]
-        if scores:
-            stats["method_avg_scores"][method] = sum(scores) / len(scores)
-        else:
-            stats["method_avg_scores"][method] = 0.0
+    method_avg_scores = {
+        method: (sum(scores) / len(scores) if scores else 0.0)
+        for method, scores in method_scores.items()
+    }
 
-    return stats
+    return {
+        "total_examples": len(examples),
+        "correct_examples": sum(1 for e in examples if e.is_correct),
+        "incorrect_examples": sum(1 for e in examples if not e.is_correct),
+        "by_scenario": by_scenario,
+        "by_attribute": by_attribute,
+        "method_avg_scores": method_avg_scores,
+    }

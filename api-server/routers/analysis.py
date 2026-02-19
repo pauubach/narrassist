@@ -78,9 +78,7 @@ def _force_clear_analysis(project_id: int):
         deps._heavy_analysis_queue[:] = [
             q for q in deps._heavy_analysis_queue if q["project_id"] != project_id
         ]
-        deps._analysis_queue[:] = [
-            q for q in deps._analysis_queue if q["project_id"] != project_id
-        ]
+        deps._analysis_queue[:] = [q for q in deps._analysis_queue if q["project_id"] != project_id]
 
     # Actualizar DB
     try:
@@ -222,6 +220,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
             raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
 
         project = result.value
+        previous_analysis_status = project.analysis_status
 
         # Guard de concurrencia con detección de análisis bloqueado
         if project.analysis_status in ("analyzing", "queued"):
@@ -493,10 +492,14 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 "start_time": start_time,
                 "queued_for_heavy": False,
                 "queue_mode": "full",
+                "previous_analysis_status": previous_analysis_status,
+                "previous_document_fingerprint": getattr(project, "document_fingerprint", "") or "",
+                "fast_path_same_document": False,
             }
 
             # Log inicio con timestamp claro
             from datetime import datetime
+
             start_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             logger.info("=" * 80)
             logger.info(f"▶ ANÁLISIS INICIADO - Proyecto {project_id}")
@@ -506,12 +509,133 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
             try:
                 # Pre-analysis
+                run_parsing(ctx, tracker)
+
+                previous_fp = (ctx.get("previous_document_fingerprint") or "").strip()
+                current_fp = (ctx.get("document_fingerprint") or "").strip()
+                previous_status = (ctx.get("previous_analysis_status") or "").strip()
+                is_same_document = (
+                    bool(previous_fp)
+                    and bool(current_fp)
+                    and previous_fp == current_fp
+                    and previous_status == "completed"
+                )
+                ctx["fast_path_same_document"] = is_same_document
+
+                if is_same_document:
+                    logger.info(
+                        f"[FAST_PATH] Project {project_id}: unchanged fingerprint detected, "
+                        "reusing previous analysis artifacts."
+                    )
+
+                    # Cargar métricas existentes para que run_completion refleje datos reales.
+                    with db_session.connection() as conn:
+                        chapters_count = int(
+                            conn.execute(
+                                "SELECT COUNT(*) FROM chapters WHERE project_id = ?",
+                                (project_id,),
+                            ).fetchone()[0]
+                        )
+                        entities_count = int(
+                            conn.execute(
+                                "SELECT COUNT(*) FROM entities WHERE project_id = ?",
+                                (project_id,),
+                            ).fetchone()[0]
+                        )
+                        attributes_count = int(
+                            conn.execute(
+                                "SELECT COUNT(*) FROM entity_attributes "
+                                "WHERE entity_id IN (SELECT id FROM entities WHERE project_id = ?)",
+                                (project_id,),
+                            ).fetchone()[0]
+                        )
+                        alerts_count = int(
+                            conn.execute(
+                                "SELECT COUNT(*) FROM alerts WHERE project_id = ?",
+                                (project_id,),
+                            ).fetchone()[0]
+                        )
+
+                    ctx["chapters_count"] = (
+                        chapters_count or int(getattr(project, "chapter_count", 0) or 0) or 1
+                    )
+                    ctx["alerts_created"] = alerts_count
+                    ctx.setdefault("entities", [])
+                    ctx.setdefault("attributes", [])
+
+                    tracker.set_metric("chapters_found", ctx["chapters_count"])
+                    tracker.set_metric("entities_found", entities_count)
+                    tracker.set_metric("attributes_extracted", attributes_count)
+                    tracker.set_metric("alerts_generated", alerts_count)
+
+                    def _mark_skipped_phase(phase_key: str, phase_index: int, message: str) -> None:
+                        tracker.start_phase(phase_key, phase_index, message)
+                        tracker.set_action(
+                            "Sin cambios detectados, reutilizando resultados previos."
+                        )
+                        tracker.end_phase(phase_key, phase_index)
+
+                    _mark_skipped_phase(
+                        "classification",
+                        1,
+                        "Clasificación omitida (documento sin cambios).",
+                    )
+                    _mark_skipped_phase(
+                        "structure",
+                        2,
+                        "Estructura reutilizada (documento sin cambios).",
+                    )
+                    _mark_skipped_phase("ner", 3, "NER reutilizado (documento sin cambios).")
+                    _mark_skipped_phase("fusion", 4, "Fusión reutilizada (documento sin cambios).")
+                    _mark_skipped_phase(
+                        "attributes",
+                        5,
+                        "Atributos reutilizados (documento sin cambios).",
+                    )
+                    _mark_skipped_phase(
+                        "consistency",
+                        6,
+                        "Consistencia reutilizada (documento sin cambios).",
+                    )
+                    _mark_skipped_phase(
+                        "grammar",
+                        7,
+                        "Gramática reutilizada (documento sin cambios).",
+                    )
+
+                    # Mantener fase de alertas para reaplicar dismissals/suppression rules.
+                    ctx["_grammar_alerts_emitted"] = True
+                    ctx["_consistency_alerts_emitted"] = True
+                    run_alerts(ctx, tracker)
+
+                    _mark_skipped_phase(
+                        "relationships",
+                        9,
+                        "Relaciones reutilizadas (documento sin cambios).",
+                    )
+                    _mark_skipped_phase("voice", 10, "Voz reutilizada (documento sin cambios).")
+                    _mark_skipped_phase(
+                        "prose",
+                        11,
+                        "Prosa reutilizada (documento sin cambios).",
+                    )
+                    _mark_skipped_phase(
+                        "health",
+                        12,
+                        "Salud narrativa reutilizada (documento sin cambios).",
+                    )
+
+                    run_reconciliation(ctx, tracker)
+                    run_completion(ctx, tracker)
+                    # Fast-path nunca reclama heavy slot; evitar tocar cola pesada en finally.
+                    ctx["heavy_slot_released"] = True
+                    return
+
                 run_snapshot(ctx, tracker)
                 run_cleanup(ctx, tracker)
                 apply_license_and_settings(ctx, tracker)
 
-                # Tier 1: Lightweight phases (run in parallel for all projects)
-                run_parsing(ctx, tracker)
+                # Tier 1: Lightweight phases
                 run_classification(ctx, tracker)
                 run_structure(ctx, tracker)
 
@@ -941,9 +1065,7 @@ def cancel_analysis(project_id: int):
             # Marcar como cancelado (usando flag dedicado + status)
             deps.analysis_cancellation_flags[project_id] = True
             deps.analysis_progress_storage[project_id]["status"] = "cancelled"
-            deps.analysis_progress_storage[project_id]["current_phase"] = (
-                "Cancelando análisis..."
-            )
+            deps.analysis_progress_storage[project_id]["current_phase"] = "Cancelando análisis..."
 
         logger.info(f"Analysis cancellation requested for project {project_id}")
 
@@ -1010,10 +1132,7 @@ def force_clear_stuck_analysis(project_id: int):
         result = project_manager.get(project_id)
 
         if result.is_failure:
-            return ApiResponse(
-                success=False,
-                error=f"Proyecto {project_id} no encontrado"
-            )
+            return ApiResponse(success=False, error=f"Proyecto {project_id} no encontrado")
 
         project = result.value
         old_status = project.analysis_status
@@ -1021,10 +1140,7 @@ def force_clear_stuck_analysis(project_id: int):
         project.analysis_status = "completed"
         project_manager.update(project)
 
-        logger.info(
-            f"[FORCE-CLEAR] Project {project_id} cleared: "
-            f"{old_status} → completed"
-        )
+        logger.info(f"[FORCE-CLEAR] Project {project_id} cleared: {old_status} → completed")
 
         return ApiResponse(
             success=True,
@@ -1038,13 +1154,9 @@ def force_clear_stuck_analysis(project_id: int):
 
     except Exception as e:
         logger.error(
-            f"Error force-clearing stuck analysis for project {project_id}: {e}",
-            exc_info=True
+            f"Error force-clearing stuck analysis for project {project_id}: {e}", exc_info=True
         )
-        return ApiResponse(
-            success=False,
-            error=f"Error al limpiar análisis: {str(e)}"
-        )
+        return ApiResponse(success=False, error=f"Error al limpiar análisis: {str(e)}")
 
 
 @router.get("/api/projects/{project_id}/analysis/stream")

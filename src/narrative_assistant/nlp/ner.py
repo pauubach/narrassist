@@ -163,7 +163,9 @@ class NERExtractionError(NLPError):
 
     def __post_init__(self):
         self.message = f"NER extraction error: {self.original_error}"
-        self.user_message = "Error al extraer entidades del texto. Se continuará con los resultados parciales."
+        self.user_message = (
+            "Error al extraer entidades del texto. Se continuará con los resultados parciales."
+        )
         super().__post_init__()
 
 
@@ -257,7 +259,7 @@ class NERExtractor(NERValidatorMixin, NERPatternDetectorMixin, NERCoordSplitterM
             )
 
         # Transformer NER (lazy loading)
-        self._transformer_ner = None
+        self._transformer_ner: Any | None = None
 
         logger.info(
             f"NERExtractor inicializado (gazetteer={enable_gazetteer}, "
@@ -272,9 +274,7 @@ class NERExtractor(NERValidatorMixin, NERPatternDetectorMixin, NERCoordSplitterM
 
                 self._llm_client = get_llm_client()
                 if self._llm_client and self._llm_client.is_available:
-                    logger.info(
-                        f"LLM disponible para NER: {self._llm_client.model_name}"
-                    )
+                    logger.info(f"LLM disponible para NER: {self._llm_client.model_name}")
                 else:
                     self._llm_client = False
             except Exception as e:
@@ -348,29 +348,40 @@ class NERExtractor(NERValidatorMixin, NERPatternDetectorMixin, NERCoordSplitterM
                     model_key=self._transformer_ner_model_key
                 )
 
-            raw_entities: list[dict[str, Any]] = getattr(self._transformer_ner, "extract", lambda x: [])(text)
+            raw_entities: list[Any] = getattr(self._transformer_ner, "extract", lambda x: [])(text)
             result: list[ExtractedEntity] = []
             for ent in raw_entities:
-                label = self.SPACY_LABEL_MAP.get(ent.label)
+                if isinstance(ent, dict):
+                    raw_label = str(ent.get("label", ""))
+                    raw_start = int(ent.get("start", 0))
+                    raw_end = int(ent.get("end", 0))
+                    raw_text = str(ent.get("text", ""))
+                    raw_score = float(ent.get("score", 0.0))
+                else:
+                    raw_label = str(getattr(ent, "label", ""))
+                    raw_start = int(getattr(ent, "start", 0))
+                    raw_end = int(getattr(ent, "end", 0))
+                    raw_text = str(getattr(ent, "text", ""))
+                    raw_score = float(getattr(ent, "score", 0.0))
+
+                label = self.SPACY_LABEL_MAP.get(raw_label)
                 if label is None:
                     # Intentar mapeo directo desde EntityLabel
                     try:
-                        label = EntityLabel(ent.label)
+                        label = EntityLabel(raw_label)
                     except ValueError:
                         continue
 
                 # Verificar que el texto coincide con la posición original
-                original_text = text[ent.start : ent.end]
-                entity_text = original_text if original_text.strip() else ent.text
+                original_text = text[raw_start:raw_end]
+                entity_text = original_text if original_text.strip() else raw_text
 
                 entity = ExtractedEntity(
                     text=entity_text,
                     label=label,
-                    start_char=ent.start,
-                    end_char=ent.end,
-                    confidence=min(
-                        ent.score, 0.95
-                    ),  # Cap: transformer tiende a dar >0.99
+                    start_char=raw_start,
+                    end_char=raw_end,
+                    confidence=min(raw_score, 0.95),  # Cap: transformer tiende a dar >0.99
                     source="roberta",
                 )
                 result.append(entity)
@@ -500,7 +511,7 @@ JSON:"""
 
         return entities
 
-    def _parse_llm_json_ner(self, response: str) -> dict | None:
+    def _parse_llm_json_ner(self, response: str) -> dict[str, Any] | None:
         """Parsea respuesta JSON del LLM con limpieza."""
         import json
 
@@ -520,7 +531,10 @@ JSON:"""
             if start_idx != -1 and end_idx > start_idx:
                 cleaned = cleaned[start_idx:end_idx]
 
-            return json.loads(cleaned)
+            parsed = json.loads(cleaned)
+            if isinstance(parsed, dict):
+                return {str(k): v for k, v in parsed.items()}
+            return None
 
         except json.JSONDecodeError as e:
             logger.debug(f"Error parseando JSON del LLM en NER: {e}")
@@ -560,7 +574,7 @@ JSON:"""
         self,
         full_text: str,
         entities: list[ExtractedEntity],
-        validation_scores: dict[str, dict],
+        validation_scores: dict[str, dict[str, Any]],
     ) -> list[ExtractedEntity]:
         """
         Verifica entidades de baja confianza usando LLM como segunda capa.
@@ -581,8 +595,8 @@ JSON:"""
             return entities
 
         # Identificar entidades de baja confianza (< 0.7)
-        low_confidence = []
-        high_confidence = []
+        low_confidence: list[ExtractedEntity] = []
+        high_confidence: list[ExtractedEntity] = []
 
         for ent in entities:
             score_data = validation_scores.get(ent.text, {})
@@ -596,12 +610,10 @@ JSON:"""
         if not low_confidence:
             return entities
 
-        logger.info(
-            f"Verificando {len(low_confidence)} entidades de baja confianza con LLM"
-        )
+        logger.info(f"Verificando {len(low_confidence)} entidades de baja confianza con LLM")
 
         # Preparar contexto para cada entidad dudosa
-        entities_to_verify = []
+        entities_to_verify: list[dict[str, Any]] = []
         for ent in low_confidence[:20]:  # Limitar a 20 para no sobrecargar
             # Obtener contexto circundante (±100 caracteres)
             start = max(0, ent.start_char - 100)
@@ -621,7 +633,7 @@ JSON:"""
             return entities
 
         # Construir prompt para verificación batch
-        entities_json = [
+        entities_json: list[dict[str, str]] = [
             {"text": e["text"], "type": e["type"], "context": e["context"][:200]}
             for e in entities_to_verify
         ]
@@ -670,20 +682,28 @@ JSON:"""
             verified_count = 0
             rejected_count = 0
 
-            for result in data.get("results", []):
-                text = result.get("text", "")
-                verdict = result.get("verdict", "").lower()
+            raw_results = data.get("results", [])
+            if not isinstance(raw_results, list):
+                return entities
+
+            for result_item in raw_results:
+                if not isinstance(result_item, dict):
+                    continue
+                result_text = str(result_item.get("text", ""))
+                verdict = str(result_item.get("verdict", "")).lower()
 
                 # Buscar la entidad correspondiente
                 for verify_data in entities_to_verify:
-                    if isinstance(verify_data, dict) and verify_data.get("text", "").lower() == text.lower():
+                    verify_text = str(verify_data.get("text", ""))
+                    if verify_text.lower() == result_text.lower():
                         if verdict == "valid":
                             # Boost de confianza por verificación LLM
-                            ent = verify_data["entity"]
-                            ent.confidence = min(0.9, ent.confidence + 0.2)
-                            ent.source = f"{ent.source}+llm_verified"
-                            verified_entities.append(ent)
-                            verified_count += 1
+                            entity_obj = verify_data.get("entity")
+                            if isinstance(entity_obj, ExtractedEntity):
+                                entity_obj.confidence = min(0.9, entity_obj.confidence + 0.2)
+                                entity_obj.source = f"{entity_obj.source}+llm_verified"
+                                verified_entities.append(entity_obj)
+                                verified_count += 1
                         else:
                             rejected_count += 1
                         break
@@ -791,9 +811,7 @@ JSON:"""
 
         return glossary_entities
 
-    def _postprocess_misc_entities(
-        self, entities: list[ExtractedEntity]
-    ) -> list[ExtractedEntity]:
+    def _postprocess_misc_entities(self, entities: list[ExtractedEntity]) -> list[ExtractedEntity]:
         """
         Post-procesa entidades MISC para filtrar errores y reclasificar.
 
@@ -941,23 +959,17 @@ JSON:"""
                         ctx_doc = self.nlp(ctx_text)
                         # Heurística simple: si el propio texto empieza con mayúscula
                         # y no tiene indicadores de lugar, asumir persona
-                        is_person = morpho_utils.is_person_context(
-                            ctx_doc, 0, len(ctx_text)
-                        )
+                        is_person = morpho_utils.is_person_context(ctx_doc, 0, len(ctx_text))
                 except Exception:
                     is_person = True  # Default: asumir persona
 
                 if is_person:
                     entity.label = EntityLabel.PER
                     entity.source = f"{entity.source}+reclassified"
-                    logger.debug(
-                        f"MISC reclasificado a PER (apellido): '{entity.text}'"
-                    )
+                    logger.debug(f"MISC reclasificado a PER (apellido): '{entity.text}'")
                     reclassified_count += 1
                 else:
-                    logger.debug(
-                        f"MISC no reclasificado (contexto no es persona): '{entity.text}'"
-                    )
+                    logger.debug(f"MISC no reclasificado (contexto no es persona): '{entity.text}'")
                 result.append(entity)
                 continue
 
@@ -970,9 +982,7 @@ JSON:"""
                 if has_surname:
                     entity.label = EntityLabel.PER
                     entity.source = f"{entity.source}+reclassified_fullname"
-                    logger.debug(
-                        f"MISC reclasificado a PER (nombre completo): '{entity.text}'"
-                    )
+                    logger.debug(f"MISC reclasificado a PER (nombre completo): '{entity.text}'")
                     reclassified_count += 1
                     result.append(entity)
                     continue
@@ -1038,9 +1048,7 @@ JSON:"""
             return Result.success(NERResult(processed_chars=0))
 
         result = NERResult(processed_chars=len(text))
-        entities_found: set[tuple[int, int]] = (
-            set()
-        )  # (start, end) para evitar duplicados
+        entities_found: set[tuple[int, int]] = set()  # (start, end) para evitar duplicados
 
         def report_progress(fase: str, pct: float, msg: str):
             """Helper para reportar progreso si hay callback."""
@@ -1063,12 +1071,8 @@ JSON:"""
             if self.use_llm_preprocessing:
                 report_progress("ner", 0.0, "Analizando el texto...")
                 llm_entities = self._preprocess_with_llm(text)
-                report_progress(
-                    "ner", 0.3, f"Encontrados {len(llm_entities)} posibles nombres..."
-                )
-                logger.info(
-                    f"LLM preprocesador: {len(llm_entities)} entidades detectadas"
-                )
+                report_progress("ner", 0.3, f"Encontrados {len(llm_entities)} posibles nombres...")
+                logger.info(f"LLM preprocesador: {len(llm_entities)} entidades detectadas")
 
                 # Añadir entidades del LLM primero (tienen prioridad)
                 for entity in llm_entities:
@@ -1113,9 +1117,7 @@ JSON:"""
                                     and ent.canonical_form
                                     and len(self.dynamic_gazetteer) < MAX_GAZETTEER_SIZE
                                 ):
-                                    self.dynamic_gazetteer[ent.canonical_form] = (
-                                        ent.label
-                                    )
+                                    self.dynamic_gazetteer[ent.canonical_form] = ent.label
 
             report_progress("ner", 0.4, "Buscando personajes y lugares...")
             doc = self.nlp(text)
@@ -1174,9 +1176,7 @@ JSON:"""
                     ent.text, label, context, entity_pos_in_ctx
                 )
                 if is_fp:
-                    logger.debug(
-                        f"Entidad filtrada por morfología: '{ent.text}' - {fp_reason}"
-                    )
+                    logger.debug(f"Entidad filtrada por morfología: '{ent.text}' - {fp_reason}")
                     continue
 
                 entity = ExtractedEntity(
@@ -1202,12 +1202,8 @@ JSON:"""
 
             # 2. Detección heurística (gazetteer dinámico)
             if self.enable_gazetteer:
-                report_progress(
-                    "ner", 0.80, "Buscando más apariciones de nombres conocidos..."
-                )
-                gazetteer_entities = self._detect_gazetteer_entities(
-                    doc, entities_found
-                )
+                report_progress("ner", 0.80, "Buscando más apariciones de nombres conocidos...")
+                gazetteer_entities = self._detect_gazetteer_entities(doc, entities_found)
                 result.entities.extend(gazetteer_entities)
 
                 # Registrar candidatos para el gazetteer
@@ -1267,8 +1263,7 @@ JSON:"""
                 result.entities = validation_result.valid_entities
                 result.rejected_entities = validation_result.rejected_entities
                 result.validation_scores = {
-                    text: score.to_dict()
-                    for text, score in validation_result.scores.items()
+                    text: score.to_dict() for text, score in validation_result.scores.items()
                 }
                 result.validation_method = validation_result.validation_method
 
@@ -1646,9 +1641,11 @@ def extract_implicit_characters(
             text[:3000] if len(text) > 3000 else text, max_length=3000
         )
 
-        known_str = ", ".join(
-            sanitize_for_prompt(e, max_length=100) for e in known_entities
-        ) if known_entities else "ninguno"
+        known_str = (
+            ", ".join(sanitize_for_prompt(e, max_length=100) for e in known_entities)
+            if known_entities
+            else "ninguno"
+        )
 
         prompt = f"""Analiza el siguiente texto narrativo en español y encuentra TODOS los personajes mencionados.
 
@@ -1698,9 +1695,7 @@ Si no hay personajes implícitos, responde: NINGUNO"""
                     break
 
                 entity = ExtractedEntity(
-                    text=text[
-                        pos : pos + len(mention_text)
-                    ],  # Usar capitalización original
+                    text=text[pos : pos + len(mention_text)],  # Usar capitalización original
                     label=EntityLabel.PER,  # Personaje
                     start_char=pos,
                     end_char=pos + len(mention_text),
@@ -1718,6 +1713,6 @@ Si no hay personajes implícitos, responde: NINGUNO"""
         return Result.failure(
             NLPError(
                 message=f"Error en detección de personajes implícitos: {e}",
-                severity=getattr(ErrorSeverity, "WARNING", "WARNING"),
+                severity=ErrorSeverity.RECOVERABLE,
             )
         )

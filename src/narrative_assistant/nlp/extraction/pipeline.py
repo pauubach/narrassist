@@ -114,7 +114,7 @@ class AttributeExtractionPipeline:
 
     def _create_default_extractors(self) -> list[BaseExtractor]:
         """Crea extractores según configuración."""
-        extractors = []
+        extractors: list[BaseExtractor] = []
 
         if self.config.use_regex:
             from .extractors.regex_extractor import RegexExtractor

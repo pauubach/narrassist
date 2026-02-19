@@ -124,9 +124,7 @@ class VitalStatusReport:
         return {
             "project_id": self.project_id,
             "death_events": [e.to_dict() for e in self.death_events],
-            "post_mortem_appearances": [
-                a.to_dict() for a in self.post_mortem_appearances
-            ],
+            "post_mortem_appearances": [a.to_dict() for a in self.post_mortem_appearances],
             "inconsistencies_count": len(self.inconsistencies),
             "entities_status": {k: v.value for k, v in self.entities_status.items()},
         }
@@ -211,10 +209,30 @@ class VitalStatusAnalyzer:
 
     # Términos relacionales que pueden sustituir a un nombre propio
     RELATIONAL_TERMS = {
-        "padre", "madre", "hermano", "hermana", "abuelo", "abuela",
-        "tío", "tía", "primo", "prima", "esposo", "esposa", "marido",
-        "mujer", "hijo", "hija", "suegro", "suegra", "cuñado", "cuñada",
-        "novio", "novia", "padrino", "madrina",
+        "padre",
+        "madre",
+        "hermano",
+        "hermana",
+        "abuelo",
+        "abuela",
+        "tío",
+        "tía",
+        "primo",
+        "prima",
+        "esposo",
+        "esposa",
+        "marido",
+        "mujer",
+        "hijo",
+        "hija",
+        "suegro",
+        "suegra",
+        "cuñado",
+        "cuñada",
+        "novio",
+        "novia",
+        "padrino",
+        "madrina",
     }
 
     def __init__(self, project_id: int, temporal_map=None):
@@ -227,7 +245,7 @@ class VitalStatusAnalyzer:
         self._name_to_id: dict[str, int] = {}
         self._synthetic_id_counter = -1  # IDs negativos para entidades sintéticas
 
-    def register_entity(self, entity_id: int, name: str, aliases: list[str] = None):
+    def register_entity(self, entity_id: int, name: str, aliases: list[str] | None = None) -> None:
         """Registra una entidad para el análisis."""
         self._entity_names[entity_id] = name
         self._name_to_id[name.lower()] = entity_id
@@ -335,9 +353,7 @@ class VitalStatusAnalyzer:
 
                     # BK-08: Descartar muertes especulativas (irrealis)
                     if self._is_speculative_death(excerpt):
-                        logger.debug(
-                            f"Skipping speculative death for {name} in chapter {chapter}"
-                        )
+                        logger.debug(f"Skipping speculative death for {name} in chapter {chapter}")
                         continue
 
                     # Calcular confianza según tipo
@@ -358,9 +374,7 @@ class VitalStatusAnalyzer:
                         excerpt=excerpt,
                         death_type=death_type,
                         confidence=confidence_map.get(death_type, 0.7),
-                        temporal_instance_id=self._extract_temporal_instance_id(
-                            excerpt, entity_id
-                        ),
+                        temporal_instance_id=self._extract_temporal_instance_id(excerpt, entity_id),
                     )
 
                     events.append(event)
@@ -440,10 +454,7 @@ class VitalStatusAnalyzer:
                     is_valid = self._is_valid_reference(context, entity_name)
 
                     # Determinar tipo de aparición
-                    if (
-                        "dijo" in match.group(0).lower()
-                        or "preguntó" in match.group(0).lower()
-                    ):
+                    if "dijo" in match.group(0).lower() or "preguntó" in match.group(0).lower():
                         appearance_type = "dialogue"
                     else:
                         appearance_type = "action"
@@ -483,9 +494,7 @@ class VitalStatusAnalyzer:
         """
         for pattern in self.VALID_REFERENCE_PATTERNS:
             # Reemplazar placeholder de nombre
-            pattern_with_name = pattern.replace(
-                r"(?P<name>\w+)", re.escape(entity_name)
-            )
+            pattern_with_name = pattern.replace(r"(?P<name>\w+)", re.escape(entity_name))
             if re.search(pattern_with_name, context, re.IGNORECASE):
                 return True
             # También probar el patrón original
@@ -609,18 +618,14 @@ def analyze_vital_status(
             if not text:
                 continue
 
-            death_events, appearances = analyzer.analyze_chapter(
-                text, chapter_num, start_offset
-            )
+            death_events, appearances = analyzer.analyze_chapter(text, chapter_num, start_offset)
 
             all_death_events.extend(death_events)
             all_appearances.extend(appearances)
 
         # Segunda pasada: para muertes en pluscuamperfecto (habían ocurrido antes),
         # buscar apariciones activas en capítulos ANTERIORES al de detección.
-        pluperfect_deaths = [
-            e for e in all_death_events if e.death_type == "pluperfect"
-        ]
+        pluperfect_deaths = [e for e in all_death_events if e.death_type == "pluperfect"]
         if pluperfect_deaths:
             sorted_chapters = sorted(chapters, key=lambda c: c.get("number", 0))
             for death_event in pluperfect_deaths:
@@ -644,9 +649,7 @@ def analyze_vital_status(
                             context_start = max(0, match.start() - 250)
                             context_end = min(len(text), match.end() + 250)
                             context = text[context_start:context_end]
-                            is_valid = analyzer._is_valid_reference(
-                                context, entity_name
-                            )
+                            is_valid = analyzer._is_valid_reference(context, entity_name)
                             appearance = PostMortemAppearance(
                                 entity_id=death_event.entity_id,
                                 entity_name=death_event.entity_name,

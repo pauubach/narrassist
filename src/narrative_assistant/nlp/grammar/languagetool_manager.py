@@ -150,7 +150,8 @@ class LanguageToolManager:
             url = f"http://localhost:{self.port}/v2/languages"
             req = urllib.request.Request(url, method="GET")
             with urllib.request.urlopen(req, timeout=2) as response:
-                return response.status == 200
+                status_code = getattr(response, "status", None)
+                return bool(status_code == 200)
         except Exception:
             return False
 
@@ -229,6 +230,7 @@ class LanguageToolManager:
             self._starting = True
 
         try:
+            assert self._lt_dir is not None
             jar_file = self._lt_dir / "languagetool-server.jar"
 
             # Comando para iniciar
@@ -248,16 +250,17 @@ class LanguageToolManager:
 
             # Iniciar proceso
             # En Windows, usar CREATE_NO_WINDOW para no mostrar ventana
-            kwargs = {
-                "stdout": subprocess.DEVNULL,
-                "stderr": subprocess.DEVNULL,
-                "cwd": str(self._lt_dir),
-            }
-
+            creationflags = 0
             if platform.system() == "Windows":
-                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+                creationflags = int(getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
-            self._process = subprocess.Popen(cmd, **kwargs)
+            self._process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                cwd=str(self._lt_dir),
+                creationflags=creationflags,
+            )
 
             if wait:
                 # Esperar a que esté listo
@@ -773,6 +776,7 @@ class LanguageToolInstaller:
                 return False
 
             extracted_dir = extracted_dirs[0]
+            assert self._java_dir is not None
 
             # macOS: contenido en Contents/Home
             if system == "Darwin":

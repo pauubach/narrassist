@@ -19,8 +19,9 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
-from ..core.errors import ErrorSeverity, NLPError
+from ..core.errors import ErrorSeverity, NarrativeError, NLPError
 from ..core.result import Result
 from .spacy_gpu import load_spacy_model
 
@@ -337,7 +338,7 @@ class CoreferenceResolver:
             return Result.success(CoreferenceResult(processed_chars=0))
 
         result = CoreferenceResult(processed_chars=len(text))
-        errors: list[NLPError] = []
+        errors: list[NarrativeError] = []
 
         try:
             doc = self.nlp(text)
@@ -630,7 +631,7 @@ class CoreferenceResolver:
         self,
         entities: list,
         chains: list[CoreferenceChain],
-    ) -> dict[str, list]:
+    ) -> dict[str, Any]:
         """
         Agrupa entidades NER por cadena de correferencia.
 

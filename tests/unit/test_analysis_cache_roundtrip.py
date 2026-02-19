@@ -3,12 +3,16 @@ import sys
 from pathlib import Path
 
 from narrative_assistant.entities.models import EntityImportance, EntityType
+from narrative_assistant.persistence.analysis_cache import AnalysisCache
+from narrative_assistant.persistence.database import get_database
 from narrative_assistant.persistence.project import ProjectManager
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "api-server"))
 
 from routers._analysis_phases import (  # noqa: E402
+    _restore_chapter_mentions_from_cache,
     _restore_entities_from_cache,
+    _serialize_chapter_mentions_for_cache,
     _serialize_entities_for_cache,
 )
 
@@ -136,3 +140,59 @@ def test_project_update_persists_document_fingerprint():
     fetched = fetched_result.value
     assert fetched is not None
     assert fetched.document_fingerprint == new_fingerprint
+
+
+def test_ner_chapter_cache_roundtrip():
+    cache = AnalysisCache(get_database())
+    manager = ProjectManager()
+    create_result = manager.create_from_document(
+        text="Texto de prueba para cache por capítulo",
+        name="Proyecto NER Chapter Cache",
+        document_format="txt",
+        check_existing=False,
+    )
+    assert create_result.is_success
+    project_id = create_result.value.id
+    chapter_hash = "a" * 64
+    config_hash = "default"
+    mentions_json = '[{"text":"Maria","label":"PER","start_char":0,"end_char":5}]'
+
+    cache.set_ner_chapter_results(
+        project_id=project_id,
+        chapter_hash=chapter_hash,
+        config_hash=config_hash,
+        mentions_json=mentions_json,
+        mention_count=1,
+        processed_chars=120,
+    )
+
+    cached = cache.get_ner_chapter_results(project_id, chapter_hash, config_hash)
+
+    assert cached is not None
+    assert cached["mentions_json"] == mentions_json
+    assert cached["mention_count"] == 1
+    assert cached["processed_chars"] == 120
+
+
+def test_chapter_mentions_cache_serialization_rebases_offsets():
+    from narrative_assistant.nlp.ner import EntityLabel, ExtractedEntity
+
+    mentions = [
+        ExtractedEntity(
+            text="María",
+            label=EntityLabel.PER,
+            start_char=110,
+            end_char=115,
+            confidence=0.92,
+            source="ner",
+        )
+    ]
+
+    serialized = _serialize_chapter_mentions_for_cache(mentions, chapter_start=100)
+    restored = _restore_chapter_mentions_from_cache(serialized, chapter_start=400)
+
+    assert len(restored) == 1
+    assert restored[0].text == "María"
+    assert restored[0].label == EntityLabel.PER
+    assert restored[0].start_char == 410
+    assert restored[0].end_char == 415

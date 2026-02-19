@@ -9,7 +9,7 @@ import json
 import logging
 import threading
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from ..persistence.database import Database, get_database
 from .models import (
@@ -86,8 +86,9 @@ class EntityRepository:
                 ),
             )
             entity_id = cursor.lastrowid
+            assert entity_id is not None
             logger.debug(f"Entidad creada: {entity.canonical_name} (ID={entity_id})")
-            return entity_id
+            return int(entity_id)
 
     def get_entity(self, entity_id: int) -> Entity | None:
         """
@@ -176,9 +177,7 @@ class EntityRepository:
             if current:
                 new_aliases = aliases if aliases is not None else current.aliases
                 new_merged = (
-                    merged_from_ids
-                    if merged_from_ids is not None
-                    else current.merged_from_ids
+                    merged_from_ids if merged_from_ids is not None else current.merged_from_ids
                 )
                 merged_data = json.dumps(
                     {
@@ -274,7 +273,7 @@ class EntityRepository:
             "SELECT COUNT(*) as cnt FROM entity_mentions WHERE entity_id = ?",
             (entity_id,),
         )
-        actual_count = row["cnt"] if row else 0
+        actual_count = int(row["cnt"]) if row and row["cnt"] is not None else 0
 
         # Actualizar el campo mention_count
         self.db.execute(
@@ -310,7 +309,9 @@ class EntityRepository:
             "SELECT COUNT(*) as cnt FROM entities WHERE project_id = ? AND is_active = 1",
             (project_id,),
         )
-        return row["cnt"] if row and "cnt" in row else 0
+        if row is None or "cnt" not in row or row["cnt"] is None:
+            return 0
+        return int(cast(int, row["cnt"]))
 
     # =========================================================================
     # Menciones - CRUD
@@ -350,7 +351,9 @@ class EntityRepository:
                     mention.metadata,
                 ),
             )
-            return cursor.lastrowid
+            mention_id = cursor.lastrowid
+            assert mention_id is not None
+            return int(mention_id)
 
     def create_mentions_batch(self, mentions: list[EntityMention]) -> int:
         """
@@ -405,9 +408,7 @@ class EntityRepository:
         )
         return [EntityMention.from_row(row) for row in rows]
 
-    def get_mentions_by_project(
-        self, project_id: int
-    ) -> list[dict]:
+    def get_mentions_by_project(self, project_id: int) -> list[dict]:
         """
         Obtiene todas las menciones de un proyecto con JOIN a entidades.
 
@@ -579,10 +580,11 @@ class EntityRepository:
                 ),
             )
             attribute_id = cursor.lastrowid
+            assert attribute_id is not None
             logger.debug(
                 f"Attribute created: {attribute_key}={attribute_value} for entity {entity_id} (ID={attribute_id})"
             )
-            return attribute_id
+            return int(attribute_id)
 
     def move_attributes(self, from_entity_id: int, to_entity_id: int) -> int:
         """
@@ -602,9 +604,7 @@ class EntityRepository:
             )
             return cursor.rowcount
 
-    def move_related_data(
-        self, from_entity_id: int, to_entity_id: int
-    ) -> dict[str, int]:
+    def move_related_data(self, from_entity_id: int, to_entity_id: int) -> dict[str, int]:
         """
         Migra todas las referencias FK de una entidad a otra.
 
@@ -750,9 +750,7 @@ class EntityRepository:
             c = conn.execute(
                 "DELETE FROM collection_entity_links WHERE source_entity_id = target_entity_id",
             )
-            counts["collection_entity_links"] = (
-                c.rowcount
-            )  # solo self-links eliminados contados
+            counts["collection_entity_links"] = c.rowcount  # solo self-links eliminados contados
 
             # 15. scene_tags: location_entity_id
             c = conn.execute(
@@ -838,8 +836,15 @@ class EntityRepository:
                                 "SET weight = ?, feedback_count = ?, dismiss_count = ?, "
                                 "confirm_count = ?, updated_at = datetime('now') "
                                 "WHERE project_id = ? AND alert_type = ? AND entity_canonical_name = ?",
-                                (merged_w, sc + tc, sr["dismiss_count"] + tgt["dismiss_count"],
-                                 sr["confirm_count"] + tgt["confirm_count"], pid, at, to_norm),
+                                (
+                                    merged_w,
+                                    sc + tc,
+                                    sr["dismiss_count"] + tgt["dismiss_count"],
+                                    sr["confirm_count"] + tgt["confirm_count"],
+                                    pid,
+                                    at,
+                                    to_norm,
+                                ),
                             )
                         else:
                             # Transfer source weight to target name
@@ -1186,7 +1191,9 @@ class EntityRepository:
                 sql,
                 (project_id, result_entity_id, old_value, new_value, note),
             )
-            return cursor.lastrowid
+            history_id = cursor.lastrowid
+            assert history_id is not None
+            return int(history_id)
 
     def merge_entities_atomic(
         self,
@@ -1253,9 +1260,7 @@ class EntityRepository:
                     (primary_entity_id,),
                 ).fetchone()
                 if existing:
-                    conn.execute(
-                        "DELETE FROM voice_profiles WHERE entity_id = ?", (eid,)
-                    )
+                    conn.execute("DELETE FROM voice_profiles WHERE entity_id = ?", (eid,))
                 else:
                     conn.execute(
                         "UPDATE voice_profiles SET entity_id = ? WHERE entity_id = ?",
@@ -1271,9 +1276,7 @@ class EntityRepository:
                 merged_count += 1
 
             # 5. Actualizar aliases y merged_from_ids en la entidad primaria
-            merged_data = json.dumps(
-                {"aliases": combined_aliases, "merged_ids": new_merged_ids}
-            )
+            merged_data = json.dumps({"aliases": combined_aliases, "merged_ids": new_merged_ids})
             conn.execute(
                 "UPDATE entities SET merged_from_ids = ?, updated_at = datetime('now') WHERE id = ?",
                 (merged_data, primary_entity_id),
@@ -1294,9 +1297,7 @@ class EntityRepository:
                     "canonical_names_before": canonical_names_before,
                 }
             )
-            new_value = json.dumps(
-                {"result_entity_id": primary_entity_id, "merged_by": merged_by}
-            )
+            new_value = json.dumps({"result_entity_id": primary_entity_id, "merged_by": merged_by})
             note = f"Fusión de {merged_count} entidades en entidad {primary_entity_id}"
             conn.execute(
                 """INSERT INTO review_history (
@@ -1333,12 +1334,8 @@ class EntityRepository:
 
         history = []
         for row in rows:
-            old_data = (
-                json.loads(row["old_value_json"]) if row["old_value_json"] else {}
-            )
-            new_data = (
-                json.loads(row["new_value_json"]) if row["new_value_json"] else {}
-            )
+            old_data = json.loads(row["old_value_json"]) if row["old_value_json"] else {}
+            new_data = json.loads(row["new_value_json"]) if row["new_value_json"] else {}
 
             history.append(
                 MergeHistory(
@@ -1349,9 +1346,7 @@ class EntityRepository:
                     source_snapshots=old_data.get("source_snapshots", []),
                     canonical_name_before=old_data.get("canonical_names_before", []),
                     merged_at=(
-                        datetime.fromisoformat(row["created_at"])
-                        if row["created_at"]
-                        else None
+                        datetime.fromisoformat(row["created_at"]) if row["created_at"] else None
                     ),
                     merged_by=new_data.get("merged_by", "user"),
                     undone_at=(

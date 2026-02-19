@@ -184,7 +184,7 @@ class TrainableWeightedVoting:
         """
         X, y = self._prepare_data(examples)
 
-        best_weights = None
+        best_weights: np.ndarray | None = None
         best_score = float("inf")
         n_iterations = 0
 
@@ -219,6 +219,11 @@ class TrainableWeightedVoting:
 
         if verbose:
             logger.info(f"Grid search: {n_iterations} combinaciones evaluadas")
+
+        if best_weights is None:
+            # Fallback defensivo: pesos uniformes si no se evaluó ninguna combinación válida.
+            method_count = max(1, len(self.methods))
+            best_weights = np.array([1.0 / method_count] * len(self.methods))
 
         # Resultados
         weights = {m: float(w) for m, w in zip(self.methods, best_weights, strict=True)}

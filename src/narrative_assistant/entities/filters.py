@@ -427,7 +427,9 @@ class EntityFilterRepository:
                 (project_id, normalized_name, entity_type, entity_type),
             ).fetchone()
 
-            return row[0] if row else 0
+            if row is None:
+                return 0
+            return int(row[0])
 
     def remove_project_override(
         self, project_id: int, entity_name: str, entity_type: str | None = None
@@ -445,7 +447,7 @@ class EntityFilterRepository:
                 (project_id, normalized_name, entity_type, entity_type),
             )
 
-            return cursor.rowcount > 0
+            return bool(int(cursor.rowcount) > 0)
 
     def add_user_rejection(
         self, entity_name: str, entity_type: str | None = None, reason: str | None = None
@@ -477,7 +479,9 @@ class EntityFilterRepository:
                 (normalized_name, entity_type, entity_type),
             ).fetchone()
 
-            return row[0] if row else 0
+            if row is None:
+                return 0
+            return int(row[0])
 
     def remove_user_rejection(self, entity_name: str, entity_type: str | None = None) -> bool:
         """Elimina un rechazo global del usuario."""
@@ -493,7 +497,7 @@ class EntityFilterRepository:
                 (normalized_name, entity_type, entity_type),
             )
 
-            return cursor.rowcount > 0
+            return bool(int(cursor.rowcount) > 0)
 
     def toggle_system_pattern(self, pattern_id: int, is_active: bool) -> bool:
         """Activa o desactiva un patrón del sistema."""
@@ -507,7 +511,7 @@ class EntityFilterRepository:
                 (1 if is_active else 0, pattern_id),
             )
 
-            return cursor.rowcount > 0
+            return bool(int(cursor.rowcount) > 0)
 
     # =========================================================================
     # Listados para UI

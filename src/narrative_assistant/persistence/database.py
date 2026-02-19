@@ -1320,6 +1320,28 @@ CREATE INDEX IF NOT EXISTS idx_attr_cache_lookup ON attribute_cache(
     config_hash
 );
 
+-- Cache NER por capítulo (optimización incremental por cambios locales)
+-- Reutiliza menciones de capítulos intactos cuando cambia solo parte del manuscrito.
+CREATE TABLE IF NOT EXISTS ner_chapter_cache (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    chapter_hash TEXT NOT NULL,          -- SHA-256 del texto del capítulo
+    config_hash TEXT NOT NULL,           -- Hash de configuración NER
+    mentions_json TEXT NOT NULL,         -- JSON de menciones (offsets locales)
+    mention_count INTEGER DEFAULT 0,
+    processed_chars INTEGER DEFAULT 0,
+    cache_version INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    UNIQUE(project_id, chapter_hash, config_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_ner_chapter_cache_lookup ON ner_chapter_cache(
+    project_id,
+    chapter_hash,
+    config_hash
+);
+
 -- Insertar versión del schema
 INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '30');
 """
@@ -1345,9 +1367,7 @@ class Database:
         """
         config = get_config()
         self.db_path = db_path or config.db_path
-        logger.info(
-            f"Database.__init__: db_path param={db_path}, config.db_path={config.db_path}"
-        )
+        logger.info(f"Database.__init__: db_path param={db_path}, config.db_path={config.db_path}")
         logger.info(f"Database.__init__: usando db_path={self.db_path}")
         self._is_memory = self.db_path == ":memory:" or (
             isinstance(self.db_path, str) and self.db_path.startswith(":")
@@ -1381,9 +1401,7 @@ class Database:
     def _initialize_schema(self) -> None:
         """Crea tablas si no existen. Detecta BD corrupta y la recrea si es necesario."""
         logger.info(f"[DB_INIT] Inicializando schema en: {self.db_path}")
-        logger.info(
-            f"[DB_INIT] db_path type: {type(self.db_path)}, is_memory: {self._is_memory}"
-        )
+        logger.info(f"[DB_INIT] db_path type: {type(self.db_path)}, is_memory: {self._is_memory}")
         logger.info(f"[DB_INIT] db_path resolved: {self.db_path}")
 
         # Verificar si el archivo existe y tiene contenido
@@ -1421,13 +1439,9 @@ class Database:
                                         f"[DB_INIT] Eliminado archivo auxiliar corrupto: {aux_path}"
                                     )
                         except Exception as del_err:
-                            logger.error(
-                                f"[DB_INIT] Error eliminando BD corrupta: {del_err}"
-                            )
+                            logger.error(f"[DB_INIT] Error eliminando BD corrupta: {del_err}")
             else:
-                logger.info(
-                    f"[DB_INIT] Archivo DB no existe, se creará nuevo en: {self.db_path}"
-                )
+                logger.info(f"[DB_INIT] Archivo DB no existe, se creará nuevo en: {self.db_path}")
 
         # Crear schema desde cero
         logger.info("[DB_INIT] Llamando _create_schema_from_scratch()...")
@@ -1441,9 +1455,7 @@ class Database:
             # Primero verificar integridad
             try:
                 integrity = conn.execute("PRAGMA integrity_check").fetchone()
-                logger.info(
-                    f"[VERIFY] Integrity check: {integrity[0] if integrity else 'N/A'}"
-                )
+                logger.info(f"[VERIFY] Integrity check: {integrity[0] if integrity else 'N/A'}")
             except Exception as e:
                 logger.warning(f"[VERIFY] Integrity check failed: {e}")
 
@@ -1451,9 +1463,7 @@ class Database:
                 "SELECT name FROM sqlite_master WHERE type='table'"
             ).fetchall()
             existing_names = {t[0] for t in existing_tables}
-            logger.info(
-                f"[VERIFY] Tablas existentes ({len(existing_names)}): {existing_names}"
-            )
+            logger.info(f"[VERIFY] Tablas existentes ({len(existing_names)}): {existing_names}")
             logger.info(f"[VERIFY] Tablas requeridas: {ESSENTIAL_TABLES}")
 
             missing_tables = ESSENTIAL_TABLES - existing_names
@@ -1461,9 +1471,7 @@ class Database:
             if missing_tables:
                 logger.warning(f"[VERIFY] Faltan tablas esenciales: {missing_tables}")
                 # Intentar crear las tablas faltantes ejecutando todo el schema
-                logger.info(
-                    "[VERIFY] Ejecutando SCHEMA_SQL para crear tablas faltantes..."
-                )
+                logger.info("[VERIFY] Ejecutando SCHEMA_SQL para crear tablas faltantes...")
                 conn.executescript(SCHEMA_SQL)
                 conn.commit()
                 logger.info("[VERIFY] SCHEMA_SQL ejecutado y commit hecho")
@@ -1477,9 +1485,7 @@ class Database:
                 logger.info(f"[VERIFY] Tablas tras reparación: {existing_names}")
 
                 if still_missing:
-                    logger.error(
-                        f"[VERIFY] FALLO: No se pudieron crear tablas: {still_missing}"
-                    )
+                    logger.error(f"[VERIFY] FALLO: No se pudieron crear tablas: {still_missing}")
                     raise RuntimeError(f"No se pudieron crear tablas: {still_missing}")
 
                 logger.info("[VERIFY] Tablas faltantes creadas exitosamente")
@@ -1627,6 +1633,21 @@ class Database:
                 vram_used_gb REAL,
                 benchmarked_at TEXT NOT NULL DEFAULT (datetime('now'))
             )""",
+            # v30+: cache incremental NER por capítulo (texto hash)
+            """CREATE TABLE IF NOT EXISTS ner_chapter_cache (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                chapter_hash TEXT NOT NULL,
+                config_hash TEXT NOT NULL,
+                mentions_json TEXT NOT NULL,
+                mention_count INTEGER DEFAULT 0,
+                processed_chars INTEGER DEFAULT 0,
+                cache_version INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                UNIQUE(project_id, chapter_hash, config_hash)
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_ner_chapter_cache_lookup ON ner_chapter_cache(project_id, chapter_hash, config_hash)",
         ]
         for sql in table_migrations:
             try:
@@ -1647,16 +1668,16 @@ class Database:
         recrea la tabla con el nuevo schema (SQLite no soporta ALTER UNIQUE).
         """
         try:
-            cols = conn.execute(
-                "PRAGMA table_info(project_detector_weights)"
-            ).fetchall()
+            cols = conn.execute("PRAGMA table_info(project_detector_weights)").fetchall()
             if not cols:
                 return  # Tabla no existe, se creará por table_migrations
             col_names = {c[1] for c in cols}
             if "entity_canonical_name" in col_names:
                 return  # Ya migrada
 
-            logger.info("[MIGRATE] v24: Reconstruyendo project_detector_weights con entity_canonical_name")
+            logger.info(
+                "[MIGRATE] v24: Reconstruyendo project_detector_weights con entity_canonical_name"
+            )
 
             conn.execute("""
                 CREATE TABLE project_detector_weights_new (
@@ -1683,8 +1704,7 @@ class Database:
             """)
             conn.execute("DROP TABLE project_detector_weights")
             conn.execute(
-                "ALTER TABLE project_detector_weights_new "
-                "RENAME TO project_detector_weights"
+                "ALTER TABLE project_detector_weights_new RENAME TO project_detector_weights"
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_proj_det_weights_project "
@@ -1736,9 +1756,7 @@ class Database:
                         "SELECT name FROM sqlite_master WHERE type='table'"
                     ).fetchall()
                     verify_names = {t[0] for t in verify_tables}
-                    logger.info(
-                        f"[SCHEMA] Tablas en conexión independiente: {verify_names}"
-                    )
+                    logger.info(f"[SCHEMA] Tablas en conexión independiente: {verify_names}")
                     verify_missing = ESSENTIAL_TABLES - verify_names
                     if verify_missing:
                         logger.error(
@@ -1762,14 +1780,8 @@ class Database:
             logger.info(f"[SCHEMA] Schema inicializado y verificado en {self.db_path}")
 
             # Log file size
-            if (
-                not self._is_memory
-                and isinstance(self.db_path, Path)
-                and self.db_path.exists()
-            ):
-                logger.info(
-                    f"[SCHEMA] DB file size: {self.db_path.stat().st_size} bytes"
-                )
+            if not self._is_memory and isinstance(self.db_path, Path) and self.db_path.exists():
+                logger.info(f"[SCHEMA] DB file size: {self.db_path.stat().st_size} bytes")
 
         except Exception as e:
             logger.error(f"[SCHEMA] Error inicializando schema: {e}", exc_info=True)
@@ -1899,9 +1911,7 @@ def get_database(db_path: Path | None = None) -> Database:
         with _database_lock:
             # Double-checked locking
             if _database is None or (db_path and db_path != _database.db_path):
-                logger.info(
-                    f"Creando nueva instancia de Database con db_path={db_path}"
-                )
+                logger.info(f"Creando nueva instancia de Database con db_path={db_path}")
                 _database = Database(db_path)
                 logger.info(f"Database creada, db_path efectivo: {_database.db_path}")
     else:

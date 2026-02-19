@@ -187,25 +187,49 @@ MIN_POETIC_INDICATORS = 1  # Dispositivos poeticos son mas raros, 1 basta
 
 CONTEXTUAL_COLLOQUIAL_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     # "fuerte" como exclamacion/intensificador (no como adjetivo descriptivo)
-    ("fuerte", re.compile(r"(?:^|[.!¡]\s*)(?:¡?\s*(?:qu[eé]|es|muy|tan|más)\s+fuerte)", re.IGNORECASE)),
+    (
+        "fuerte",
+        re.compile(r"(?:^|[.!¡]\s*)(?:¡?\s*(?:qu[eé]|es|muy|tan|más)\s+fuerte)", re.IGNORECASE),
+    ),
     # "brutal" como exclamacion/intensificador
-    ("brutal", re.compile(r"(?:^|[.!¡]\s*)(?:¡?\s*(?:qu[eé]|es)\s+brutal|brutal[,!])", re.IGNORECASE)),
+    (
+        "brutal",
+        re.compile(r"(?:^|[.!¡]\s*)(?:¡?\s*(?:qu[eé]|es)\s+brutal|brutal[,!])", re.IGNORECASE),
+    ),
     # "locura" como exclamacion
     ("locura", re.compile(r"(?:¡?\s*(?:qu[eé]|menuda|vaya|es una)\s+locura)", re.IGNORECASE)),
     # "pasada" como exclamacion
     ("pasada", re.compile(r"(?:¡?\s*(?:qu[eé]|menuda|vaya|es una)\s+pasada)", re.IGNORECASE)),
     # "rollo" como aburrimiento/tema
-    ("rollo", re.compile(r"(?:(?:qu[eé]|menudo|vaya|es un|buen)\s+rollo|rollo\s+(?:patatero|total))", re.IGNORECASE)),
+    (
+        "rollo",
+        re.compile(
+            r"(?:(?:qu[eé]|menudo|vaya|es un|buen)\s+rollo|rollo\s+(?:patatero|total))",
+            re.IGNORECASE,
+        ),
+    ),
     # "lio" como problema/desorden coloquial
-    ("lio", re.compile(r"(?:(?:qu[eé]|menudo|vaya|es un)\s+l[ií]o|l[ií]o\s+(?:gordo|pardo|mental))", re.IGNORECASE)),
+    (
+        "lio",
+        re.compile(
+            r"(?:(?:qu[eé]|menudo|vaya|es un)\s+l[ií]o|l[ií]o\s+(?:gordo|pardo|mental))",
+            re.IGNORECASE,
+        ),
+    ),
     # "movida" como asunto/problema coloquial
-    ("movida", re.compile(r"(?:(?:qu[eé]|menuda|vaya)\s+movida|la\s+movida\s+(?:de|del))", re.IGNORECASE)),
+    (
+        "movida",
+        re.compile(r"(?:(?:qu[eé]|menuda|vaya)\s+movida|la\s+movida\s+(?:de|del))", re.IGNORECASE),
+    ),
     # "morro" como descaro
     ("morro", re.compile(r"(?:(?:qu[eé]|menudo|vaya|tiene|con)\s+morro)", re.IGNORECASE)),
     # "heavy" como intensificador coloquial
     ("heavy", re.compile(r"(?:(?:qu[eé]|es|muy|bastante)\s+heavy)", re.IGNORECASE)),
     # "crack" como elogio coloquial (no sustantivo)
-    ("crack", re.compile(r"(?:(?:eres|es)\s+un\s+crack|crack\s+(?:total|absoluto))", re.IGNORECASE)),
+    (
+        "crack",
+        re.compile(r"(?:(?:eres|es)\s+un\s+crack|crack\s+(?:total|absoluto))", re.IGNORECASE),
+    ),
 ]
 
 # Patrones tecnicos por dominio
@@ -384,7 +408,9 @@ class RegisterAnalyzer:
             if response and response.strip():
                 is_colloquial = "coloquial" in response.strip().lower()
                 self._llm_cache[cache_key] = is_colloquial
-                logger.debug(f"LLM register fallback: '{word}' in '{sentence[:40]}...' -> {response.strip()}")
+                logger.debug(
+                    f"LLM register fallback: '{word}' in '{sentence[:40]}...' -> {response.strip()}"
+                )
                 return is_colloquial
         except Exception as e:
             logger.debug(f"LLM register fallback unavailable: {e}")
@@ -529,7 +555,9 @@ class RegisterAnalyzer:
 
         # Aplicar umbrales minimos: por debajo del umbral, score = 0
         effective_formal = formal_count if formal_count >= MIN_FORMAL_INDICATORS else 0
-        effective_colloquial = colloquial_count if colloquial_count >= MIN_COLLOQUIAL_INDICATORS else 0
+        effective_colloquial = (
+            colloquial_count if colloquial_count >= MIN_COLLOQUIAL_INDICATORS else 0
+        )
         effective_technical = technical_count if technical_count >= MIN_TECHNICAL_INDICATORS else 0
         effective_poetic = poetic_count if poetic_count >= MIN_POETIC_INDICATORS else 0
 
@@ -611,7 +639,7 @@ class RegisterChangeDetector:
         Returns:
             Lista de cambios de registro detectados
         """
-        changes: list[dict[str, Any]] = []
+        changes: list[RegisterChange] = []
 
         # Filtrar solo narracion (no dialogos) para comparar
         narrative_analyses = [a for a in self.analyses if not a.is_dialogue]

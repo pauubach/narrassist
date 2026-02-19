@@ -22,7 +22,7 @@ Uso:
 import logging
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional, cast
 
 from .title_preprocessor import ProcessedDocument, ProcessedParagraph, TitlePreprocessor
 
@@ -67,7 +67,7 @@ class TitleAwareAnalysisResult:
 
     docs: list[object]  # list[Doc]
     preprocessed: ProcessedDocument
-    grouped_by_title: list[tuple[object | None, list[object]]]
+    grouped_by_title: list[tuple[TitleAwareDoc | None, list[object]]]
     title_count: int
     content_count: int
 
@@ -104,9 +104,8 @@ def analyze_with_title_handling(nlp, text: str) -> TitleAwareAnalysisResult:
     preprocessor = TitlePreprocessor()
     processed = preprocessor.process(text)
 
-    docs = []
-    title_aware_docs = []
-    title_index_map: dict[int, int] = {}  # Mapeo de índice de párrafo a índice de título
+    docs: list[object] = []
+    title_index_map: dict[int | None, tuple[TitleAwareDoc | None, list[object]]] = {}
 
     # Procesar todos los párrafos con spaCy
     last_title_index = -1
@@ -122,7 +121,6 @@ def analyze_with_title_handling(nlp, text: str) -> TitleAwareAnalysisResult:
         )
 
         docs.append(doc)
-        title_aware_docs.append(aware_doc)
 
         if para.is_title:
             last_title_index = i
@@ -138,13 +136,15 @@ def analyze_with_title_handling(nlp, text: str) -> TitleAwareAnalysisResult:
                 title_index_map[None][1].append(doc)
 
     # Agrupar por título
-    grouped = []
-    seen_titles = set()
+    grouped: list[tuple[TitleAwareDoc | None, list[object]]] = []
+    seen_titles: set[int | None] = set()
     for para in processed.paragraphs:
         if para.is_title:
             # Buscar título en el mapa
             for idx, (title_doc, content_docs) in title_index_map.items():
-                if idx not in seen_titles and title_doc is not None and hasattr(title_doc, 'text') and title_doc.text == para.text:
+                if idx is None or idx in seen_titles:
+                    continue
+                if title_doc is not None and title_doc.text == para.text:
                     grouped.append((title_doc, content_docs))
                     seen_titles.add(idx)
                     break
@@ -234,11 +234,11 @@ def extract_entities_by_title(nlp, text: str, entity_labels: list[str] | None = 
     entities_by_title = {}
 
     for title_doc, content_docs in result.grouped_by_title:
-        title_text = title_doc.text if title_doc is not None and hasattr(title_doc, 'text') else "Sin título"
+        title_text = title_doc.text if title_doc is not None else "Sin título"
         entities_by_label: dict[str, list[str]] = {}
 
         for doc in content_docs:
-            for ent in getattr(doc, 'ents', []):
+            for ent in getattr(doc, "ents", []):
                 # Filtrar por etiqueta si se especificó
                 if entity_labels and ent.label_ not in entity_labels:
                     continue
@@ -288,11 +288,13 @@ def extract_dependencies_by_title(nlp, text: str, dep_labels: list[str] | None =
     deps_by_title = {}
 
     for title_doc, content_docs in result.grouped_by_title:
-        title_text = title_doc.text if title_doc is not None and hasattr(title_doc, 'text') else "Sin título"
+        title_text = title_doc.text if title_doc is not None else "Sin título"
         deps_list = []
 
         for doc in content_docs:
-            for token in doc:
+            if not hasattr(doc, "__iter__"):
+                continue
+            for token in cast(Iterator[Any], doc):
                 if token.dep_ == "ROOT":
                     continue
 

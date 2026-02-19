@@ -27,7 +27,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -393,7 +393,8 @@ class OllamaManager:
             try:
                 req = urllib.request.Request(f"{self._config.host}/api/tags")
                 with urllib.request.urlopen(req, timeout=self._config.network_timeout) as resp:
-                    return resp.status == 200
+                    status_code = getattr(resp, "status", None)
+                    return bool(status_code == 200)
             except Exception:
                 return False
         except Exception:
@@ -452,11 +453,12 @@ class OllamaManager:
         except Exception as e:
             logger.debug(f"Error actualizando lista de modelos: {e}")
 
-    def _subprocess_kwargs(self) -> dict:
+    def _subprocess_kwargs(self) -> dict[str, Any]:
         """Kwargs comunes para subprocess en Windows (ocultar ventana de consola)."""
-        if self._platform == InstallationPlatform.WINDOWS and hasattr(subprocess, "CREATE_NO_WINDOW"):
-            return {"creationflags": subprocess.CREATE_NO_WINDOW}
-        return {}
+        if self._platform == InstallationPlatform.WINDOWS and hasattr(
+            subprocess, "CREATE_NO_WINDOW"
+        ):
+            return {"creationflags": int(getattr(subprocess, "CREATE_NO_WINDOW", 0))}
         return {}
 
     @property
@@ -472,7 +474,9 @@ class OllamaManager:
     @property
     def is_downloading(self) -> bool:
         """True si hay una descarga en curso."""
-        return self._download_progress is not None and self._download_progress.status == "downloading"
+        return (
+            self._download_progress is not None and self._download_progress.status == "downloading"
+        )
 
     def start_download_async(self, model_name: str) -> bool:
         """Inicia descarga de modelo en un hilo de fondo.
@@ -493,17 +497,11 @@ class OllamaManager:
             try:
                 success, msg = self.download_model(model_name, progress_callback=_progress_cb)
                 if success:
-                    self._download_progress = DownloadProgress(
-                        status="complete", percentage=100.0
-                    )
+                    self._download_progress = DownloadProgress(status="complete", percentage=100.0)
                 elif not self._download_progress or self._download_progress.status != "error":
-                    self._download_progress = DownloadProgress(
-                        status="error", error=msg
-                    )
+                    self._download_progress = DownloadProgress(status="error", error=msg)
             except Exception as e:
-                self._download_progress = DownloadProgress(
-                    status="error", error=str(e)
-                )
+                self._download_progress = DownloadProgress(status="error", error=str(e))
             finally:
                 self._downloading_model = None
 
@@ -529,14 +527,14 @@ class OllamaManager:
             )
             if result.returncode == 0:
                 # Parsear version del output
-                output = result.stdout.strip()
+                output = str(result.stdout).strip()
                 # Formato tipico: "ollama version 0.1.xx"
                 if "version" in output.lower():
                     parts = output.split()
                     for i, part in enumerate(parts):
                         if part.lower() == "version" and i + 1 < len(parts):
-                            return parts[i + 1]
-                return output
+                            return str(parts[i + 1])
+                return str(output)
         except Exception as e:
             logger.debug(f"Error obteniendo version: {e}")
 
@@ -829,6 +827,7 @@ class OllamaManager:
         """Detecta si la GPU fue bloqueada por seguridad (CC < 6.0 → BSOD risk)."""
         try:
             from narrative_assistant.core.device import get_blocked_gpu_info
+
             blocked = get_blocked_gpu_info()
             if blocked:
                 logger.info(
@@ -926,19 +925,23 @@ class OllamaManager:
 
     def _restart_in_cpu_mode(self) -> tuple[bool, str]:
         """Reinicia Ollama en modo CPU si está corriendo con GPU bloqueada."""
-        logger.warning("Ollama corriendo con GPU potencialmente insegura. Intentando reiniciar en modo CPU...")
+        logger.warning(
+            "Ollama corriendo con GPU potencialmente insegura. Intentando reiniciar en modo CPU..."
+        )
         try:
             # Intentar detener Ollama via taskkill (Windows) o kill (Unix)
             import subprocess as sp
+
             if self._platform == InstallationPlatform.WINDOWS:
-                sp.run(["taskkill", "/IM", "ollama.exe", "/F"],
-                       capture_output=True, timeout=10)
+                sp.run(["taskkill", "/IM", "ollama.exe", "/F"], capture_output=True, timeout=10)
                 # También matar ollama_llama_server si existe
-                sp.run(["taskkill", "/IM", "ollama_llama_server.exe", "/F"],
-                       capture_output=True, timeout=10)
+                sp.run(
+                    ["taskkill", "/IM", "ollama_llama_server.exe", "/F"],
+                    capture_output=True,
+                    timeout=10,
+                )
             else:
-                sp.run(["pkill", "-f", "ollama serve"],
-                       capture_output=True, timeout=10)
+                sp.run(["pkill", "-f", "ollama serve"], capture_output=True, timeout=10)
 
             # Esperar a que se detenga
             for _ in range(10):
@@ -949,7 +952,9 @@ class OllamaManager:
             logger.warning(f"Error deteniendo Ollama: {e}")
 
         if self.is_running:
-            logger.warning("No se pudo detener Ollama. Continuando con la instancia existente (riesgo BSOD).")
+            logger.warning(
+                "No se pudo detener Ollama. Continuando con la instancia existente (riesgo BSOD)."
+            )
             return True, "Ollama corriendo (no se pudo reiniciar en CPU)"
 
         # Reiniciar con force_cpu
@@ -1113,10 +1118,7 @@ class OllamaManager:
                 return False, error_msg
 
         except FileNotFoundError:
-            error_msg = (
-                "Comando 'ollama' no encontrado. "
-                "Instala Ollama desde ollama.com/download"
-            )
+            error_msg = "Comando 'ollama' no encontrado. Instala Ollama desde ollama.com/download"
             progress.status = "error"
             progress.error = error_msg
             if progress_callback:
@@ -1215,9 +1217,7 @@ class OllamaManager:
                 f"{host}/api/chat",
                 json={
                     "model": model_name,
-                    "messages": [
-                        {"role": "user", "content": "Cuenta del 1 al 10."}
-                    ],
+                    "messages": [{"role": "user", "content": "Cuenta del 1 al 10."}],
                     "stream": False,
                     "options": {"num_predict": 30},
                 },

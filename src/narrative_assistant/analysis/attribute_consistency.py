@@ -311,31 +311,51 @@ for _region, _keywords in {
 # Dimensiones de vello facial — solo valores de la misma dimensión son comparables
 _FACIAL_HAIR_DIMENSIONS: dict[str, str] = {
     # Densidad / grosor
-    "espeso": "density", "espesa": "density",
-    "poblado": "density", "poblada": "density",
-    "tupido": "density", "tupida": "density",
-    "cerrado": "density", "cerrada": "density",
-    "fino": "density", "fina": "density",
-    "ralo": "density", "rala": "density",
-    "escaso": "density", "escasa": "density",
+    "espeso": "density",
+    "espesa": "density",
+    "poblado": "density",
+    "poblada": "density",
+    "tupido": "density",
+    "tupida": "density",
+    "cerrado": "density",
+    "cerrada": "density",
+    "fino": "density",
+    "fina": "density",
+    "ralo": "density",
+    "rala": "density",
+    "escaso": "density",
+    "escasa": "density",
     "incipiente": "density",
     # Color
-    "canoso": "color", "canosa": "color",
-    "cana": "color", "canas": "color",
+    "canoso": "color",
+    "canosa": "color",
+    "cana": "color",
+    "canas": "color",
     "gris": "color",
-    "entrecano": "color", "entrecana": "color",
-    "negro": "color", "negra": "color",
-    "oscuro": "color", "oscura": "color",
-    "rojizo": "color", "rojiza": "color",
-    "rubio": "color", "rubia": "color",
-    "blanco": "color", "blanca": "color",
+    "entrecano": "color",
+    "entrecana": "color",
+    "negro": "color",
+    "negra": "color",
+    "oscuro": "color",
+    "oscura": "color",
+    "rojizo": "color",
+    "rojiza": "color",
+    "rubio": "color",
+    "rubia": "color",
+    "blanco": "color",
+    "blanca": "color",
     # Longitud
-    "largo": "length", "larga": "length",
-    "corto": "length", "corta": "length",
-    "recortado": "length", "recortada": "length",
+    "largo": "length",
+    "larga": "length",
+    "corto": "length",
+    "corta": "length",
+    "recortado": "length",
+    "recortada": "length",
     # Estilo / cuidado
-    "cuidado": "style", "cuidada": "style",
-    "descuidado": "style", "descuidada": "style",
+    "cuidado": "style",
+    "cuidada": "style",
+    "descuidado": "style",
+    "descuidada": "style",
 }
 
 
@@ -437,10 +457,10 @@ def _normalize_value(value: str) -> str:
             doc = nlp(v)
             if doc and len(doc) > 0:
                 if len(doc) == 1:
-                    lemma = doc[0].lemma_.lower()
+                    lemma = str(doc[0].lemma_).lower()
                 else:
                     # Multi-word: lematizar todos los tokens
-                    lemma = " ".join(token.lemma_.lower() for token in doc)
+                    lemma = " ".join(str(token.lemma_).lower() for token in doc)
                 _lemma_cache[v] = lemma
                 return lemma
         except Exception as e:
@@ -650,7 +670,17 @@ COLOR_ANTONYMS: dict[str, set[str]] = {
     "azul": {"verde", "marrón", "negro", "castaño", "miel", "ámbar"},
     "marrón": {"verde", "azul", "gris", "negro"},
     "castaño": {"verde", "azul", "rubio", "negro", "pelirrojo"},
-    "negro": {"verde", "azul", "rubio", "castaño", "pelirrojo", "canoso", "cana", "canas", "blanco"},
+    "negro": {
+        "verde",
+        "azul",
+        "rubio",
+        "castaño",
+        "pelirrojo",
+        "canoso",
+        "cana",
+        "canas",
+        "blanco",
+    },
     "rubio": {"negro", "castaño", "moreno", "pelirrojo"},
     "pelirrojo": {"negro", "rubio", "castaño", "moreno", "canoso", "cana", "canas"},
     "canoso": {"negro", "rubio", "castaño", "pelirrojo"},
@@ -1221,9 +1251,7 @@ class AttributeConsistencyChecker:
         # "espesa" (densidad) vs "canas" (color) NO son inconsistentes
         if attr_key == AttributeKey.FACIAL_HAIR:
             if not _same_facial_hair_dimension(v1, v2):
-                logger.debug(
-                    f"Dimensiones distintas de vello facial: {v1} vs {v2} — no comparar"
-                )
+                logger.debug(f"Dimensiones distintas de vello facial: {v1} vs {v2} — no comparar")
                 return 0.0, InconsistencyType.VALUE_CHANGE
 
         # 2. Caso especial: edad (real o aparente, valores numéricos o descriptivos)
@@ -1258,22 +1286,34 @@ class AttributeConsistencyChecker:
 
     # Rangos aproximados para descriptores de edad
     _AGE_RANGES: dict[str, tuple[int, int]] = {
-        "niño": (0, 12), "niña": (0, 12),
+        "niño": (0, 12),
+        "niña": (0, 12),
         "adolescente": (13, 17),
         "joven": (15, 30),
-        "veinteañero": (20, 29), "veinteañera": (20, 29),
-        "treintañero": (30, 39), "treintañera": (30, 39),
-        "cuarentón": (40, 49), "cuarentona": (40, 49),
-        "cincuentón": (50, 59), "cincuentona": (50, 59),
+        "veinteañero": (20, 29),
+        "veinteañera": (20, 29),
+        "treintañero": (30, 39),
+        "treintañera": (30, 39),
+        "cuarentón": (40, 49),
+        "cuarentona": (40, 49),
+        "cincuentón": (50, 59),
+        "cincuentona": (50, 59),
         "de mediana edad": (40, 55),
-        "maduro": (40, 60), "madura": (40, 60),
+        "maduro": (40, 60),
+        "madura": (40, 60),
         "mayor": (55, 80),
-        "sexagenario": (60, 69), "sexagenaria": (60, 69),
-        "septuagenario": (70, 79), "septuagenaria": (70, 79),
-        "octogenario": (80, 89), "octogenaria": (80, 89),
-        "nonagenario": (90, 99), "nonagenaria": (90, 99),
-        "viejo": (60, 99), "vieja": (60, 99),
-        "anciano": (65, 99), "anciana": (65, 99),
+        "sexagenario": (60, 69),
+        "sexagenaria": (60, 69),
+        "septuagenario": (70, 79),
+        "septuagenaria": (70, 79),
+        "octogenario": (80, 89),
+        "octogenaria": (80, 89),
+        "nonagenario": (90, 99),
+        "nonagenaria": (90, 99),
+        "viejo": (60, 99),
+        "vieja": (60, 99),
+        "anciano": (65, 99),
+        "anciana": (65, 99),
     }
 
     def _age_to_range(self, value: str) -> tuple[int, int] | None:
@@ -1413,7 +1453,9 @@ class AttributeConsistencyChecker:
         entity_attrs = [a for a in attributes if a.entity_name.lower() == entity_name.lower()]
 
         result = self.check_consistency(entity_attrs)
-        return result.value if result.is_success else []
+        if result.is_success and result.value is not None:
+            return result.value
+        return []
 
 
 # =============================================================================

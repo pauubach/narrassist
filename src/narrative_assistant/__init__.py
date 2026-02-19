@@ -7,10 +7,11 @@ Herramienta offline de análisis narrativo para correctores profesionales.
 # Version: try importlib.metadata first, then fallback to hardcoded version
 # IMPORTANT: This fallback is critical for embedded Python where the package
 # is not installed via pip, so importlib.metadata.version() fails.
-_FALLBACK_VERSION = "0.11.2"
+_FALLBACK_VERSION = "0.11.3"
 
 try:
     from importlib.metadata import version
+
     __version__ = version("narrative-assistant")
 except Exception:
     # Fallback for embedded Python or development environments

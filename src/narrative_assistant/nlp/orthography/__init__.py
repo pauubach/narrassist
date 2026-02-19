@@ -31,6 +31,8 @@ Uso:
     result = checker.check(text)
 """
 
+from typing import Any
+
 from .base import (
     SpellingErrorType,
     SpellingIssue,
@@ -44,24 +46,35 @@ from .spelling_checker import (
 )
 
 # Sistema de votación multi-corrector
+VotingSpellingChecker: Any
+get_voting_spelling_checker: Any
+reset_voting_spelling_checker: Any
+VotingResult: Any
+Vote: Any
+
 try:
     from .voting_checker import (
-        Vote,
-        VotingResult,
-        VotingSpellingChecker,
-        get_voting_spelling_checker,
-        reset_voting_spelling_checker,
+        Vote as _Vote,
+        VotingResult as _VotingResult,
+        VotingSpellingChecker as _VotingSpellingChecker,
+        get_voting_spelling_checker as _get_voting_spelling_checker,
+        reset_voting_spelling_checker as _reset_voting_spelling_checker,
     )
+
+    Vote = _Vote
+    VotingResult = _VotingResult
+    VotingSpellingChecker = _VotingSpellingChecker
+    get_voting_spelling_checker = _get_voting_spelling_checker
+    reset_voting_spelling_checker = _reset_voting_spelling_checker
 
     _VOTING_AVAILABLE = True
 except ImportError:
     _VOTING_AVAILABLE = False
-    from typing import Optional, Any
-    VotingSpellingChecker: Optional[Any] = None
-    get_voting_spelling_checker: Optional[Any] = None
-    reset_voting_spelling_checker: Optional[Any] = None
-    VotingResult: Optional[Any] = None
-    Vote: Optional[Any] = None
+    VotingSpellingChecker = None
+    get_voting_spelling_checker = None
+    reset_voting_spelling_checker = None
+    VotingResult = None
+    Vote = None
 
 __all__ = [
     # Types

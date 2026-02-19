@@ -14,6 +14,7 @@ Reglas implementadas:
 
 import re
 from dataclasses import dataclass
+from typing import Any, Callable
 
 from spacy.tokens import Doc
 
@@ -28,13 +29,18 @@ from .base import (
 
 # S15: Detector híbrido de 'a' tónica (lista + automático)
 try:
-    from .stress_detector import requires_masculine_article
+    from .stress_detector import requires_masculine_article as _requires_masculine_article
+
+    requires_masculine_article: Callable[..., bool] = _requires_masculine_article
     STRESS_DETECTOR_AVAILABLE = True
 except ImportError:
     STRESS_DETECTOR_AVAILABLE = False
-    def requires_masculine_article(*args, **kwargs):
+
+    def _requires_masculine_article_fallback(*args: Any, **kwargs: Any) -> bool:
         """Fallback cuando stress_detector no está disponible."""
         return False
+
+    requires_masculine_article = _requires_masculine_article_fallback
 
 # =============================================================================
 # Listas de verbos para reglas de dequeísmo/queísmo
@@ -1013,15 +1019,12 @@ def check_gender_agreement(doc: Doc) -> list[GrammarIssue]:
 
                 # Usar detector híbrido para verificar si requiere "el"
                 # PERO SOLO si no hay adjetivo interpuesto
-                needs_masculine = (
-                    not has_interposed_adjective
-                    and requires_masculine_article(
-                        word=noun_lower,
-                        is_feminine=True,  # Asumimos que es femenino si llegamos aquí
-                        is_plural=noun_is_plural,
-                        use_static_list=True,  # Siempre usar lista estática (fast path)
-                        use_automatic_detection=STRESS_DETECTOR_AVAILABLE,  # Auto solo si disponible
-                    )
+                needs_masculine = not has_interposed_adjective and requires_masculine_article(
+                    word=noun_lower,
+                    is_feminine=True,  # Asumimos que es femenino si llegamos aquí
+                    is_plural=noun_is_plural,
+                    use_static_list=True,  # Siempre usar lista estática (fast path)
+                    use_automatic_detection=STRESS_DETECTOR_AVAILABLE,  # Auto solo si disponible
                 )
 
                 if needs_masculine:
@@ -1237,9 +1240,9 @@ def check_number_agreement(doc: Doc) -> list[GrammarIssue]:
     text_lower = doc.text.lower()
 
     # Detectar determinante plural + sustantivo singular
-    for noun in COMMON_SINGULAR_NOUNS:
+    for noun_text in COMMON_SINGULAR_NOUNS:
         for det in ["los", "las", "unos", "unas"]:
-            pattern = rf"\b{det}\s+{re.escape(noun)}\b"
+            pattern = rf"\b{det}\s+{re.escape(noun_text)}\b"
             for match in re.finditer(pattern, text_lower):
                 start, end = match.span()
                 # Verificar que no esté ya detectado

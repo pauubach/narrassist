@@ -38,6 +38,7 @@ LLMBackend = Literal["ollama", "transformers", "none"]
 # LLM Scheduler — prioriza chat interactivo sobre análisis batch
 # =============================================================================
 
+
 class LLMScheduler:
     """
     Coordina acceso al LLM entre análisis (batch) y chat (interactivo).
@@ -606,8 +607,7 @@ class LocalLLMClient:
             and options.get("num_gpu") != 0
         ):
             logger.warning(
-                "Ollama falló por VRAM insuficiente. "
-                "Reintentando con num_gpu=0 (CPU)..."
+                "Ollama falló por VRAM insuficiente. Reintentando con num_gpu=0 (CPU)..."
             )
             options["num_gpu"] = 0
             self._ollama_num_gpu = 0  # Persistir para futuras llamadas
@@ -620,9 +620,7 @@ class LocalLLMClient:
                 return content
 
         if status is not None and status != 200:
-            logger.error(
-                f"Error de Ollama: {status} - {(content or '')[:200]}"
-            )
+            logger.error(f"Error de Ollama: {status} - {(content or '')[:200]}")
         return None
 
     def _complete_transformers(
@@ -649,7 +647,7 @@ class LocalLLMClient:
                 pad_token_id=self._transformers_pipeline.tokenizer.eos_token_id,
             )
 
-            generated_text = result[0]["generated_text"]
+            generated_text = str(result[0]["generated_text"])
             # Extraer solo la respuesta del asistente
             if "<|assistant|>" in generated_text:
                 response = generated_text.split("<|assistant|>")[-1].strip()
@@ -666,7 +664,7 @@ class LocalLLMClient:
         prompt: str,
         system: str | None = None,
         schema_hint: str | None = None,
-    ) -> dict | None:
+    ) -> dict[str, Any] | None:
         """
         Genera una respuesta estructurada en JSON.
 
@@ -707,7 +705,10 @@ class LocalLLMClient:
             if start_idx != -1 and end_idx > start_idx:
                 cleaned = cleaned[start_idx:end_idx]
 
-            return json.loads(cleaned)
+            parsed = json.loads(cleaned)
+            if isinstance(parsed, dict):
+                return {str(k): v for k, v in parsed.items()}
+            return None
 
         except json.JSONDecodeError as e:
             logger.error(f"Error parseando JSON: {e}")
@@ -758,8 +759,10 @@ class LocalLLMClient:
         except ValueError:
             logger.error(f"Tarea desconocida para votación: {task_name}")
             return VotingResult(
-                consensus=None, confidence=0.0,
-                models_used=[], roles_used=[],
+                consensus=None,
+                confidence=0.0,
+                models_used=[],
+                roles_used=[],
             )
 
         # Nivel de calidad
@@ -780,8 +783,10 @@ class LocalLLMClient:
         if not config.slots:
             logger.error(f"Votación {task_name}: sin modelos disponibles")
             return VotingResult(
-                consensus=None, confidence=0.0,
-                models_used=[], roles_used=[],
+                consensus=None,
+                confidence=0.0,
+                models_used=[],
+                roles_used=[],
             )
 
         # Ejecutar cada slot
@@ -793,6 +798,7 @@ class LocalLLMClient:
 
         # Detectar fallbacks
         from .config import QUALITY_MATRIX
+
         original_config = QUALITY_MATRIX.get(task)
         if original_config:
             original_models = {s.model_name for s in original_config.slot_for_level(quality_level)}
@@ -817,9 +823,7 @@ class LocalLLMClient:
                 )
             except Exception as e:
                 elapsed = time.time() - start
-                logger.warning(
-                    f"Votación {task_name}/{slot.model_name}: error en complete(): {e}"
-                )
+                logger.warning(f"Votación {task_name}/{slot.model_name}: error en complete(): {e}")
                 per_model_times[slot.model_name] = elapsed
                 continue
             elapsed = time.time() - start
@@ -843,9 +847,7 @@ class LocalLLMClient:
                     f"{elapsed:.1f}s"
                 )
             else:
-                logger.warning(
-                    f"Votación {task_name}/{slot.model_name}: sin respuesta"
-                )
+                logger.warning(f"Votación {task_name}/{slot.model_name}: sin respuesta")
                 per_model_times[slot.model_name] = elapsed
 
         # Consolidar resultados
@@ -972,14 +974,20 @@ def _load_config() -> LocalLLMConfig:
     - NA_OLLAMA_MODEL: Modelo de Ollama a usar
     - NA_LLM_MODEL_PATH: Ruta al modelo local de Transformers
     """
-    backend = os.getenv("NA_LLM_BACKEND", "ollama")
-    if backend not in ("ollama", "transformers", "auto", "none"):
+    backend_env = os.getenv("NA_LLM_BACKEND", "ollama")
+    backend: LLMBackend
+    if backend_env == "ollama":
+        backend = "ollama"
+    elif backend_env == "transformers":
+        backend = "transformers"
+    elif backend_env == "none":
+        backend = "none"
+    else:
+        # "auto" y valores inválidos caen al backend por defecto.
         backend = "ollama"
 
     # A-12: Validar host de Ollama desde variable de entorno
-    ollama_host = _validate_ollama_host(
-        os.getenv("NA_OLLAMA_HOST", "http://localhost:11434")
-    )
+    ollama_host = _validate_ollama_host(os.getenv("NA_OLLAMA_HOST", "http://localhost:11434"))
 
     config = LocalLLMConfig(
         backend=backend,
@@ -993,9 +1001,7 @@ def _load_config() -> LocalLLMConfig:
         if model_path.is_absolute() and model_path.exists():
             config.transformers_model_path = model_path
         else:
-            logger.warning(
-                f"NA_LLM_MODEL_PATH inválido o no existe: {model_path_str}"
-            )
+            logger.warning(f"NA_LLM_MODEL_PATH inválido o no existe: {model_path_str}")
 
     return config
 

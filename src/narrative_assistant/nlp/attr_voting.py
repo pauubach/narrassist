@@ -33,6 +33,8 @@ class AttributeVotingMixin:
     - self.min_confidence (float)
     """
 
+    min_confidence: float
+
     def _vote_attributes(
         self,
         extractions: dict[str, list],
@@ -171,8 +173,7 @@ class AttributeVotingMixin:
         MIN_METHOD_WEIGHT = 0.10
         active_methods = set(extractions.keys())
         active_weights = {
-            m: max(MIN_METHOD_WEIGHT, METHOD_WEIGHTS.get(m, 0.15))
-            for m in active_methods
+            m: max(MIN_METHOD_WEIGHT, METHOD_WEIGHTS.get(m, 0.15)) for m in active_methods
         }
         total_active_weight = sum(active_weights.values())
 

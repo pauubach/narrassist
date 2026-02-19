@@ -138,7 +138,7 @@ class SingleModelResult:
     """Resultado de extracción de un solo modelo."""
 
     model_name: str
-    attributes: list[dict]  # Atributos crudos del JSON
+    attributes: list[dict[str, Any]]  # Atributos crudos del JSON
     raw_response: str
     success: bool
     error: str | None = None
@@ -335,17 +335,17 @@ class LLMExtractor(BaseExtractor):
         """Obtiene lista de modelos para ensemble."""
         if self._ensemble_models:
             # Filtrar solo los que están disponibles
-            available = set(self.get_available_models())
+            available_set = set(self.get_available_models())
             return [
-                m for m in self._ensemble_models if any(m.split(":")[0] in a for a in available)
+                m for m in self._ensemble_models if any(m.split(":")[0] in a for a in available_set)
             ]
 
         # Si no se especificaron, usar todos los disponibles que conocemos
-        available = self.get_available_models()
-        ensemble = []
+        available_list = self.get_available_models()
+        ensemble: list[str] = []
         for config in RECOMMENDED_MODELS:
             model_base = config.name.split(":")[0]
-            for avail in available:
+            for avail in available_list:
                 if model_base in avail:
                     ensemble.append(avail)
                     break
@@ -388,8 +388,8 @@ class LLMExtractor(BaseExtractor):
         2. Recopila atributos de cada uno
         3. Vota para determinar atributos finales
         """
-        attributes: list[dict[str, Any]] = []
-        errors = []
+        attributes: list[ExtractedAttribute] = []
+        errors: list[str] = []
         model_results: list[SingleModelResult] = []
 
         models = self._get_ensemble_models()
@@ -495,7 +495,7 @@ class LLMExtractor(BaseExtractor):
                 latency_ms=latency_ms,
             )
 
-    def _parse_json_response(self, response_text: str) -> list[dict]:
+    def _parse_json_response(self, response_text: str) -> list[dict[str, Any]]:
         """Parsea respuesta JSON del LLM."""
         try:
             # Buscar array JSON
@@ -504,7 +504,15 @@ class LLMExtractor(BaseExtractor):
 
             if start >= 0 and end > start:
                 json_str = response_text[start:end]
-                return json.loads(json_str)
+                parsed = json.loads(json_str)
+                if not isinstance(parsed, list):
+                    return []
+
+                normalized: list[dict[str, Any]] = []
+                for item in parsed:
+                    if isinstance(item, dict):
+                        normalized.append({str(k): v for k, v in item.items()})
+                return normalized
 
             return []
 

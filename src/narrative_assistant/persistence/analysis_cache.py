@@ -181,6 +181,113 @@ class AnalysisCache:
             # No re-raise, graceful degradation
 
     # ========================================================================
+    # NER Chapter Cache (incremental by chapter text hash)
+    # ========================================================================
+
+    def get_ner_chapter_results(
+        self,
+        project_id: int,
+        chapter_hash: str,
+        config_hash: str,
+    ) -> Optional[dict]:
+        """
+        Recupera menciones NER cacheadas para un capítulo.
+
+        Args:
+            project_id: ID del proyecto
+            chapter_hash: SHA-256 del texto del capítulo
+            config_hash: Hash de configuración NER
+
+        Returns:
+            Dict con {mentions_json, mention_count, processed_chars} o None
+        """
+        if not CACHE_ENABLED:
+            return None
+
+        try:
+            with self._db.connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT mentions_json, mention_count, processed_chars
+                    FROM ner_chapter_cache
+                    WHERE project_id = ?
+                      AND chapter_hash = ?
+                      AND config_hash = ?
+                    """,
+                    (project_id, chapter_hash, config_hash),
+                )
+                row = cursor.fetchone()
+
+                if row:
+                    self._hits += 1
+                    logger.debug(
+                        f"[NER_CHAPTER_CACHE] HIT: project={project_id}, "
+                        f"chapter={chapter_hash[:12]}..., mentions={row[1]}"
+                    )
+                    return {
+                        "mentions_json": row[0],
+                        "mention_count": row[1],
+                        "processed_chars": row[2],
+                    }
+
+                self._misses += 1
+                return None
+        except Exception as e:
+            logger.warning(f"NER chapter cache read failed (continuing): {e}")
+            return None
+
+    def set_ner_chapter_results(
+        self,
+        project_id: int,
+        chapter_hash: str,
+        config_hash: str,
+        mentions_json: str,
+        mention_count: int,
+        processed_chars: int,
+    ) -> None:
+        """
+        Guarda menciones NER para un capítulo.
+
+        Args:
+            project_id: ID del proyecto
+            chapter_hash: SHA-256 del texto del capítulo
+            config_hash: Hash de configuración NER
+            mentions_json: JSON de menciones con offsets locales al capítulo
+            mention_count: Número de menciones
+            processed_chars: Caracteres procesados
+        """
+        if not CACHE_ENABLED:
+            return
+
+        try:
+            with self._db.connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO ner_chapter_cache (
+                        project_id,
+                        chapter_hash,
+                        config_hash,
+                        mentions_json,
+                        mention_count,
+                        processed_chars
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        project_id,
+                        chapter_hash,
+                        config_hash,
+                        mentions_json,
+                        mention_count,
+                        processed_chars,
+                    ),
+                )
+                conn.commit()
+        except Exception as e:
+            logger.warning(f"NER chapter cache write failed (continuing): {e}")
+
+    # ========================================================================
     # Coreference Cache (5-7 min → <1s)
     # ========================================================================
 
@@ -233,8 +340,7 @@ class AnalysisCache:
                 # Miss
                 self._misses += 1
                 logger.debug(
-                    f"[COREF_CACHE] MISS: project={project_id} "
-                    f"(hit rate: {self.hit_rate:.1%})"
+                    f"[COREF_CACHE] MISS: project={project_id} (hit rate: {self.hit_rate:.1%})"
                 )
                 return None
 
@@ -343,8 +449,7 @@ class AnalysisCache:
                 # Miss
                 self._misses += 1
                 logger.debug(
-                    f"[ATTR_CACHE] MISS: project={project_id} "
-                    f"(hit rate: {self.hit_rate:.1%})"
+                    f"[ATTR_CACHE] MISS: project={project_id} (hit rate: {self.hit_rate:.1%})"
                 )
                 return None
 
@@ -514,8 +619,7 @@ class AnalysisCache:
 
                 if total_deleted > 0:
                     logger.info(
-                        f"[CACHE] INVALIDATE: {total_deleted} entries deleted "
-                        f"(fingerprint changed)"
+                        f"[CACHE] INVALIDATE: {total_deleted} entries deleted (fingerprint changed)"
                     )
 
         except Exception as e:
@@ -539,6 +643,9 @@ class AnalysisCache:
                 cursor.execute("DELETE FROM ner_cache")
                 total_deleted += cursor.rowcount
 
+                cursor.execute("DELETE FROM ner_chapter_cache")
+                total_deleted += cursor.rowcount
+
                 cursor.execute("DELETE FROM coreference_cache")
                 total_deleted += cursor.rowcount
 
@@ -559,10 +666,11 @@ class AnalysisCache:
         Estadísticas del cache.
 
         Returns:
-            Dict con: ner_size, coref_size, attr_size, hits, misses, hit_rate
+            Dict con: ner_size, ner_chapter_size, coref_size, attr_size, hits, misses, hit_rate
         """
         stats = {
             "ner_size": 0,
+            "ner_chapter_size": 0,
             "coref_size": 0,
             "attr_size": 0,
             "hits": self._hits,
@@ -576,6 +684,9 @@ class AnalysisCache:
 
                 cursor.execute("SELECT COUNT(*) FROM ner_cache")
                 stats["ner_size"] = cursor.fetchone()[0]
+
+                cursor.execute("SELECT COUNT(*) FROM ner_chapter_cache")
+                stats["ner_chapter_size"] = cursor.fetchone()[0]
 
                 cursor.execute("SELECT COUNT(*) FROM coreference_cache")
                 stats["coref_size"] = cursor.fetchone()[0]

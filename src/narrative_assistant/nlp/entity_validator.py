@@ -718,8 +718,8 @@ class EntityValidator:
 
         for entity in entities:
             instance_key = (entity.text, entity.start_char)
-            score = instance_scores.get(instance_key)
-            if score and score.is_valid:
+            entity_score = instance_scores.get(instance_key)
+            if entity_score and entity_score.is_valid:
                 valid.append(entity)
             else:
                 rejected.append(entity)
@@ -1051,7 +1051,7 @@ class EntityValidator:
 
         # Agrupar entidades únicas con score borderline para validar
         # (las muy buenas y muy malas ya están decididas por heurísticas)
-        entities_to_validate: list[dict[str, Any]] = []
+        entities_to_validate: list[Any] = []
         for entity in entities:
             score = scores.get(entity.text)
             if score and 0.3 <= score.total_score <= 0.7:
@@ -1164,7 +1164,7 @@ JSON:"""
 
         return context
 
-    def _parse_llm_validation_response(self, response: str) -> list[dict]:
+    def _parse_llm_validation_response(self, response: str) -> list[dict[str, Any]]:
         """Parsea la respuesta JSON del LLM."""
         import json
 
@@ -1185,7 +1185,18 @@ JSON:"""
                 cleaned = cleaned[start:end]
 
             data = json.loads(cleaned)
-            return data.get("validations", [])
+            if not isinstance(data, dict):
+                return []
+
+            validations = data.get("validations", [])
+            if not isinstance(validations, list):
+                return []
+
+            parsed_validations: list[dict[str, Any]] = []
+            for item in validations:
+                if isinstance(item, dict):
+                    parsed_validations.append({str(k): v for k, v in item.items()})
+            return parsed_validations
 
         except json.JSONDecodeError as e:
             logger.debug(f"Error parseando JSON de validación LLM: {e}")

@@ -8,6 +8,7 @@ S8a-14: Refactor monolito → funciones standalone.
 """
 
 import contextlib
+import hashlib
 import json
 import threading
 import time
@@ -51,9 +52,13 @@ def _serialize_entities_for_cache(entities: list, entity_repo) -> str:
         entity_dict = {
             "id": entity.id,
             "canonical_name": entity.canonical_name,
-            "entity_type": entity.entity_type.value if hasattr(entity.entity_type, "value") else str(entity.entity_type),
+            "entity_type": entity.entity_type.value
+            if hasattr(entity.entity_type, "value")
+            else str(entity.entity_type),
             "aliases": entity.aliases if entity.aliases else [],
-            "importance": entity.importance.value if hasattr(entity.importance, "value") else str(entity.importance),
+            "importance": entity.importance.value
+            if hasattr(entity.importance, "value")
+            else str(entity.importance),
             "first_appearance_char": entity.first_appearance_char,
             "mention_count": entity.mention_count,
             "mentions": [
@@ -162,6 +167,67 @@ def _restore_entities_from_cache(
         entities.append(entity)
 
     return entities
+
+
+def _chapter_text_hash(text: str) -> str:
+    """Hash determinístico del texto de un capítulo para cache incremental."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _serialize_chapter_mentions_for_cache(raw_mentions: list, chapter_start: int) -> str:
+    """
+    Serializa menciones NER con offsets locales al capítulo.
+
+    Guardar offsets locales permite reutilizar cache aunque cambie la
+    posición global del capítulo en el documento.
+    """
+    payload: list[dict[str, Any]] = []
+    for ent in raw_mentions:
+        local_start = max(0, int(ent.start_char) - chapter_start)
+        local_end = max(local_start, int(ent.end_char) - chapter_start)
+        payload.append(
+            {
+                "text": ent.text,
+                "label": ent.label.value if hasattr(ent.label, "value") else str(ent.label),
+                "start_char": local_start,
+                "end_char": local_end,
+                "confidence": float(ent.confidence),
+                "source": ent.source,
+            }
+        )
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def _restore_chapter_mentions_from_cache(mentions_json: str, chapter_start: int) -> list:
+    """Restaura menciones NER cacheadas y vuelve a offsets globales."""
+    from narrative_assistant.nlp.ner import EntityLabel, ExtractedEntity
+
+    data = json.loads(mentions_json) if mentions_json else []
+    restored: list[ExtractedEntity] = []
+    for item in data:
+        label_raw = item.get("label", "MISC")
+        try:
+            label = EntityLabel(label_raw)
+        except ValueError:
+            label = EntityLabel.MISC
+
+        start_char = chapter_start + int(item.get("start_char", 0))
+        end_char = chapter_start + int(item.get("end_char", 0))
+        if end_char < start_char:
+            end_char = start_char
+
+        restored.append(
+            ExtractedEntity(
+                text=item.get("text", ""),
+                label=label,
+                start_char=start_char,
+                end_char=end_char,
+                confidence=float(item.get("confidence", 0.8)),
+                source=item.get("source", "chapter_cache"),
+            )
+        )
+
+    return restored
 
 
 # ============================================================================
@@ -351,12 +417,14 @@ class ProgressTracker:
                 existing["completed"] = True
                 existing["current"] = False
             else:
-                phases_list.append({
-                    "id": phase_key,
-                    "name": phase_key,
-                    "completed": True,
-                    "current": False,
-                })
+                phases_list.append(
+                    {
+                        "id": phase_key,
+                        "name": phase_key,
+                        "completed": True,
+                        "current": False,
+                    }
+                )
 
     def update_time_remaining(self):
         """Calcula tiempo restante usando tiempos reales de fases completadas."""
@@ -440,7 +508,8 @@ class ProgressTracker:
             # Check dedicated cancellation flag (primary) or status (fallback)
             cancelled = (
                 deps.analysis_cancellation_flags.get(self.project_id, False)
-                or deps.analysis_progress_storage.get(self.project_id, {}).get("status") == "cancelled"
+                or deps.analysis_progress_storage.get(self.project_id, {}).get("status")
+                == "cancelled"
             )
         if cancelled:
             raise AnalysisCancelledError("Análisis cancelado por el usuario")
@@ -1002,7 +1071,9 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
                     dialogue_repo.create_batch(dialogues_to_save)
                     dialogues_total += len(dialogues_to_save)
 
-        logger.info(f"Dialogues detected and persisted: {dialogues_total} dialogues across {chapters_count} chapters")
+        logger.info(
+            f"Dialogues detected and persisted: {dialogues_total} dialogues across {chapters_count} chapters"
+        )
 
         # S16b: Inicializar dialogue_style_preference desde correction_config
         try:
@@ -1020,13 +1091,17 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
                 quote_style = correction_config.get("quote_style")
 
                 # Mapear a preferencia de diálogo
-                preference = map_correction_config_to_dialogue_preference(dialogue_dash, quote_style)
+                preference = map_correction_config_to_dialogue_preference(
+                    dialogue_dash, quote_style
+                )
 
                 # Guardar en settings
                 if "dialogue_style_preference" not in project.settings_json:
                     project.settings_json["dialogue_style_preference"] = preference
                     proj_manager.update(project)
-                    logger.info(f"Initialized dialogue_style_preference={preference} from correction_config")
+                    logger.info(
+                        f"Initialized dialogue_style_preference={preference} from correction_config"
+                    )
         except Exception as pref_err:
             logger.warning(f"Error initializing dialogue_style_preference (continuing): {pref_err}")
     except Exception as e:
@@ -1163,13 +1238,16 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
 
     project_id = ctx["project_id"]
     full_text = ctx["full_text"]
+    chapters_data = ctx.get("chapters_data", [])
     find_chapter_id_for_position = ctx["find_chapter_id_for_position"]
     # Usar fingerprint recién parseado (fuente de verdad en esta ejecución).
     # Fallback al proyecto por compatibilidad.
     document_fingerprint = ctx.get("document_fingerprint", "")
     if not document_fingerprint:
         _fp_project = ctx.get("project")
-        document_fingerprint = getattr(_fp_project, "document_fingerprint", "") if _fp_project else ""
+        document_fingerprint = (
+            getattr(_fp_project, "document_fingerprint", "") if _fp_project else ""
+        )
     analysis_config = ctx.get("analysis_config")
 
     tracker.start_phase("ner", 3, "Buscando personajes, lugares y otros elementos...")
@@ -1202,6 +1280,7 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
             )
 
             ctx["entities"] = entities
+            ctx["entity_repo"] = get_entity_repository()
             tracker.set_metric("entities_found", len(entities))
             tracker.end_phase("ner", 3)
 
@@ -1236,18 +1315,149 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
     except Exception:
         pass
 
-    # Habilitar preprocesamiento con LLM para mejor detección de entidades
-    ner_extractor = NERExtractor(use_llm_preprocessing=True)
-    ner_result = ner_extractor.extract_entities(
-        full_text,
-        progress_callback=ner_progress_callback,
-    )
-
     entities = []
     entity_repo = get_entity_repository()
+    raw_entities = []
 
-    if ner_result.is_success and ner_result.value:
-        raw_entities = ner_result.value.entities or []
+    # ========================================================================
+    # Chapter-level incremental cache (si solo cambian algunos capítulos)
+    # ========================================================================
+    chapter_entries = []
+    if isinstance(chapters_data, list):
+        for ch in chapters_data:
+            if not isinstance(ch, dict):
+                continue
+            content = ch.get("content")
+            if isinstance(content, str) and content:
+                chapter_entries.append(ch)
+
+    incremental_mode = False
+    if chapter_entries:
+        cached_mentions = []
+        missing_chapters: list[tuple[dict, str]] = []
+        chapter_cache_hits = 0
+
+        for chapter in chapter_entries:
+            chapter_text = chapter.get("content", "") or ""
+            chapter_hash = _chapter_text_hash(chapter_text)
+            cached_chapter = cache.get_ner_chapter_results(project_id, chapter_hash, config_hash)
+            if cached_chapter and cached_chapter.get("mentions_json"):
+                chapter_start = int(chapter.get("start_char", 0) or 0)
+                restored = _restore_chapter_mentions_from_cache(
+                    cached_chapter["mentions_json"],
+                    chapter_start,
+                )
+                cached_mentions.extend(restored)
+                chapter_cache_hits += 1
+            else:
+                missing_chapters.append((chapter, chapter_hash))
+
+        total_chapters = len(chapter_entries)
+        hit_ratio = chapter_cache_hits / total_chapters if total_chapters else 0.0
+        if chapter_cache_hits > 0 and hit_ratio >= 0.5:
+            incremental_mode = True
+            raw_entities.extend(cached_mentions)
+
+            logger.info(
+                f"[NER_CHAPTER_CACHE] incremental mode enabled: "
+                f"{chapter_cache_hits}/{total_chapters} chapters reused, "
+                f"{len(missing_chapters)} chapters reprocessed"
+            )
+
+            if missing_chapters:
+                ner_extractor = NERExtractor(use_llm_preprocessing=True)
+                total_missing = len(missing_chapters)
+
+                for idx, (chapter, chapter_hash) in enumerate(missing_chapters, start=1):
+                    tracker.check_cancelled()
+
+                    chapter_text = chapter.get("content", "") or ""
+                    chapter_start = int(chapter.get("start_char", 0) or 0)
+                    chapter_number = chapter.get("chapter_number", idx)
+
+                    _update_storage(
+                        project_id,
+                        current_action=(
+                            f"Reanalizando capítulo {chapter_number} ({idx}/{total_missing})"
+                        ),
+                    )
+
+                    chapter_result = ner_extractor.extract_entities(chapter_text)
+                    chapter_mentions = []
+                    if chapter_result.is_success and chapter_result.value:
+                        chapter_mentions = chapter_result.value.entities or []
+                        for ent in chapter_mentions:
+                            ent.start_char += chapter_start
+                            ent.end_char += chapter_start
+                        raw_entities.extend(chapter_mentions)
+
+                    try:
+                        mentions_json = _serialize_chapter_mentions_for_cache(
+                            chapter_mentions,
+                            chapter_start,
+                        )
+                        cache.set_ner_chapter_results(
+                            project_id=project_id,
+                            chapter_hash=chapter_hash,
+                            config_hash=config_hash,
+                            mentions_json=mentions_json,
+                            mention_count=len(chapter_mentions),
+                            processed_chars=len(chapter_text),
+                        )
+                    except Exception as chapter_cache_err:
+                        logger.debug(
+                            f"NER chapter cache write failed for chapter {chapter_number}: {chapter_cache_err}"
+                        )
+
+                    sub_pct = idx / total_missing
+                    sub_progress = ner_pct_start + int(sub_pct * (ner_pct_end - ner_pct_start))
+                    _update_storage(project_id, progress=min(ner_pct_end, sub_progress))
+                    tracker.update_time_remaining()
+
+    # Fallback: full-document NER
+    if not incremental_mode:
+        # Habilitar preprocesamiento con LLM para mejor detección de entidades
+        ner_extractor = NERExtractor(use_llm_preprocessing=True)
+        ner_result = ner_extractor.extract_entities(
+            full_text,
+            progress_callback=ner_progress_callback,
+        )
+        if ner_result.is_success and ner_result.value:
+            raw_entities = ner_result.value.entities or []
+
+    # Persistir cache incremental por capítulo (también cuando no hay menciones)
+    if chapter_entries:
+        try:
+            for chapter in chapter_entries:
+                chapter_text = chapter.get("content", "") or ""
+                chapter_start = int(chapter.get("start_char", 0) or 0)
+                chapter_end = int(
+                    chapter.get("end_char", chapter_start + len(chapter_text))
+                    or (chapter_start + len(chapter_text))
+                )
+                chapter_hash = _chapter_text_hash(chapter_text)
+                chapter_mentions = [
+                    ent for ent in raw_entities if chapter_start <= ent.start_char < chapter_end
+                ]
+
+                mentions_json = _serialize_chapter_mentions_for_cache(
+                    chapter_mentions,
+                    chapter_start,
+                )
+                cache.set_ner_chapter_results(
+                    project_id=project_id,
+                    chapter_hash=chapter_hash,
+                    config_hash=config_hash,
+                    mentions_json=mentions_json,
+                    mention_count=len(chapter_mentions),
+                    processed_chars=len(chapter_text),
+                )
+        except Exception as chapter_cache_err:
+            logger.debug(f"NER chapter cache bulk write failed: {chapter_cache_err}")
+
+    if raw_entities:
+        if not incremental_mode:
+            logger.info(f"[NER] Full-document extraction produced {len(raw_entities)} mentions")
 
         label_to_type = {
             EntityLabel.PER: EntityType.CHARACTER,
@@ -2103,9 +2313,7 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
                 )
             all_markers.extend(chapter_markers)
 
-        logger.info(
-            f"Timeline: {len(chapters_with_ids)} chapters, {len(all_markers)} markers"
-        )
+        logger.info(f"Timeline: {len(chapters_with_ids)} chapters, {len(all_markers)} markers")
 
         # Construir timeline
         builder = TimelineBuilder()
@@ -2126,8 +2334,7 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
         inconsistencies = checker.check(timeline, all_markers)
 
         logger.info(
-            f"Timeline built: {len(timeline.events)} events, "
-            f"{len(inconsistencies)} inconsistencies"
+            f"Timeline built: {len(timeline.events)} events, {len(inconsistencies)} inconsistencies"
         )
 
         # Persistir timeline en BD
@@ -2295,6 +2502,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
                 # Ceder turno al chat interactivo si hay uno esperando
                 try:
                     from narrative_assistant.llm.client import get_llm_scheduler
+
                     get_llm_scheduler().yield_to_chat()
                 except Exception:
                     pass
@@ -2453,8 +2661,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
                         (
                             e
                             for e in character_entities
-                            if e.canonical_name
-                            and e.canonical_name.lower() == attr_name_lower
+                            if e.canonical_name and e.canonical_name.lower() == attr_name_lower
                         ),
                         None,
                     )
@@ -2956,7 +3163,9 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
                     # Obtener document fingerprint
                     # Obtener fingerprint del proyecto (campo de BD, NO de ctx)
                     _fp_project = ctx.get("project")
-                    document_fingerprint = getattr(_fp_project, "document_fingerprint", "") if _fp_project else ""
+                    document_fingerprint = (
+                        getattr(_fp_project, "document_fingerprint", "") if _fp_project else ""
+                    )
 
                     speech_alerts = tracker_speech.detect_changes(
                         character_id=entity.id,
@@ -3053,6 +3262,7 @@ def run_events(ctx: dict, tracker: ProgressTracker):
     # Cargar spaCy si no está en contexto
     if nlp is None:
         from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+
         nlp = load_spacy_model()
 
     event_repo = get_event_repository()
@@ -3060,7 +3270,9 @@ def run_events(ctx: dict, tracker: ProgressTracker):
     # Borrar eventos previos de este proyecto
     delete_result = event_repo.delete_by_project(project_id)
     if delete_result.is_success and delete_result.value:
-        logger.info(f"run_events: deleted {delete_result.value} old events for project {project_id}")
+        logger.info(
+            f"run_events: deleted {delete_result.value} old events for project {project_id}"
+        )
 
     # Detectar eventos por capítulo
     all_events = []
@@ -3081,17 +3293,19 @@ def run_events(ctx: dict, tracker: ProgressTracker):
 
         for event in detected:
             tier = EVENT_TIER_MAP.get(event.event_type)
-            all_events.append({
-                "event_type": event.event_type.value,
-                "tier": tier.value if tier else 1,
-                "description": event.description,
-                "chapter": ch_num,
-                "start_char": event.start_char,
-                "end_char": event.end_char,
-                "entity_ids": event.entity_ids,
-                "confidence": event.confidence,
-                "metadata": event.metadata,
-            })
+            all_events.append(
+                {
+                    "event_type": event.event_type.value,
+                    "tier": tier.value if tier else 1,
+                    "description": event.description,
+                    "chapter": ch_num,
+                    "start_char": event.start_char,
+                    "end_char": event.end_char,
+                    "entity_ids": event.entity_ids,
+                    "confidence": event.confidence,
+                    "metadata": event.metadata,
+                }
+            )
 
         prev_chapter_text = content
 
@@ -3099,7 +3313,9 @@ def run_events(ctx: dict, tracker: ProgressTracker):
     if all_events:
         save_result = event_repo.save_events(project_id, all_events)
         if save_result.is_success:
-            logger.info(f"run_events: persisted {save_result.value} events for project {project_id}")
+            logger.info(
+                f"run_events: persisted {save_result.value} events for project {project_id}"
+            )
         else:
             logger.error(f"run_events: failed to save events: {save_result.error}")
     else:
@@ -3167,7 +3383,9 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
             project_settings = project.settings or {}
             # New system: correction_customizations (CorrectionConfigModal)
             # Legacy: correction_config (old presets)
-            cc = project_settings.get("correction_customizations") or project_settings.get("correction_config", {})
+            cc = project_settings.get("correction_customizations") or project_settings.get(
+                "correction_config", {}
+            )
             dialog_cfg = cc.get("dialog", {})
             dash_val = dialog_cfg.get("spoken_dialogue_dash", "")
             dash_map = {"em_dash": "em", "en_dash": "en", "hyphen": "hyphen"}
@@ -3177,7 +3395,9 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
             quote_map = {"angular": "angular", "double": "curly", "single": "straight"}
             if quote_val in quote_map:
                 correction_config.typography.quote_style = quote_map[quote_val]  # type: ignore[assignment]
-            logger.info(f"Correction config loaded: dialogue_dash={correction_config.typography.dialogue_dash}, quote_style={correction_config.typography.quote_style}")
+            logger.info(
+                f"Correction config loaded: dialogue_dash={correction_config.typography.dialogue_dash}, quote_style={correction_config.typography.quote_style}"
+            )
         except Exception as cfg_err:
             logger.debug(f"Could not load project correction config: {cfg_err}")
 
@@ -3206,6 +3426,7 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
             StructureConfig,
             StyleRegisterConfig,
         )
+
         correction_config.style_register = StyleRegisterConfig(enabled=enabled, profile=profile)
 
         # Activar detectores científicos/académicos según tipo de documento
@@ -3220,12 +3441,8 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
             structure_profile, coherence_use_llm = sci_config
             correction_config.references = ReferencesConfig(enabled=True)
             correction_config.acronyms = AcronymConfig(enabled=True)
-            correction_config.structure = StructureConfig(
-                enabled=True, profile=structure_profile
-            )
-            correction_config.coherence = CoherenceConfig(
-                enabled=True, use_llm=coherence_use_llm
-            )
+            correction_config.structure = StructureConfig(enabled=True, profile=structure_profile)
+            correction_config.coherence = CoherenceConfig(enabled=True, use_llm=coherence_use_llm)
 
         orchestrator = CorrectionOrchestrator(config=correction_config)
 
@@ -3798,7 +4015,16 @@ def run_completion(ctx: dict, tracker: ProgressTracker):
 
         chapter_repo = get_chapter_repository()
         chapters = chapter_repo.get_by_project(project_id)
-        characters = [e for e in entities if getattr(e, "entity_type", None) in ("person", "PERSON", "PER", "CHARACTER") or (hasattr(e, "entity_type") and hasattr(e.entity_type, "value") and e.entity_type.value in ("person", "PERSON", "PER", "CHARACTER"))]
+        characters = [
+            e
+            for e in entities
+            if getattr(e, "entity_type", None) in ("person", "PERSON", "PER", "CHARACTER")
+            or (
+                hasattr(e, "entity_type")
+                and hasattr(e.entity_type, "value")
+                and e.entity_type.value in ("person", "PERSON", "PER", "CHARACTER")
+            )
+        ]
 
         repo = SQLiteFocalizationRepository()
         service = FocalizationDeclarationService(repository=repo)

@@ -153,6 +153,8 @@ class BaseVoter:
 
     name: str = "base"
     weight: float = 0.1
+    _available: bool
+    _init_error: str | None
 
     def __init__(self):
         self._available = False
@@ -346,7 +348,8 @@ class SymSpellVoter(BaseVoter):
         # Intentar cargar diccionario personalizado
         if custom_path and custom_path.exists():
             # El método load_dictionary retorna el tipo correcto
-            return self._symspell.load_dictionary(str(custom_path), term_index=0, count_index=1)
+            loaded = self._symspell.load_dictionary(str(custom_path), term_index=0, count_index=1)
+            return bool(loaded)
 
         # Buscar en ubicaciones comunes
         common_paths = [
@@ -999,40 +1002,40 @@ class PatternVoter(BaseVoter):
         (r"\b(subir\s+arriba|bajar\s+abajo|salir\s+afuera|entrar\s+adentro)\b", "redundancy", []),
         (r"\b(mas\s+mejor|mas\s+peor|mas\s+mayor|mas\s+menor)\b", "redundancy", []),
         (r"\b(volver\s+a\s+regresar)\b", "redundancy", ["volver", "regresar"]),
-
         # ============================================================================
         # NOTA: Detección semántica de "riegos vs riesgos" ahora se hace en
         # semantic_checker.py con análisis contextual más robusto
         # ============================================================================
-
         # ============================================================================
         # FASE 2 - Medio Plazo (Panel de Expertos 2026-02)
         # ============================================================================
-
         # Repetición de palabras no funcionales (casa casa, libro libro, etc.)
         # Patrón: palabra de 4+ letras repetida inmediatamente
         (r"\b([a-záéíóúüñ]{4,})\s+\1\b", "repetition", []),
-
         # Dequeísmo: "de que" innecesario con verbos de pensamiento
-        (r"\b(pienso|creo|opino|considero|parece|supongo|imagino|entiendo)\s+de\s+que\b",
-         "dequeismo", []),
-
+        (
+            r"\b(pienso|creo|opino|considero|parece|supongo|imagino|entiendo)\s+de\s+que\b",
+            "dequeismo",
+            [],
+        ),
         # Queísmo: falta "de" con verbos pronominales
-        (r"\b(me\s+acuerdo|te\s+acuerdas|se\s+acuerda|me\s+olvid[oóaé]|te\s+alegras?|se\s+alegr[aóaé])\s+que\b",
-         "queismo", ["de que"]),
-
+        (
+            r"\b(me\s+acuerdo|te\s+acuerdas|se\s+acuerda|me\s+olvid[oóaé]|te\s+alegras?|se\s+alegr[aóaé])\s+que\b",
+            "queismo",
+            ["de que"],
+        ),
         # Números 1-10 en cifras (solo en contexto narrativo, no técnico)
         # Este patrón es básico, idealmente requiere análisis de contexto
-        (r"\b([1-9])\s+(personas?|niños?|hombres?|mujeres?|amigos?|hijos?|días?|años?|veces)\b",
-         "style", []),
-
+        (
+            r"\b([1-9])\s+(personas?|niños?|hombres?|mujeres?|amigos?|hijos?|días?|años?|veces)\b",
+            "style",
+            [],
+        ),
         # Gerundios excesivos: 3+ gerundios en ventana de 30 palabras
         # Patrón: detecta cadenas de gerundios
         # NOTA: Este patrón es simplificado. La implementación completa requeriría
         # análisis morfológico con spaCy para contar gerundios en ventana deslizante
-        (r"(\w+ndo)\s+\S+\s+\S+\s+(\w+ndo)\s+\S+\s+\S+\s+(\w+ndo)",
-         "style", []),
-
+        (r"(\w+ndo)\s+\S+\s+\S+\s+(\w+ndo)\s+\S+\s+\S+\s+(\w+ndo)", "style", []),
         # Palabras comúnmente mal escritas
         (r"\b(atravez|atraves)\b", "other", ["a través"]),
         (r"\b(enserio|encerio)\b", "other", ["en serio"]),
@@ -1371,6 +1374,8 @@ class BETOVoter(BaseVoter):
             masked_context = context[: match.start()] + "[MASK]" + context[match.end() :]
 
             # Obtener predicciones
+            if self._fill_mask is None:
+                return None
             predictions = self._fill_mask(masked_context)
 
             # Verificar si la palabra original está entre las predicciones
@@ -1639,6 +1644,8 @@ class VoteAggregator:
 class LLMArbitrator:
     """Árbitro LLM para casos dudosos."""
 
+    _available: bool
+
     def __init__(self):
         self._available = False
         try:
@@ -1761,33 +1768,33 @@ class VotingSpellingChecker:
 
         # 1. Patrones regex (rápido, alta precisión en casos conocidos)
         if use_patterns:
-            voter = PatternVoter()
-            if voter.is_available:
-                self._voters.append(voter)
+            pattern_voter = PatternVoter()
+            if pattern_voter.is_available:
+                self._voters.append(pattern_voter)
 
         # 2. PySpellChecker (Pure Python, diccionario español)
         if use_pyspellchecker:
-            voter = PySpellCheckerVoter()
-            if voter.is_available:
-                self._voters.append(voter)
+            pyspell_voter = PySpellCheckerVoter()
+            if pyspell_voter.is_available:
+                self._voters.append(pyspell_voter)
 
         # 3. Hunspell (diccionario profesional)
         if use_hunspell:
-            voter = ChunspellVoter()
-            if voter.is_available:
-                self._voters.append(voter)
+            chunspell_voter = ChunspellVoter()
+            if chunspell_voter.is_available:
+                self._voters.append(chunspell_voter)
 
         # 4. SymSpell (basado en frecuencia, muy rápido)
         if use_symspell:
-            voter = SymSpellVoter()
-            if voter.is_available:
-                self._voters.append(voter)
+            symspell_voter = SymSpellVoter()
+            if symspell_voter.is_available:
+                self._voters.append(symspell_voter)
 
         # 5. BETO (transformer español - más lento pero preciso)
         if use_beto:
-            voter = BETOVoter()
-            if voter.is_available:
-                self._voters.append(voter)
+            beto_voter = BETOVoter()
+            if beto_voter.is_available:
+                self._voters.append(beto_voter)
 
         # 6. LanguageTool (servidor Java, gramática + ortografía)
         if use_languagetool:
@@ -1903,9 +1910,9 @@ class VotingSpellingChecker:
 
             # Recoger votos de cada votante
             for voter in self._voters:
-                vote = voter.check_word(word, sentence)
-                if vote:
-                    result.votes.append(vote)
+                voter_vote = voter.check_word(word, sentence)
+                if voter_vote:
+                    result.votes.append(voter_vote)
 
             # Añadir voto de LanguageTool si existe
             if start in lt_results:

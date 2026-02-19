@@ -20,6 +20,7 @@ Uso:
 import logging
 import re
 from dataclasses import dataclass
+from typing import cast
 
 from . import morpho_utils
 
@@ -43,10 +44,19 @@ _FEM_PRONOUNS = frozenset({"ella"})
 
 # Verbos de percepción/dirección que combinan con "en él/ella" para indicar
 # que el sujeto de "sus" es la OTRA persona (no el pronombre)
-_GAZE_VERBS = frozenset({
-    "clavar", "posar", "fijar", "dirigir", "volver", "posarse",
-    "clavarse", "fijarse", "dirigirse",
-})
+_GAZE_VERBS = frozenset(
+    {
+        "clavar",
+        "posar",
+        "fijar",
+        "dirigir",
+        "volver",
+        "posarse",
+        "clavarse",
+        "fijarse",
+        "dirigirse",
+    }
+)
 
 
 @dataclass
@@ -324,13 +334,10 @@ class ScopeResolver:
         for child in subject_token.children:
             if child.dep_ == "nmod" and child.pos_ == "PROPN":
                 # Verificar que tiene preposición "de"
-                has_de = any(
-                    c.dep_ == "case" and c.text.lower() == "de"
-                    for c in child.children
-                )
+                has_de = any(c.dep_ == "case" and c.text.lower() == "de" for c in child.children)
                 if has_de:
                     # child es Token, el tipo de retorno es correcto
-                    return child
+                    return cast(object, child)
         return None
 
     def _expand_entity_span(self, token) -> str:
@@ -345,7 +352,7 @@ class ScopeResolver:
             for ent in self.doc.ents:
                 if ent.start <= token.i < ent.end:
                     # ent.text es str, el tipo de retorno es correcto
-                    return ent.text
+                    return str(ent.text)
 
         # Si no, expandir con dependencias (compound, flat)
         tokens_in_span = [token]
@@ -549,9 +556,7 @@ class ScopeResolver:
         # Patrón 1: "Cuando X verbo a Y, tenía..." (subordinada temporal)
         # La clave es que hay una subordinada con "cuando" que introduce
         # dos entidades antes del verbo principal con el atributo.
-        if self._is_cuando_subordinate_ambiguity(
-            position, attr_sent_idx, entity_mentions
-        ):
+        if self._is_cuando_subordinate_ambiguity(position, attr_sent_idx, entity_mentions):
             candidates = sorted(unique_per_names)
             return (candidates, attr_sent_text)
 
@@ -572,27 +577,21 @@ class ScopeResolver:
         # Patrón 4: "X se enfadó con Y porque tenía <atributo>"
         # Subordinada causal con "porque/ya que/puesto que" donde ambos
         # candidatos son posibles.
-        if self._is_causal_subordinate_ambiguity(
-            position, attr_sent_idx, entity_mentions
-        ):
+        if self._is_causal_subordinate_ambiguity(position, attr_sent_idx, entity_mentions):
             candidates = sorted(unique_per_names)
             return (candidates, attr_sent_text)
 
         # Patrón 5: "X miró a Y. Tenía <atributo>."
         # Anáfora cero: oración adyacente sin sujeto explícito,
         # oración previa con 2+ entidades PER distintas.
-        if self._is_zero_anaphora_ambiguity(
-            position, attr_sent_idx, entity_mentions
-        ):
+        if self._is_zero_anaphora_ambiguity(position, attr_sent_idx, entity_mentions):
             candidates = sorted(unique_per_names)
             return (candidates, attr_sent_text)
 
         # Patrón 6: "Entre X y Y, tenía <atributo>"
         # Coordinación con "entre/junto a/con": introduce dos candidatos
         # y el atributo aparece sin sujeto claro.
-        if self._is_coordination_ambiguity(
-            position, attr_sent_idx, entity_mentions
-        ):
+        if self._is_coordination_ambiguity(position, attr_sent_idx, entity_mentions):
             candidates = sorted(unique_per_names)
             return (candidates, attr_sent_text)
 
@@ -696,9 +695,7 @@ class ScopeResolver:
             return False
 
         # Check that there's NO gendered pronoun that could disambiguate
-        has_gendered_pronoun = bool(
-            re.search(r"\ben\s+(?:él|ella)\b", sent_text.lower())
-        )
+        has_gendered_pronoun = bool(re.search(r"\ben\s+(?:él|ella)\b", sent_text.lower()))
         if has_gendered_pronoun:
             return False
 
@@ -752,8 +749,7 @@ class ScopeResolver:
 
         if len(entities_in_sent) >= 2:
             logger.debug(
-                f"Ambiguity detected: 'le dijo a X que tenía' pattern "
-                f"with {entities_in_sent}"
+                f"Ambiguity detected: 'le dijo a X que tenía' pattern with {entities_in_sent}"
             )
             return True
 
@@ -794,10 +790,7 @@ class ScopeResolver:
                 entities_in_sent.add(name)
 
         if len(entities_in_sent) >= 2:
-            logger.debug(
-                f"Ambiguity detected: causal subordinate pattern "
-                f"with {entities_in_sent}"
-            )
+            logger.debug(f"Ambiguity detected: causal subordinate pattern with {entities_in_sent}")
             return True
 
         return False
@@ -846,8 +839,7 @@ class ScopeResolver:
 
         if len(prev_entities) >= 2:
             logger.debug(
-                f"Ambiguity detected: zero anaphora with "
-                f"{prev_entities} in previous sentence"
+                f"Ambiguity detected: zero anaphora with {prev_entities} in previous sentence"
             )
             return True
 
@@ -874,13 +866,11 @@ class ScopeResolver:
 
         # Patrón: "entre X y Y" o "X junto a Y" o "X con Y" seguido de coma + verbo
         coord_patterns = [
-            r"\bentre\s+\w+\s+y\s+\w+",           # "entre Juan y María"
-            r"\w+\s+junto\s+a\s+\w+",              # "Juan junto a María"
+            r"\bentre\s+\w+\s+y\s+\w+",  # "entre Juan y María"
+            r"\w+\s+junto\s+a\s+\w+",  # "Juan junto a María"
         ]
 
-        has_coordination = any(
-            re.search(p, sent_lower) for p in coord_patterns
-        )
+        has_coordination = any(re.search(p, sent_lower) for p in coord_patterns)
 
         if not has_coordination:
             return False
@@ -900,8 +890,7 @@ class ScopeResolver:
             verb = self._find_governing_verb(attr_token)
             if verb is not None and not morpho_utils.has_explicit_subject(verb):
                 logger.debug(
-                    f"Ambiguity detected: coordination pattern "
-                    f"with {entities_before_attr}"
+                    f"Ambiguity detected: coordination pattern with {entities_before_attr}"
                 )
                 return True
 
@@ -960,6 +949,8 @@ class ScopeResolver:
                 break
         if attr_sent_start is None:
             return None
+        if attr_sent_end is None:
+            return None
 
         sent_text = self.text[attr_sent_start:attr_sent_end]
         sent_lower = sent_text.lower()
@@ -1005,7 +996,13 @@ class ScopeResolver:
         candidates = []
         seen_names = set()
         for name, start, end, etype in entity_mentions:
-            if etype == "PER" and search_start is not None and start is not None and search_start <= start < search_end and name not in seen_names:
+            if (
+                etype == "PER"
+                and search_start is not None
+                and start is not None
+                and search_start <= start < search_end
+                and name not in seen_names
+            ):
                 candidates.append((name, start, end, etype))
                 seen_names.add(name)
 
@@ -1039,9 +1036,7 @@ class ScopeResolver:
                     target_entity = name
 
                 if target_entity:
-                    other_entities = [
-                        n for n, _, _, _ in candidates if n != target_entity
-                    ]
+                    other_entities = [n for n, _, _, _ in candidates if n != target_entity]
                     break
 
         if target_entity and other_entities:
@@ -1065,7 +1060,7 @@ class ScopeResolver:
         position: int,
         entity_mentions: list[tuple[str, int, int, str]],
         prefer_subject: bool = True,
-    ) -> tuple[str, float] | None:
+    ) -> tuple[str, float] | AmbiguousResult | None:
         """
         Encuentra la entidad más relevante para una posición usando scope gramatical.
 
@@ -1110,8 +1105,7 @@ class ScopeResolver:
         if ambiguity_result:
             candidates, context_text = ambiguity_result
             logger.debug(
-                f"Ambiguous context detected at position {position}, "
-                f"candidates: {candidates}"
+                f"Ambiguous context detected at position {position}, candidates: {candidates}"
             )
             # El tipo de retorno es AmbiguousResult, compatible
             return AmbiguousResult(
@@ -1149,7 +1143,9 @@ class ScopeResolver:
                     # entidades, preferir el nombre propio.
                     if identity_match:
                         is_descriptive_noun = (
-                            subject_token is not None and hasattr(subject_token, "pos_") and subject_token.pos_ == "NOUN"
+                            subject_token is not None
+                            and hasattr(subject_token, "pos_")
+                            and subject_token.pos_ == "NOUN"
                         )
                         if is_descriptive_noun or not subject_match:
                             logger.debug(
@@ -1201,9 +1197,7 @@ class ScopeResolver:
         # En español, el sujeto tácito hereda del sujeto de la oración anterior.
         # Esto tiene prioridad sobre la búsqueda por proximidad en wider scope.
         if prefer_subject:
-            prev_subject = self._find_previous_sentence_subject(
-                position, filtered_mentions
-            )
+            prev_subject = self._find_previous_sentence_subject(position, filtered_mentions)
             if prev_subject:
                 return prev_subject
 
@@ -1248,9 +1242,7 @@ class ScopeResolver:
             )
             # Si la confianza es baja, intentar análisis LLM antes de fallback final
             if 0.45 < 0.6:  # Confianza baja
-                llm_result = self._llm_semantic_disambiguation(
-                    position, candidates_in_paragraph
-                )
+                llm_result = self._llm_semantic_disambiguation(position, candidates_in_paragraph)
                 if llm_result:
                     return llm_result
             return (best[0], 0.45)  # Baja confianza: mismo párrafo pero lejos
@@ -1264,9 +1256,7 @@ class ScopeResolver:
             and not (start > position and self._is_object_complement(start))
         ]
         if fallback_candidates_temp:
-            llm_result = self._llm_semantic_disambiguation(
-                position, fallback_candidates_temp
-            )
+            llm_result = self._llm_semantic_disambiguation(position, fallback_candidates_temp)
             if llm_result:
                 return llm_result
 
@@ -1347,10 +1337,7 @@ class ScopeResolver:
         for child in token.children:
             if child.dep_ == "nmod":
                 # Verificar que tiene preposición "de"
-                has_de = any(
-                    c.dep_ == "case" and c.text.lower() == "de"
-                    for c in child.children
-                )
+                has_de = any(c.dep_ == "case" and c.text.lower() == "de" for c in child.children)
                 if has_de:
                     child_text = self._expand_entity_span(child)
                     for name, _start, _end, _etype in entity_mentions:
@@ -1463,7 +1450,12 @@ class ScopeResolver:
         # Estrategia 1: dep parsing
         token = self._token_at_position(mention_start)
         if token is not None and token.dep_ in {
-            "obj", "obl", "iobj", "dobj", "nmod", "obl:arg",
+            "obj",
+            "obl",
+            "iobj",
+            "dobj",
+            "nmod",
+            "obl:arg",
         }:
             return True
 
@@ -1505,7 +1497,7 @@ class ScopeResolver:
             from ..llm.client import get_llm_client
 
             llm = get_llm_client()
-            if llm is None or not hasattr(llm, 'is_available') or not llm.is_available():
+            if llm is None or not llm.is_available:
                 logger.debug("LLM no disponible para desambiguación semántica")
                 return None
         except Exception as e:
@@ -1537,15 +1529,14 @@ class ScopeResolver:
 
 Contexto: {context}
 
-Candidatos posibles: {', '.join(candidate_names)}
+Candidatos posibles: {", ".join(candidate_names)}
 
 Responde SOLO con el nombre del candidato más probable, o "AMBIGUO" si no puedes determinarlo con certeza."""
 
         try:
-            if llm is None or not hasattr(llm, 'generate'):
+            if llm is None:
                 return None
-            # LLM puede ser objeto dinámico, comprobamos método
-            response = llm.generate(prompt, max_tokens=50, temperature=0.1)
+            response = llm.complete(prompt=prompt, max_tokens=50, temperature=0.1)
             if not response:
                 return None
 

@@ -381,11 +381,13 @@ class EmotionalCoherenceChecker:
             return None
 
         dialogue_sentiment = result.value
+        if dialogue_sentiment is None:
+            return None
 
         # Verificar confianza mínima
-        if getattr(dialogue_sentiment, "sentiment_confidence", None) is not None and dialogue_sentiment.sentiment_confidence < self.min_confidence:
+        if dialogue_sentiment.sentiment_confidence < self.min_confidence:
             logger.debug(
-                f"Confianza baja ({getattr(dialogue_sentiment, 'sentiment_confidence', 0):.2f}), ignorando"
+                f"Confianza baja ({dialogue_sentiment.sentiment_confidence:.2f}), ignorando"
             )
             return None
 
@@ -393,15 +395,18 @@ class EmotionalCoherenceChecker:
         expected_sentiments = self._emotion_to_expected_sentiment(declared_emotion)
 
         # Verificar coherencia
-        if not self._is_coherent(expected_sentiments, getattr(dialogue_sentiment, 'sentiment', None)):
+        if not self._is_coherent(expected_sentiments, dialogue_sentiment.sentiment):
             return EmotionalIncoherence(
                 entity_name=entity_name,
                 incoherence_type=IncoherenceType.EMOTION_DIALOGUE,
                 declared_emotion=declared_emotion,
-                actual_behavior=f"{getattr(dialogue_sentiment, 'sentiment', type('X', (), {'value': ''})()).value} ({getattr(dialogue_sentiment, 'primary_emotion', type('X', (), {'value': ''})()).value})",
+                actual_behavior=(
+                    f"{dialogue_sentiment.sentiment.value} "
+                    f"({dialogue_sentiment.primary_emotion.value})"
+                ),
                 declared_text=context,
                 behavior_text=dialogue_text,
-                confidence=getattr(dialogue_sentiment, 'sentiment_confidence', None),
+                confidence=dialogue_sentiment.sentiment_confidence,
                 explanation=self._generate_explanation(
                     entity_name, declared_emotion, dialogue_sentiment
                 ),
@@ -631,14 +636,14 @@ class EmotionalCoherenceChecker:
         # Patrones: —texto—, —texto (fin de línea), "texto", --texto--
         dialogue_patterns = [
             # Raya española con texto
-            r'—([^—\n]+)(?:—|(?=\n|$))',
+            r"—([^—\n]+)(?:—|(?=\n|$))",
             # Doble guión (alternativa común en textos digitales)
-            r'--([^\n]+?)(?:--|(?=\n|$))',
+            r"--([^\n]+?)(?:--|(?=\n|$))",
             # Comillas dobles ASCII
             r'"([^"]+)"',
             # Comillas tipográficas
             r'"([^"]+)"',
-            r'«([^»]+)»',
+            r"«([^»]+)»",
         ]
 
         dialogues: list[tuple[str, str, int, int]] = []
@@ -705,13 +710,13 @@ class EmotionalCoherenceChecker:
         context = text[context_start:dialogue_start]
 
         # Patrón: Nombre + verbo de habla
-        speech_pattern = r'([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+(?:dijo|exclamó|preguntó|murmuró|gritó|susurró|respondió|añadió|contestó|replicó)'
+        speech_pattern = r"([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+(?:dijo|exclamó|preguntó|murmuró|gritó|susurró|respondió|añadió|contestó|replicó)"
         match = re.search(speech_pattern, context)
         if match:
             return match.group(1)
 
         # Patrón: verbo de habla + Nombre
-        speech_pattern2 = r'(?:—[^—]+—\s*)?(?:dijo|exclamó|preguntó|murmuró|gritó|susurró)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)'
+        speech_pattern2 = r"(?:—[^—]+—\s*)?(?:dijo|exclamó|preguntó|murmuró|gritó|susurró)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)"
         match = re.search(speech_pattern2, context)
         if match:
             return match.group(1)

@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from ...core.config import GrammarConfig, get_config
-from ...core.errors import ErrorSeverity, NLPError
+from ...core.errors import ErrorSeverity, NarrativeError, NLPError
 from ...core.result import Result
 from .base import (
     GRAMMAR_PATTERNS,
@@ -121,7 +121,7 @@ class GrammarChecker:
         """
         self._config = config or get_config().grammar
         self._nlp = None
-        self._lt_client = None
+        self._lt_client: Any | None = None
         self._load_spacy()
         if self._config.use_languagetool:
             self._load_languagetool()
@@ -215,7 +215,7 @@ class GrammarChecker:
         )
 
         report = GrammarReport()
-        errors: list[NLPError] = []
+        errors: list[NarrativeError] = []
 
         try:
             # Fase 1: Reglas propias de español (0.0 - 0.4)
@@ -815,7 +815,7 @@ class GrammarChecker:
             from ...llm.client import get_llm_client
 
             client = get_llm_client()
-            if not client or not getattr(client, "is_available", lambda: False)():
+            if not client or not client.is_available:
                 return []
 
             # Preparar contexto de issues existentes
@@ -838,7 +838,7 @@ Responde SOLO con un JSON array de errores encontrados:
 
 Si no hay errores adicionales, responde: []"""
 
-            response = client.generate(prompt, max_tokens=500)
+            response = client.complete(prompt=prompt, max_tokens=500)
             if not response:
                 return []
 

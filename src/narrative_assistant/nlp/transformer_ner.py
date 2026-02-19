@@ -22,6 +22,7 @@ import os
 import threading
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from ..core.config import get_config
 from ..core.device import get_device
@@ -104,10 +105,9 @@ class TransformerNERModel:
             device: Dispositivo ('cuda', 'cpu', None=auto).
             cache_dir: Directorio de cache para el modelo.
         """
-        self._model_key = model_key or os.environ.get(
-            "NA_TRANSFORMER_NER_MODEL", DEFAULT_MODEL
-        )
-        self._pipeline = None
+        env_model = os.environ.get("NA_TRANSFORMER_NER_MODEL")
+        self._model_key: str = model_key or env_model or DEFAULT_MODEL
+        self._pipeline: Any | None = None
         self._load_error: str | None = None
         self._cache_dir = cache_dir
 
@@ -121,13 +121,12 @@ class TransformerNERModel:
         model_info = TRANSFORMER_NER_MODELS.get(self._model_key)
         if not model_info:
             logger.warning(
-                f"Modelo transformer NER desconocido: {self._model_key}. "
-                f"Usando {DEFAULT_MODEL}"
+                f"Modelo transformer NER desconocido: {self._model_key}. Usando {DEFAULT_MODEL}"
             )
             self._model_key = DEFAULT_MODEL
             model_info = TRANSFORMER_NER_MODELS[DEFAULT_MODEL]
 
-        self._hf_model_name = model_info["hf_name"]
+        self._hf_model_name: str = str(model_info["hf_name"])
         logger.info(
             f"TransformerNER configurado: {self._model_key} "
             f"({model_info['params']}) en {self._device}"
@@ -186,8 +185,7 @@ class TransformerNERModel:
 
             # Descargar con progreso gestionado
             logger.info(
-                "Modelo transformer NER no encontrado localmente. "
-                "Iniciando descarga (~500 MB)..."
+                "Modelo transformer NER no encontrado localmente. Iniciando descarga (~500 MB)..."
             )
 
             def log_progress(message: str, percent: float):
@@ -231,10 +229,7 @@ class TransformerNERModel:
             from transformers import AutoModelForTokenClassification, AutoTokenizer
             from transformers import pipeline as hf_pipeline
         except ImportError:
-            self._load_error = (
-                "transformers no instalado. "
-                "Instalar con: pip install transformers"
-            )
+            self._load_error = "transformers no instalado. Instalar con: pip install transformers"
             logger.warning(self._load_error)
             return False
 
@@ -270,19 +265,13 @@ class TransformerNERModel:
                 aggregation_strategy="simple",
             )
 
-            logger.info(
-                f"Modelo transformer NER cargado: {self._hf_model_name} "
-                f"en {self._device}"
-            )
+            logger.info(f"Modelo transformer NER cargado: {self._hf_model_name} en {self._device}")
             return True
 
         except Exception as e:
             # Fallback a CPU si GPU falla
             if self._device == "cuda":
-                logger.warning(
-                    f"Error cargando transformer NER en GPU: {e}. "
-                    "Intentando en CPU..."
-                )
+                logger.warning(f"Error cargando transformer NER en GPU: {e}. Intentando en CPU...")
                 self._device = "cpu"
                 try:
                     source = str(local_model_path) if local_model_path else self._hf_model_name
@@ -328,6 +317,7 @@ class TransformerNERModel:
             chunks = self._split_text(text, max_chars)
 
             all_entities: list[TransformerNEREntity] = []
+            assert self._pipeline is not None
             for chunk_text, offset in chunks:
                 raw_entities = self._pipeline(chunk_text)
                 for ent in raw_entities:
@@ -362,9 +352,7 @@ class TransformerNERModel:
             clean = clean[2:]
         return LABEL_MAP.get(clean)
 
-    def _split_text(
-        self, text: str, max_chars: int
-    ) -> list[tuple[str, int]]:
+    def _split_text(self, text: str, max_chars: int) -> list[tuple[str, int]]:
         """
         Divide el texto en chunks respetando límites de oraciones.
 

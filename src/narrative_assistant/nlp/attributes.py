@@ -552,16 +552,23 @@ def _normalize_entity_mentions(
     if not entity_mentions:
         return []
 
-    normalized = []
+    normalized: list[EntityMention] = []
     for mention in entity_mentions:
         if len(mention) == 3:
             # Formato antiguo: (name, start, end) -> agregar None como entity_type
             name, start, end = mention
-            normalized.append((name, start, end, None))
+            normalized.append((str(name), int(start), int(end), None))
         elif len(mention) >= 4:
             # Formato nuevo: (name, start, end, entity_type)
             name, start, end, entity_type = mention[:4]
-            normalized.append((name, start, end, entity_type))
+            normalized.append(
+                (
+                    str(name),
+                    int(start),
+                    int(end),
+                    str(entity_type) if entity_type is not None else None,
+                )
+            )
         else:
             logger.warning(f"entity_mention con formato inválido: {mention}")
             continue
@@ -1489,7 +1496,9 @@ from .attr_entity_resolution import AttributeEntityResolutionMixin
 from .attr_voting import AttributeVotingMixin
 
 
-class AttributeExtractor(AttributeContextMixin, AttributeVotingMixin, AttributeEntityResolutionMixin):
+class AttributeExtractor(
+    AttributeContextMixin, AttributeVotingMixin, AttributeEntityResolutionMixin
+):
     """
     Extractor de atributos de entidades narrativas.
 
@@ -1675,6 +1684,7 @@ class AttributeExtractor(AttributeContextMixin, AttributeVotingMixin, AttributeE
             if callable(nlp):
                 self._spacy_doc = nlp(text)
                 from .scope_resolver import ScopeResolver
+
                 self._scope_resolver = ScopeResolver(self._spacy_doc, text)
             else:
                 logger.debug("nlp is not callable, skipping spaCy doc creation.")
@@ -1827,16 +1837,22 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                                 known_entity_names
                                 and entity_name.lower() not in known_entity_names_lower
                             ):
-                                logger.debug(f"LLM alucinó entidad '{entity_name}' no presente en texto/menciones")
+                                logger.debug(
+                                    f"LLM alucinó entidad '{entity_name}' no presente en texto/menciones"
+                                )
                                 continue
 
                         # Normalizar nombre parcial al canónico completo.
                         # El LLM suele devolver "María" en vez de "María Sánchez".
-                        if known_entity_names and entity_name.lower() not in known_entity_names_lower:
+                        if (
+                            known_entity_names
+                            and entity_name.lower() not in known_entity_names_lower
+                        ):
                             name_lower = entity_name.lower()
                             canonical_match = next(
                                 (
-                                    cn for cn in known_entity_names
+                                    cn
+                                    for cn in known_entity_names
                                     if cn.lower().startswith(name_lower + " ")
                                     or cn.lower().split()[0] == name_lower
                                 ),
@@ -1855,7 +1871,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                     if known_entity_names and entity_name:
                         entity_type_hint = mention_type_by_name.get(entity_name.lower())
                         if entity_type_hint and not self._is_key_compatible_with_type(
-                            key_str_raw, entity_type_hint,
+                            key_str_raw,
+                            entity_type_hint,
                         ):
                             logger.debug(
                                 f"LLM asignó key '{key_str_raw}' incompatible con tipo "
@@ -2191,6 +2208,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
 
                     # Detectar y colectar atributos ambiguos
                     from .scope_resolver import AmbiguousResult
+
                     if isinstance(entity_result, AmbiguousResult):
                         # Colectar para alerta interactiva
                         ambig_attr = AmbiguousAttribute(
@@ -2233,7 +2251,10 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                 # Verificar patrón contrastivo "No es X, sino Y"
                 match_end_in_context = match.end() - context_start
                 is_contrastive, corrected_value = self._check_contrastive_correction(
-                    context, match_pos_in_context, match_end_in_context, value if isinstance(value, str) else ""
+                    context,
+                    match_pos_in_context,
+                    match_end_in_context,
+                    value if isinstance(value, str) else "",
                 )
                 if is_contrastive:
                     if corrected_value:
@@ -2416,7 +2437,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
         }
         return mapping.get(key_str.lower(), AttributeKey.OTHER)
 
-    def _parse_llm_json(self, response: str) -> dict | None:
+    def _parse_llm_json(self, response: str) -> dict[str, Any] | None:
         """Parsea respuesta JSON del LLM con limpieza y fallback."""
         try:
             # Limpiar respuesta
@@ -2434,7 +2455,10 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
 
             if start_idx != -1 and end_idx > start_idx:
                 json_str = cleaned[start_idx:end_idx]
-                return json.loads(json_str)
+                parsed = json.loads(json_str)
+                if isinstance(parsed, dict):
+                    return {str(k): v for k, v in parsed.items()}
+                return None
 
             # Fallback: parsear texto formateado con markdown
             # El LLM a veces responde con formato tipo "**key**: value"
@@ -2479,7 +2503,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
             if attr_match and current_entity:
                 key_raw = attr_match.group(1).strip().lower()
                 value = attr_match.group(2).strip()
-                evidence = attr_match.group(3) if attr_match.lastindex >= 3 else ""
+                has_evidence = attr_match.lastindex is not None and attr_match.lastindex >= 3
+                evidence = attr_match.group(3) if has_evidence else ""
 
                 # Mapear key
                 key_mapping = {
@@ -2547,12 +2572,25 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
         return float(dot / (norm1 * norm2))
 
     # Keys exclusivas de personaje (no tienen sentido para lugar/objeto).
-    _PERSON_ONLY_KEYS = frozenset({
-        "eye_color", "hair_color", "hair_type", "hair_modification",
-        "age", "apparent_age", "height", "build", "skin",
-        "distinctive_feature", "facial_hair", "personality",
-        "temperament", "fear", "desire",
-    })
+    _PERSON_ONLY_KEYS = frozenset(
+        {
+            "eye_color",
+            "hair_color",
+            "hair_type",
+            "hair_modification",
+            "age",
+            "apparent_age",
+            "height",
+            "build",
+            "skin",
+            "distinctive_feature",
+            "facial_hair",
+            "personality",
+            "temperament",
+            "fear",
+            "desire",
+        }
+    )
     # Keys exclusivas de lugar.
     _LOCATION_ONLY_KEYS = frozenset({"climate", "terrain"})
 
@@ -3040,9 +3078,21 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
 
         elif key_str == "climate":
             climate_values = [
-                "húmedo", "húmeda", "seco", "seca", "templado", "templada",
-                "tropical", "frío", "fría", "cálido", "cálida", "árido", "árida",
-                "lluvioso", "lluviosa",
+                "húmedo",
+                "húmeda",
+                "seco",
+                "seca",
+                "templado",
+                "templada",
+                "tropical",
+                "frío",
+                "fría",
+                "cálido",
+                "cálida",
+                "árido",
+                "árida",
+                "lluvioso",
+                "lluviosa",
             ]
             for climate in climate_values:
                 if climate in sentence_lower:
@@ -3050,9 +3100,22 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
 
         elif key_str == "terrain":
             terrain_values = [
-                "montañoso", "montañosa", "llano", "llana", "costero", "costera",
-                "desértico", "desértica", "boscoso", "boscosa", "urbano", "urbana",
-                "rural", "rocoso", "rocosa", "fértil",
+                "montañoso",
+                "montañosa",
+                "llano",
+                "llana",
+                "costero",
+                "costera",
+                "desértico",
+                "desértica",
+                "boscoso",
+                "boscosa",
+                "urbano",
+                "urbana",
+                "rural",
+                "rocoso",
+                "rocosa",
+                "fértil",
             ]
             for terrain in terrain_values:
                 if terrain in sentence_lower:
@@ -3060,9 +3123,19 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
 
         elif key_str == "size":
             size_values = [
-                "enorme", "gigante", "vasto", "vasta", "amplio", "amplia",
-                "grande", "mediano", "mediana", "pequeño", "pequeña",
-                "diminuto", "diminuta",
+                "enorme",
+                "gigante",
+                "vasto",
+                "vasta",
+                "amplio",
+                "amplia",
+                "grande",
+                "mediano",
+                "mediana",
+                "pequeño",
+                "pequeña",
+                "diminuto",
+                "diminuta",
             ]
             for size in size_values:
                 if size in sentence_lower:
@@ -3083,8 +3156,19 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
 
         elif key_str == "material":
             material_values = [
-                "oro", "plata", "bronce", "hierro", "acero", "cobre", "madera",
-                "cristal", "vidrio", "cuero", "hueso", "obsidiana", "piedra",
+                "oro",
+                "plata",
+                "bronce",
+                "hierro",
+                "acero",
+                "cobre",
+                "madera",
+                "cristal",
+                "vidrio",
+                "cuero",
+                "hueso",
+                "obsidiana",
+                "piedra",
             ]
             for material in material_values:
                 if material in sentence_lower:
@@ -3097,9 +3181,24 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
 
         elif key_str == "condition":
             condition_values = [
-                "roto", "rota", "deteriorado", "deteriorada", "intacto", "intacta",
-                "oxidado", "oxidada", "nuevo", "nueva", "viejo", "vieja",
-                "destruido", "destruida", "dañado", "dañada", "gastado", "gastada",
+                "roto",
+                "rota",
+                "deteriorado",
+                "deteriorada",
+                "intacto",
+                "intacta",
+                "oxidado",
+                "oxidada",
+                "nuevo",
+                "nueva",
+                "viejo",
+                "vieja",
+                "destruido",
+                "destruida",
+                "dañado",
+                "dañada",
+                "gastado",
+                "gastada",
             ]
             for condition in condition_values:
                 if condition in sentence_lower:
@@ -3145,7 +3244,6 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
         attributes: list[ExtractedAttribute] = []
 
         try:
-
             # Índices de menciones para búsqueda y tipo de entidad.
             mention_spans = {}
             mention_type_by_name: dict[str, str | None] = {}
@@ -3376,38 +3474,55 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                         "patillas": AttributeKey.FACIAL_HAIR,
                     }
                     _HAIR_TYPE_ADJS = {
-                        "largo", "corto", "liso", "rizado", "ondulado",
-                        "recogido", "suelto", "trenzado",
+                        "largo",
+                        "corto",
+                        "liso",
+                        "rizado",
+                        "ondulado",
+                        "recogido",
+                        "suelto",
+                        "trenzado",
                     }
                     if token.pos_ == "NOUN" and token.lemma_.lower() in _BODY_PART_KEY_MAP:
                         base_key = _BODY_PART_KEY_MAP[token.lemma_.lower()]
                         adj_children = [
-                            c for c in token.children
-                            if c.pos_ == "ADJ" and c.dep_ == "amod"
+                            c for c in token.children if c.pos_ == "ADJ" and c.dep_ == "amod"
                         ]
                         if adj_children:
                             # Resolver entidad: buscar posesivo (det), prep "de X", o proximidad
                             entity_result = None
                             from .scope_resolver import AmbiguousResult
+
                             for child in token.children:
                                 # "Sus ojos" → det posesivo
                                 if child.dep_ == "det" and child.lemma_.lower() in (
-                                    "su", "sus", "mi", "mis", "tu", "tus",
+                                    "su",
+                                    "sus",
+                                    "mi",
+                                    "mis",
+                                    "tu",
+                                    "tus",
                                 ):
                                     entity_result = self._find_nearest_entity(
-                                        text, token.idx, entity_mentions,
+                                        text,
+                                        token.idx,
+                                        entity_mentions,
                                     )
                                     break
                                 # "los ojos de María" → nmod/case
                                 if child.dep_ == "nmod" and child.pos_ == "PROPN":
                                     entity_result = self._resolve_entity_from_token(
-                                        child, mention_spans, doc,
+                                        child,
+                                        mention_spans,
+                                        doc,
                                     )
                                     break
                             # Fallback: prepositional context "con barba espesa y ojos marrones"
                             if not entity_result:
                                 entity_result = self._find_nearest_entity(
-                                    text, token.idx, entity_mentions,
+                                    text,
+                                    token.idx,
+                                    entity_mentions,
                                 )
 
                             # Detectar atributos ambiguos en dependency extraction
@@ -3415,7 +3530,10 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                                 # Colectar todos los adjetivos para la alerta
                                 for adj in adj_children:
                                     adj_lower = adj.text.lower()
-                                    if base_key == AttributeKey.HAIR_COLOR and adj_lower in _HAIR_TYPE_ADJS:
+                                    if (
+                                        base_key == AttributeKey.HAIR_COLOR
+                                        and adj_lower in _HAIR_TYPE_ADJS
+                                    ):
                                         attr_key = AttributeKey.HAIR_TYPE
                                     else:
                                         attr_key = base_key
@@ -3437,7 +3555,10 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                                 for adj in adj_children:
                                     adj_lower = adj.text.lower()
                                     # Determinar key: pelo/cabello + adj de tipo → hair_type
-                                    if base_key == AttributeKey.HAIR_COLOR and adj_lower in _HAIR_TYPE_ADJS:
+                                    if (
+                                        base_key == AttributeKey.HAIR_COLOR
+                                        and adj_lower in _HAIR_TYPE_ADJS
+                                    ):
                                         attr_key = AttributeKey.HAIR_TYPE
                                     else:
                                         attr_key = base_key
@@ -3489,20 +3610,15 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
             entity_mentions=[(entity_name, 0, len(entity_name))],
         )
 
-        if result.is_success:
-            # Ajustar posiciones al contexto global
-            for attr in result.value.attributes:
-                if hasattr(result.value, "attributes") and result.value.attributes is not None:
-                    for attr in result.value.attributes:
-                        attr.start_char += context_start
-                        attr.end_char += context_start
-                    return result.value.attributes
-                else:
-                    logger.debug("result.value.attributes is None or missing.")
-                    return []
-        else:
+        if not result.is_success or result.value is None:
             logger.debug("result.is_success is False or result.value is None.")
             return []
+
+        # Ajustar posiciones al contexto global
+        for attr in result.value.attributes:
+            attr.start_char += context_start
+            attr.end_char += context_start
+        return result.value.attributes
 
 
 def extract_attributes(
@@ -3827,8 +3943,17 @@ def load_trained_weights(path: "Path") -> dict[str, float]:
 
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
+    if not isinstance(data, dict):
+        raise ValueError(f"Formato de archivo inválido en {path}")
 
-    weights = data.get("weights", {})
+    raw_weights = data.get("weights", {})
+    if not isinstance(raw_weights, dict):
+        raise ValueError(f"No se encontraron pesos válidos en {path}")
+
+    weights: dict[str, float] = {}
+    for method, value in raw_weights.items():
+        if isinstance(method, str) and isinstance(value, (int, float)):
+            weights[method] = float(value)
     if not weights:
         raise ValueError(f"No se encontraron pesos en {path}")
 

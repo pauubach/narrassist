@@ -163,6 +163,10 @@ class EmbeddingsExtractor(BaseExtractor):
     def _precompute_embeddings(self) -> None:
         """Pre-calcula embeddings de templates y valores canónicos."""
         logger.info("Pre-computing embeddings for attribute classification...")
+        model = self.embeddings
+        if model is None or not hasattr(model, "encode"):
+            logger.warning("Modelo de embeddings no disponible para pre-cálculo")
+            return
 
         # Embeddings de valores canónicos por tipo
         for attr_type, values in CANONICAL_VALUES.items():
@@ -174,7 +178,7 @@ class EmbeddingsExtractor(BaseExtractor):
                 avg_text = texts[0] if texts else value
 
                 # Calcular embedding normalizado para similitud coseno
-                emb = self._embeddings.encode(avg_text, normalize=True) if hasattr(self._embeddings, "encode") else None
+                emb = model.encode(avg_text, normalize=True)
                 self._value_embeddings[attr_type][value] = emb
 
         logger.info("Embeddings pre-computed successfully")
@@ -193,6 +197,8 @@ class EmbeddingsExtractor(BaseExtractor):
         import numpy as np
 
         # Aplanar si es necesario
+        if emb1 is None or emb2 is None:
+            return 0.0
         e1 = emb1.flatten() if hasattr(emb1, "flatten") else emb1
         e2 = emb2.flatten() if hasattr(emb2, "flatten") else emb2
 
@@ -286,7 +292,10 @@ class EmbeddingsExtractor(BaseExtractor):
                     continue  # Ignorar sub-frases muy cortas
 
                 # Calcular embedding de la sub-frase (normalizado)
-                sub_embedding = self._embeddings.encode(subphrase, normalize=True) if hasattr(self._embeddings, "encode") else None
+                model = self.embeddings
+                if model is None or not hasattr(model, "encode"):
+                    continue
+                sub_embedding = model.encode(subphrase, normalize=True)
 
                 # Comparar con templates de cada tipo de atributo
                 for attr_type, value_embs in self._value_embeddings.items():
@@ -552,7 +561,10 @@ class EmbeddingsExtractor(BaseExtractor):
         _ = self.embeddings
 
         # Calcular embedding del contexto (normalizado)
-        context_emb = self._embeddings.encode(context_text, normalize=True) if hasattr(self._embeddings, "encode") else None
+        model = self.embeddings
+        if model is None or not hasattr(model, "encode"):
+            return None
+        context_emb = model.encode(context_text, normalize=True)
 
         best_type = None
         best_similarity = 0.0
@@ -595,7 +607,10 @@ class EmbeddingsExtractor(BaseExtractor):
 
         # Calcular embedding del atributo (normalizado)
         attr_text = f"tiene {attr.attribute_type.value} {attr.value}"
-        attr_emb = self._embeddings.encode(attr_text, normalize=True) if hasattr(self._embeddings, "encode") else None
+        model = self.embeddings
+        if model is None or not hasattr(model, "encode"):
+            return 0.0
+        attr_emb = model.encode(attr_text, normalize=True)
 
         # Comparar con valores canónicos del mismo tipo
         max_similarity = 0.0
@@ -623,8 +638,11 @@ class EmbeddingsExtractor(BaseExtractor):
         # Forzar carga
         _ = self.embeddings
 
-        suggestions = []
-        value_emb = self._embeddings.encode(value, normalize=True) if hasattr(self._embeddings, "encode") else None
+        suggestions: list[tuple[AttributeType, float]] = []
+        model = self.embeddings
+        if model is None or not hasattr(model, "encode"):
+            return suggestions
+        value_emb = model.encode(value, normalize=True)
 
         for attr_type, value_embs in self._value_embeddings.items():
             max_similarity = 0.0

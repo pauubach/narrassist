@@ -16,7 +16,7 @@ from typing import Any
 
 import numpy as np
 
-from narrative_assistant.core import Result, get_resource_manager
+from narrative_assistant.core import NLPError, Result, get_resource_manager
 
 logger = logging.getLogger(__name__)
 
@@ -254,7 +254,7 @@ class SemanticRedundancyDetector:
             embeddings = model.encode(texts, show_progress=len(texts) > 1000)
 
             if embeddings is None:
-                return Result.failure(Exception("Error generando embeddings"))
+                return Result.failure(NLPError(message="Error generando embeddings"))
 
             # Encontrar duplicados usando FAISS o búsqueda lineal
             if FAISS_AVAILABLE and len(sentences) > 100:
@@ -289,7 +289,7 @@ class SemanticRedundancyDetector:
 
         except Exception as e:
             logger.error(f"Error en detección de redundancia: {e}", exc_info=True)
-            return Result.failure(e)
+            return Result.failure(NLPError(message=str(e)))
 
     def _extract_sentences(self, chapters: list[dict]) -> list[SentenceInfo]:
         """Extrae oraciones de los capítulos."""
@@ -428,7 +428,7 @@ class SemanticRedundancyDetector:
         max_duplicates: int,
     ) -> list[SemanticDuplicate]:
         """Encuentra duplicados con búsqueda lineal (fallback sin FAISS)."""
-        duplicates: list[dict[str, Any]] = []
+        duplicates: list[SemanticDuplicate] = []
         seen_pairs = set()
 
         n_sentences = len(sentences)

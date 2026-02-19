@@ -36,8 +36,10 @@ logger = logging.getLogger("narrative_assistant.api")
 # Constants
 # ============================================================================
 
-BACKEND_VERSION = "0.11.2"
-IS_EMBEDDED_RUNTIME = os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
+BACKEND_VERSION = "0.11.3"
+IS_EMBEDDED_RUNTIME = (
+    os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
+)
 
 # Minimum required Python version (major, minor)
 MIN_PYTHON_VERSION = (3, 10)
@@ -100,14 +102,15 @@ _python_status_cache: dict | None = None
 # Bootstrap helpers
 # ============================================================================
 
+
 def _write_debug(msg):
     """Write debug message to file (for early startup diagnostics)."""
     try:
-        localappdata = os.environ.get('LOCALAPPDATA', os.environ.get('TEMP', ''))
+        localappdata = os.environ.get("LOCALAPPDATA", os.environ.get("TEMP", ""))
         if localappdata:
             debug_file = os.path.join(localappdata, "Narrative Assistant", "early-debug.txt")
             os.makedirs(os.path.dirname(debug_file), exist_ok=True)
-            with open(debug_file, 'a', encoding='utf-8') as f:
+            with open(debug_file, "a", encoding="utf-8") as f:
                 f.write(f"{datetime.now().isoformat()} - {msg}\n")
                 f.flush()
     except Exception:
@@ -141,6 +144,7 @@ def load_narrative_assistant_modules():
         from narrative_assistant.persistence.database import Database as DB  # noqa: N814
         from narrative_assistant.persistence.database import get_database as get_db
         from narrative_assistant.persistence.project import ProjectManager
+
         _write_debug("On-demand Phase 1 OK: persistence imports succeeded")
     except Exception as e:
         error_msg = f"Phase 1 FAILED (persistence): {type(e).__name__}: {e}"
@@ -162,8 +166,8 @@ def load_narrative_assistant_modules():
         db = get_db()
         _write_debug(f"Database path: {db.db_path}")
         tables = db.fetchall("SELECT name FROM sqlite_master WHERE type='table'")
-        table_names = [t['name'] for t in tables]
-        if 'projects' not in table_names:
+        table_names = [t["name"] for t in tables]
+        if "projects" not in table_names:
             _write_debug("WARNING: 'projects' table NOT found after init!")
             logger.error("WARNING: 'projects' table NOT found after init!")
 
@@ -173,6 +177,7 @@ def load_narrative_assistant_modules():
         try:
             from narrative_assistant.persistence import repair_database, reset_database
             from narrative_assistant.persistence.database import delete_and_recreate_database
+
             _write_debug("Attempting repair...")
             success, msg = repair_database()
             if success:
@@ -197,6 +202,7 @@ def load_narrative_assistant_modules():
     # Phase 2: Entity/Alert repos
     try:
         from narrative_assistant.entities.repository import EntityRepository
+
         deps.entity_repository = EntityRepository()
         _write_debug("Phase 2a OK: EntityRepository loaded")
     except Exception as e:
@@ -205,6 +211,7 @@ def load_narrative_assistant_modules():
 
     try:
         from narrative_assistant.alerts.repository import AlertRepository
+
         deps.alert_repository = AlertRepository()
         _write_debug("Phase 2b OK: AlertRepository loaded")
     except Exception as e:
@@ -213,6 +220,7 @@ def load_narrative_assistant_modules():
 
     try:
         from narrative_assistant.persistence.dismissal_repository import DismissalRepository
+
         deps.dismissal_repository = DismissalRepository()
         _write_debug("Phase 2c OK: DismissalRepository loaded")
     except Exception as e:
@@ -237,7 +245,9 @@ def load_narrative_assistant_modules():
                 _missing.append("spacy")
             deps.MODULES_LOADED = False
             deps.MODULES_ERROR = f"NLP dependencies missing: {', '.join(_missing)}"
-            _write_debug(f"=== load_narrative_assistant_modules() PARTIAL: {deps.MODULES_ERROR} ===")
+            _write_debug(
+                f"=== load_narrative_assistant_modules() PARTIAL: {deps.MODULES_ERROR} ==="
+            )
             logger.warning(f"Modules partially loaded, NLP deps missing: {deps.MODULES_ERROR}")
             return False
     else:
@@ -249,8 +259,10 @@ def load_narrative_assistant_modules():
 # Pydantic models (Request/Response)
 # ============================================================================
 
+
 class HealthResponse(BaseModel):
     """Respuesta del endpoint /health"""
+
     status: str = "ok"
     version: str
     backend_loaded: bool
@@ -259,6 +271,7 @@ class HealthResponse(BaseModel):
 
 class ApiResponse(BaseModel):
     """Respuesta genérica de la API"""
+
     success: bool
     data: Optional[Any] = None
     error: Optional[str] = None
@@ -267,12 +280,14 @@ class ApiResponse(BaseModel):
 
 class CreateProjectRequest(BaseModel):
     """Request para crear un proyecto"""
+
     name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
 
 
 class ProjectResponse(BaseModel):
     """Respuesta con datos de un proyecto"""
+
     id: int
     name: str
     description: Optional[str]
@@ -292,6 +307,7 @@ class ProjectResponse(BaseModel):
 
 class EntityResponse(BaseModel):
     """Respuesta con datos de una entidad"""
+
     id: int
     project_id: int
     entity_type: str
@@ -311,6 +327,7 @@ class EntityResponse(BaseModel):
 
 class AlertResponse(BaseModel):
     """Respuesta con datos de una alerta"""
+
     id: int
     project_id: int
     category: str
@@ -340,11 +357,13 @@ class AlertResponse(BaseModel):
 
 class MarkResolvedRequest(BaseModel):
     """Request para confirmar resolución manual de alerta."""
+
     resolution_reason: Optional[str] = "manual"
 
 
 class DownloadModelsRequest(BaseModel):
     """Request para descargar modelos"""
+
     models: list[str] = ["spacy", "embeddings", "transformer_ner"]
     force: bool = False
 
@@ -393,8 +412,10 @@ class DefaultOverrideRequest(BaseModel):
 
 # --- Request models for endpoints that used raw request.json() ---
 
+
 class AlertStatusRequest(BaseModel):
     """PUT /api/projects/{id}/alerts/{id}/status"""
+
     status: str = Field(..., pattern=r"^(resolved|dismissed|open|active|reopen)$")
     reason: str = ""
     scope: str = "instance"
@@ -402,6 +423,7 @@ class AlertStatusRequest(BaseModel):
 
 class BatchDismissRequest(BaseModel):
     """POST /api/projects/{id}/alerts/batch-dismiss"""
+
     alert_ids: list[int] = Field(..., min_length=1)
     reason: str = ""
     scope: str = "instance"
@@ -409,22 +431,26 @@ class BatchDismissRequest(BaseModel):
 
 class ResolveAmbiguousAttributeRequest(BaseModel):
     """POST /api/projects/{id}/alerts/{id}/resolve-attribute"""
+
     entity_id: Optional[int] = None  # None = "No asignar"
 
 
 class AmbiguousAttributeResolution(BaseModel):
     """Resolución individual para batch resolve de alertas ambiguas"""
+
     alert_id: int
     entity_id: Optional[int] = None  # None = "No asignar"
 
 
 class BatchResolveAmbiguousAttributesRequest(BaseModel):
     """POST /api/projects/{id}/alerts/batch-resolve-attributes"""
+
     resolutions: list[AmbiguousAttributeResolution] = Field(..., min_length=1)
 
 
 class SuppressionRuleRequest(BaseModel):
     """POST /api/projects/{id}/alerts/suppression-rules"""
+
     rule_type: str = Field(..., pattern=r"^(alert_type|category|entity|source_module)$")
     pattern: str = Field(..., min_length=1)
     entity_name: Optional[str] = None
@@ -433,16 +459,20 @@ class SuppressionRuleRequest(BaseModel):
 
 class EntityIdsRequest(BaseModel):
     """POST merge-preview / merge"""
+
     entity_ids: list[int] = Field(..., min_length=2)
 
 
 class AttributeResolution(BaseModel):
     """Resolución de un conflicto de atributo durante merge."""
+
     attribute_name: str
     chosen_value: str  # Valor elegido (puede ser custom)
 
+
 class MergeEntitiesRequest(BaseModel):
     """POST /api/projects/{id}/entities/merge"""
+
     primary_entity_id: int
     entity_ids: list[int] = Field(..., min_length=1)
     attribute_resolutions: Optional[list[AttributeResolution]] = None
@@ -450,6 +480,7 @@ class MergeEntitiesRequest(BaseModel):
 
 class UpdateEntityRequest(BaseModel):
     """PUT /api/projects/{id}/entities/{id}"""
+
     name: Optional[str] = None
     canonical_name: Optional[str] = None
     aliases: Optional[list[str]] = None
@@ -459,6 +490,7 @@ class UpdateEntityRequest(BaseModel):
 
 class CoreferenceCorrectionRequest(BaseModel):
     """POST /api/projects/{id}/entities/coreference-corrections"""
+
     mention_start_char: int
     mention_end_char: int
     mention_text: str = ""
@@ -471,17 +503,20 @@ class CoreferenceCorrectionRequest(BaseModel):
 
 class RejectEntityRequest(BaseModel):
     """POST /api/projects/{id}/entities/reject"""
+
     entity_text: str = Field(..., min_length=1)
     reason: str = ""
 
 
 class TogglePatternRequest(BaseModel):
     """PATCH /api/entity-filters/system-patterns/{id}"""
+
     is_active: bool = True
 
 
 class UserRejectionRequest(BaseModel):
     """POST /api/entity-filters/user-rejections"""
+
     entity_name: str = Field(..., min_length=1)
     entity_type: Optional[str] = None
     reason: Optional[str] = None
@@ -489,6 +524,7 @@ class UserRejectionRequest(BaseModel):
 
 class ProjectOverrideRequest(BaseModel):
     """POST /api/projects/{id}/entity-overrides"""
+
     entity_name: str = Field(..., min_length=1)
     action: str = Field("reject", pattern=r"^(reject|force_include)$")
     entity_type: Optional[str] = None
@@ -497,6 +533,7 @@ class ProjectOverrideRequest(BaseModel):
 
 class CheckFilterRequest(BaseModel):
     """POST /api/entity-filters/check"""
+
     entity_name: str = Field(..., min_length=1)
     entity_type: Optional[str] = None
     project_id: Optional[int] = None
@@ -504,6 +541,7 @@ class CheckFilterRequest(BaseModel):
 
 class CreateAttributeRequest(BaseModel):
     """POST /api/projects/{id}/entities/{id}/attributes"""
+
     category: str = "physical"
     name: str = Field(..., min_length=1)
     value: str = Field(..., min_length=1)
@@ -512,6 +550,7 @@ class CreateAttributeRequest(BaseModel):
 
 class UpdateAttributeRequest(BaseModel):
     """PUT /api/projects/{id}/entities/{id}/attributes/{id}"""
+
     name: Optional[str] = None
     value: Optional[str] = None
     is_verified: Optional[bool] = None
@@ -519,6 +558,7 @@ class UpdateAttributeRequest(BaseModel):
 
 class CreateRelationshipRequest(BaseModel):
     """POST /api/projects/{id}/relationships"""
+
     source_entity_id: int
     target_entity_id: int
     relation_type: str = "other"
@@ -528,6 +568,7 @@ class CreateRelationshipRequest(BaseModel):
 
 class DialogueCorrectionRequest(BaseModel):
     """POST /api/projects/{id}/voice-style/dialogue-corrections"""
+
     chapter_number: int
     dialogue_start_char: int
     dialogue_end_char: int
@@ -539,6 +580,7 @@ class DialogueCorrectionRequest(BaseModel):
 
 class CorrectionConfigUpdate(BaseModel):
     """Modelo para actualizar configuración de corrección."""
+
     customizations: Optional[dict] = None  # Solo los parámetros personalizados
     config: Optional[dict] = None  # Compat: config completa (legacy)
     selectedPreset: Optional[str] = None  # noqa: N815
@@ -596,6 +638,7 @@ def is_valid_attribute_category(entity_type: str | None, category: str) -> bool:
 # Helper functions
 # ============================================================================
 
+
 def convert_numpy_types(obj: Any) -> Any:
     """
     Convierte recursivamente tipos numpy a tipos Python nativos para serialización JSON.
@@ -621,7 +664,6 @@ def convert_numpy_types(obj: Any) -> Any:
         return obj
 
 
-
 def generate_person_aliases(canonical_name: str, all_canonical_names: set[str]) -> list[str]:
     """
     Genera aliases automáticos para nombres de personas.
@@ -636,19 +678,40 @@ def generate_person_aliases(canonical_name: str, all_canonical_names: set[str]) 
         return aliases
 
     first_name = parts[0]
-    titles = {"don", "doña", "señor", "señora", "sr", "sra", "dr", "dra",
-              "doctor", "doctora", "padre", "madre", "hermano", "hermana",
-              "el", "la", "los", "las"}
+    titles = {
+        "don",
+        "doña",
+        "señor",
+        "señora",
+        "sr",
+        "sra",
+        "dr",
+        "dra",
+        "doctor",
+        "doctora",
+        "padre",
+        "madre",
+        "hermano",
+        "hermana",
+        "el",
+        "la",
+        "los",
+        "las",
+    }
 
-    if (len(first_name) >= 3 and
-        first_name.lower() not in titles and
-        first_name.lower() not in {n.lower() for n in all_canonical_names}):
+    if (
+        len(first_name) >= 3
+        and first_name.lower() not in titles
+        and first_name.lower() not in {n.lower() for n in all_canonical_names}
+    ):
         aliases.append(first_name)
 
     if len(parts) >= 3:
         first_two = " ".join(parts[:2])
-        if (first_two.lower() not in {n.lower() for n in all_canonical_names} and
-            first_two != canonical_name):
+        if (
+            first_two.lower() not in {n.lower() for n in all_canonical_names}
+            and first_two != canonical_name
+        ):
             aliases.append(first_two)
 
     return aliases
@@ -671,26 +734,24 @@ def _get_project_stats(project_id: int, db) -> dict:
 
     try:
         row = db.fetchone(
-            "SELECT COUNT(*) as cnt FROM chapters WHERE project_id = ?",
-            (project_id,)
+            "SELECT COUNT(*) as cnt FROM chapters WHERE project_id = ?", (project_id,)
         )
         stats["chapter_count"] = row["cnt"] if row else 0
 
         row = db.fetchone(
-            "SELECT COUNT(*) as cnt FROM entities WHERE project_id = ?",
-            (project_id,)
+            "SELECT COUNT(*) as cnt FROM entities WHERE project_id = ?", (project_id,)
         )
         stats["entity_count"] = row["cnt"] if row else 0
 
         row = db.fetchone(
             "SELECT COUNT(*) as cnt FROM alerts WHERE project_id = ? AND status = 'open'",
-            (project_id,)
+            (project_id,),
         )
         stats["open_alerts_count"] = row["cnt"] if row else 0
 
         row = db.fetchone(
             "SELECT COALESCE(SUM(word_count), 0) as total FROM chapters WHERE project_id = ?",
-            (project_id,)
+            (project_id,),
         )
         stats["word_count"] = row["total"] if row else 0
 
@@ -737,6 +798,7 @@ def _check_languagetool_available(auto_start: bool = False) -> bool:
     """Verifica si LanguageTool está disponible."""
     try:
         import httpx
+
         response = httpx.get("http://localhost:8081/v2/check", timeout=1.5)
         if response.status_code in (200, 400):
             return True
@@ -749,6 +811,7 @@ def _check_languagetool_available(auto_start: bool = False) -> bool:
                 ensure_languagetool_running,
                 is_languagetool_installed,
             )
+
             if is_languagetool_installed():
                 logger.info("LanguageTool instalado pero no corriendo, intentando iniciar...")
                 if ensure_languagetool_running():
@@ -770,7 +833,9 @@ def find_python_executable() -> tuple[str | None, str | None, str | None]:
     import shutil
     import sys
 
-    IS_EMBEDDED_RUNTIME = os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
+    IS_EMBEDDED_RUNTIME = (
+        os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
+    )
 
     if IS_EMBEDDED_RUNTIME:
         version_info = sys.version_info
@@ -789,11 +854,11 @@ def find_python_executable() -> tuple[str | None, str | None, str | None]:
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                timeout=5
+                timeout=5,
             )
             if result.returncode == 0:
                 version_output = result.stdout.strip() or result.stderr.strip()
-                match = re.search(r'Python (\d+)\.(\d+)\.?(\d*)', version_output)
+                match = re.search(r"Python (\d+)\.(\d+)\.?(\d*)", version_output)
                 if match:
                     major, minor = int(match.group(1)), int(match.group(2))
                     version_str = f"{major}.{minor}"
@@ -802,7 +867,9 @@ def find_python_executable() -> tuple[str | None, str | None, str | None]:
                     if (major, minor) >= MIN_PYTHON_VERSION:
                         return python_cmd, version_str
                     else:
-                        logger.debug(f"Python at {python_cmd} is version {version_str}, need {MIN_PYTHON_VERSION[0]}.{MIN_PYTHON_VERSION[1]}+")
+                        logger.debug(
+                            f"Python at {python_cmd} is version {version_str}, need {MIN_PYTHON_VERSION[0]}.{MIN_PYTHON_VERSION[1]}+"
+                        )
         except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
             logger.debug(f"Could not check Python at {python_cmd}: {e}")
         return None, None
@@ -815,50 +882,50 @@ def find_python_executable() -> tuple[str | None, str | None, str | None]:
     if python_path := shutil.which("python"):
         python_candidates.append(python_path)
 
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
         if py_path := shutil.which("py"):
             python_candidates.append(py_path)
             for minor_ver in range(14, 9, -1):
                 python_candidates.append(f"py -3.{minor_ver}")
 
         common_paths = [
-            Path(os.environ.get('LOCALAPPDATA', '')) / 'Programs' / 'Python',
-            Path('C:/Python'),
-            Path('C:/Program Files/Python'),
-            Path(os.environ.get('USERPROFILE', '')) / 'AppData' / 'Local' / 'Programs' / 'Python',
+            Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Python",
+            Path("C:/Python"),
+            Path("C:/Program Files/Python"),
+            Path(os.environ.get("USERPROFILE", "")) / "AppData" / "Local" / "Programs" / "Python",
         ]
 
         for base_path in common_paths:
             if base_path.exists():
                 for subdir in sorted(base_path.iterdir(), reverse=True):
-                    if subdir.is_dir() and subdir.name.startswith('Python3'):
-                        python_exe = subdir / 'python.exe'
+                    if subdir.is_dir() and subdir.name.startswith("Python3"):
+                        python_exe = subdir / "python.exe"
                         if python_exe.exists():
                             python_candidates.append(str(python_exe))
 
     conda_base_paths = []
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
         conda_base_paths = [
-            Path(os.environ.get('USERPROFILE', '')) / 'anaconda3',
-            Path(os.environ.get('USERPROFILE', '')) / 'miniconda3',
-            Path(os.environ.get('LOCALAPPDATA', '')) / 'anaconda3',
-            Path(os.environ.get('LOCALAPPDATA', '')) / 'miniconda3',
-            Path('C:/ProgramData/anaconda3'),
-            Path('C:/ProgramData/miniconda3'),
+            Path(os.environ.get("USERPROFILE", "")) / "anaconda3",
+            Path(os.environ.get("USERPROFILE", "")) / "miniconda3",
+            Path(os.environ.get("LOCALAPPDATA", "")) / "anaconda3",
+            Path(os.environ.get("LOCALAPPDATA", "")) / "miniconda3",
+            Path("C:/ProgramData/anaconda3"),
+            Path("C:/ProgramData/miniconda3"),
         ]
     else:
         conda_base_paths = [
-            Path.home() / 'anaconda3',
-            Path.home() / 'miniconda3',
-            Path('/opt/anaconda3'),
-            Path('/opt/miniconda3'),
+            Path.home() / "anaconda3",
+            Path.home() / "miniconda3",
+            Path("/opt/anaconda3"),
+            Path("/opt/miniconda3"),
         ]
 
     for conda_path in conda_base_paths:
-        if sys.platform == 'win32':
-            python_exe = conda_path / 'python.exe'
+        if sys.platform == "win32":
+            python_exe = conda_path / "python.exe"
         else:
-            python_exe = conda_path / 'bin' / 'python'
+            python_exe = conda_path / "bin" / "python"
         if python_exe.exists():
             python_candidates.append(str(python_exe))
 
@@ -872,11 +939,11 @@ def find_python_executable() -> tuple[str | None, str | None, str | None]:
                     text=True,
                     encoding="utf-8",
                     errors="replace",
-                    timeout=5
+                    timeout=5,
                 )
                 if result.returncode == 0:
                     version_output = result.stdout.strip() or result.stderr.strip()
-                    match = re.search(r'Python (\d+)\.(\d+)\.?(\d*)', version_output)
+                    match = re.search(r"Python (\d+)\.(\d+)\.?(\d*)", version_output)
                     if match:
                         major, minor_ver = int(match.group(1)), int(match.group(2))
                         if (major, minor_ver) >= MIN_PYTHON_VERSION:
@@ -891,7 +958,11 @@ def find_python_executable() -> tuple[str | None, str | None, str | None]:
             if path:
                 return path, version, None
 
-    return None, None, f"Python {MIN_PYTHON_VERSION[0]}.{MIN_PYTHON_VERSION[1]}+ no encontrado. Por favor instala Python desde python.org"
+    return (
+        None,
+        None,
+        f"Python {MIN_PYTHON_VERSION[0]}.{MIN_PYTHON_VERSION[1]}+ no encontrado. Por favor instala Python desde python.org",
+    )
 
 
 def get_python_status() -> dict:
@@ -907,7 +978,7 @@ def get_python_status() -> dict:
         "python_available": python_path is not None,
         "python_version": python_version,
         "python_path": python_path,
-        "error": error
+        "error": error,
     }
 
     return _python_status_cache
@@ -917,15 +988,52 @@ def _classify_mention_type(surface_form: str) -> str:
     """Clasifica el tipo de mención de una entidad."""
     lower = surface_form.lower().strip()
     pronouns = {
-        "él", "ella", "ellos", "ellas", "le", "les", "lo", "la", "los", "las",
-        "se", "sí", "consigo", "su", "sus", "suyo", "suya", "suyos", "suyas",
-        "este", "esta", "ese", "esa", "aquel", "aquella",
-        "quien", "quienes", "cual", "cuales",
+        "él",
+        "ella",
+        "ellos",
+        "ellas",
+        "le",
+        "les",
+        "lo",
+        "la",
+        "los",
+        "las",
+        "se",
+        "sí",
+        "consigo",
+        "su",
+        "sus",
+        "suyo",
+        "suya",
+        "suyos",
+        "suyas",
+        "este",
+        "esta",
+        "ese",
+        "esa",
+        "aquel",
+        "aquella",
+        "quien",
+        "quienes",
+        "cual",
+        "cuales",
     }
     if lower in pronouns:
         return "pronoun"
-    descriptors = {"el hombre", "la mujer", "el chico", "la chica", "el joven", "la joven",
-                   "el niño", "la niña", "el anciano", "la anciana", "el señor", "la señora"}
+    descriptors = {
+        "el hombre",
+        "la mujer",
+        "el chico",
+        "la chica",
+        "el joven",
+        "la joven",
+        "el niño",
+        "la niña",
+        "el anciano",
+        "la anciana",
+        "el señor",
+        "la señora",
+    }
     if lower in descriptors:
         return "descriptor"
     return "name"
@@ -1017,9 +1125,9 @@ def is_character_entity(entity) -> bool:
     """
     character_types = {"character", "animal", "creature", "PER", "PERSON"}
 
-    if hasattr(entity, 'entity_type'):
+    if hasattr(entity, "entity_type"):
         etype = entity.entity_type
-        if hasattr(etype, 'value'):
+        if hasattr(etype, "value"):
             return etype.value in character_types
         return etype in character_types
     return False

@@ -20,7 +20,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -1167,16 +1167,16 @@ class CharacterKnowledgeAnalyzer:
             HYBRID si hay GPU/LLM disponible, RULES si solo CPU.
         """
         try:
-            from ..core.device import get_device_detector
-            from ..llm.client import get_client
+            from ..core.device import DeviceType, get_device_detector
+            from ..llm.client import get_llm_client
 
             # Verificar si hay LLM disponible
-            client = get_client()
-            if client and client.is_available():
+            client = get_llm_client()
+            if client and client.is_available:
                 detector = get_device_detector()
-                device_info = detector.get_info()
+                device_info = detector.detect_best_device()
                 # Si hay GPU, usar HYBRID para mejor calidad
-                if device_info.get("cuda_available") or device_info.get("mps_available"):
+                if device_info.device_type in {DeviceType.CUDA, DeviceType.MPS}:
                     return KnowledgeExtractionMode.HYBRID
                 # Si hay LLM pero no GPU, RULES es más rápido
                 return KnowledgeExtractionMode.RULES
@@ -1350,11 +1350,9 @@ class CharacterKnowledgeAnalyzer:
                 # Buscar el presenter (quien habla la introducción):
                 # "—dijo Name" justo antes del match
                 presenter_id = None
-                dijo_pattern = re.compile(
-                    r"—\s*dijo\s+(?P<speaker>\w+)", re.IGNORECASE
-                )
+                dijo_pattern = re.compile(r"—\s*dijo\s+(?P<speaker>\w+)", re.IGNORECASE)
                 # Buscar "dijo X" en las 200 chars antes del match
-                context_before = text[max(0, match.start() - 200): match.start()]
+                context_before = text[max(0, match.start() - 200) : match.start()]
                 for dm in dijo_pattern.finditer(context_before):
                     speaker_name = dm.group("speaker").lower()
                     pid = self._name_to_id.get(speaker_name)
@@ -1368,7 +1366,7 @@ class CharacterKnowledgeAnalyzer:
                 pos = match.start()
 
                 # Buscar en ventana de 500 chars antes de la presentación
-                search_window = text[max(0, pos - 500): pos]
+                search_window = text[max(0, pos - 500) : pos]
 
                 # Usar nombre canónico (case-sensitive) para distinguir
                 # nombres propios de adjetivos homónimos
@@ -1396,7 +1394,7 @@ class CharacterKnowledgeAnalyzer:
                     knower_name=self._entity_names.get(best_knower_id, ""),
                     known_name=self._entity_names.get(known_id, known_name),
                     knowledge_type=KnowledgeType.IDENTITY,
-                    fact_description=text[max(0, match.start() - 30): match.end() + 30][:200],
+                    fact_description=text[max(0, match.start() - 30) : match.end() + 30][:200],
                     fact_value="identidad",
                     source_chapter=chapter,
                     source_position=start_char + match.start(),
@@ -1422,10 +1420,10 @@ class CharacterKnowledgeAnalyzer:
         facts: list = []
 
         try:
-            from ..llm.client import get_client
+            from ..llm.client import get_llm_client
 
-            client = get_client()
-            if not client or not client.is_available():
+            client = get_llm_client()
+            if not client or not client.is_available:
                 logger.debug("LLM not available, skipping LLM extraction")
                 return facts
 
@@ -1449,7 +1447,7 @@ Para cada hecho de conocimiento detectado, responde en formato JSON:
 Solo incluye hechos explícitos donde un personaje claramente sabe algo sobre otro.
 Responde solo con el JSON, sin explicaciones."""
 
-            response = client.generate(prompt, max_tokens=1024, temperature=0.1)
+            response = client.complete(prompt=prompt, max_tokens=1024, temperature=0.1)
 
             if not response:
                 return facts
@@ -1526,10 +1524,32 @@ _IGNORANCE_MODES = {"unknown"}
 # Conocimiento público: atributos que una persona puede conocer sin contacto directo
 # (por leer su obra, ver sus películas, conocer su reputación, etc.)
 _PUBLIC_KNOWLEDGE_TERMS = {
-    "obra", "libro", "novela", "teoría", "teorema", "trabajo", "investigación",
-    "canción", "disco", "álbum", "película", "serie", "cuadro", "pintura",
-    "artículo", "ensayo", "poema", "sinfonía", "ley", "descubrimiento",
-    "reputación", "fama", "carrera", "trayectoria", "legado", "filosofía",
+    "obra",
+    "libro",
+    "novela",
+    "teoría",
+    "teorema",
+    "trabajo",
+    "investigación",
+    "canción",
+    "disco",
+    "álbum",
+    "película",
+    "serie",
+    "cuadro",
+    "pintura",
+    "artículo",
+    "ensayo",
+    "poema",
+    "sinfonía",
+    "ley",
+    "descubrimiento",
+    "reputación",
+    "fama",
+    "carrera",
+    "trayectoria",
+    "legado",
+    "filosofía",
 }
 
 
@@ -1622,7 +1642,7 @@ def _facts_related(fact_a: KnowledgeFact, fact_b: KnowledgeFact) -> bool:
 
 def detect_knowledge_anachronisms(
     facts: list[KnowledgeFact],
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """
     Detecta anachronismos temporales de conocimiento.
 
@@ -1648,7 +1668,7 @@ def detect_knowledge_anachronisms(
         key = (fact.knower_entity_id, fact.known_entity_id)
         groups[key].append(fact)
 
-    anachronisms = []
+    anachronisms: list[dict[str, Any]] = []
 
     for (_knower_id, _known_id), group_facts in groups.items():
         # Separar por rol semántico
@@ -1660,12 +1680,9 @@ def detect_knowledge_anachronisms(
         # Compara primero por capítulo; si mismo capítulo, compara por posición
         for ref in references:
             for acq in acquisitions:
-                is_before = (
-                    acq.source_chapter > ref.source_chapter
-                    or (
-                        acq.source_chapter == ref.source_chapter
-                        and acq.source_position > ref.source_position > 0
-                    )
+                is_before = acq.source_chapter > ref.source_chapter or (
+                    acq.source_chapter == ref.source_chapter
+                    and acq.source_position > ref.source_position > 0
                 )
                 if not (is_before and _facts_related(ref, acq)):
                     continue
@@ -1760,12 +1777,12 @@ def detect_knowledge_anachronisms(
                     )
 
     # Deduplicar por (knower, fact_value, used_chapter, learned_chapter)
-    seen = set()
-    unique = []
+    seen: set[tuple[str, int, int | None]] = set()
+    unique: list[dict[str, Any]] = []
     for a in anachronisms:
-        key = (a["knower_name"], a["used_chapter"], a.get("learned_chapter"))
-        if key not in seen:
-            seen.add(key)
+        unique_key = (str(a["knower_name"]), int(a["used_chapter"]), a.get("learned_chapter"))
+        if unique_key not in seen:
+            seen.add(unique_key)
             unique.append(a)
 
     return unique

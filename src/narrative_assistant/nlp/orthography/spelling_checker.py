@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from ...core.errors import ErrorSeverity, NLPError
+from ...core.errors import ErrorSeverity, NarrativeError, NLPError
 from ...core.result import Result
 from .base import (
     COMMON_ACCENT_ERRORS,
@@ -361,27 +361,51 @@ SPELLING_PATTERNS = [
     (r"([!?])\1+", SpellingErrorType.TYPO, "Puntuación duplicada"),
     # Coma o punto seguido de letra sin espacio
     (r"[,.](?=[a-záéíóúñ])", SpellingErrorType.TYPO, "Falta espacio después de puntuación"),
-
     # ============================================================================
     # QUICK WINS - Panel de Expertos (2026-02)
     # ============================================================================
-
     # 1. "etc..." - redundancia (etc. + puntos suspensivos)
     # Consenso: Alta prioridad, 0% falsos positivos
-    (r'\b(etc|etcétera)\.{2,}', SpellingErrorType.TYPO, 'Redundancia: "etc." ya implica continuación (usar "etc." o "...")'),
-    (r'\b(etc|etcétera)\.\s*\.{2,}', SpellingErrorType.TYPO, 'Redundancia: "etc." ya implica continuación (usar "etc." o "...")'),
-
+    (
+        r"\b(etc|etcétera)\.{2,}",
+        SpellingErrorType.TYPO,
+        'Redundancia: "etc." ya implica continuación (usar "etc." o "...")',
+    ),
+    (
+        r"\b(etc|etcétera)\.\s*\.{2,}",
+        SpellingErrorType.TYPO,
+        'Redundancia: "etc." ya implica continuación (usar "etc." o "...")',
+    ),
     # 2. Espacio antes de puntuación (excepto apertura ¿ ¡)
     # Consenso: Alta prioridad, <1% falsos positivos
-    (r'\s+([,;:!?)\]])', SpellingErrorType.TYPO, 'Espacio antes de puntuación (debe eliminarse)'),
-
+    (r"\s+([,;:!?)\]])", SpellingErrorType.TYPO, "Espacio antes de puntuación (debe eliminarse)"),
     # 3. Redundancias espaciales comunes
     # Consenso: Alta prioridad, <2% falsos positivos
-    (r'\bsubir\s+arriba\b', SpellingErrorType.REDUNDANCY, 'Redundancia: "subir arriba" (usar solo "subir")'),
-    (r'\bbajar\s+abajo\b', SpellingErrorType.REDUNDANCY, 'Redundancia: "bajar abajo" (usar solo "bajar")'),
-    (r'\bsalir\s+(?:a\s+)?fuera\b', SpellingErrorType.REDUNDANCY, 'Redundancia: "salir fuera" (usar solo "salir")'),
-    (r'\bentrar\s+(?:a\s+)?dentro\b', SpellingErrorType.REDUNDANCY, 'Redundancia: "entrar dentro" (usar solo "entrar")'),
-    (r'\bvolver\s+a\s+regresar\b', SpellingErrorType.REDUNDANCY, 'Redundancia: "volver a regresar" (usar solo "volver" o "regresar")'),
+    (
+        r"\bsubir\s+arriba\b",
+        SpellingErrorType.REDUNDANCY,
+        'Redundancia: "subir arriba" (usar solo "subir")',
+    ),
+    (
+        r"\bbajar\s+abajo\b",
+        SpellingErrorType.REDUNDANCY,
+        'Redundancia: "bajar abajo" (usar solo "bajar")',
+    ),
+    (
+        r"\bsalir\s+(?:a\s+)?fuera\b",
+        SpellingErrorType.REDUNDANCY,
+        'Redundancia: "salir fuera" (usar solo "salir")',
+    ),
+    (
+        r"\bentrar\s+(?:a\s+)?dentro\b",
+        SpellingErrorType.REDUNDANCY,
+        'Redundancia: "entrar dentro" (usar solo "entrar")',
+    ),
+    (
+        r"\bvolver\s+a\s+regresar\b",
+        SpellingErrorType.REDUNDANCY,
+        'Redundancia: "volver a regresar" (usar solo "volver" o "regresar")',
+    ),
 ]
 
 
@@ -454,7 +478,7 @@ class SpellingChecker:
             return Result.success(SpellingReport())
 
         report = SpellingReport()
-        errors: list[NLPError] = []
+        errors: list[NarrativeError] = []
 
         # Preparar set de palabras conocidas
         known_words = COMMON_SPANISH_WORDS.copy()
@@ -735,7 +759,7 @@ class SpellingChecker:
             from ...llm.client import get_llm_client
 
             client = get_llm_client()
-            if not client or not getattr(client, "is_available", lambda: False)():
+            if not client or not client.is_available:
                 return []
 
             # Preparar prompt con el texto y issues existentes
@@ -754,7 +778,7 @@ Responde SOLO con un JSON array de errores encontrados, cada uno con:
 
 Si no hay errores adicionales, responde con un array vacío: []"""
 
-            response = client.generate(prompt, max_tokens=500)
+            response = client.complete(prompt=prompt, max_tokens=500)
             if not response:
                 return []
 
@@ -921,21 +945,21 @@ Si no hay errores adicionales, responde con un array vacío: []"""
 
         # Obtener las palabras anteriores (hasta 20 caracteres)
         # NO hacer strip() para no perder espacios al final
-        preceding_text = text[max(0, position - 20):position].lower()
+        preceding_text = text[max(0, position - 20) : position].lower()
 
         # Preposiciones que requieren "mí" con tilde
         # El patrón verifica que termine con la preposición + espacios antes de "mi"
         prep_patterns = [
-            r'\bpara\s+$',      # para mí
-            r'\ba\s+$',          # a mí
-            r'\bde\s+$',         # de mí
-            r'\bpor\s+$',        # por mí
-            r'\bante\s+$',       # ante mí
-            r'\bcontra\s+$',     # contra mí
-            r'\bentre\s+$',      # entre ... y mí
-            r'\bhacia\s+$',      # hacia mí
-            r'\bsin\s+$',        # sin mí
-            r'\bcon\s+$',        # con mí (poco común pero válido)
+            r"\bpara\s+$",  # para mí
+            r"\ba\s+$",  # a mí
+            r"\bde\s+$",  # de mí
+            r"\bpor\s+$",  # por mí
+            r"\bante\s+$",  # ante mí
+            r"\bcontra\s+$",  # contra mí
+            r"\bentre\s+$",  # entre ... y mí
+            r"\bhacia\s+$",  # hacia mí
+            r"\bsin\s+$",  # sin mí
+            r"\bcon\s+$",  # con mí (poco común pero válido)
         ]
 
         for pattern in prep_patterns:
@@ -978,14 +1002,14 @@ Si no hay errores adicionales, responde con un array vacío: []"""
         Indicadores: participios (terminados en -ado, -ido, -to, -cho, etc.)
         """
         # Verificar si hay un participio después de "a"
-        following_text = text[position + 1:min(len(text), position + 30)].strip().lower()
+        following_text = text[position + 1 : min(len(text), position + 30)].strip().lower()
 
         # Participios regulares e irregulares comunes
         participle_patterns = [
-            r'^\s*(estado|sido|tenido|habido)',  # haber
-            r'^\s*\w+ado\b',   # participios -ado (hablado, comido, etc.)
-            r'^\s*\w+ido\b',   # participios -ido (vendido, vivido, etc.)
-            r'^\s*(hecho|dicho|visto|puesto|escrito|roto|abierto|cubierto|vuelto|muerto)',  # irregulares
+            r"^\s*(estado|sido|tenido|habido)",  # haber
+            r"^\s*\w+ado\b",  # participios -ado (hablado, comido, etc.)
+            r"^\s*\w+ido\b",  # participios -ido (vendido, vivido, etc.)
+            r"^\s*(hecho|dicho|visto|puesto|escrito|roto|abierto|cubierto|vuelto|muerto)",  # irregulares
         ]
 
         for pattern in participle_patterns:
