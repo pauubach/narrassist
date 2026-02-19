@@ -1033,32 +1033,11 @@ def get_dialogue_attributions(project_id: int, chapter_number: int):
             for e in characters
         ]
 
-        # Construir perfiles de voz (opcional, mejora precisión)
+        # NOTE: Voice profiles are disabled because they require pre-attributed dialogues.
+        # DialogueSpan objects don't have speaker_id, so we can't build profiles from
+        # raw dialogue detection. Voice profiles should be built from saved speaker_corrections
+        # or manual attributions in a separate process.
         voice_profiles = None
-        try:
-            # Obtener todos los diálogos del proyecto para perfiles
-            all_dialogues = []
-            for ch in chapters:
-                ch_dialogue_result = detect_dialogues(ch.content)
-                if ch_dialogue_result.is_success:
-                    for d in ch_dialogue_result.value.dialogues:
-                        all_dialogues.append({
-                            "text": d.text,
-                            "speaker_id": d.speaker_id,
-                            "chapter": ch.chapter_number,
-                            "position": d.start_char,
-                        })
-
-            if all_dialogues:
-                entity_dict_data = [
-                    {"id": e.id, "name": e.canonical_name, "aliases": e.aliases}
-                    for e in characters
-                ]
-                builder = VoiceProfileBuilder()
-                profiles = builder.build_profiles(all_dialogues, entity_dict_data)
-                voice_profiles = {p.entity_id: p for p in profiles}
-        except Exception as e:
-            logger.warning(f"Could not build voice profiles: {e}")
 
         # Atribuir hablantes
         attributor = SpeakerAttributor(entity_data, voice_profiles)
