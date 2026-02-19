@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import DocumentViewer from '@/components/DocumentViewer.vue'
 import TextFindBar from '@/components/workspace/TextFindBar.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { META_CATEGORIES, type MetaCategoryKey } from '@/composables/useAlertUtils'
 import type { Alert, Chapter } from '@/types'
 
 const workspaceStore = useWorkspaceStore()
@@ -98,38 +99,69 @@ const gutterMarkersCache = ref<{ hash: string; value: any[] } | null>(null)
 function computeGutterMarkers() {
   const markers: Array<{
     id: number
-    top: number // porcentaje
-    severity: string
-    count: number
-    alerts: Alert[]
+    chapterIndex: number
+    badges: Array<{
+      metaCategory: MetaCategoryKey
+      count: number
+      color: string
+      label: string
+      alerts: Alert[]
+    }>
   }> = []
 
   if (props.chapters.length === 0) {
     return markers
   }
 
-  // Calcular posición de cada capítulo como porcentaje del documento total
-  const totalChapters = props.chapters.length
+  // Para cada capítulo, agrupar alertas por meta-categoría
   props.chapters.forEach((chapter, index) => {
     const chapterAlerts = alertsByChapter.value.get(chapter.chapterNumber) || []
-    if (chapterAlerts.length > 0) {
-      // Posición vertical como porcentaje
-      const top = (index / totalChapters) * 100
+    if (chapterAlerts.length === 0) return
 
-      // Severidad más alta
-      const severities = ['critical', 'high', 'medium', 'low', 'info']
-      const highestSeverity = chapterAlerts.reduce((highest, alert) => {
-        const currentIdx = severities.indexOf(alert.severity)
-        const highestIdx = severities.indexOf(highest)
-        return currentIdx < highestIdx ? alert.severity : highest
-      }, 'info')
+    // Agrupar por meta-categoría
+    const byMetaCategory = new Map<MetaCategoryKey, Alert[]>()
 
+    for (const alert of chapterAlerts) {
+      // Encontrar la meta-categoría de esta alerta
+      let metaKey: MetaCategoryKey | null = null
+      for (const [key, metaConfig] of Object.entries(META_CATEGORIES)) {
+        const meta = metaConfig as typeof META_CATEGORIES[MetaCategoryKey]
+        if (meta.categories.includes(alert.category as never)) {
+          metaKey = key as MetaCategoryKey
+          break
+        }
+      }
+
+      if (metaKey) {
+        const list = byMetaCategory.get(metaKey) || []
+        list.push(alert)
+        byMetaCategory.set(metaKey, list)
+      }
+    }
+
+    // Crear badges ordenados por prioridad (errors, inconsistencies, quality, suggestions)
+    const badges = []
+    const order: MetaCategoryKey[] = ['errors', 'inconsistencies', 'quality', 'suggestions']
+
+    for (const metaKey of order) {
+      const alerts = byMetaCategory.get(metaKey)
+      if (alerts && alerts.length > 0) {
+        const meta = META_CATEGORIES[metaKey]
+        badges.push({
+          metaCategory: metaKey,
+          count: alerts.length,
+          color: meta.color,
+          label: meta.label,
+          alerts
+        })
+      }
+    }
+
+    if (badges.length > 0) {
       markers.push({
         id: chapter.id,
-        top,
-        severity: highestSeverity,
-        count: chapterAlerts.length,
-        alerts: chapterAlerts
+        chapterIndex: index,
+        badges
       })
     }
   })
@@ -162,23 +194,11 @@ function handleEntityClick(entityId: number) {
   emit('entity-click', entityId)
 }
 
-function handleGutterMarkerClick(marker: typeof gutterMarkers.value[0]) {
-  // Emitir la primera alerta del grupo para navegación
-  if (marker.alerts.length > 0) {
-    emit('alert-click', marker.alerts[0])
+function handleBadgeClick(badge: typeof gutterMarkers.value[0]['badges'][0]) {
+  // Emitir la primera alerta del badge para navegación
+  if (badge.alerts.length > 0) {
+    emit('alert-click', badge.alerts[0])
   }
-}
-
-// Colores de severidad para el gutter
-function getSeverityColor(severity: string): string {
-  const colors: Record<string, string> = {
-    critical: 'var(--ds-color-danger, #ef4444)',
-    high: 'var(--orange-500)',
-    medium: 'var(--yellow-500)',
-    low: 'var(--blue-500)',
-    info: 'var(--gray-400)'
-  }
-  return colors[severity] || colors.info
 }
 
 // Computed: scroll target basado en posición de carácter y/o chapterId
@@ -247,11 +267,43 @@ watch(scrollTarget, (target) => {
   }
 })
 
-// onMounted: procesar scroll pendiente si el componente se monta después de setear la posición
+// Posicionar badges junto a títulos de capítulos
+function updateBadgePositions() {
+  nextTick(() => {
+    const documentArea = document.querySelector('.document-area')
+    if (!documentArea) return
+
+    // Encontrar todos los títulos de capítulos (h1, h2 con clase chapter-title o similar)
+    const chapterHeaders = documentArea.querySelectorAll('h1, h2')
+
+    gutterMarkers.value.forEach((marker, index) => {
+      const header = chapterHeaders[marker.chapterIndex]
+      if (!header) return
+
+      const badgeEl = document.querySelector(`[data-chapter-index="${marker.chapterIndex}"]`)
+      if (!badgeEl) return
+
+      // Obtener posición relativa del header al viewport del documentArea
+      const headerRect = header.getBoundingClientRect()
+      const areaRect = documentArea.getBoundingClientRect()
+      const topOffset = headerRect.top - areaRect.top
+
+      ;(badgeEl as HTMLElement).style.top = `${Math.max(0, topOffset)}px`
+    })
+  })
+}
+
+// Actualizar posiciones cuando cambian capítulos o alertas
+watch([() => props.chapters, () => props.alerts], updateBadgePositions)
+
+// onMounted: procesar scroll pendiente + posicionar badges
 onMounted(async () => {
   // Esperar al siguiente tick para asegurar que las props están actualizadas
   await nextTick()
-  
+
+  // Posicionar badges inicialmente
+  updateBadgePositions()
+
   // Si hay una posición pendiente cuando el componente se monta, el computed scrollTarget
   // ya la habrá detectado. Solo necesitamos asegurar que se procese.
   if (workspaceStore.scrollToPosition !== null) {
@@ -270,24 +322,27 @@ onMounted(async () => {
       @close="showFindBar = false"
     />
 
-    <!-- Gutter con marcadores de alertas -->
+    <!-- Gutter con badges de alertas por meta-categoría -->
     <div
       v-if="showGutter"
       class="alert-gutter"
-      :style="{ width: gutterWidth + 'px' }"
     >
       <div
         v-for="marker in gutterMarkers"
         :key="marker.id"
-        class="gutter-marker"
-        :style="{
-          top: marker.top + '%',
-          backgroundColor: getSeverityColor(marker.severity)
-        }"
-        :title="`${marker.count} alerta(s) en este capítulo`"
-        @click="handleGutterMarkerClick(marker)"
+        class="chapter-badges"
+        :data-chapter-index="marker.chapterIndex"
       >
-        <span v-if="marker.count > 1" class="marker-count">{{ marker.count }}</span>
+        <button
+          v-for="badge in marker.badges"
+          :key="badge.metaCategory"
+          class="alert-badge"
+          :style="{ backgroundColor: badge.color }"
+          :title="`${badge.count} ${badge.label.toLowerCase()}`"
+          @click="handleBadgeClick(badge)"
+        >
+          <span class="badge-count">{{ badge.count }}</span>
+        </button>
       </div>
     </div>
 
@@ -316,37 +371,52 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-/* Gutter lateral */
+/* Gutter lateral con badges por meta-categoría */
 .alert-gutter {
-  position: relative;
-  background: var(--surface-100);
-  border-right: 1px solid var(--surface-border);
-  flex-shrink: 0;
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 60px;
+  z-index: 5;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
 }
 
-.gutter-marker {
+.chapter-badges {
   position: absolute;
-  left: 4px;
-  right: 4px;
-  height: 8px;
-  border-radius: var(--app-radius-sm);
-  cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
+  left: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: all;
+  /* top se establece dinámicamente via JS */
+}
+
+.alert-badge {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.gutter-marker:hover {
-  transform: scaleY(1.5);
-  box-shadow: 0 0 4px currentColor;
+.alert-badge:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
-.marker-count {
-  font-size: 0.625rem;
-  font-weight: 700;
+.badge-count {
+  font-size: 0.75rem;
+  font-weight: 600;
   color: white;
-  text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
 }
 
 /* Document area */

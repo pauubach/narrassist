@@ -363,7 +363,7 @@ const statusConfigs: Record<AlertStatus, StatusConfig> = {
 
 /**
  * Meta-categorías para agrupación simplificada de alertas.
- * Agrupa las 14 categorías en 3 grupos de alto nivel.
+ * Agrupa las 14 categorías en 4 grupos de alto nivel.
  */
 export const META_CATEGORIES = {
   errors: {
@@ -379,19 +379,28 @@ export const META_CATEGORIES = {
     key: 'inconsistencies' as const,
     label: 'Inconsistencias',
     icon: 'pi pi-exclamation-triangle',
-    color: 'var(--ds-color-warning, #d97706)',
+    color: 'var(--p-orange-600, #ea580c)',
+    bgColor: 'var(--p-orange-50, #fff7ed)',
+    darkBgColor: 'color-mix(in srgb, var(--p-orange-900, #7c2d12) 40%, transparent)',
+    categories: ['attribute', 'timeline', 'relationship', 'location', 'behavior', 'knowledge', 'continuity'] as AlertCategory[],
+  },
+  quality: {
+    key: 'quality' as const,
+    label: 'Calidad narrativa',
+    icon: 'pi pi-align-left',
+    color: 'var(--p-yellow-700, #a16207)',
     bgColor: 'var(--p-yellow-50, #fefce8)',
     darkBgColor: 'color-mix(in srgb, var(--p-yellow-900, #713f12) 40%, transparent)',
-    categories: ['attribute', 'timeline', 'relationship', 'location', 'behavior', 'knowledge'] as AlertCategory[],
+    categories: ['coherence', 'repetition', 'style'] as AlertCategory[],
   },
   suggestions: {
     key: 'suggestions' as const,
     label: 'Sugerencias',
     icon: 'pi pi-lightbulb',
-    color: 'var(--ds-color-success, #16a34a)',
-    bgColor: 'var(--p-green-50, #f0fdf4)',
-    darkBgColor: 'color-mix(in srgb, var(--p-green-900, #14532d) 40%, transparent)',
-    categories: ['style', 'structure', 'repetition', 'other'] as AlertCategory[],
+    color: 'var(--p-cyan-600, #0891b2)',
+    bgColor: 'var(--p-cyan-50, #ecfeff)',
+    darkBgColor: 'color-mix(in srgb, var(--p-cyan-900, #164e63) 40%, transparent)',
+    categories: ['structure', 'other'] as AlertCategory[],
   },
 } as const
 
