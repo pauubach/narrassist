@@ -1486,7 +1486,7 @@ class ModelManager:
             try:
                 socket.create_connection((host, port), timeout=timeout)
                 return True
-            except (TimeoutError, OSError):
+            except OSError:
                 continue
 
         return False

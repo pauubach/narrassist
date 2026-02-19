@@ -337,7 +337,7 @@ def cmd_analyze(document: Path, project_name: str | None) -> int:
         if result.error is not None:
             print(f"Motivo: {getattr(result.error, 'user_message', str(result.error))}")
             if hasattr(result.error, "context") and getattr(result.error, "context", None):
-                print(f"Contexto: {getattr(result.error, 'context')}")
+                print(f"Contexto: {result.error.context}")
         return 1
 
     report = result.value

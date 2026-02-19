@@ -1358,7 +1358,7 @@ def collect_export_data(
                 for rel in relationships:
                     data.relationships.append(rel.to_dict())
 
-            except (ImportError, Exception) as e:
+            except Exception as e:
                 logger.debug(f"Relationships not available for export: {e}")
 
         # Style guide

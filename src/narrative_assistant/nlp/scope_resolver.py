@@ -528,7 +528,7 @@ class ScopeResolver:
         """
         # Solo es ambiguo si hay >= 2 entidades PERSONA distintas en scope
         unique_per_names = set()
-        for name, start, end, etype in entity_mentions:
+        for name, _start, _end, etype in entity_mentions:
             if etype == "PER":
                 unique_per_names.add(name)
         if len(unique_per_names) < 2:
@@ -643,7 +643,7 @@ class ScopeResolver:
         # Verify there are >= 2 different PERSON entities in the cuando clause
         # region (from cuando to the attribute position)
         entities_in_cuando_region = set()
-        for name, start, end, etype in entity_mentions:
+        for name, start, _end, etype in entity_mentions:
             if etype == "PER" and cuando_search_start <= start < position:
                 entities_in_cuando_region.add(name)
 
@@ -707,7 +707,7 @@ class ScopeResolver:
         if attr_sent_idx > 0:
             prev_start, prev_end = self._sentence_spans[attr_sent_idx - 1]
             prev_entities = set()
-            for name, start, end, etype in entity_mentions:
+            for name, start, _end, etype in entity_mentions:
                 if etype == "PER" and prev_start <= start < prev_end:
                     prev_entities.add(name)
             if len(prev_entities) >= 2:
@@ -746,7 +746,7 @@ class ScopeResolver:
 
         # Verify there are >= 2 different entities in this sentence
         entities_in_sent = set()
-        for name, start, end, etype in entity_mentions:
+        for name, start, _end, etype in entity_mentions:
             if etype == "PER" and attr_sent_start <= start < attr_sent_end:
                 entities_in_sent.add(name)
 
@@ -789,7 +789,7 @@ class ScopeResolver:
 
         # Verificar que hay >= 2 entidades PER en la oración
         entities_in_sent = set()
-        for name, start, end, etype in entity_mentions:
+        for name, start, _end, etype in entity_mentions:
             if etype == "PER" and attr_sent_start <= start < attr_sent_end:
                 entities_in_sent.add(name)
 
@@ -840,7 +840,7 @@ class ScopeResolver:
         # Verificar que la oración previa tiene >= 2 entidades PER
         prev_start, prev_end = self._sentence_spans[attr_sent_idx - 1]
         prev_entities = set()
-        for name, start, end, etype in entity_mentions:
+        for name, start, _end, etype in entity_mentions:
             if etype == "PER" and prev_start <= start < prev_end:
                 prev_entities.add(name)
 
@@ -887,7 +887,7 @@ class ScopeResolver:
 
         # Verificar que hay >= 2 entidades PER antes de la posición del atributo
         entities_before_attr = set()
-        for name, start, end, etype in entity_mentions:
+        for name, start, _end, etype in entity_mentions:
             if etype == "PER" and attr_sent_start <= start < position:
                 entities_before_attr.add(name)
 
@@ -1017,7 +1017,7 @@ class ScopeResolver:
         target_entity = None
         other_entities = []
 
-        for name, start, end, etype in candidates:
+        for name, start, _end, _etype in candidates:
             token = self._token_at_position(start)
             if token is not None:
                 gender = morpho_utils.get_gender(token)
@@ -1030,7 +1030,7 @@ class ScopeResolver:
 
         # If we couldn't match by morphology, try name heuristics
         if target_entity is None:
-            for name, start, end, etype in candidates:
+            for name, _start, _end, _etype in candidates:
                 # Common Spanish feminine name endings
                 name_lower = name.lower().rstrip("s")
                 if pronoun_gender == "Fem" and name_lower.endswith("a"):
