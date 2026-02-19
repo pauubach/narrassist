@@ -12,19 +12,11 @@
           :options="chapterOptions"
           option-label="label"
           option-value="value"
-          placeholder="Capítulo"
+          placeholder="Todos los capítulos"
           class="chapter-selector"
           size="small"
+          show-clear
           @change="loadAttributions"
-        />
-        <Button
-          v-tooltip.bottom="'Actualizar'"
-          icon="pi pi-refresh"
-          text
-          rounded
-          size="small"
-          :loading="loading"
-          @click="loadAttributions"
         />
       </div>
     </div>
@@ -104,6 +96,7 @@
         <div v-if="correctingIndex === idx" class="correction-form" @click.stop>
           <label class="correction-label">Hablante correcto:</label>
           <Select
+            v-if="speakerOptions.length > 0"
             v-model="correctedSpeakerId"
             :options="speakerOptions"
             option-label="label"
@@ -112,10 +105,12 @@
             class="correction-select"
             size="small"
           />
+          <span v-else class="no-entities-message">No hay personajes disponibles</span>
           <div class="correction-actions">
             <Button
               icon="pi pi-check"
               size="small"
+              :disabled="speakerOptions.length === 0"
               :loading="savingCorrection"
               @click.stop="saveCorrection(attr)"
             />
@@ -163,7 +158,8 @@
     <!-- No Chapter Selected -->
     <div v-else class="empty-state">
       <i class="pi pi-book empty-icon"></i>
-      <p>Selecciona un capítulo para ver las atribuciones de diálogos</p>
+      <p>Selecciona un capítulo para ver la atribución de diálogos</p>
+      <small>Se analizarán quién dice cada diálogo basándose en el contexto</small>
     </div>
   </div>
 </template>
@@ -568,6 +564,12 @@ watch(selectedChapter, (newChapter) => {
 .attribution-meta {
   display: flex;
   gap: 0.375rem;
+  align-items: center;
+}
+
+.attribution-meta :deep(.p-tag) {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
 }
 
 .dialogue-text {
@@ -682,5 +684,11 @@ watch(selectedChapter, (newChapter) => {
 
 .alt-chip:hover {
   background: var(--primary-100);
+}
+
+.no-entities-message {
+  font-size: 0.8rem;
+  color: var(--text-color-secondary);
+  font-style: italic;
 }
 </style>
