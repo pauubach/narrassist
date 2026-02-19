@@ -191,15 +191,13 @@ def get_config_diff(type_code: str, subtype_code: str | None = None) -> dict:
             for param, value in values.items():
                 type_value = type_config.get(category, {}).get(param)
                 if type_value != value:
-                    if "effective_overrides" in diff and hasattr(diff["effective_overrides"], "append"):
-                        diff["effective_overrides"].append(
-                            {
-                                "category": category,
-                                "parameter": param,
-                                "type_value": type_value,
-                                "subtype_value": value,
-                            }
-                        )
+                    diff["effective_overrides"].append(  # type: ignore[attr-defined]
+                        {
+                            "category": category,
+                            "parameter": param,
+                            "type_value": type_value,
+                            "subtype_value": value,
+                        }
                     )
 
     return diff

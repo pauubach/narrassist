@@ -178,8 +178,8 @@ class AttributeEntityResolutionMixin:
                         f"Ambiguous attribution detected at position {position}, "
                         f"candidates: {scope_result.candidates}"
                     )
-                    return None  # No se puede resolver de forma inequívoca
-            in_relative_clause = self._is_inside_relative_clause(text, start, end, position)
+                    return scope_result  # type: ignore[return-value]
+
                 if scope_result is not None:
                     entity_name, confidence = scope_result
                     if confidence >= 0.5:
@@ -187,7 +187,7 @@ class AttributeEntityResolutionMixin:
                             f"Entidad resuelta por scope gramatical: '{entity_name}' "
                             f"(confianza={confidence:.2f})"
                         )
-                        return str(entity_name)
+                        return entity_name  # type: ignore[no-any-return]
             except Exception as e:
                 logger.debug(f"Scope resolution fallback: {e}")
 
@@ -219,7 +219,7 @@ class AttributeEntityResolutionMixin:
 
         for name, start, end, distance, entity_type in candidates:
             # Detectar si la entidad está dentro de una cláusula relativa
-            in_relative_clause = self._is_inside_relative_clause(text, start, end, position) if hasattr(self, "_is_inside_relative_clause") else False
+            in_relative_clause = self._is_inside_relative_clause(text, start, end, position)  # type: ignore[attr-defined]
 
             # Aplicar penalización por cláusula relativa
             relative_clause_penalty = 300 if in_relative_clause else 0
@@ -288,7 +288,7 @@ class AttributeEntityResolutionMixin:
                 re.IGNORECASE,
             )
         )
-            return person_candidates[0][0]
+
         # Detectar pronombres de sujeto explícitos o indicadores de género
         subject_pronoun_match = re.search(
             r"\b(él|ella)\b", immediate_context + " " + context_forward, re.IGNORECASE
@@ -408,7 +408,7 @@ class AttributeEntityResolutionMixin:
                     f"seleccionando '{best_candidate[0]}' (dist={best_candidate[2]}, "
                     f"ajustada={best_candidate[1]})"
                 )
-                return str(best_candidate[0])
+                return best_candidate[0]  # type: ignore[no-any-return]
 
         return None
 
@@ -455,15 +455,15 @@ class AttributeEntityResolutionMixin:
             if gendered_candidates:
                 gendered_candidates.sort(key=lambda x: x[1])
                 if gendered_candidates[0][1] < 300:
-                    return str(gendered_candidates[0][0])
+                    return gendered_candidates[0][0]  # type: ignore[no-any-return]
 
             # Fallback: buscar segunda persona más cercana
             person_candidates_sorted = sorted(person_candidates, key=lambda x: x[3])
             if len(person_candidates_sorted) >= 2 and person_candidates_sorted[1][3] < 200:
-                return str(person_candidates_sorted[1][0])
+                return person_candidates_sorted[1][0]  # type: ignore[no-any-return]
 
             if person_candidates_sorted:
-                return str(person_candidates_sorted[0][0])
+                return person_candidates_sorted[0][0]  # type: ignore[no-any-return]
 
         return None
 
@@ -508,7 +508,7 @@ class AttributeEntityResolutionMixin:
                 f"Sujeto elíptico: seleccionando '{best[0]}' "
                 f"(dist={best[3]}, ajustada={best[4]}, es_objeto={best[5]})"
             )
-            return str(best[0])
+            return best[0]  # type: ignore[no-any-return]
 
         return None
 
@@ -530,12 +530,12 @@ class AttributeEntityResolutionMixin:
         """
         # Si es nombre propio, usar directamente
         if token.pos_ == "PROPN":
-            return str(token.text)
+            return token.text  # type: ignore[no-any-return]
 
         # Buscar en menciones conocidas por posición
         for (start, end), name in mention_spans.items():
             if start <= token.idx < end:
-                return str(name)
+                return name  # type: ignore[no-any-return]
 
         # Si es pronombre, buscar entidad cercana con análisis exhaustivo
         if token.pos_ == "PRON":
@@ -562,7 +562,7 @@ class AttributeEntityResolutionMixin:
                             best_distance = distance
 
             if best_candidate and best_distance < 50:
-                return str(best_candidate)
+                return best_candidate  # type: ignore[no-any-return]
 
             # 2. Si no encontramos nombre propio, buscar en mention_spans
             sorted_mentions = sorted(mention_spans.items(), key=lambda x: x[0][0], reverse=True)
@@ -581,7 +581,7 @@ class AttributeEntityResolutionMixin:
 
             if person_mentions:
                 person_mentions.sort(key=lambda x: x[3])
-                return str(person_mentions[0][2])
+                return person_mentions[0][2]  # type: ignore[no-any-return]
 
         return None
 

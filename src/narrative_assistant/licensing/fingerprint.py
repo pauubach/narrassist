@@ -153,7 +153,7 @@ class HardwareDetector:
                     r"HARDWARE\DESCRIPTION\System\CentralProcessor\0",
                 )
                 value, _ = winreg.QueryValueEx(key, "ProcessorNameString")
-                return str(value).strip()
+                return value.strip()  # type: ignore[no-any-return]
             elif sys.platform == "darwin":
                 result = subprocess.run(
                     ["sysctl", "-n", "machdep.cpu.brand_string"],
@@ -180,8 +180,7 @@ class HardwareDetector:
 
             # Nucleos fisicos, no threads
             if hasattr(os, "cpu_count"):
-                cpu_count = os.cpu_count()
-                return cpu_count // 2 if cpu_count else 1
+                return os.cpu_count() // 2 or 1  # type: ignore[operator]
         except Exception as e:
             logger.debug(f"No se pudo obtener nucleos CPU: {e}")
         return 1
@@ -220,7 +219,7 @@ class HardwareDetector:
                 mem_status = MEMORYSTATUSEX()
                 mem_status.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
                 kernel32.GlobalMemoryStatusEx(ctypes.byref(mem_status))
-                return round(float(mem_status.ullTotalPhys) / (1024**3), 1)
+                return round(mem_status.ullTotalPhys / (1024**3), 1)  # type: ignore[no-any-return]
             elif sys.platform == "darwin":
                 result = subprocess.run(
                     ["sysctl", "-n", "hw.memsize"],
@@ -324,8 +323,8 @@ class HardwareDetector:
                     winreg.HKEY_LOCAL_MACHINE,
                     r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
                 )
-                    value, _ = winreg.QueryValueEx(key, "ProductId")
-                    return value
+                value, _ = winreg.QueryValueEx(key, "ProductId")
+                return value  # type: ignore[no-any-return]
             elif sys.platform == "darwin":
                 result = subprocess.run(
                     ["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"],
@@ -466,14 +465,14 @@ def verify_fingerprint(expected: str) -> Result[bool]:
     """
     result = get_hardware_fingerprint()
     if result.is_failure:
-        return result
+        return result  # type: ignore[return-value]
 
     current = result.value
     matches = current == expected
 
     if not matches:
         logger.warning(
-            f"Fingerprint mismatch: expected {str(expected)[:16]}..., got {str(current)[:16]}..."
+            f"Fingerprint mismatch: expected {expected[:16]}..., got {current[:16]}..."  # type: ignore[index]
         )
 
     return Result.success(matches)
