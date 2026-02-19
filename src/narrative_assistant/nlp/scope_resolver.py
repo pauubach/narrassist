@@ -1502,7 +1502,7 @@ class ScopeResolver:
             from ..llm.client import get_llm_client
 
             llm = get_llm_client()
-            if llm is None or not llm.is_available():
+            if llm is None or not (callable(getattr(llm, 'is_available', None)) and llm.is_available()):
                 logger.debug("LLM no disponible para desambiguación semántica")
                 return None
         except Exception as e:
@@ -1539,9 +1539,9 @@ Candidatos posibles: {', '.join(candidate_names)}
 Responde SOLO con el nombre del candidato más probable, o "AMBIGUO" si no puedes determinarlo con certeza."""
 
         try:
-            if llm is None:
+            if llm is None or not hasattr(llm, 'generate'):
                 return None
-            response = llm.generate(prompt, max_tokens=50, temperature=0.1)
+            response = llm.generate(prompt, max_tokens=50, temperature=0.1)  # type: ignore[attr-defined]
             if not response:
                 return None
 

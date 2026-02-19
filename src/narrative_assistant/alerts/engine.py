@@ -1400,16 +1400,16 @@ class AlertEngine:
 
                 # Verificar si tiene el mismo atributo con valor similar
                 for attr in attributes:
-                    if attr.attribute_key == attribute_key:
+                    if attr.get("attribute_key") == attribute_key:
                         # Comparación case-insensitive y normalizada
-                        existing_value = attr.attribute_value.lower().strip()
+                        existing_value = str(attr.get("attribute_value", "")).lower().strip()
                         new_value = attribute_value.lower().strip()
 
                         if existing_value == new_value or existing_value in new_value or new_value in existing_value:
                             suggested_entity_id = entity_id
                             logger.info(
                                 f"Sugerencia contextual: {candidate['entity_name']} ya tiene "
-                                f"{attribute_key}={attr.attribute_value} (confianza={attr.confidence:.2f})"
+                                f"{attribute_key}={attr.get('attribute_value')} (confianza={attr.get('confidence', 0):.2f})"
                             )
                             break
 
@@ -1536,8 +1536,8 @@ class AlertEngine:
                 repo = get_entity_repository()
                 attrs = repo.get_attributes_by_entity(entity_id)
                 for attr in attrs:
-                    if attr.attribute_key == "gender":
-                        val = attr.attribute_value.lower().strip()
+                    if attr.get("attribute_key") == "gender":
+                        val = str(attr.get("attribute_value", "")).lower().strip()
                         if val in ("masculino", "masc", "m", "male"):
                             return "Masc"
                         elif val in ("femenino", "fem", "f", "female"):
@@ -1585,10 +1585,10 @@ class AlertEngine:
             entity_repo = get_entity_repository()
             entity_repo.create_attribute(
                 entity_id=entity_id,
+                attribute_type="inferred",
                 attribute_key=attribute_key,
                 attribute_value=attribute_value,
                 confidence=confidence,
-                source=source,
             )
             logger.info(
                 f"Auto-asignado por género: {entity_name}.{attribute_key} = "
@@ -1598,7 +1598,7 @@ class AlertEngine:
             logger.warning(f"Error auto-asignando atributo: {e}")
 
         # Crear alerta informativa (ya resuelta) para que el usuario sepa qué se hizo
-        attr_display = get_attribute_display_name(attribute_key)
+        attr_display = get_attribute_display_name(attribute_key)  # type: ignore[arg-type]
         return self.create_alert(
             project_id=project_id,
             category=AlertCategory.CONSISTENCY,
