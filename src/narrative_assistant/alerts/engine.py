@@ -190,16 +190,18 @@ class AlertEngine:
         Returns:
             Result con lista de alertas creadas
         """
-        created_alerts = []
-        errors = []
+        created_alerts: list[Alert] = []
+        errors: list[NarrativeError] = []
 
         for data in alerts_data:
             data["project_id"] = project_id
             result = self.create_alert(**data)
 
             if result.is_success:
+                assert result.value is not None  # is_success guarantees value is not None
                 created_alerts.append(result.value)
             else:
+                assert result.error is not None  # is_failure guarantees error is not None
                 errors.append(result.error)
 
         if errors:

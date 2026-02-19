@@ -15,6 +15,7 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 from ..core.config import get_config
 from ..core.errors import ErrorSeverity, NLPError

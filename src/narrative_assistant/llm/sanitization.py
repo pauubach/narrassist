@@ -175,7 +175,7 @@ def validate_llm_response(
             # No rechazar completamente, solo advertir
 
     # Sanitizar valores de texto en la respuesta
-    sanitized = _sanitize_response_values(data)
+    sanitized: dict[Any, Any] | None = _sanitize_response_values(data)
 
     return sanitized
 

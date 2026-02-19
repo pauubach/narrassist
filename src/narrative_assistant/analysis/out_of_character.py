@@ -17,6 +17,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 from .character_profiling import (
     NEGATIVE_WORDS,

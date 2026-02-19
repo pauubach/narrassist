@@ -17,6 +17,7 @@ import re
 import threading
 from collections import Counter
 from dataclasses import dataclass, field
+from typing import Any
 
 from ..entities.filters import get_filter_repository
 
