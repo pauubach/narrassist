@@ -73,7 +73,7 @@ export function useAlertFiltering(
   const selectedMetaCategory = ref<MetaCategoryKey | null>(null)
 
   const metaCategoryCounts = computed(() => {
-    const counts: Record<MetaCategoryKey, number> = { errors: 0, inconsistencies: 0, suggestions: 0 }
+    const counts: Record<MetaCategoryKey, number> = { errors: 0, inconsistencies: 0, quality: 0, suggestions: 0 }
     for (const alert of alerts()) {
       if (alert.status !== 'active') continue
       for (const [key, meta] of Object.entries(META_CATEGORIES)) {

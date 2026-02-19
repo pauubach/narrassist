@@ -19,9 +19,9 @@ interface AnalysisPollingOptions {
   alerts: Ref<Alert[]>
   chapters: Ref<Chapter[]>
   /** Loaders called when incremental data becomes available */
-  loadEntities: (projectId: number) => Promise<void>
-  loadAlerts: (projectId: number) => Promise<void>
-  loadChapters: (projectId: number) => Promise<void>
+  loadEntities: (projectId: number, forceReload?: boolean) => Promise<void>
+  loadAlerts: (projectId: number, forceReload?: boolean) => Promise<void>
+  loadChapters: (projectId: number, forceReload?: boolean) => Promise<void>
 }
 
 export function useAnalysisPolling(options: AnalysisPollingOptions) {

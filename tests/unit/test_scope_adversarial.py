@@ -526,10 +526,6 @@ class TestPassiveImpersonal:
         result = _resolve_scope(shared_spacy_nlp, text, ["María"])
         assert result == "María"
 
-    @pytest.mark.xfail(reason=(
-        "Pasiva refleja con complemento agente: "
-        "'se notaban sus ojos' necesita resolver 'sus' al sujeto previo."
-    ))
     def test_pasiva_refleja_con_posesivo(self, shared_spacy_nlp):
         """
         "María llegó. Se notaban sus ojos azules."
@@ -609,10 +605,6 @@ class TestComparison:
     El atributo pertenece al sujeto, no al comparando.
     """
 
-    @pytest.mark.xfail(reason=(
-        "Comparaciones con 'como los de' requieren analisis de la estructura "
-        "comparativa para no asignar al comparando."
-    ))
     def test_comparacion_como_los_de(self, shared_spacy_nlp):
         """
         "Juan tenía los ojos azules como los de su madre."
@@ -642,10 +634,6 @@ class TestContrastCorrection:
     El atributo real pertenece a la segunda parte (la correccion).
     """
 
-    @pytest.mark.xfail(reason=(
-        "Estructura 'no X sino Y' requiere analisis de negacion + "
-        "correccion. El resolver no distingue entre la parte negada y la afirmada."
-    ))
     def test_no_sino_basico(self, shared_spacy_nlp):
         """
         "No eran los ojos azules de María sino los de Juan."
@@ -688,10 +676,6 @@ class TestTwoCharactersSameSentence:
     "Juan, de ojos azules, miraba a María, de ojos verdes."
     """
 
-    @pytest.mark.xfail(reason=(
-        "Aposiciones con 'de ojos X' para dos personajes en la misma oracion "
-        "requieren analisis de la estructura apositiva."
-    ))
     def test_aposicion_doble(self, shared_spacy_nlp):
         """
         "Juan, de ojos azules, miraba a María, de ojos verdes."
@@ -729,11 +713,6 @@ class TestNestedPossessives:
     "Su hermana" = hermana de X, "sus mismos ojos" = ojos de la hermana.
     """
 
-    @pytest.mark.xfail(reason=(
-        "Posesivos anidados: 'Su hermana tenia sus mismos ojos azules' "
-        "tiene dos 'su(s)' con referentes diferentes. "
-        "El segundo 'sus' se refiere a la hermana, el primero a alguien exterior."
-    ))
     def test_posesivo_anidado(self, shared_spacy_nlp):
         """
         "Juan recordaba a su hermana. Ella tenía sus mismos ojos azules."

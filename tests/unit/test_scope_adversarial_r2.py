@@ -565,9 +565,9 @@ class TestAdversarialEdgeCases:
         """
         text = "Juan y María caminaban. Tenía los ojos cansados."
         result = _resolve("ojos", text, ["Juan", "María"], nlp=shared_spacy_nlp)
-        # Both None and either name are acceptable here
-        assert result in (None, "Juan", "María"), (
-            f"Acceptable: None or either name. Got: {result}"
+        # AmbiguousResult, None, or either name are all acceptable here
+        assert isinstance(result, AmbiguousResult) or result in (None, "Juan", "María"), (
+            f"Acceptable: AmbiguousResult, None, or either name. Got: {result}"
         )
 
     def test_explicit_subject_overrides_nearby_object(self, shared_spacy_nlp):

@@ -80,13 +80,13 @@ const gutterWidth = ref(20)
 const showGutter = computed(() => gutterMarkers.value.length > 0)
 
 // Helper: encontrar el capítulo que contiene una posición de carácter
-function findChapterForPosition(position: number): number | null {
+function findChapterForPosition(position: number): number | undefined {
   for (const chapter of props.chapters) {
     if (position >= chapter.positionStart && position <= chapter.positionEnd) {
       return chapter.chapterNumber
     }
   }
-  return null
+  return undefined
 }
 
 // Computed: alertas agrupadas por capítulo para el gutter
@@ -101,13 +101,13 @@ const alertsByChapter = computed(() => {
     // Si no tiene chapter pero tiene spanStart, inferir el capítulo
     if ((chapterNum === undefined || chapterNum === null) && alert.spanStart !== undefined) {
       chapterNum = findChapterForPosition(alert.spanStart)
-      if (chapterNum !== null) {
+      if (chapterNum !== undefined) {
         inferred++
         console.log(`[TextTab] Capítulo inferido para "${alert.title}": cap ${chapterNum} (spanStart=${alert.spanStart})`)
       }
     }
 
-    if (chapterNum !== undefined && chapterNum !== null) {
+    if (chapterNum !== undefined) {
       const list = grouped.get(chapterNum) || []
       list.push(alert)
       grouped.set(chapterNum, list)

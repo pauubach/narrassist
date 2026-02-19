@@ -964,7 +964,6 @@ def get_dialogue_attributions(project_id: int, chapter_number: int):
         from narrative_assistant.entities.repository import get_entity_repository
         from narrative_assistant.nlp.dialogue import detect_dialogues
         from narrative_assistant.persistence.chapter import get_chapter_repository
-        from narrative_assistant.voice.profiles import VoiceProfileBuilder
         from narrative_assistant.voice.speaker_attribution import SpeakerAttributor
 
         # Verificar proyecto
