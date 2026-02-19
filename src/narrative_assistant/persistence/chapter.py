@@ -48,7 +48,7 @@ class ChapterData:
 
     def to_dict(self) -> dict:
         """Convierte a diccionario para serialización JSON."""
-        d = {
+        d: dict[str, object] = {
             "id": self.id,
             "project_id": self.project_id,
             "chapter_number": self.chapter_number,

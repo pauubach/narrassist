@@ -191,7 +191,7 @@ _download_progress: dict[ModelType, DownloadProgress] = {}
 _progress_lock = threading.Lock()
 
 # Cache de tamaños de modelos (consultados dinámicamente de HuggingFace/GitHub)
-_model_sizes_cache: dict[str, int] = {}
+_model_sizes_cache: dict[str, int | None] = {}
 _model_sizes_cache_time: float = 0.0
 _MODEL_SIZES_CACHE_TTL = 7 * 24 * 3600.0  # 1 semana de cache (los tamaños cambian poco)
 
@@ -613,7 +613,7 @@ class ModelManager:
         import zipfile
 
         try:
-            import requests
+            import requests  # type: ignore[import-untyped]
             import spacy
         except ImportError:
             return None
@@ -814,7 +814,12 @@ class ModelManager:
 
         # Resolución dinámica: consultar API de compatibilidad de spaCy
         try:
-            from spacy.cli._util import get_compatibility
+            import importlib
+
+            spacy_util = importlib.import_module("spacy.cli._util")
+            get_compatibility = getattr(spacy_util, "get_compatibility", None)
+            if not callable(get_compatibility):
+                raise RuntimeError("spacy.cli._util.get_compatibility no disponible")
 
             compat = get_compatibility()
             spacy_compat = compat.get("spacy", {})
@@ -825,7 +830,7 @@ class ModelManager:
                 if model_name in models and models[model_name]:
                     version = models[model_name][0]
                     logger.debug(f"Versión compatible para {model_name}: {version}")
-                    return version
+                    return str(version)
 
             # Buscar por major.minor
             major_minor = ".".join(spacy_version.split(".")[:2])
@@ -833,7 +838,7 @@ class ModelManager:
                 if sv.startswith(major_minor) and model_name in models and models[model_name]:
                     version = models[model_name][0]
                     logger.debug(f"Versión compatible (minor match) para {model_name}: {version}")
-                    return version
+                    return str(version)
 
         except Exception as e:
             logger.debug(f"Error consultando compatibilidad spaCy: {e}")
@@ -1465,7 +1470,8 @@ class ModelManager:
 
         try:
             with open(version_file, encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                return data if isinstance(data, dict) else None
         except (OSError, json.JSONDecodeError) as e:
             logger.debug(f"No se pudo leer marcador de versión: {e}")
             return None
@@ -1697,12 +1703,12 @@ def get_spacy_model_size(model_name: str) -> int | None:
         # Buscar el asset del wheel
         for asset in data.get("assets", []):
             if asset["name"].endswith(".whl") or asset["name"].endswith(".tar.gz"):
-                size = asset.get("size", 0)
+                size = int(asset.get("size", 0))
                 if size > 0:
                     logger.debug(f"Tamaño de spaCy {model_name} desde GitHub: {size} bytes ({size / (1024*1024):.1f} MB)")
                     _model_sizes_cache[cache_key] = size
                     _model_sizes_cache_time = time.time()
-                    return size
+                    return int(size)
 
     except Exception as e:
         logger.debug(f"No se pudo obtener tamaño de spaCy {model_name}: {e}")

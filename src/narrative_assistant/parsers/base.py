@@ -125,6 +125,7 @@ class RawDocument:
         """Obtiene el sistema de coordenadas, construyéndolo si es necesario."""
         if self._coordinate_system is None:
             self._build_coordinate_system()
+        assert self._coordinate_system is not None
         return self._coordinate_system
 
     @property
@@ -338,7 +339,7 @@ def get_parser(format_or_path: DocumentFormat | Path | str) -> DocumentParser:
     from .docx_parser import DocxParser
     from .txt_parser import TxtParser
 
-    parsers = {
+    parsers: dict[DocumentFormat, type[DocumentParser]] = {
         DocumentFormat.DOCX: DocxParser,
         DocumentFormat.TXT: TxtParser,
         DocumentFormat.MD: TxtParser,  # MD usa el mismo parser que TXT
@@ -390,7 +391,8 @@ def get_parser(format_or_path: DocumentFormat | Path | str) -> DocumentParser:
             detected_format=fmt.value,
         )
 
-    return parsers[fmt]()
+    parser_cls = parsers[fmt]
+    return parser_cls()
 
 
 def calculate_page_and_line(

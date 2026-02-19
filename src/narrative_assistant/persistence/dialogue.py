@@ -263,7 +263,7 @@ class DialogueRepository:
                 (project_id, dialogue_type),
             ).fetchone()
 
-            return result["count"] if result else 0
+            return int(result["count"]) if result else 0
 
     def delete_by_project(self, project_id: int) -> int:
         """

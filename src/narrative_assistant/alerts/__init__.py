@@ -18,9 +18,14 @@ from .repository import AlertRepository, get_alert_repository
 # AlertEngine depends on analysis modules which import NLP libraries (numpy, spacy).
 # These are NOT available in embedded Python (production) until the user
 # installs the full NLP stack. Gracefully degrade if missing.
-from typing import TYPE_CHECKING, Optional, Callable
+from typing import TYPE_CHECKING, Any, Callable
+
 if TYPE_CHECKING:
-    from .engine import AlertEngine, get_alert_engine
+    from .engine import AlertEngine as AlertEngineType
+
+AlertEngine: Any
+get_alert_engine: Callable[..., Any] | None
+
 try:
     from .engine import AlertEngine, get_alert_engine
 except ImportError:

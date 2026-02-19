@@ -10,7 +10,7 @@ import threading
 from collections import defaultdict
 from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from ..analysis.attribute_consistency import get_attribute_display_name
 from ..core.errors import NarrativeError
@@ -18,6 +18,9 @@ from ..core.result import Result
 from .formatter import AlertFormatter
 from .models import Alert, AlertCategory, AlertFilter, AlertSeverity, AlertStatus
 from .repository import AlertRepository, get_alert_repository
+
+if TYPE_CHECKING:
+    from ..nlp.attributes import AttributeKey
 
 logger = logging.getLogger(__name__)
 
@@ -326,40 +329,44 @@ class AlertEngine:
         """
         result = self.repo.get_by_project(project_id)
         if result.is_failure:
-            return result
+            error = result.error
+            assert error is not None
+            return Result.failure(error)
 
         assert result.value is not None  # is_success guarantees value
         alerts = result.value
 
-        summary = {
+        by_category: defaultdict[str, int] = defaultdict(int)
+        by_severity: defaultdict[str, int] = defaultdict(int)
+        by_status: defaultdict[str, int] = defaultdict(int)
+        by_chapter: defaultdict[int, int] = defaultdict(int)
+        by_source: defaultdict[str, int] = defaultdict(int)
+
+        summary: dict[str, Any] = {
             "total": len(alerts),
-            "open": sum(1 for a in alerts if hasattr(a, 'is_open') and a.is_open()),
-            "closed": sum(1 for a in alerts if hasattr(a, 'is_closed') and a.is_closed()),
-            "by_category": defaultdict(int),
-            "by_severity": defaultdict(int),
-            "by_status": defaultdict(int),
-            "by_chapter": defaultdict(int),
-            "by_source": defaultdict(int),
+            "open": sum(1 for a in alerts if a.is_open()),
+            "closed": sum(1 for a in alerts if a.is_closed()),
+            "by_category": by_category,
+            "by_severity": by_severity,
+            "by_status": by_status,
+            "by_chapter": by_chapter,
+            "by_source": by_source,
         }
 
         for alert in alerts:
-            if hasattr(alert, 'category') and hasattr(alert.category, 'value'):
-                summary["by_category"][alert.category.value] += 1
-            if hasattr(alert, 'severity') and hasattr(alert.severity, 'value'):
-                summary["by_severity"][alert.severity.value] += 1
-            if hasattr(alert, 'status') and hasattr(alert.status, 'value'):
-                summary["by_status"][alert.status.value] += 1
-            if hasattr(alert, 'source_module'):
-                summary["by_source"][alert.source_module] += 1
-            if hasattr(alert, 'chapter') and alert.chapter:
-                summary["by_chapter"][alert.chapter] += 1
+            by_category[alert.category.value] += 1
+            by_severity[alert.severity.value] += 1
+            by_status[alert.status.value] += 1
+            by_source[alert.source_module] += 1
+            if alert.chapter:
+                by_chapter[alert.chapter] += 1
 
         # Convertir defaultdict a dict normal
-        summary["by_category"] = dict(summary["by_category"])
-        summary["by_severity"] = dict(summary["by_severity"])
-        summary["by_status"] = dict(summary["by_status"])
-        summary["by_chapter"] = dict(summary["by_chapter"])
-        summary["by_source"] = dict(summary["by_source"])
+        summary["by_category"] = dict(by_category)
+        summary["by_severity"] = dict(by_severity)
+        summary["by_status"] = dict(by_status)
+        summary["by_chapter"] = dict(by_chapter)
+        summary["by_source"] = dict(by_source)
 
         return Result.success(summary)
 
@@ -1204,7 +1211,7 @@ class AlertEngine:
         possible_speakers: list[str],
         context: str,
         extra_data: dict[str, Any] | None = None,
-    ) -> Result[Alert]:
+    ) -> Result[Alert | None]:
         """
         Crea alerta para diálogo con atribución ambigua.
 
@@ -1236,7 +1243,9 @@ class AlertEngine:
             ", ".join(possible_speakers) if possible_speakers else "desconocido"
         )
 
-        return self.create_alert(
+        return cast(
+            Result[Alert | None],
+            self.create_alert(
             project_id=project_id,
             category=AlertCategory.STYLE,
             severity=severity,
@@ -1257,6 +1266,7 @@ class AlertEngine:
                 "context": context,
                 **(extra_data or {}),
             },
+            ),
         )
 
     def create_from_emotional_incoherence(
@@ -1608,7 +1618,9 @@ class AlertEngine:
             logger.warning(f"Error auto-asignando atributo: {e}")
 
         # Crear alerta informativa (ya resuelta) para que el usuario sepa qué se hizo
-        attr_display = get_attribute_display_name(attribute_key)
+        attr_display = get_attribute_display_name(
+            cast("AttributeKey", attribute_key)
+        )
         return self.create_alert(
             project_id=project_id,
             category=AlertCategory.CONSISTENCY,
@@ -2250,7 +2262,11 @@ class AlertEngine:
                 """,
                 (project_id, alert_type, source_module),
             )
-            factor = row["calibration_factor"] if row else 1.0
+            factor = (
+                float(row["calibration_factor"])
+                if row and row["calibration_factor"] is not None
+                else 1.0
+            )
             self._calibration_cache[cache_key] = factor
             return factor
         except Exception:
@@ -2274,7 +2290,7 @@ class AlertEngine:
                 "SELECT COUNT(*) as cnt FROM chapters WHERE project_id = ?",
                 (project_id,),
             )
-            total = row["cnt"] if row else 0
+            total = int(row["cnt"]) if row and row["cnt"] is not None else 0
             self._total_chapters_cache[project_id] = total
             return total
         except Exception:
@@ -2447,7 +2463,7 @@ class AlertEngine:
                     (project_id, alert_type, norm_name),
                 )
                 if row:
-                    weight = row["weight"]
+                    weight = float(row["weight"])
                     cache[entity_key] = weight
                     return weight
             except Exception:
@@ -2466,7 +2482,7 @@ class AlertEngine:
                 "WHERE project_id = ? AND alert_type = ? AND entity_canonical_name = ''",
                 (project_id, alert_type),
             )
-            weight = row["weight"] if row else 1.0
+            weight = float(row["weight"]) if row and row["weight"] is not None else 1.0
             cache[project_key] = weight
             return weight
         except Exception:
@@ -2534,10 +2550,10 @@ class AlertEngine:
             )
 
             if row:
-                weight = row["weight"]
-                feedback_count = row["feedback_count"]
-                dismiss_count = row["dismiss_count"]
-                confirm_count = row["confirm_count"]
+                weight = float(row["weight"])
+                feedback_count = int(row["feedback_count"])
+                dismiss_count = int(row["dismiss_count"])
+                confirm_count = int(row["confirm_count"])
             else:
                 weight = 1.0
                 feedback_count = 0

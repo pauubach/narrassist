@@ -398,6 +398,7 @@ class ResourceManager:
         """Retorna capacidades detectadas."""
         if self._capabilities is None:
             self.refresh_capabilities()
+        assert self._capabilities is not None
         return self._capabilities
 
     @property
@@ -405,6 +406,7 @@ class ResourceManager:
         """Retorna recomendaciones actuales."""
         if self._recommendation is None:
             self.refresh_capabilities()
+        assert self._recommendation is not None
         return self._recommendation
 
     @property
@@ -412,6 +414,7 @@ class ResourceManager:
         """Retorna semáforo para tareas pesadas."""
         if self._heavy_task_semaphore is None:
             self.refresh_capabilities()
+        assert self._heavy_task_semaphore is not None
         return self._heavy_task_semaphore
 
     def is_system_under_pressure(self) -> bool:
@@ -420,11 +423,12 @@ class ResourceManager:
             return False
 
         try:
-            cpu = psutil.cpu_percent(interval=0.1)
+            cpu = float(psutil.cpu_percent(interval=0.1))
             mem = psutil.virtual_memory()
+            mem_percent = float(mem.percent)
 
             # Presión si CPU > 80% o RAM > 85%
-            return cpu > 80 or mem.percent > 85
+            return cpu > 80.0 or mem_percent > 85.0
         except Exception:
             return False
 

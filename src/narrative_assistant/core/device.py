@@ -292,24 +292,24 @@ class DeviceDetector:
 
         # Forzar CUDA
         if prefer == "cuda":
-            device = self.detect_cuda()
-            if device is None:
+            cuda_device = self.detect_cuda()
+            if cuda_device is None:
                 raise RuntimeError(
                     "CUDA solicitado pero no disponible. "
                     "Instale PyTorch con CUDA: pip install torch --index-url https://download.pytorch.org/whl/cu121"
                 )
-            self._detected_device = device
-            return device
+            self._detected_device = cuda_device
+            return cuda_device
 
         # Forzar MPS
         if prefer == "mps":
-            device = self.detect_mps()
-            if device is None:
+            mps_device = self.detect_mps()
+            if mps_device is None:
                 raise RuntimeError(
                     "MPS solicitado pero no disponible. Requiere macOS 12.3+ y Apple Silicon."
                 )
-            self._detected_device = device
-            return device
+            self._detected_device = mps_device
+            return mps_device
 
         # Auto-detectar (prefer == "auto")
         # 1. Intentar CUDA
@@ -350,7 +350,7 @@ class DeviceDetector:
             DeviceType.MPS: "mps",
             DeviceType.CPU: "cpu",
         }
-        if hasattr(self._detected_device, 'device_type'):
+        if self._detected_device is not None:
             return device_map[self._detected_device.device_type]
         raise AttributeError("_detected_device missing 'device_type' attribute")
 

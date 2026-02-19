@@ -95,9 +95,13 @@ class TxtParser(DocumentParser):
         # Validar archivo antes de abrir
         validation_result = self.validate_file(path)
         if validation_result.is_failure:
-            return validation_result
+            error = validation_result.error
+            assert error is not None
+            return Result.failure(error)
 
-        path = validation_result.value
+        validated_path = validation_result.value
+        assert validated_path is not None
+        path = validated_path
 
         # Detectar si es Markdown por extensión
         if path.suffix.lower() in (".md", ".markdown"):

@@ -355,7 +355,9 @@ def preview_import(project_id: int, import_data: dict) -> Result[ImportPreview]:
         # Validar formato
         validation = _validate_import_data(import_data)
         if validation.is_failure:
-            return validation
+            error = validation.error
+            assert error is not None
+            return Result.failure(error)
 
         from ..alerts.repository import get_alert_repository
         from ..entities.repository import get_entity_repository
@@ -445,7 +447,9 @@ def _get_project_fingerprint(db, project_id: int) -> str:
             "SELECT document_fingerprint FROM projects WHERE id = ?",
             (project_id,),
         ).fetchone()
-    return row["document_fingerprint"] if row and row["document_fingerprint"] else ""
+    if row and row["document_fingerprint"]:
+        return str(row["document_fingerprint"])
+    return ""
 
 
 def _preview_entity_merges(
@@ -771,7 +775,9 @@ def confirm_import(
         # Re-generar preview para obtener acciones actualizadas
         preview_result = preview_import(project_id, import_data)
         if preview_result.is_failure:
-            return Result.failure(preview_result.error)
+            error = preview_result.error
+            assert error is not None
+            return Result.failure(error)
 
         assert preview_result.value is not None  # is_success guarantees value
         preview = preview_result.value
@@ -840,12 +846,12 @@ def _apply_entity_merges(project_id: int, actions: list[dict]) -> int:
 
         primary_id = source_ids[0]
         primary = entity_repo.get_entity(primary_id)
-        if not primary:
+        if not primary or primary.id is None:
             continue
 
         for secondary_id in source_ids[1:]:
             secondary = entity_repo.get_entity(secondary_id)
-            if not secondary or not secondary.is_active:
+            if not secondary or secondary.id is None or not secondary.is_active:
                 continue
 
             aliases = primary.aliases or []

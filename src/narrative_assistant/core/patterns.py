@@ -7,15 +7,17 @@ como Singleton, evitando duplicación de código boilerplate.
 
 import threading
 from functools import wraps
-from typing import Callable, Protocol, TypeVar, cast
+from typing import Callable, Generic, Protocol, TypeVar
 
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+U = TypeVar("U")
 
 
-class LazySingletonFactory(Protocol[T]):
+class LazySingletonFactory(Protocol[T_co]):
     """Callable singleton factory enriched with helper methods."""
 
-    def __call__(self) -> T: ...
+    def __call__(self) -> T_co: ...
 
     def reset(self) -> None: ...
 
@@ -170,30 +172,27 @@ def lazy_singleton(factory: Callable[[], T]) -> LazySingletonFactory[T]:
         - Se necesita lazy initialization
         - No quieres modificar la clase original
     """
-    _instance: T | None = None
-    _lock = threading.Lock()
+    class _LazySingleton(Generic[U]):
+        def __init__(self, creator: Callable[[], U]):
+            self._creator = creator
+            self._instance: U | None = None
+            self._lock = threading.Lock()
+            wraps(creator)(self)
 
-    @wraps(factory)
-    def wrapper() -> T:
-        nonlocal _instance
-        if _instance is None:
-            with _lock:
-                if _instance is None:
-                    _instance = factory()
-        return _instance
+        def __call__(self) -> U:
+            if self._instance is None:
+                with self._lock:
+                    if self._instance is None:
+                        self._instance = self._creator()
+            return self._instance
 
-    def reset() -> None:
-        """Reset la instancia singleton."""
-        nonlocal _instance
-        with _lock:
-            _instance = None
+        def reset(self) -> None:
+            """Reset la instancia singleton."""
+            with self._lock:
+                self._instance = None
 
-    def has_instance() -> bool:
-        """Verificar si ya existe una instancia."""
-        return _instance is not None
+        def has_instance(self) -> bool:
+            """Verificar si ya existe una instancia."""
+            return self._instance is not None
 
-    wrapped = cast(LazySingletonFactory[T], wrapper)
-    wrapped.reset = reset
-    wrapped.has_instance = has_instance
-
-    return wrapped
+    return _LazySingleton(factory)

@@ -509,7 +509,7 @@ class StructureDetector:
         # 3. Si no, usar el nivel mínimo SOLO si hay más de 1 heading a ese nivel
         #    (un solo H1 suele ser el título del documento, no un capítulo)
 
-        chapter_level = None
+        chapter_level: int | None = None
 
         # Buscar headings que coincidan con patrones de capítulo
         for h in headings:
@@ -529,13 +529,17 @@ class StructureDetector:
 
         # Si no encontramos patrones, usar heurística de nivel mínimo
         if chapter_level is None:
-            min_level = min(h.heading_level for h in headings if h.heading_level)
+            heading_levels = [h.heading_level for h in headings if h.heading_level is not None]
+            if not heading_levels:
+                return chapters
+
+            min_level = min(heading_levels)
             headings_at_min = [h for h in headings if h.heading_level == min_level]
 
             # Si solo hay 1 heading al nivel mínimo, probablemente es título
             # Usar el siguiente nivel si existe
             if len(headings_at_min) == 1:
-                other_levels = [h.heading_level for h in headings if getattr(h, 'heading_level', None) is not None and h.heading_level > min_level]
+                other_levels = [level for level in heading_levels if level > min_level]
                 if other_levels:
                     chapter_level = min(other_levels)
                 else:
@@ -695,6 +699,9 @@ class StructureDetector:
         while i < len(headings):
             heading = headings[i]
             level = heading.heading_level
+            if level is None:
+                i += 1
+                continue
 
             # Calcular fin de esta sección
             # La sección termina cuando:
@@ -708,7 +715,7 @@ class StructureDetector:
                 next_heading = headings[j]
                 next_level = next_heading.heading_level
 
-                if next_level is not None and level is not None and next_level <= level:
+                if next_level is not None and next_level <= level:
                     # Heading del mismo nivel o superior: fin de sección
                     end_char = next_heading.start_char
                     break

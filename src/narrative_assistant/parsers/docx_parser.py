@@ -140,9 +140,13 @@ class DocxParser(DocumentParser):
         # Validar archivo antes de abrir
         validation_result = self.validate_file(path)
         if validation_result.is_failure:
-            return validation_result
+            error = validation_result.error
+            assert error is not None
+            return Result.failure(error)
 
-        path = validation_result.value
+        validated_path = validation_result.value
+        assert validated_path is not None
+        path = validated_path
 
         if not self._docx_available:
             from ..core.errors import ErrorSeverity, NarrativeError

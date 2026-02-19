@@ -143,7 +143,7 @@ class CollectionRepository:
         """Actualiza nombre y/o descripción."""
         db = self._get_db()
         updates = []
-        params = []
+        params: list[object] = []
         if name is not None:
             updates.append("name = ?")
             params.append(name)
@@ -209,7 +209,7 @@ class CollectionRepository:
             )
             conn.commit()
 
-            result = {"success": True}
+            result: dict[str, bool | str] = {"success": True}
             if count + 1 > WARN_PROJECTS_THRESHOLD:
                 result["warning"] = (
                     f"Colección con {count + 1} proyectos. "
@@ -499,6 +499,7 @@ class CollectionRepository:
         if not cache_file.exists():
             return None
         try:
-            return json.loads(cache_file.read_text(encoding="utf-8"))
+            data = json.loads(cache_file.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else None
         except (json.JSONDecodeError, OSError):
             return None

@@ -8,7 +8,7 @@ y filtrar falsos positivos antes de mostrarlas al usuario.
 import logging
 from dataclasses import dataclass
 
-from ..llm.client import LLMClientError, get_llm_client
+from ..llm.client import get_llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +126,7 @@ IMPORTANTE: Sé conservador. Si no estás seguro, marca como válido (is_valid: 
 
             return self._parse_response(response)
 
-        except LLMClientError as e:
+        except RuntimeError as e:
             logger.warning(f"LLM review failed: {e}")
             # Si falla el LLM, marcar como válida (conservador)
             return AlertReviewResult(
