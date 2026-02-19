@@ -73,6 +73,9 @@
             <span v-else class="speaker-name">{{ attr.speakerName || 'Desconocido' }}</span>
           </div>
           <div class="attribution-meta">
+            <Tag v-if="selectedChapter === null && attr.chapterNumber" severity="info" size="small">
+              Cap. {{ attr.chapterNumber }}
+            </Tag>
             <Tag :severity="getConfidenceSeverity(attr.confidence)" size="small">
               {{ getConfidenceLabel(attr.confidence) }}
             </Tag>
@@ -150,16 +153,11 @@
     </div>
 
     <!-- No Attributions -->
-    <div v-else-if="selectedChapter !== null" class="empty-state">
-      <i class="pi pi-comments empty-icon"></i>
-      <p>No se encontraron diálogos en este capítulo</p>
-    </div>
-
-    <!-- No Chapter Selected -->
     <div v-else class="empty-state">
-      <i class="pi pi-book empty-icon"></i>
-      <p>Selecciona un capítulo para ver la atribución de diálogos</p>
-      <small>Se analizarán quién dice cada diálogo basándose en el contexto</small>
+      <i class="pi pi-comments empty-icon"></i>
+      <p v-if="selectedChapter !== null">No se encontraron diálogos en este capítulo</p>
+      <p v-else>No se encontraron diálogos en el proyecto</p>
+      <small v-if="selectedChapter === null">Haz clic en "Actualizar" para cargar todos los capítulos</small>
     </div>
   </div>
 </template>
@@ -233,7 +231,52 @@ const chapterOptions = computed(() => {
 
 // Get attributions from store
 const attributionData = computed(() => {
-  if (selectedChapter.value === null) return null
+  if (selectedChapter.value === null) {
+    // Return combined attributions from all chapters
+    const allAttributions: DialogueAttribution[] = []
+    const statsCombined = {
+      total: 0,
+      attributed: 0,
+      highConfidence: 0,
+      mediumConfidence: 0,
+      lowConfidence: 0,
+      unknown: 0,
+      byMethod: {} as Record<string, number>
+    }
+
+    props.chapters.forEach(ch => {
+      const data = store.getDialogueAttributions(props.projectId, ch.number)
+      if (data) {
+        // Add chapter number to each attribution for context
+        const withChapter = data.attributions.map(attr => ({
+          ...attr,
+          chapterNumber: ch.number
+        }))
+        allAttributions.push(...withChapter)
+
+        // Combine stats
+        if (data.stats) {
+          statsCombined.total += data.stats.total
+          statsCombined.attributed += data.stats.attributed
+          statsCombined.highConfidence += data.stats.highConfidence
+          statsCombined.mediumConfidence += data.stats.mediumConfidence
+          statsCombined.lowConfidence += data.stats.lowConfidence
+          statsCombined.unknown += data.stats.unknown
+
+          // Merge byMethod counts
+          Object.entries(data.stats.byMethod).forEach(([method, count]) => {
+            statsCombined.byMethod[method] = (statsCombined.byMethod[method] || 0) + (count as number)
+          })
+        }
+      }
+    })
+
+    return allAttributions.length > 0 ? {
+      attributions: allAttributions,
+      stats: statsCombined
+    } : null
+  }
+
   return store.getDialogueAttributions(props.projectId, selectedChapter.value)
 })
 
@@ -245,20 +288,30 @@ const stats = computed<DialogueAttributionStats | null>(() => {
   return attributionData.value?.stats || null
 })
 
-// Load attributions for selected chapter
+// Load attributions for selected chapter (or all chapters)
 const loadAttributions = async () => {
-  if (selectedChapter.value === null) return
-
   loading.value = true
   error.value = null
 
   try {
-    const success = await store.fetchDialogueAttributions(
-      props.projectId,
-      selectedChapter.value
-    )
-    if (!success) {
-      error.value = store.error || 'Error al cargar atribuciones'
+    if (selectedChapter.value === null) {
+      // Load all chapters
+      const promises = props.chapters.map(ch =>
+        store.fetchDialogueAttributions(props.projectId, ch.number)
+      )
+      const results = await Promise.all(promises)
+      if (results.some(success => !success)) {
+        error.value = store.error || 'Error al cargar algunas atribuciones'
+      }
+    } else {
+      // Load single chapter
+      const success = await store.fetchDialogueAttributions(
+        props.projectId,
+        selectedChapter.value
+      )
+      if (!success) {
+        error.value = store.error || 'Error al cargar atribuciones'
+      }
     }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
@@ -319,8 +372,9 @@ function cancelCorrection() {
   correctedSpeakerId.value = null
 }
 
-function getDialogueKey(attr: DialogueAttribution): string {
-  return `${selectedChapter.value}-${attr.startChar}-${attr.endChar}`
+function getDialogueKey(attr: DialogueAttribution & { chapterNumber?: number }): string {
+  const chapterNum = selectedChapter.value ?? attr.chapterNumber ?? 'unknown'
+  return `${chapterNum}-${attr.startChar}-${attr.endChar}`
 }
 
 function isDialogueCorrected(attr: DialogueAttribution): boolean {
@@ -332,13 +386,15 @@ function getCorrectedSpeaker(attr: DialogueAttribution): string {
   return correction?.speakerName || attr.speakerName || 'Desconocido'
 }
 
-async function saveCorrection(attr: DialogueAttribution) {
-  if (selectedChapter.value === null) return
+async function saveCorrection(attr: DialogueAttribution & { chapterNumber?: number }) {
+  // Get chapter number from either selected chapter or from the attribution itself
+  const chapterNum = selectedChapter.value ?? attr.chapterNumber
+  if (chapterNum === null || chapterNum === undefined) return
 
   savingCorrection.value = true
   try {
     const data = await api.postRaw<any>(`/api/projects/${props.projectId}/speaker-corrections`, {
-      chapter_number: selectedChapter.value,
+      chapter_number: chapterNum,
       dialogue_start_char: attr.startChar,
       dialogue_end_char: attr.endChar,
       dialogue_text: attr.text,
@@ -367,21 +423,15 @@ async function saveCorrection(attr: DialogueAttribution) {
   }
 }
 
-// Auto-load if initial chapter provided
+// Auto-load on mount
 onMounted(() => {
-  if (selectedChapter.value !== null) {
-    loadAttributions()
-  }
+  // Load all chapters by default (selectedChapter starts as null)
+  loadAttributions()
 })
 
 // Watch for chapter selection changes
-watch(selectedChapter, (newChapter) => {
-  if (newChapter !== null) {
-    const key = `${props.projectId}-${newChapter}`
-    if (!store.dialogueAttributions[key]) {
-      loadAttributions()
-    }
-  }
+watch(selectedChapter, () => {
+  loadAttributions()
 })
 </script>
 
