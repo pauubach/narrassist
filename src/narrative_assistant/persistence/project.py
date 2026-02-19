@@ -342,7 +342,7 @@ class ProjectManager:
         fingerprint = generate_fingerprint(text)
         match = self.matcher.find_match(fingerprint, self.db)
 
-        if match.is_exact_match or match.is_similar:
+        if (match.is_exact_match or match.is_similar) and match.existing_project_id is not None:
             result = self.get(match.existing_project_id)
             return result.value if result.is_success else None
 

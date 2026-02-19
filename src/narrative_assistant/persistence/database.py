@@ -14,6 +14,7 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import cast
 
 from ..core.config import get_config
 
@@ -1872,7 +1873,8 @@ class Database:
     def fetchone(self, sql: str, params: tuple = ()) -> sqlite3.Row | None:
         """Ejecuta y retorna una fila."""
         with self.connection() as conn:
-            return conn.execute(sql, params).fetchone()
+            row = conn.execute(sql, params).fetchone()
+            return cast(sqlite3.Row | None, row)
 
     def fetchall(self, sql: str, params: tuple = ()) -> list[sqlite3.Row]:
         """Ejecuta y retorna todas las filas."""

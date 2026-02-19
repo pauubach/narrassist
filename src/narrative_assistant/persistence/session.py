@@ -253,6 +253,8 @@ class SessionManager:
             self._current_session.last_position_char = char_position
 
         if updates:
+            if self._current_session.id is None:
+                return
             params.append(self._current_session.id)
             self.db.execute(
                 f"UPDATE sessions SET {', '.join(updates)} WHERE id = ?",
@@ -303,6 +305,18 @@ class SessionManager:
             """,
             (self.project_id,),
         )
+
+        if row is None:
+            return {
+                "session_count": 0,
+                "total_duration_seconds": 0,
+                "total_duration_hours": 0.0,
+                "total_alerts_reviewed": 0,
+                "total_alerts_resolved": 0,
+                "total_entities_merged": 0,
+                "first_session": None,
+                "last_session": None,
+            }
 
         return {
             "session_count": row["session_count"] or 0,

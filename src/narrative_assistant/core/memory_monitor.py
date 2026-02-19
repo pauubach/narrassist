@@ -43,11 +43,14 @@ def get_process_memory_mb() -> float:
     try:
         import resource
 
-        # maxrss en KB en Linux, bytes en macOS
-        if hasattr(resource, 'RUSAGE_SELF'):
-            usage = resource.getrusage(resource.RUSAGE_SELF)
+        getrusage = getattr(resource, "getrusage", None)
+        rusage_self = getattr(resource, "RUSAGE_SELF", None)
+        if callable(getrusage) and rusage_self is not None:
+            usage = getrusage(rusage_self)
         else:
-            raise AttributeError("resource module missing RUSAGE_SELF attribute")
+            raise AttributeError(
+                "resource module missing getrusage/RUSAGE_SELF attributes"
+            )
         maxrss = usage.ru_maxrss
         import platform
 

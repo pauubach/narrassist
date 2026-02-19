@@ -7,10 +7,10 @@ Las fases mutan el contexto añadiendo resultados que fases posteriores necesita
 S8a-14: Refactor monolito → funciones standalone.
 """
 
+import contextlib
 import json
 import threading
 import time
-import contextlib
 from collections import Counter
 from typing import Any
 

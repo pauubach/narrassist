@@ -380,7 +380,7 @@ class HistoryManager:
             """.format(",".join(f"'{a}'" for a in UNDOABLE_ACTIONS)),
             (self.project_id,),
         )
-        return row["cnt"] if row else 0
+        return int(row["cnt"]) if row else 0
 
     # ── Dependencias ──
 
@@ -477,25 +477,34 @@ class HistoryManager:
         logger.info(f"Deshaciendo acción {entry_id}: {action}")
 
         try:
+            if target_id is None:
+                return UndoResult(
+                    success=False,
+                    message="La acción no tiene target_id; no se puede deshacer",
+                    entry_id=entry_id,
+                )
+
+            old_value_dict: dict[str, Any] = old_value or {}
+
             # Dispatch por tipo de acción
             if action == "entity_merged":
-                self._undo_entity_merge(target_id, old_value)
+                self._undo_entity_merge(target_id, old_value_dict)
             elif action == "entity_created":
                 self._undo_entity_create(target_id)
             elif action == "entity_deleted":
-                self._undo_entity_delete(target_id, old_value)
+                self._undo_entity_delete(target_id, old_value_dict)
             elif action == "entity_updated":
-                self._undo_entity_update(target_id, old_value)
+                self._undo_entity_update(target_id, old_value_dict)
             elif action in ("alert_resolved", "alert_dismissed"):
-                self._undo_alert_status_change(target_id, old_value)
+                self._undo_alert_status_change(target_id, old_value_dict)
             elif action == "attribute_verified":
-                self._undo_attribute_verification(target_id, old_value)
+                self._undo_attribute_verification(target_id, old_value_dict)
             elif action in ("attribute_updated", "attribute_added"):
-                self._undo_attribute_change(target_id, old_value)
+                self._undo_attribute_change(target_id, old_value_dict)
             elif action == "attribute_deleted":
-                self._undo_attribute_delete(target_id, old_value)
+                self._undo_attribute_delete(target_id, old_value_dict)
             elif action in ("relationship_created", "relationship_updated", "relationship_deleted"):
-                self._undo_relationship_change(action, target_id, old_value)
+                self._undo_relationship_change(action, target_id, old_value_dict)
             else:
                 return UndoResult(
                     success=False,
@@ -585,7 +594,7 @@ class HistoryManager:
 
     # ── Handlers de undo específicos ──
 
-    def _undo_entity_merge(self, result_entity_id: int, old_value: dict) -> None:
+    def _undo_entity_merge(self, result_entity_id: int, old_value: dict[str, Any]) -> None:
         """Revierte fusión de entidades restaurando las originales."""
         if not old_value:
             raise ValueError("No hay información de fusión para deshacer")
@@ -691,7 +700,7 @@ class HistoryManager:
             )
         logger.debug(f"Entidad {entity_id} desactivada (undo create)")
 
-    def _undo_entity_delete(self, entity_id: int, old_value: dict) -> None:
+    def _undo_entity_delete(self, entity_id: int, old_value: dict[str, Any]) -> None:
         """Revierte eliminación de entidad (reactivar soft-delete)."""
         with self.db.connection() as conn:
             conn.execute(
@@ -700,7 +709,7 @@ class HistoryManager:
             )
         logger.debug(f"Entidad {entity_id} restaurada (reactivada)")
 
-    def _undo_entity_update(self, entity_id: int, old_value: dict) -> None:
+    def _undo_entity_update(self, entity_id: int, old_value: dict[str, Any]) -> None:
         """Revierte actualización de entidad restaurando valores anteriores."""
         if not old_value:
             raise ValueError("No hay old_value para restaurar")
@@ -725,7 +734,7 @@ class HistoryManager:
             )
         logger.debug(f"Entidad {entity_id} restaurada a estado anterior")
 
-    def _undo_alert_status_change(self, alert_id: int, old_value: dict) -> None:
+    def _undo_alert_status_change(self, alert_id: int, old_value: dict[str, Any]) -> None:
         """Revierte cambio de status de alerta."""
         old_status = "open"
         if old_value and "status" in old_value:
@@ -751,7 +760,7 @@ class HistoryManager:
 
         logger.debug(f"Alerta {alert_id} restaurada a status '{old_status}'")
 
-    def _undo_attribute_verification(self, attribute_id: int, old_value: dict) -> None:
+    def _undo_attribute_verification(self, attribute_id: int, old_value: dict[str, Any]) -> None:
         """Revierte verificación de atributo."""
         old_verified = 0
         old_attr_value = None
@@ -772,7 +781,7 @@ class HistoryManager:
                 )
         logger.debug(f"Atributo {attribute_id} des-verificado")
 
-    def _undo_attribute_change(self, attribute_id: int, old_value: dict) -> None:
+    def _undo_attribute_change(self, attribute_id: int, old_value: dict[str, Any]) -> None:
         """Revierte cambio de valor de atributo."""
         if not old_value:
             raise ValueError("No hay old_value para restaurar atributo")
@@ -797,7 +806,7 @@ class HistoryManager:
                     )
                 logger.debug(f"Atributo {attribute_id} restaurado")
 
-    def _undo_attribute_delete(self, attribute_id: int, old_value: dict) -> None:
+    def _undo_attribute_delete(self, attribute_id: int, old_value: dict[str, Any]) -> None:
         """Revierte eliminación de atributo (re-crearlo)."""
         if not old_value:
             raise ValueError("No hay old_value para restaurar atributo eliminado")
@@ -821,7 +830,9 @@ class HistoryManager:
             )
         logger.debug(f"Atributo {attribute_id} restaurado (re-creado)")
 
-    def _undo_relationship_change(self, action: str, target_id: int, old_value: dict) -> None:
+    def _undo_relationship_change(
+        self, action: str, target_id: int, old_value: dict[str, Any]
+    ) -> None:
         """Revierte cambio en relación."""
         if not old_value:
             raise ValueError("No hay old_value para restaurar relación")

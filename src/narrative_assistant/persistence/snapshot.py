@@ -111,7 +111,8 @@ class SnapshotRepository:
                        VALUES (?, ?, ?, ?, 'complete')""",
                     (project_id, fingerprint, alert_count, entity_count),
                 )
-                snapshot_id = cursor.lastrowid
+                assert cursor.lastrowid is not None
+                snapshot_id = int(cursor.lastrowid)
 
                 # Copiar alertas con entity names denormalizados
                 alerts = conn.execute(

@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 from ..analysis.attribute_consistency import get_attribute_display_name
+from ..core.errors import NarrativeError
 from ..core.result import Result
 from .formatter import AlertFormatter
 from .models import Alert, AlertCategory, AlertFilter, AlertSeverity, AlertStatus

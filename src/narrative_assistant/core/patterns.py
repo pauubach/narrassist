@@ -7,9 +7,19 @@ como Singleton, evitando duplicación de código boilerplate.
 
 import threading
 from functools import wraps
-from typing import Callable, TypeVar
+from typing import Callable, Protocol, TypeVar, cast
 
 T = TypeVar("T")
+
+
+class LazySingletonFactory(Protocol[T]):
+    """Callable singleton factory enriched with helper methods."""
+
+    def __call__(self) -> T: ...
+
+    def reset(self) -> None: ...
+
+    def has_instance(self) -> bool: ...
 
 
 class SingletonMeta(type):
@@ -140,7 +150,7 @@ def singleton(cls: type[T]) -> type[T]:
     return cls
 
 
-def lazy_singleton(factory: Callable[[], T]) -> Callable[[], T]:
+def lazy_singleton(factory: Callable[[], T]) -> LazySingletonFactory[T]:
     """
     Decorator para funciones factory que crean singletons.
 
@@ -182,7 +192,8 @@ def lazy_singleton(factory: Callable[[], T]) -> Callable[[], T]:
         """Verificar si ya existe una instancia."""
         return _instance is not None
 
-    wrapper.reset = reset
-    wrapper.has_instance = has_instance
+    wrapped = cast(LazySingletonFactory[T], wrapper)
+    wrapped.reset = reset
+    wrapped.has_instance = has_instance
 
-    return wrapper
+    return wrapped

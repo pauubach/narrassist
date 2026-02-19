@@ -11,7 +11,7 @@ import sys
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,15 @@ def _get_default_data_dir() -> Path:
 DevicePreference = Literal["auto", "cuda", "mps", "cpu"]
 
 
+def _parse_device_preference(raw_value: str) -> DevicePreference:
+    """Valida el valor de preferencia de dispositivo y aplica fallback seguro."""
+    value = raw_value.strip().lower()
+    if value in {"auto", "cuda", "mps", "cpu"}:
+        return cast(DevicePreference, value)
+    logger.warning("NA_DEVICE invalido '%s'; usando 'auto'", raw_value)
+    return "auto"
+
+
 @dataclass
 class GPUConfig:
     """Configuración de GPU/dispositivo."""
@@ -72,7 +81,7 @@ class GPUConfig:
     def from_env(cls) -> "GPUConfig":
         """Crea configuración desde variables de entorno."""
         return cls(
-            device_preference=str(os.getenv("NA_DEVICE", "auto")),
+            device_preference=_parse_device_preference(os.getenv("NA_DEVICE", "auto")),
             spacy_gpu_enabled=os.getenv("NA_SPACY_GPU", "true").lower() == "true",
             embeddings_gpu_enabled=os.getenv("NA_EMBEDDINGS_GPU", "true").lower() == "true",
             embeddings_batch_size_gpu=int(os.getenv("NA_BATCH_SIZE_GPU", "64")),
@@ -368,7 +377,9 @@ class AppConfig:
                 # Mapear GPU config
                 if gpu_data := data.get("gpu"):
                     config.gpu = GPUConfig(
-                        device_preference=gpu_data.get("device_preference", "auto"),
+                        device_preference=_parse_device_preference(
+                            str(gpu_data.get("device_preference", "auto"))
+                        ),
                         spacy_gpu_enabled=gpu_data.get("spacy_gpu_enabled", True),
                         spacy_gpu_memory_limit=gpu_data.get("spacy_gpu_memory_limit"),
                         embeddings_gpu_enabled=gpu_data.get("embeddings_gpu_enabled", True),
