@@ -162,8 +162,8 @@ class EntityRepository:
         Returns:
             True si se actualizó
         """
-        updates = []
-        params = []
+        updates: list[str] = []
+        params: list[Any] = []
 
         if canonical_name is not None:
             updates.append("canonical_name = ?")
@@ -975,8 +975,8 @@ class EntityRepository:
         Returns:
             True si se actualizó
         """
-        updates = []
-        params = []
+        updates: list[str] = []
+        params: list[Any] = []
 
         if attribute_key is not None:
             updates.append("attribute_key = ?")

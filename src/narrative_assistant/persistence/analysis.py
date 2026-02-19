@@ -388,6 +388,7 @@ class AnalysisRepository:
                 """,
                 (project_id, session_id, config_json, quality_profile),
             )
+            assert cursor.lastrowid is not None, "Failed to get lastrowid after insert"
             return int(cursor.lastrowid)
 
     def complete_run(
@@ -454,6 +455,7 @@ class AnalysisRepository:
                 """,
                 (run_id, phase_name, int(executed), result_count, error_message, metadata_json),
             )
+            assert cursor.lastrowid is not None, "Failed to get lastrowid after insert"
             return int(cursor.lastrowid)
 
     def get_executed_phases(self, project_id: int) -> dict[str, bool]:
@@ -507,6 +509,7 @@ class AnalysisRepository:
                     int(rel.is_inferred),
                 ),
             )
+            assert cursor.lastrowid is not None, "Failed to get lastrowid after insert"
             return int(cursor.lastrowid)
 
     def save_relationships_batch(self, relationships: list[Relationship]) -> int:
@@ -588,6 +591,7 @@ class AnalysisRepository:
                     int(interaction.is_in_dialogue),
                 ),
             )
+            assert cursor.lastrowid is not None, "Failed to get lastrowid after insert"
             return int(cursor.lastrowid)
 
     def save_interactions_batch(self, interactions: list[Interaction]) -> int:
@@ -674,6 +678,7 @@ class AnalysisRepository:
                     int(change.is_justified),
                 ),
             )
+            assert cursor.lastrowid is not None, "Failed to get lastrowid after insert"
             return int(cursor.lastrowid)
 
     def save_register_changes_batch(self, changes: list[RegisterChange]) -> int:
@@ -761,6 +766,7 @@ class AnalysisRepository:
                     metrics.balance_deviation,
                 ),
             )
+            assert cursor.lastrowid is not None, "Failed to get lastrowid after insert"
             return int(cursor.lastrowid)
 
     def get_pacing_metrics(self, project_id: int) -> list[PacingMetrics]:
