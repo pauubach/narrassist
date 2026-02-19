@@ -209,7 +209,12 @@ const correctedDialogues = ref<Map<string, { speakerName: string; speakerId: num
 
 // Entity options for speaker correction dropdown
 const speakerOptions = computed(() => {
-  const characters = (props.entities || []).filter(e => {
+  // Ensure entities is always an array, never undefined
+  if (!props.entities || !Array.isArray(props.entities)) {
+    return []
+  }
+
+  const characters = props.entities.filter(e => {
     const t = e.type || e.entity_type || ''
     return t === 'character'
   })
@@ -363,6 +368,17 @@ const truncateText = (text: string, maxLength: number): string => {
 
 // Speaker correction methods
 function startCorrection(idx: number, attr: DialogueAttribution) {
+  // Defensive check: don't start correction if no speaker options available
+  if (speakerOptions.value.length === 0) {
+    toast.add({
+      severity: 'warn',
+      summary: 'No hay personajes',
+      detail: 'No se encontraron personajes en el proyecto para asignar como hablantes',
+      life: 3000
+    })
+    return
+  }
+
   correctingIndex.value = idx
   correctedSpeakerId.value = attr.speakerId
 }
