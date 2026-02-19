@@ -230,6 +230,7 @@ class AlertEngine:
         if result.is_failure:
             return result
 
+        assert result.value is not None  # is_success guarantees value
         alerts = result.value
 
         if alert_filter:
@@ -271,8 +272,9 @@ class AlertEngine:
         if result.is_failure:
             return result
 
+        assert result.value is not None  # is_success guarantees value
         alert = result.value
-        old_status = getattr(alert, 'status', None)
+        old_status = alert.status
 
         alert.status = status
         alert.resolution_note = note
@@ -325,6 +327,7 @@ class AlertEngine:
         if result.is_failure:
             return result
 
+        assert result.value is not None  # is_success guarantees value
         alerts = result.value
 
         summary = {
