@@ -1298,6 +1298,21 @@ watch(() => alerts.value.length, (newLength, oldLength) => {
   }
 })
 
+// Auto-reload alerts when settings change (e.g., dialogue dash style)
+const handleSettingsChange = async () => {
+  if (!project.value) return
+  console.log('[ProjectDetailView] Settings changed, reloading alerts...')
+  await loadAlerts(project.value.id, true) // Force reload
+}
+
+onMounted(() => {
+  window.addEventListener('settings-changed', handleSettingsChange)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('settings-changed', handleSettingsChange)
+})
+
 const onDocumentTypeChanged = async (_type: string, _subtype: string | null) => {
   // Recargar el proyecto para obtener el nuevo perfil de features
   if (project.value) {
