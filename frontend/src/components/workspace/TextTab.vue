@@ -153,17 +153,28 @@ function computeGutterMarkers() {
     const order: MetaCategoryKey[] = ['errors', 'inconsistencies', 'quality', 'suggestions']
 
     for (const metaKey of order) {
-      const alerts = byMetaCategory.get(metaKey)
-      if (alerts && alerts.length > 0) {
-        const meta = META_CATEGORIES[metaKey]
-        badges.push({
-          metaCategory: metaKey,
-          count: alerts.length,
-          color: meta.color,
-          label: meta.label,
-          alerts
-        })
+      const alertsList = byMetaCategory.get(metaKey)
+      if (!alertsList || alertsList.length === 0) continue
+
+      const meta = META_CATEGORIES[metaKey]
+      if (!meta) {
+        console.warn(`[TextTab] No meta-category config for key: ${metaKey}`)
+        continue
       }
+
+      const count = alertsList.length
+      if (typeof count !== 'number' || isNaN(count)) {
+        console.error(`[TextTab] Invalid count for ${metaKey}:`, count, alertsList)
+        continue
+      }
+
+      badges.push({
+        metaCategory: metaKey,
+        count,
+        color: meta.color,
+        label: meta.label,
+        alerts: alertsList
+      })
     }
 
     if (badges.length > 0) {
