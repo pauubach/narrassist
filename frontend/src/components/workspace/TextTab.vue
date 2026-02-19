@@ -100,6 +100,7 @@ function computeGutterMarkers() {
   const markers: Array<{
     id: number
     chapterIndex: number
+    topPercent: number
     badges: Array<{
       metaCategory: MetaCategoryKey
       count: number
@@ -112,6 +113,8 @@ function computeGutterMarkers() {
   if (props.chapters.length === 0) {
     return markers
   }
+
+  const totalChapters = props.chapters.length
 
   // Para cada capítulo, agrupar alertas por meta-categoría
   props.chapters.forEach((chapter, index) => {
@@ -155,18 +158,22 @@ function computeGutterMarkers() {
         const meta = META_CATEGORIES[metaKey]
         badges.push({
           metaCategory: metaKey,
-          count: alerts?.length || 0,
-          color: meta.color || 'var(--ds-color-text-secondary, #6b7280)',
-          label: meta.label || 'Otros',
-          alerts: alerts || []
+          count: alerts.length,
+          color: meta.color,
+          label: meta.label,
+          alerts
         })
       }
     }
 
     if (badges.length > 0) {
+      // Calcular posición vertical como porcentaje del documento total
+      const topPercent = (index / totalChapters) * 100
+
       markers.push({
         id: chapter.id,
         chapterIndex: index,
+        topPercent,
         badges
       })
     }
@@ -273,42 +280,10 @@ watch(scrollTarget, (target) => {
   }
 })
 
-// Posicionar badges junto a títulos de capítulos
-function updateBadgePositions() {
-  nextTick(() => {
-    const documentArea = document.querySelector('.document-area')
-    if (!documentArea) return
-
-    // Encontrar todos los títulos de capítulos (h1, h2 con clase chapter-title o similar)
-    const chapterHeaders = documentArea.querySelectorAll('h1, h2')
-
-    gutterMarkers.value.forEach((marker, index) => {
-      const header = chapterHeaders[marker.chapterIndex]
-      if (!header) return
-
-      const badgeEl = document.querySelector(`[data-chapter-index="${marker.chapterIndex}"]`)
-      if (!badgeEl) return
-
-      // Obtener posición relativa del header al viewport del documentArea
-      const headerRect = header.getBoundingClientRect()
-      const areaRect = documentArea.getBoundingClientRect()
-      const topOffset = headerRect.top - areaRect.top
-
-      ;(badgeEl as HTMLElement).style.top = `${Math.max(0, topOffset)}px`
-    })
-  })
-}
-
-// Actualizar posiciones cuando cambian capítulos o alertas
-watch([() => props.chapters, () => props.alerts], updateBadgePositions)
-
-// onMounted: procesar scroll pendiente + posicionar badges
+// onMounted: procesar scroll pendiente
 onMounted(async () => {
   // Esperar al siguiente tick para asegurar que las props están actualizadas
   await nextTick()
-
-  // Posicionar badges inicialmente
-  updateBadgePositions()
 
   // Si hay una posición pendiente cuando el componente se monta, el computed scrollTarget
   // ya la habrá detectado. Solo necesitamos asegurar que se procese.
@@ -337,6 +312,7 @@ onMounted(async () => {
         v-for="marker in gutterMarkers"
         :key="marker.id"
         class="chapter-badges"
+        :style="{ top: marker.topPercent + '%' }"
         :data-chapter-index="marker.chapterIndex"
       >
         <button
@@ -384,10 +360,8 @@ onMounted(async () => {
   top: 0;
   bottom: 0;
   width: 60px;
-  z-index: 5;
+  z-index: 1;
   pointer-events: none;
-  display: flex;
-  flex-direction: column;
 }
 
 .chapter-badges {
