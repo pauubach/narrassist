@@ -1003,7 +1003,7 @@ class ScopeResolver:
         candidates = []
         seen_names = set()
         for name, start, end, etype in entity_mentions:
-            if etype == "PER" and search_start <= start < search_end and name not in seen_names:
+            if etype == "PER" and search_start is not None and start is not None and search_start <= start < search_end and name not in seen_names:
                 candidates.append((name, start, end, etype))
                 seen_names.add(name)
 
@@ -1502,7 +1502,7 @@ class ScopeResolver:
             from ..llm.client import get_llm_client
 
             llm = get_llm_client()
-            if not llm.is_available():
+            if llm is None or not llm.is_available():
                 logger.debug("LLM no disponible para desambiguación semántica")
                 return None
         except Exception as e:
@@ -1539,6 +1539,8 @@ Candidatos posibles: {', '.join(candidate_names)}
 Responde SOLO con el nombre del candidato más probable, o "AMBIGUO" si no puedes determinarlo con certeza."""
 
         try:
+            if llm is None:
+                return None
             response = llm.generate(prompt, max_tokens=50, temperature=0.1)
             if not response:
                 return None

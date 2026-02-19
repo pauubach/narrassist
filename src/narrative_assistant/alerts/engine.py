@@ -794,7 +794,7 @@ class AlertEngine:
             alert_type=f"{category}_{issue_type}",
             title=title,
             description=description,
-            explanation=explanation_text,
+            explanation=explanation_text or "",
             suggestion=suggestion,
             chapter=chapter,
             start_char=start_char,
