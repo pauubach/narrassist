@@ -5,7 +5,7 @@ Gestiona el almacenamiento y recuperación de capítulos detectados en documento
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from .database import Database, get_database

@@ -12,8 +12,8 @@ ya que la correferencia automática tiene ~45-55% de errores.
 import logging
 import threading
 from dataclasses import dataclass
-from typing import Optional
 from difflib import SequenceMatcher
+from typing import Optional
 
 from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result

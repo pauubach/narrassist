@@ -94,7 +94,7 @@ class TerminologyDetector(BaseDetector):
 
     def __init__(self, config: TerminologyConfig | None = None):
         self.config = config or TerminologyConfig()
-        self._embeddings_model: "EmbeddingsModel | None" = None
+        self._embeddings_model: EmbeddingsModel | None = None
         self._synonym_lookup = self._build_synonym_lookup()
 
     def _build_synonym_lookup(self) -> dict[str, set[str]]:
