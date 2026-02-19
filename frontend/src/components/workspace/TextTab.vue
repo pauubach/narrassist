@@ -82,13 +82,18 @@ const showGutter = computed(() => gutterMarkers.value.length > 0)
 // Computed: alertas agrupadas por capítulo para el gutter
 const alertsByChapter = computed(() => {
   const grouped = new Map<number, Alert[]>()
+  let withoutChapter = 0
   for (const alert of props.alerts) {
-    if (alert.chapter !== undefined) {
+    if (alert.chapter !== undefined && alert.chapter !== null) {
       const list = grouped.get(alert.chapter) || []
       list.push(alert)
       grouped.set(alert.chapter, list)
+    } else {
+      withoutChapter++
+      console.warn(`[TextTab] Alert sin capítulo asignado:`, alert.title, alert)
     }
   }
+  console.log(`[TextTab] Total alerts: ${props.alerts.length}, sin capítulo: ${withoutChapter}, agrupadas: ${Array.from(grouped.entries()).map(([ch, alerts]) => `cap${ch}=${alerts.length}`).join(', ')}`)
   return grouped
 })
 
@@ -126,7 +131,10 @@ function computeGutterMarkers() {
 
     for (const alert of chapterAlerts) {
       // Skip si no tiene categoría
-      if (!alert.category) continue
+      if (!alert.category) {
+        console.warn(`[TextTab] Alert ${alert.id} sin categoría:`, alert.title)
+        continue
+      }
 
       // Encontrar la meta-categoría de esta alerta
       let metaKey: MetaCategoryKey | null = null
@@ -134,12 +142,14 @@ function computeGutterMarkers() {
         const meta = metaConfig as typeof META_CATEGORIES[MetaCategoryKey]
         if (meta.categories.includes(alert.category as never)) {
           metaKey = key as MetaCategoryKey
+          console.log(`[TextTab] Alert "${alert.title}" (${alert.category}) → meta: ${metaKey}`)
           break
         }
       }
 
       // Fallback a 'suggestions' si no encontró meta-categoría
       if (!metaKey) {
+        console.warn(`[TextTab] Alert "${alert.title}" category="${alert.category}" no mapeó a ninguna meta-categoría, fallback a suggestions`)
         metaKey = 'suggestions'
       }
 
@@ -181,6 +191,8 @@ function computeGutterMarkers() {
       // Calcular posición vertical como porcentaje del documento total
       const topPercent = (index / totalChapters) * 100
 
+      console.log(`[TextTab] Cap ${index} (${chapter.chapterNumber}) badges:`, badges.map(b => `${b.metaCategory}=${b.count}`).join(', '), `topPercent=${topPercent}%`)
+
       markers.push({
         id: chapter.id,
         chapterIndex: index,
@@ -190,6 +202,7 @@ function computeGutterMarkers() {
     }
   })
 
+  console.log(`[TextTab] Total markers creados: ${markers.length}`)
   return markers
 }
 
@@ -207,6 +220,15 @@ const gutterMarkers = computed(() => {
     gutterMarkersCache.value = { hash, value: markers }
   })
   return markers
+})
+
+// Computed: convertir gutterMarkers a Map<chapterId, badges[]> para DocumentViewer
+const chapterBadgesMap = computed(() => {
+  const map = new Map()
+  for (const marker of gutterMarkers.value) {
+    map.set(marker.id, marker.badges)
+  }
+  return map
 })
 
 // Handlers
@@ -314,31 +336,6 @@ onMounted(async () => {
       @close="showFindBar = false"
     />
 
-    <!-- Gutter con badges de alertas por meta-categoría -->
-    <div
-      v-if="showGutter"
-      class="alert-gutter"
-    >
-      <div
-        v-for="marker in gutterMarkers"
-        :key="marker.id"
-        class="chapter-badges"
-        :style="{ top: marker.topPercent + '%' }"
-        :data-chapter-index="marker.chapterIndex"
-      >
-        <button
-          v-for="badge in marker.badges"
-          :key="badge.metaCategory"
-          class="alert-badge"
-          :style="{ backgroundColor: badge.color }"
-          :title="`${badge.count} ${badge.label.toLowerCase()}`"
-          @click="handleBadgeClick(badge)"
-        >
-          <span class="badge-count">{{ badge.count }}</span>
-        </button>
-      </div>
-    </div>
-
     <!-- Document Viewer -->
     <div class="document-area">
       <DocumentViewer
@@ -349,6 +346,7 @@ onMounted(async () => {
         :scroll-to-target="scrollTarget"
         :external-chapters="chapters"
         :alert-highlight-ranges="alertHighlightRanges"
+        :chapter-badges="chapterBadgesMap"
         @chapter-visible="handleChapterVisible"
         @entity-click="handleEntityClick"
       />
@@ -364,61 +362,10 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-/* Gutter lateral con badges por meta-categoría */
-.alert-gutter {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 60px;
-  z-index: 1;
-  pointer-events: none;
-}
-
-.chapter-badges {
-  position: absolute;
-  left: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  pointer-events: all;
-  /* top se establece dinámicamente via JS */
-}
-
-.alert-badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 24px;
-  border-radius: 12px;
-  border: none;
-  cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.alert-badge:hover {
-  transform: scale(1.05);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-}
-
-.badge-count {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: white;
-  text-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
-}
-
 /* Document area */
 .document-area {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-}
-
-/* Dark mode */
-.dark .alert-gutter {
-  background: var(--surface-800);
 }
 </style>

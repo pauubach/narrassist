@@ -38,7 +38,7 @@ const severityOrder: Record<AlertSeverity, number> = {
 
 /** Conteo por meta-categoría */
 const metaCounts = computed(() => {
-  const counts: Record<MetaCategoryKey, number> = { errors: 0, inconsistencies: 0, suggestions: 0 }
+  const counts: Record<MetaCategoryKey, number> = { errors: 0, inconsistencies: 0, quality: 0, suggestions: 0 }
   for (const alert of props.alerts) {
     if (alert.status !== 'active') continue
     for (const [key, meta] of Object.entries(META_CATEGORIES)) {
@@ -79,6 +79,18 @@ function truncateTitle(title: string, maxLen = 40): string {
 /** Check si una alerta está seleccionada */
 function isSelected(alert: Alert): boolean {
   return selectionStore.selectedAlertIds.includes(alert.id)
+}
+
+/** Obtener color de meta-categoría para una alerta */
+function getAlertMetaColor(alert: Alert): string {
+  for (const [key, metaConfig] of Object.entries(META_CATEGORIES)) {
+    const meta = metaConfig as typeof META_CATEGORIES[MetaCategoryKey]
+    if (meta.categories.includes(alert.category as never)) {
+      return meta.color
+    }
+  }
+  // Fallback a sugerencias
+  return META_CATEGORIES.suggestions.color
 }
 
 function handleAlertClick(alert: Alert) {
@@ -137,7 +149,7 @@ function handleAlertClick(alert: Alert) {
       >
         <span
           class="severity-dot"
-          :style="{ backgroundColor: getSeverityColor(alert.severity) }"
+          :style="{ backgroundColor: getAlertMetaColor(alert) }"
         ></span>
         <span class="alert-title">{{ truncateTitle(alert.title) }}</span>
         <span v-if="alert.chapter" class="alert-chapter">{{ alert.chapter }}</span>

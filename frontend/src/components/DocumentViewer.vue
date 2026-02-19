@@ -126,9 +126,22 @@
           :data-chapter-id="chapter.id"
           class="chapter-section"
         >
-          <h2 class="chapter-title">
-            {{ chapter.chapterNumber }}. {{ chapter.title }}
-          </h2>
+          <div class="chapter-header">
+            <span v-if="chapterBadges?.has(chapter.id)" class="chapter-badges-float">
+              <button
+                v-for="badge in chapterBadges.get(chapter.id)"
+                :key="badge.metaCategory"
+                class="alert-badge"
+                :style="{ backgroundColor: badge.color }"
+                :title="`${badge.count} ${badge.label.toLowerCase()}`"
+              >
+                <span class="badge-count">{{ badge.count }}</span>
+              </button>
+            </span>
+            <h2 class="chapter-title">
+              {{ chapter.chapterNumber }}. {{ chapter.title }}
+            </h2>
+          </div>
 
           <!-- Contenido del capítulo con entidades resaltadas (lazy loaded) -->
           <div
@@ -227,6 +240,13 @@ interface AlertHighlightRange {
   label?: string
 }
 
+interface ChapterBadge {
+  metaCategory: string
+  count: number
+  color: string
+  label: string
+}
+
 const props = defineProps<{
   projectId: number
   documentTitle?: string
@@ -237,6 +257,8 @@ const props = defineProps<{
   externalChapters?: Chapter[]
   /** Rangos múltiples a resaltar (para alertas de inconsistencia) */
   alertHighlightRanges?: AlertHighlightRange[]
+  /** Badges de alertas por capítulo (Map: chapterId -> badges[]) */
+  chapterBadges?: Map<number, ChapterBadge[]>
 }>()
 
 const emit = defineEmits<{
@@ -1826,6 +1848,48 @@ defineExpose({
   margin-bottom: 3rem;
   /* Offset for scroll-to navigation to account for toolbar */
   scroll-margin-top: 80px;
+}
+
+.chapter-header {
+  position: relative;
+}
+
+.chapter-badges-float {
+  position: absolute;
+  left: -40px; /* Más cerca del título */
+  top: 0; /* Alineado con el inicio del título */
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  align-items: flex-end;
+}
+
+.chapter-badges-float .alert-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  border-radius: 0.875rem;
+  border: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+}
+
+.chapter-badges-float .alert-badge:hover {
+  transform: translateX(-2px) scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
+}
+
+.chapter-badges-float .alert-badge .badge-count {
+  font-size: 0.75rem;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .chapter-title {
