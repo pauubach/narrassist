@@ -758,6 +758,7 @@ class PipelineAlertsMixin:
                         start_char=getattr(issue, "start_char", None),
                         end_char=getattr(issue, "end_char", None),
                         confidence=getattr(issue, "confidence", 0.8),
+                        chapter=getattr(issue, "chapter_index", None),
                     )
                     if result.is_success:
                         context.alerts.append(result.value)
@@ -864,6 +865,7 @@ class PipelineAlertsMixin:
                         end_char=getattr(issue, "end_char", None),
                         confidence=getattr(issue, "confidence", 0.7),
                         extra_data=getattr(issue, "extra_data", {}),
+                        chapter=getattr(issue, "chapter_index", None),
                     )
                     if result.is_success:
                         context.alerts.append(result.value)

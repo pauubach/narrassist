@@ -671,7 +671,7 @@ class PipelineQualityMixin:
                         suggestion=filler.suggestion,
                         confidence=0.7 if filler.severity.value == "high" else 0.6,
                         context=occ.context,
-                        chapter_index=None,  # TODO: Mapear posición a capítulo
+                        chapter_index=self._find_chapter_for_position(occ.start_char, context.chapters) if context.chapters else None,
                         rule_id=f"filler_{filler.normalized}",
                         extra_data={
                             "filler_type": filler.filler_type.value,
