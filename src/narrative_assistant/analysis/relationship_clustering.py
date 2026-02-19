@@ -623,7 +623,7 @@ class RelationshipClusteringEngine:
 
         Usa votación: si hierarchical y community coinciden, mayor confianza.
         """
-        clusters = []
+        clusters: list[CharacterCluster] = []
 
         # Preferir communities si disponible, sino hierarchical
         cluster_source = communities if communities else hierarchical_clusters
@@ -679,7 +679,7 @@ class RelationshipClusteringEngine:
         if not members:
             return None
 
-        connection_counts = defaultdict(int)
+        connection_counts: dict[int, int] = defaultdict(int)
         for cooc in self._cooccurrences:
             if cooc.entity1_id in members and cooc.entity2_id in members:
                 connection_counts[cooc.entity1_id] += 1

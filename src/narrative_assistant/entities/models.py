@@ -13,6 +13,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 
 class EntityType(Enum):
@@ -131,7 +132,8 @@ class EntityMention:
         try:
             import json
 
-            return json.loads(self.metadata)
+            parsed: dict[Any, Any] | None = json.loads(self.metadata)
+            return parsed
         except (json.JSONDecodeError, TypeError):
             return None
 

@@ -333,7 +333,7 @@ class VoiceProfileBuilder:
             metrics.formality_score = 0.5  # Neutral
 
         # Calcular muletillas
-        filler_counts = Counter()
+        filler_counts: Counter[str] = Counter()
         total_filler_count = 0
         for text in interventions:
             text_lower = text.lower()
@@ -470,7 +470,7 @@ class VoiceProfileBuilder:
         patterns = []
 
         # Patrones de inicio de frase
-        starts = Counter()
+        starts: Counter[str] = Counter()
         for text in interventions:
             words = text.split()[:3]  # Primeras 3 palabras
             if len(words) >= 2:
@@ -481,7 +481,7 @@ class VoiceProfileBuilder:
                 patterns.append(f"Inicio: '{pattern}...'")
 
         # Patrones de fin de frase
-        ends = Counter()
+        ends: Counter[str] = Counter()
         for text in interventions:
             # Buscar patrones antes de puntuación final
             match = re.search(r"(\w+\s+\w+)[.!?]+\s*$", text)
@@ -493,7 +493,7 @@ class VoiceProfileBuilder:
                 patterns.append(f"Final: '...{pattern}'")
 
         # Expresiones repetidas
-        expressions = Counter()
+        expressions: Counter[str] = Counter()
         for text in interventions:
             # Buscar bigramas y trigramas frecuentes
             words = self._tokenize(text)

@@ -387,7 +387,7 @@ class LLMExtractor(BaseExtractor):
         2. Recopila atributos de cada uno
         3. Vota para determinar atributos finales
         """
-        attributes = []
+        attributes: list[dict[str, Any]] = []
         errors = []
         model_results: list[SingleModelResult] = []
 

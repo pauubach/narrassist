@@ -55,9 +55,10 @@ class SingletonMeta(type):
 
         return cls._instances[cls]
 
-    def get_instance(cls, *args, **kwargs) -> T:
+    def get_instance(cls: type[T], *args, **kwargs) -> T:
         """Alias explícito para obtener la instancia singleton."""
-        return cls(*args, **kwargs)
+        instance: T = cls(*args, **kwargs)  # type: ignore[return-value]
+        return instance
 
     def reset_instance(cls) -> None:
         """Reset la instancia singleton (para testing)."""
@@ -117,7 +118,8 @@ def singleton(cls: type[T]) -> type[T]:
 
     def get_instance(*args, **kwargs) -> T:
         """Obtener instancia singleton."""
-        return new_call(cls, *args, **kwargs)
+        instance: T = new_call(cls, *args, **kwargs)  # type: ignore[assignment]
+        return instance
 
     def reset_instance() -> None:
         """Reset la instancia singleton (para testing)."""
@@ -129,11 +131,11 @@ def singleton(cls: type[T]) -> type[T]:
         """Verificar si ya existe una instancia."""
         return _instance is not None
 
-    cls.__init__ = new_init
-    cls.__new__ = lambda c, *a, **kw: new_call(c, *a, **kw)
-    cls.get_instance = staticmethod(get_instance)
-    cls.reset_instance = staticmethod(reset_instance)
-    cls.has_instance = staticmethod(has_instance)
+    cls.__init__ = new_init  # type: ignore[method-assign]
+    cls.__new__ = lambda c, *a, **kw: new_call(c, *a, **kw)  # type: ignore[method-assign]
+    cls.get_instance = staticmethod(get_instance)  # type: ignore[attr-defined]
+    cls.reset_instance = staticmethod(reset_instance)  # type: ignore[attr-defined]
+    cls.has_instance = staticmethod(has_instance)  # type: ignore[attr-defined]
 
     return cls
 

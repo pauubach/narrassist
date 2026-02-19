@@ -258,7 +258,7 @@ def _collect_alert_decisions(alert_repo, project_id: int) -> list[dict]:
         if alert.status.value == "new":
             continue
 
-        entity_names = []
+        entity_names: list[str] = []
         if alert.entity_ids:
             # entity_ids ya viene como lista de ints
             pass  # No resolvemos nombres aquí para evitar dependencia circular

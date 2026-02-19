@@ -610,7 +610,7 @@ class RegisterChangeDetector:
         Returns:
             Lista de cambios de registro detectados
         """
-        changes = []
+        changes: list[dict[str, Any]] = []
 
         # Filtrar solo narracion (no dialogos) para comparar
         narrative_analyses = [a for a in self.analyses if not a.is_dialogue]

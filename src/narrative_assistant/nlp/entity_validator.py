@@ -1050,7 +1050,7 @@ class EntityValidator:
 
         # Agrupar entidades únicas con score borderline para validar
         # (las muy buenas y muy malas ya están decididas por heurísticas)
-        entities_to_validate = []
+        entities_to_validate: list[dict[str, Any]] = []
         for entity in entities:
             score = scores.get(entity.text)
             if score and 0.3 <= score.total_score <= 0.7:

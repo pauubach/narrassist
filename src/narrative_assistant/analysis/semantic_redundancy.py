@@ -428,7 +428,7 @@ class SemanticRedundancyDetector:
         max_duplicates: int,
     ) -> list[SemanticDuplicate]:
         """Encuentra duplicados con búsqueda lineal (fallback sin FAISS)."""
-        duplicates = []
+        duplicates: list[dict[str, Any]] = []
         seen_pairs = set()
 
         n_sentences = len(sentences)

@@ -347,7 +347,7 @@ class NERExtractor(NERValidatorMixin, NERPatternDetectorMixin, NERCoordSplitterM
                     model_key=self._transformer_ner_model_key
                 )
 
-            raw_entities = getattr(self._transformer_ner, "extract", lambda x: [])(text)
+            raw_entities: list[dict[str, Any]] = getattr(self._transformer_ner, "extract", lambda x: [])(text)
             result: list[ExtractedEntity] = []
             for ent in raw_entities:
                 label = self.SPACY_LABEL_MAP.get(ent.label)
@@ -1291,7 +1291,7 @@ JSON:"""
             result.entities.sort(key=lambda e: e.start_char)
 
             # Log de fuentes
-            sources = {}
+            sources: dict[str, Any] = {}
             for e in result.entities:
                 sources[e.source] = sources.get(e.source, 0) + 1
 
