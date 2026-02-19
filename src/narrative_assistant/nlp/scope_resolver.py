@@ -329,7 +329,7 @@ class ScopeResolver:
                     for c in child.children
                 )
                 if has_de:
-                    return child  # type: ignore[return-value]
+                    return child  # type: ignore[no-any-return]
         return None
 
     def _expand_entity_span(self, token) -> str:
@@ -1502,7 +1502,7 @@ class ScopeResolver:
             from ..llm.client import get_llm_client
 
             llm = get_llm_client()
-            if llm is None or not (callable(getattr(llm, 'is_available', None)) and llm.is_available()):
+            if llm is None or not hasattr(llm, 'is_available') or not llm.is_available():
                 logger.debug("LLM no disponible para desambiguación semántica")
                 return None
         except Exception as e:
