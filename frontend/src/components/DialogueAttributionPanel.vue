@@ -99,16 +99,15 @@
         <div v-if="correctingIndex === idx" class="correction-form" @click.stop>
           <label class="correction-label">Hablante correcto:</label>
           <Select
-            v-if="speakerOptions.length > 0"
             v-model="correctedSpeakerId"
-            :options="speakerOptions"
+            :options="speakerOptions || []"
             option-label="label"
             option-value="value"
             placeholder="Seleccionar hablante"
             class="correction-select"
             size="small"
           />
-          <span v-else class="no-entities-message">No hay personajes disponibles</span>
+          <span v-if="speakerOptions.length === 0" class="no-entities-message">No hay personajes disponibles</span>
           <div class="correction-actions">
             <Button
               icon="pi pi-check"
@@ -222,7 +221,12 @@ const speakerOptions = computed(() => {
     label: e.name,
     value: e.id
   }))
-  options.push({ label: 'Desconocido', value: null })
+
+  // Only add "Desconocido" option if there are characters
+  if (options.length > 0) {
+    options.push({ label: 'Desconocido', value: null })
+  }
+
   return options
 })
 
