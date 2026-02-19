@@ -114,31 +114,42 @@
         
         <!-- Bars view -->
         <div v-if="chartType === 'bars'" class="distribution-bars">
-          <div
-            v-for="(value, register) in registerDistribution"
-            :key="register"
-            class="distribution-item"
-          >
-            <div class="distribution-header">
-              <span class="register-name">{{ getRegisterLabel(String(register)) }}</span>
-              <span class="register-percent">{{ formatPercent(value) }}</span>
+          <div v-if="Object.keys(registerDistribution).length > 0">
+            <div
+              v-for="(value, register) in registerDistribution"
+              :key="register"
+              class="distribution-item"
+            >
+              <div class="distribution-header">
+                <span class="register-name">{{ getRegisterLabel(String(register)) }}</span>
+                <span class="register-percent">{{ formatPercent(value) }}</span>
+              </div>
+              <ProgressBar
+                :value="value * 100"
+                :show-value="false"
+                :class="getRegisterClass(String(register))"
+              />
             </div>
-            <ProgressBar
-              :value="value * 100"
-              :show-value="false"
-              :class="getRegisterClass(String(register))"
-            />
+          </div>
+          <div v-else class="empty-chart">
+            <i class="pi pi-chart-bar"></i>
+            <p>No hay datos de distribución de registros</p>
           </div>
         </div>
         
         <!-- Pie chart view -->
         <div v-else class="distribution-pie">
-          <Chart 
-            type="pie" 
-            :data="pieChartData" 
+          <Chart
+            v-if="Object.keys(registerDistribution).length > 0"
+            type="pie"
+            :data="pieChartData"
             :options="pieChartOptions"
             class="pie-chart"
           />
+          <div v-else class="empty-chart">
+            <i class="pi pi-chart-pie"></i>
+            <p>No hay datos de distribución de registros</p>
+          </div>
         </div>
       </div>
 
