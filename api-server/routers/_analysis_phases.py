@@ -922,11 +922,11 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
         """Busca el chapter_id para una posición de carácter dada."""
         for ch in chapters_with_ids:
             if ch.start_char <= start_char < ch.end_char:
-                return ch.id  # type: ignore[no-any-return]
+                return ch.id
         # Fallback: capítulo más cercano
         if chapters_with_ids:
             closest = min(chapters_with_ids, key=lambda c: abs(c.start_char - start_char))
-            return closest.id  # type: ignore[no-any-return]
+            return closest.id
         return None
 
     # S8a-02: Compute and persist chapter metrics (lightweight, regex-based)
@@ -1118,7 +1118,7 @@ def _filter_overlapping_entities(raw_entities: list) -> list:
     if not raw_entities:
         return []
     sorted_ents = sorted(raw_entities, key=lambda e: (e.start_char, -(e.end_char - e.start_char)))
-    result = []  # type: ignore[var-annotated]
+    result = []
     for ent in sorted_ents:
         overlaps = False
         for accepted in result:
@@ -1902,9 +1902,9 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
 
             entity_names = [e.canonical_name for e in entities if e.canonical_name]
             aliases_dict = {}
-            for e in entities:  # type: ignore[misc]
-                if e.canonical_name and e.aliases:  # type: ignore[misc]
-                    aliases_dict[e.canonical_name] = e.aliases  # type: ignore[misc]
+            for e in entities:
+                if e.canonical_name and e.aliases:
+                    aliases_dict[e.canonical_name] = e.aliases
 
             existing_positions = set()
             for entity in entities:
@@ -1961,7 +1961,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
 
         # Recalcular importancia final
         logger.info("Recalculando importancia de entidades...")
-        db = deps.get_database()  # type: ignore[misc]
+        db = deps.get_database()
         for entity in entities:
             try:
                 with db.connection() as conn:
@@ -2205,7 +2205,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
             from narrative_assistant.core.device import get_device_detector
 
             detector = get_device_detector()
-            has_gpu = detector.device_type.value in ("cuda", "mps")  # type: ignore[attr-defined]
+            has_gpu = detector.device_type.value in ("cuda", "mps")
         except Exception:
             has_gpu = False
 
@@ -2345,7 +2345,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
                     def find_chapter_number_for_position(char_pos: int) -> int | None:
                         for ch in chapters_data:
                             if ch["start_char"] <= char_pos <= ch["end_char"]:
-                                return ch["chapter_number"]  # type: ignore[no-any-return]
+                                return ch["chapter_number"]
                         return None
 
                     attrs_with_chapter = 0
@@ -2524,7 +2524,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     cons_pct_start, cons_pct_end = tracker.get_phase_progress_range("consistency")
 
     # Consistencia de atributos
-    inconsistencies = []  # type: ignore[var-annotated]
+    inconsistencies = []
     if attributes:
         checker = AttributeConsistencyChecker()
         check_result = checker.check_consistency(attributes)
@@ -3101,8 +3101,8 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
 
     tracker.start_phase("grammar", 7, "Revisando la redacción...")
 
-    grammar_issues = []  # type: ignore[var-annotated]
-    spelling_issues = []  # type: ignore[var-annotated]
+    grammar_issues = []
+    spelling_issues = []
     try:
         from narrative_assistant.nlp.grammar import (
             ensure_languagetool_running,
@@ -3772,7 +3772,7 @@ def run_completion(ctx: dict, tracker: ProgressTracker):
 
     # Auto-sugerir focalizacion para capitulos sin declaracion
     try:
-        from narrative_assistant.focalization import (  # type: ignore[attr-defined]
+        from narrative_assistant.focalization import (
             FocalizationDeclarationService,
             SQLiteFocalizationRepository,
         )

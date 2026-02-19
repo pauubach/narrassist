@@ -440,7 +440,7 @@ def create_project(
             file_ext = Path(file.filename).suffix.lower()
 
             # Crear directorio de documentos
-            config = deps.get_config()  # type: ignore[misc]
+            config = deps.get_config()
             documents_dir = config.data_dir / "documents"
             documents_dir.mkdir(parents=True, exist_ok=True)
 
@@ -506,7 +506,7 @@ def create_project(
             logger.info(f"Creating project '{name}' from: {document_path}")
 
             project_repo = deps.project_manager
-            create_result = project_repo.create_from_document(  # type: ignore[attr-defined]
+            create_result = project_repo.create_from_document(
                 text=document_text,
                 name=name,
                 document_format=format_str,
@@ -585,7 +585,7 @@ def delete_project(project_id: int):
     """
     try:
         project_repo = deps.project_manager
-        project_repo.delete(project_id)  # type: ignore[attr-defined]
+        project_repo.delete(project_id)
 
         # Limpiar progreso de análisis huérfano
         with deps._progress_lock:
@@ -611,7 +611,7 @@ def list_versions(project_id: int, limit: int = Query(50, ge=1, le=200)):
         Lista de version_metrics ordenadas por version_num descendente.
     """
     try:
-        db = deps.get_database()  # type: ignore[misc]
+        db = deps.get_database()
         with db.connection() as conn:
             rows = conn.execute(
                 """SELECT id, project_id, version_num, snapshot_id,
@@ -656,7 +656,7 @@ def get_version_trend(project_id: int, limit: int = Query(10, ge=2, le=50)):
         últimas N versiones, ordenadas cronológicamente (ASC).
     """
     try:
-        db = deps.get_database()  # type: ignore[misc]
+        db = deps.get_database()
         with db.connection() as conn:
             rows = conn.execute(
                 """SELECT version_num, alert_count, health_score, word_count, created_at

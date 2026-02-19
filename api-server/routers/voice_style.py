@@ -31,7 +31,7 @@ def get_voice_profiles(
     # Check enrichment cache first (S8a-13) — only when not forcing refresh
     if not force_refresh:
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "voice_profiles", allow_stale=True)  # type: ignore[misc]
+        cached = get_cached_enrichment(deps.get_database(), project_id, "voice_profiles", allow_stale=True)
         if cached:
             return ApiResponse(success=True, data=cached)
 
@@ -419,7 +419,7 @@ def get_voice_deviations(
     # Check enrichment cache first (S8a-13) — only when no chapter filter
     if chapter_number is None:
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "voice_deviations", allow_stale=True)  # type: ignore[misc]
+        cached = get_cached_enrichment(deps.get_database(), project_id, "voice_deviations", allow_stale=True)
         if cached:
             return ApiResponse(success=True, data=cached)
 
@@ -584,7 +584,7 @@ def get_register_analysis(
     # Check enrichment cache first (S8a-13) — only when no chapter filter
     if chapter_number is None:
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "register_analysis", allow_stale=True)  # type: ignore[misc]
+        cached = get_cached_enrichment(deps.get_database(), project_id, "register_analysis", allow_stale=True)
         if cached:
             return ApiResponse(success=True, data=cached)
 
@@ -776,7 +776,7 @@ def list_speaker_corrections(
 ):
     """Lista correcciones manuales de atribución de hablantes."""
     try:
-        db = deps.get_database()  # type: ignore[misc]
+        db = deps.get_database()
         with db.connect() as conn:
             if chapter_number is not None:
                 rows = conn.execute(
@@ -858,7 +858,7 @@ def create_speaker_correction(project_id: int, payload: deps.DialogueCorrectionR
         corrected_speaker_id = payload.corrected_speaker_id
         notes = payload.notes
 
-        db = deps.get_database()  # type: ignore[misc]
+        db = deps.get_database()
         with db.connect() as conn:
             # Verificar si ya existe corrección para este diálogo
             existing = conn.execute(
@@ -902,7 +902,7 @@ def create_speaker_correction(project_id: int, payload: deps.DialogueCorrectionR
 def delete_speaker_correction(project_id: int, correction_id: int):
     """Elimina una corrección manual de atribución de hablante."""
     try:
-        db = deps.get_database()  # type: ignore[misc]
+        db = deps.get_database()
         with db.connect() as conn:
             result = conn.execute(
                 "DELETE FROM speaker_corrections WHERE id = ? AND project_id = ?",
@@ -923,7 +923,7 @@ def delete_speaker_correction(project_id: int, correction_id: int):
 def get_project_focalizations(project_id: int):
     """Obtiene todas las declaraciones de focalización de un proyecto."""
     try:
-        from narrative_assistant.focalization import (  # type: ignore[attr-defined]
+        from narrative_assistant.focalization import (
             FocalizationDeclarationService,
             SQLiteFocalizationRepository,
         )
@@ -958,7 +958,7 @@ def get_project_focalizations(project_id: int):
 def create_focalization(project_id: int, data: dict):
     """Crea una nueva declaración de focalización para un capítulo/escena."""
     try:
-        from narrative_assistant.focalization import (  # type: ignore[attr-defined]
+        from narrative_assistant.focalization import (
             FocalizationDeclarationService,
             FocalizationType,
             SQLiteFocalizationRepository,
@@ -1006,7 +1006,7 @@ def create_focalization(project_id: int, data: dict):
 def update_focalization(project_id: int, declaration_id: int, data: dict):
     """Actualiza una declaración de focalización existente."""
     try:
-        from narrative_assistant.focalization import (  # type: ignore[attr-defined]
+        from narrative_assistant.focalization import (
             FocalizationDeclarationService,
             FocalizationType,
             SQLiteFocalizationRepository,
@@ -1049,7 +1049,7 @@ def update_focalization(project_id: int, declaration_id: int, data: dict):
 def delete_focalization(project_id: int, declaration_id: int):
     """Elimina una declaración de focalización."""
     try:
-        from narrative_assistant.focalization import (  # type: ignore[attr-defined]
+        from narrative_assistant.focalization import (
             FocalizationDeclarationService,
             SQLiteFocalizationRepository,
         )
@@ -1080,13 +1080,13 @@ def detect_focalization_violations(project_id: int):
     """Detecta violaciones de focalización en todo el proyecto."""
     # Check enrichment cache first (S8a-13)
     from routers._enrichment_cache import get_cached_enrichment
-    cached = get_cached_enrichment(deps.get_database(), project_id, "focalization_violations", allow_stale=True)  # type: ignore[misc]
+    cached = get_cached_enrichment(deps.get_database(), project_id, "focalization_violations", allow_stale=True)
     if cached:
         return ApiResponse(success=True, data=cached)
 
     try:
         from narrative_assistant.entities.repository import get_entity_repository
-        from narrative_assistant.focalization import (  # type: ignore[attr-defined]
+        from narrative_assistant.focalization import (
             FocalizationDeclarationService,
             FocalizationViolationDetector,
             SQLiteFocalizationRepository,

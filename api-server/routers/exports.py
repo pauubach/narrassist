@@ -690,7 +690,7 @@ def export_scrivener(
             export_to_scrivener,
         )
 
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 

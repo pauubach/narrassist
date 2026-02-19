@@ -1117,7 +1117,7 @@ def suggest_chapter_focalization(project_id: int, chapter_number: int):
     """Sugiere la focalización más probable para un capítulo."""
     try:
         from narrative_assistant.entities.repository import get_entity_repository
-        from narrative_assistant.focalization import (  # type: ignore[attr-defined]
+        from narrative_assistant.focalization import (
             FocalizationDeclarationService,
             SQLiteFocalizationRepository,
         )
@@ -1178,7 +1178,7 @@ def suggest_all_focalizations(project_id: int, auto_apply: bool = False):
     """
     try:
         from narrative_assistant.entities.repository import get_entity_repository
-        from narrative_assistant.focalization import (  # type: ignore[attr-defined]
+        from narrative_assistant.focalization import (
             FocalizationDeclarationService,
             SQLiteFocalizationRepository,
         )

@@ -42,7 +42,7 @@ def get_chapter_progress(
     # Check enrichment cache first (S8a-13) — only for basic mode (what pipeline caches)
     if mode == "basic":
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "chapter_progress", allow_stale=True)  # type: ignore[misc]
+        cached = get_cached_enrichment(deps.get_database(), project_id, "chapter_progress", allow_stale=True)
         if cached:
             return ApiResponse(success=True, data=cached)
 
@@ -93,7 +93,7 @@ def get_narrative_templates(
     """
     # Check enrichment cache first (S8a-13)
     from routers._enrichment_cache import get_cached_enrichment
-    cached = get_cached_enrichment(deps.get_database(), project_id, "narrative_templates", allow_stale=True)  # type: ignore[misc]
+    cached = get_cached_enrichment(deps.get_database(), project_id, "narrative_templates", allow_stale=True)
     if cached:
         return ApiResponse(success=True, data=cached)
 
@@ -101,7 +101,7 @@ def get_narrative_templates(
         from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
         from narrative_assistant.analysis.narrative_templates import NarrativeTemplateAnalyzer
 
-        proj_result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        proj_result = deps.project_manager.get(project_id)
         if proj_result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
@@ -152,7 +152,7 @@ def get_narrative_health(
     """
     # Check enrichment cache first (S8a-13)
     from routers._enrichment_cache import get_cached_enrichment
-    cached = get_cached_enrichment(deps.get_database(), project_id, "narrative_health", allow_stale=True)  # type: ignore[misc]
+    cached = get_cached_enrichment(deps.get_database(), project_id, "narrative_health", allow_stale=True)
     if cached:
         return ApiResponse(success=True, data=cached)
 
@@ -160,7 +160,7 @@ def get_narrative_health(
         from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
         from narrative_assistant.analysis.narrative_health import NarrativeHealthChecker
 
-        proj_result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        proj_result = deps.project_manager.get(project_id)
         if proj_result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
@@ -177,7 +177,7 @@ def get_narrative_health(
         # Obtener entidades del proyecto
         entities_data = []
         try:
-            entities = deps.entity_repository.get_entities_by_project(project_id)  # type: ignore[attr-defined]
+            entities = deps.entity_repository.get_entities_by_project(project_id)
             for ent in entities:
                 # Obtener tipo de entidad correctamente (puede ser enum o string)
                 etype = ent.entity_type if hasattr(ent, 'entity_type') else "character"
@@ -239,21 +239,21 @@ def get_sticky_sentences(
     # Check enrichment cache first (S8a-13)
     if chapter_number is None:  # Cache only covers all-chapters analysis
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "sticky_sentences", allow_stale=True)  # type: ignore[misc]
+        cached = get_cached_enrichment(deps.get_database(), project_id, "sticky_sentences", allow_stale=True)
         if cached:
             return ApiResponse(success=True, data=cached)
 
     try:
         from narrative_assistant.nlp.style.sticky_sentences import get_sticky_sentence_detector
 
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
         _ = result.value
 
         # Obtener texto de todos los capítulos
         chapters_data = []
-        chapters = deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = deps.chapter_repository.get_by_project(project_id)
 
         detector = get_sticky_sentence_detector()
         global_sticky = []
@@ -373,18 +373,18 @@ def get_sentence_energy(
     # Check enrichment cache first (S8a-13)
     if chapter_number is None:
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "sentence_energy", allow_stale=True)  # type: ignore[misc]
+        cached = get_cached_enrichment(deps.get_database(), project_id, "sentence_energy", allow_stale=True)
         if cached:
             return ApiResponse(success=True, data=cached)
 
     try:
         from narrative_assistant.nlp.style.sentence_energy import get_sentence_energy_detector
 
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
-        chapters = deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = deps.chapter_repository.get_by_project(project_id)
         detector = get_sentence_energy_detector()
 
         chapters_data = []
@@ -394,7 +394,7 @@ def get_sentence_energy(
         global_weak_count = 0
         global_nom_count = 0
         global_total_sentences = 0
-        global_by_level = {}  # type: ignore[var-annotated]
+        global_by_level = {}
 
         for chapter in chapters:
             if chapter_number is not None and chapter.chapter_number != chapter_number:
@@ -508,24 +508,24 @@ def get_echo_report(
     # Check enrichment cache first (S8a-13) — only lexical, no per-chapter filter
     if chapter_number is None and not include_semantic:
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "echo_report", allow_stale=True)  # type: ignore[misc]
+        cached = get_cached_enrichment(deps.get_database(), project_id, "echo_report", allow_stale=True)
         if cached:
             return ApiResponse(success=True, data=cached)
 
     try:
         from narrative_assistant.nlp.style.repetition_detector import get_repetition_detector
 
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
         _ = result.value
 
         detector = get_repetition_detector()
-        chapters = deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = deps.chapter_repository.get_by_project(project_id)
 
         chapters_data = []
         global_repetitions = []
-        global_word_counts = {}  # type: ignore[var-annotated]
+        global_word_counts = {}
         global_total_words = 0
         by_severity = {"high": 0, "medium": 0, "low": 0}
 
@@ -648,12 +648,12 @@ def get_duplicate_content(
     try:
         from narrative_assistant.analysis.duplicate_detector import get_duplicate_detector
 
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
         detector = get_duplicate_detector()
-        chapters = deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = deps.chapter_repository.get_by_project(project_id)
 
         # Construir texto completo y lista de capítulos
         full_text = ""
@@ -707,7 +707,7 @@ def get_duplicate_content(
         report = result.value
 
         # Agrupar por capítulo para el frontend
-        duplicates_by_chapter = {}  # type: ignore[var-annotated]
+        duplicates_by_chapter = {}
         for dup in report.duplicates:
             ch1 = dup.location1.chapter
             ch2 = dup.location2.chapter
@@ -774,7 +774,7 @@ def get_narrative_structure(
     # Check enrichment cache first (S8a-13)
     if chapter_number is None:
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "narrative_structure", allow_stale=True)  # type: ignore[misc]
+        cached = get_cached_enrichment(deps.get_database(), project_id, "narrative_structure", allow_stale=True)
         if cached:
             return ApiResponse(success=True, data=cached)
 
@@ -783,12 +783,12 @@ def get_narrative_structure(
             get_narrative_structure_detector,
         )
 
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
         detector = get_narrative_structure_detector()
-        chapters = deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = deps.chapter_repository.get_by_project(project_id)
 
         # Construir texto completo y lista de capítulos
         full_text = ""
@@ -883,7 +883,7 @@ def get_dialogue_validation(
     # Check enrichment cache first (S8a-13)
     if chapter_number is None and not create_alerts:
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "dialogue_validation", allow_stale=True)  # type: ignore[misc]
+        cached = get_cached_enrichment(deps.get_database(), project_id, "dialogue_validation", allow_stale=True)
         if cached:
             return ApiResponse(success=True, data=cached)
 
@@ -895,14 +895,14 @@ def get_dialogue_validation(
             DialogueIssueType,
         )
 
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
         validator = DialogueContextValidator(
             max_unattributed_consecutive=max_unattributed,
         )
-        chapters = deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = deps.chapter_repository.get_by_project(project_id)
 
         # Construir lista de capítulos para validación
         chapters_info = []
@@ -1021,7 +1021,7 @@ def get_sentence_variation(
     # Check enrichment cache first (S8a-13)
     if chapter_number is None:
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "sentence_variation", allow_stale=True)  # type: ignore[misc]
+        cached = get_cached_enrichment(deps.get_database(), project_id, "sentence_variation", allow_stale=True)
         if cached:
             return ApiResponse(success=True, data=cached)
 
@@ -1029,11 +1029,11 @@ def get_sentence_variation(
         import math
         import re as _re
 
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
-        chapters = deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = deps.chapter_repository.get_by_project(project_id)
 
         def _split_sentences(text: str) -> list[str]:
             raw = _re.split(r'(?<=[.!?])\s+', text)
@@ -1086,7 +1086,7 @@ def get_sentence_variation(
             std_dev = round(math.sqrt(variance), 1)
             var_coeff = round((std_dev / avg_len) * 100, 1) if avg_len > 0 else 0
 
-            ch_dist = {}  # type: ignore[var-annotated]
+            ch_dist = {}
             for wc in ch_lengths:
                 cat = _classify(wc)
                 ch_dist[cat] = ch_dist.get(cat, 0) + 1
@@ -1174,7 +1174,7 @@ def get_pacing_analysis(
     # Check enrichment cache first (S8a-13)
     if chapter_number is None:
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "pacing_analysis", allow_stale=True)  # type: ignore[misc]
+        cached = get_cached_enrichment(deps.get_database(), project_id, "pacing_analysis", allow_stale=True)
         if cached:
             return ApiResponse(success=True, data=cached)
 
@@ -1183,13 +1183,13 @@ def get_pacing_analysis(
 
         from narrative_assistant.analysis.pacing import get_pacing_analyzer
 
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
         _ = result.value
 
         analyzer = get_pacing_analyzer()
-        chapters = deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = deps.chapter_repository.get_by_project(project_id)
 
         chapter_metrics = []
         issues = []
@@ -1370,7 +1370,7 @@ def get_tension_curve(
     # Check enrichment cache first (S8a-13)
     if chapter_number is None:
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "tension_curve", allow_stale=True)  # type: ignore[misc]
+        cached = get_cached_enrichment(deps.get_database(), project_id, "tension_curve", allow_stale=True)
         if cached:
             return ApiResponse(success=True, data=cached)
 
@@ -1504,11 +1504,11 @@ def get_pacing_genre_comparison(
             compute_tension_curve,
         )
 
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
-        chapters = deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = deps.chapter_repository.get_by_project(project_id)
         if not chapters:
             return ApiResponse(success=True, data={"comparison": None, "message": "No hay capítulos"})
 
@@ -1651,7 +1651,7 @@ def get_story_bible(
     try:
         from narrative_assistant.analysis.story_bible import StoryBibleBuilder
 
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
@@ -1708,7 +1708,7 @@ def get_story_bible_entry(
     try:
         from narrative_assistant.analysis.story_bible import StoryBibleBuilder
 
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
@@ -1750,7 +1750,7 @@ def get_sensory_report(
     # Check enrichment cache first (S8a-13)
     if chapter_number is None:
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "sensory_report", allow_stale=True)  # type: ignore[misc]
+        cached = get_cached_enrichment(deps.get_database(), project_id, "sensory_report", allow_stale=True)
         if cached:
             return ApiResponse(success=True, data=cached)
 
@@ -1762,7 +1762,7 @@ def get_sensory_report(
         )
         from narrative_assistant.persistence.chapter import get_chapter_repository
 
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
@@ -1841,20 +1841,20 @@ def get_age_readability(
     # Check enrichment cache first (S8a-13) — only when no specific target_age_group
     if not target_age_group:
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "age_readability", allow_stale=True)  # type: ignore[misc]
+        cached = get_cached_enrichment(deps.get_database(), project_id, "age_readability", allow_stale=True)
         if cached:
             return ApiResponse(success=True, data=cached)
 
     try:
         from narrative_assistant.nlp.style.readability import AgeGroup, get_readability_analyzer
 
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
         _ = result.value
 
         analyzer = get_readability_analyzer()
-        chapters = deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = deps.chapter_repository.get_by_project(project_id)
 
         # Parsear grupo de edad objetivo
         target_group = None
@@ -1962,11 +1962,11 @@ def get_semantic_redundancy(
                 error=f"Modo inválido. Opciones: {', '.join(valid_modes)}"
             )
 
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
-        chapters = deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = deps.chapter_repository.get_by_project(project_id)
         if not chapters:
             return ApiResponse(
                 success=True,

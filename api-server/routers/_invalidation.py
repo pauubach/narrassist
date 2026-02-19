@@ -187,7 +187,7 @@ def get_project_revision(db_session, project_id: int) -> int:
                 "SELECT COALESCE(MAX(revision), 0) FROM invalidation_events WHERE project_id = ?",
                 (project_id,),
             ).fetchone()
-            return row[0] if row else 0  # type: ignore[no-any-return]
+            return row[0] if row else 0
     except Exception:
         return 0
 

@@ -54,7 +54,7 @@ def list_entities(
         entities = entity_repo.get_entities_by_project(project_id)
 
         # Obtener word_count del proyecto para calcular densidad
-        project_result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        project_result = deps.project_manager.get(project_id)
         project = project_result.value if project_result.is_success else None
         word_count = (
             project.word_count if project and project.word_count else 50000
@@ -76,7 +76,7 @@ def list_entities(
             if idx >= 0:
                 ch = _sorted_chapters[idx]
                 if ch.start_char <= pos < ch.end_char:
-                    return ch.chapter_number  # type: ignore[no-any-return]
+                    return ch.chapter_number
             return 1  # Default al capítulo 1 si no se encuentra
 
         # Si se filtra por capítulo, obtener IDs de entidades con menciones en ese capítulo
@@ -190,7 +190,7 @@ def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
         # Obtener las entidades
         entities = []
         for entity_id in entity_ids:
-            entity = entity_repo.get_entity(entity_id)  # type: ignore[attr-defined]
+            entity = entity_repo.get_entity(entity_id)
             if entity and entity.project_id == project_id:
                 entities.append(entity)
 
@@ -313,7 +313,7 @@ def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
         total_mentions = sum(e.mention_count for e in entities)
 
         # Determinar el tipo más común
-        type_counts = {}  # type: ignore[var-annotated]
+        type_counts = {}
         for entity in entities:
             t = entity.entity_type.value
             type_counts[t] = type_counts.get(t, 0) + entity.mention_count
@@ -357,12 +357,12 @@ def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
         # 3. Detectar conflictos de atributos
         # =====================================================================
         conflicts = []
-        all_attributes = (  # type: ignore[var-annotated]
+        all_attributes = (
             {}
         )  # {(category, name): [(value, entity_name, entity_id), ...]}
 
         for entity in entities:
-            attrs = entity_repo.get_attributes_by_entity(entity.id)  # type: ignore[attr-defined]
+            attrs = entity_repo.get_attributes_by_entity(entity.id)
             for attr in attrs:
                 key = (
                     attr.get("attribute_type", attr.get("category", "")),
@@ -474,7 +474,7 @@ def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
         entity_repo = deps.entity_repository
 
         # Verificar que la entidad principal existe
-        primary_entity = entity_repo.get_entity(primary_entity_id)  # type: ignore[attr-defined]
+        primary_entity = entity_repo.get_entity(primary_entity_id)
         if not primary_entity or primary_entity.project_id != project_id:
             return ApiResponse(success=False, error="Entidad principal no encontrada")
 
@@ -486,7 +486,7 @@ def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
             if entity_id == primary_entity_id:
                 continue
 
-            entity = entity_repo.get_entity(entity_id)  # type: ignore[attr-defined]
+            entity = entity_repo.get_entity(entity_id)
             if not entity or entity.project_id != project_id:
                 continue
 
@@ -510,7 +510,7 @@ def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
         )
         total_mentions = sum(e.get("mention_count", 0) for e in source_entities)
 
-        merged_count = entity_repo.merge_entities_atomic(  # type: ignore[attr-defined]
+        merged_count = entity_repo.merge_entities_atomic(
             project_id=project_id,
             primary_entity_id=primary_entity_id,
             source_entities=source_entities,
@@ -523,7 +523,7 @@ def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
         # Apply attribute conflict resolutions
         resolutions_applied = 0
         if body.attribute_resolutions and merged_count > 0:
-            attrs = entity_repo.get_attributes_by_entity(primary_entity_id)  # type: ignore[attr-defined]
+            attrs = entity_repo.get_attributes_by_entity(primary_entity_id)
             for resolution in body.attribute_resolutions:
                 # Find all attributes with this key
                 matching = [
@@ -544,12 +544,12 @@ def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
                         kept = True
                         continue
                     # Delete duplicate/conflicting attribute
-                    entity_repo.delete_attribute(attr["id"])  # type: ignore[attr-defined]
+                    entity_repo.delete_attribute(attr["id"])
                     resolutions_applied += 1
 
                 # If chosen value doesn't match any existing, update the first one
                 if not kept and matching:
-                    entity_repo.update_attribute(  # type: ignore[attr-defined]
+                    entity_repo.update_attribute(
                         attribute_id=matching[0]["id"],
                         attribute_value=resolution.chosen_value,
                         is_verified=True,
@@ -566,7 +566,7 @@ def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
         )
 
         # Obtener la entidad actualizada para retornarla
-        updated_entity = entity_repo.get_entity(primary_entity_id)  # type: ignore[attr-defined]
+        updated_entity = entity_repo.get_entity(primary_entity_id)
 
         return ApiResponse(
             success=True,
@@ -619,7 +619,7 @@ def get_merge_history(project_id: int):
         entity_repo = deps.entity_repository
 
         # Obtener historial de fusiones
-        history = entity_repo.get_merge_history(project_id)  # type: ignore[attr-defined]
+        history = entity_repo.get_merge_history(project_id)
 
         return ApiResponse(
             success=True,
@@ -798,15 +798,15 @@ def update_entity(
             from narrative_assistant.entities.models import EntityImportance
 
             importance_map = {
-                "main": EntityImportance.MAIN,  # type: ignore[attr-defined]
+                "main": EntityImportance.MAIN,
                 "secondary": EntityImportance.SECONDARY,
-                "minor": EntityImportance.MINOR,  # type: ignore[attr-defined]
+                "minor": EntityImportance.MINOR,
             }
             importance = importance_map.get(importance_str.lower())
 
         # Actualizar la entidad
         entity_repo = deps.entity_repository
-        updated = entity_repo.update_entity(  # type: ignore[attr-defined]
+        updated = entity_repo.update_entity(
             entity_id=entity_id,
             canonical_name=canonical_name,
             aliases=aliases,
@@ -818,7 +818,7 @@ def update_entity(
             return ApiResponse(success=False, error="No se pudo actualizar la entidad")
 
         # Obtener la entidad actualizada
-        updated_entity = entity_repo.get_entity(entity_id)  # type: ignore[attr-defined]
+        updated_entity = entity_repo.get_entity(entity_id)
 
         logger.info(f"Updated entity {entity_id} ({updated_entity.canonical_name})")
 
@@ -887,7 +887,7 @@ def delete_entity(project_id: int, entity_id: int, hard_delete: bool = False):
 
         # Siempre soft-delete (undo-compatible)
         entity_repo = deps.entity_repository
-        deleted = entity_repo.delete_entity(entity_id, hard_delete=False)  # type: ignore[attr-defined]
+        deleted = entity_repo.delete_entity(entity_id, hard_delete=False)
 
         if not deleted:
             return ApiResponse(success=False, error="No se pudo eliminar la entidad")
@@ -956,14 +956,14 @@ def get_entity_timeline(project_id: int, entity_id: int):
 
         # Obtener menciones de la entidad
         entity_repo = deps.entity_repository
-        mentions = entity_repo.get_mentions_by_entity(entity_id)  # type: ignore[attr-defined]
+        mentions = entity_repo.get_mentions_by_entity(entity_id)
 
         if not mentions:
             return ApiResponse(success=True, data=[])
 
         # Obtener capítulos para mapear chapter_id a chapter_number
-        chapters = (  # type: ignore[var-annotated]
-            deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = (
+            deps.chapter_repository.get_by_project(project_id)
             if deps.chapter_repository
             else []
         )
@@ -978,7 +978,7 @@ def get_entity_timeline(project_id: int, entity_id: int):
             mentions_by_chapter[ch_id].append(mention)
 
         # Obtener atributos para detectar cambios
-        attributes = entity_repo.get_attributes_by_entity(entity_id)  # type: ignore[attr-defined]
+        attributes = entity_repo.get_attributes_by_entity(entity_id)
         attrs_by_chapter: dict[int, list] = {}
         for attr in attributes:
             # Si el atributo tiene chapter_id o first_mention_chapter
@@ -1100,19 +1100,19 @@ def get_entity_mentions(
         entity_repo = deps.entity_repository
 
         # Verificar que la entidad existe y pertenece al proyecto
-        entity = entity_repo.get_entity(entity_id)  # type: ignore[attr-defined]
+        entity = entity_repo.get_entity(entity_id)
         if not entity or entity.project_id != project_id:
             return ApiResponse(success=False, error="Entidad no encontrada")
 
         # Obtener menciones de la entidad
-        mentions = entity_repo.get_mentions_by_entity(entity_id)  # type: ignore[attr-defined]
+        mentions = entity_repo.get_mentions_by_entity(entity_id)
 
         if not mentions:
             return ApiResponse(success=True, data={"mentions": [], "total": 0})
 
         # Obtener capítulos para mapear chapter_id a chapter_number y título
-        chapters = (  # type: ignore[var-annotated]
-            deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = (
+            deps.chapter_repository.get_by_project(project_id)
             if deps.chapter_repository
             else []
         )
@@ -1227,7 +1227,7 @@ def get_entity_mentions(
                 return True
             return False
 
-        filtered_mentions = []  # type: ignore[var-annotated]
+        filtered_mentions = []
         removed_count = 0
 
         def normalize_surface_form(text: str) -> str:
@@ -1420,12 +1420,12 @@ def get_entity_coreference_info(project_id: int, entity_id: int):
         entity_repo = deps.entity_repository
 
         # Verificar que la entidad existe y pertenece al proyecto
-        entity = entity_repo.get_entity(entity_id)  # type: ignore[attr-defined]
+        entity = entity_repo.get_entity(entity_id)
         if not entity or entity.project_id != project_id:
             return ApiResponse(success=False, error="Entidad no encontrada")
 
         # Obtener menciones de la entidad
-        mentions = entity_repo.get_mentions_by_entity(entity_id)  # type: ignore[attr-defined]
+        mentions = entity_repo.get_mentions_by_entity(entity_id)
 
         if not mentions:
             return ApiResponse(
@@ -1584,7 +1584,7 @@ def get_entity_coreference_info(project_id: int, entity_id: int):
 def list_coreference_corrections(project_id: int):
     """Lista todas las correcciones manuales de correferencias de un proyecto."""
     try:
-        db = deps.get_database()  # type: ignore[misc]
+        db = deps.get_database()
         with db.connect() as conn:
             rows = conn.execute(
                 """SELECT cc.id, cc.mention_start_char, cc.mention_end_char,
@@ -1662,7 +1662,7 @@ def create_coreference_correction(
         correction_type = payload.correction_type
         notes = payload.notes
 
-        db = deps.get_database()  # type: ignore[misc]
+        db = deps.get_database()
         with db.connect() as conn:
             # Verificar si ya existe corrección para esta mención
             existing = conn.execute(
@@ -1745,7 +1745,7 @@ def create_coreference_correction(
 def delete_coreference_correction(project_id: int, correction_id: int):
     """Elimina una corrección manual de correferencia."""
     try:
-        db = deps.get_database()  # type: ignore[misc]
+        db = deps.get_database()
         with db.connect() as conn:
             # Obtener la corrección antes de eliminar
             row = conn.execute(
@@ -1801,7 +1801,7 @@ def list_rejected_entities(project_id: int):
     """
     try:
 
-        db = deps.get_database()  # type: ignore[misc]
+        db = deps.get_database()
         rows = db.fetchall(
             """
             SELECT id, entity_text, rejection_reason, created_at
@@ -1863,12 +1863,12 @@ def reject_entity_by_id(project_id: int, entity_id: int, body: dict | None = Non
         entity_text = entity.canonical_name
         reason = body.get("reason", "") if isinstance(body, dict) else ""
 
-        validator = get_entity_validator(db=deps.get_database())  # type: ignore[misc]
+        validator = get_entity_validator(db=deps.get_database())
         success = validator.reject_entity(project_id, entity_text)
 
         if success:
             if reason:
-                db = deps.get_database()  # type: ignore[misc]
+                db = deps.get_database()
                 db.execute(
                     """
                     UPDATE rejected_entities
@@ -1882,7 +1882,7 @@ def reject_entity_by_id(project_id: int, entity_id: int, body: dict | None = Non
                 from routers._invalidation import emit_invalidation_event
 
                 emit_invalidation_event(
-                    deps.get_database(),  # type: ignore[misc]
+                    deps.get_database(),
                     project_id,
                     "reject",
                     [],
@@ -1929,13 +1929,13 @@ def reject_entity_text(project_id: int, body: deps.RejectEntityRequest):
         reason = body.reason
 
         # Usar el validador para rechazar la entidad
-        validator = get_entity_validator(db=deps.get_database())  # type: ignore[misc]
+        validator = get_entity_validator(db=deps.get_database())
         success = validator.reject_entity(project_id, entity_text)
 
         if success:
             # Guardar razón si se proporcionó
             if reason:
-                db = deps.get_database()  # type: ignore[misc]
+                db = deps.get_database()
                 db.execute(
                     """
                     UPDATE rejected_entities
@@ -1950,7 +1950,7 @@ def reject_entity_text(project_id: int, body: deps.RejectEntityRequest):
                 from routers._invalidation import emit_invalidation_event
 
                 emit_invalidation_event(
-                    deps.get_database(),  # type: ignore[misc]
+                    deps.get_database(),
                     project_id,
                     "reject",
                     [],
@@ -1997,7 +1997,7 @@ def unreject_entity_text(project_id: int, entity_text: str):
             return ApiResponse(success=False, error="entity_text es requerido")
 
         # Usar el validador para des-rechazar la entidad
-        validator = get_entity_validator(db=deps.get_database())  # type: ignore[misc]
+        validator = get_entity_validator(db=deps.get_database())
         success = validator.unreject_entity(project_id, entity_text)
 
         if success:
@@ -2233,7 +2233,7 @@ def remove_user_rejection(rejection_id: int):
         from narrative_assistant.entities.filters import get_filter_repository
 
         # Primero obtener el nombre de la entidad
-        db = deps.get_database()  # type: ignore[misc]
+        db = deps.get_database()
         row = db.fetchone(
             "SELECT entity_name, entity_type FROM user_rejected_entities WHERE id = ?",
             (rejection_id,),
@@ -2373,7 +2373,7 @@ def remove_project_override(project_id: int, override_id: int):
         from narrative_assistant.entities.filters import get_filter_repository
 
         # Primero obtener el nombre de la entidad
-        db = deps.get_database()  # type: ignore[misc]
+        db = deps.get_database()
         row = db.fetchone(
             """SELECT entity_name, entity_type FROM project_entity_overrides
                WHERE id = ? AND project_id = ?""",
@@ -2460,12 +2460,12 @@ def list_entity_attributes(project_id: int, entity_id: int):
         entity_repo = deps.entity_repository
 
         # Verificar que la entidad existe y pertenece al proyecto
-        entity = entity_repo.get_entity(entity_id)  # type: ignore[attr-defined]
+        entity = entity_repo.get_entity(entity_id)
         if not entity or entity.project_id != project_id:
             return ApiResponse(success=False, error="Entidad no encontrada")
 
         # Obtener atributos
-        attributes = entity_repo.get_attributes_by_entity(entity_id)  # type: ignore[attr-defined]
+        attributes = entity_repo.get_attributes_by_entity(entity_id)
 
         return ApiResponse(success=True, data=attributes)
 
@@ -2498,7 +2498,7 @@ def create_entity_attribute(
         entity_repo = deps.entity_repository
 
         # Verificar que la entidad existe y pertenece al proyecto
-        entity = entity_repo.get_entity(entity_id)  # type: ignore[attr-defined]
+        entity = entity_repo.get_entity(entity_id)
         if not entity or entity.project_id != project_id:
             return ApiResponse(success=False, error="Entidad no encontrada")
 
@@ -2526,7 +2526,7 @@ def create_entity_attribute(
             )
 
         # Crear atributo
-        attribute_id = entity_repo.create_attribute(  # type: ignore[attr-defined]
+        attribute_id = entity_repo.create_attribute(
             entity_id=entity_id,
             attribute_type=category,
             attribute_key=name,
@@ -2564,7 +2564,7 @@ def create_entity_attribute(
             from routers._invalidation import emit_invalidation_event
 
             emit_invalidation_event(
-                deps.get_database(),  # type: ignore[misc]
+                deps.get_database(),
                 project_id,
                 "attribute_create",
                 [entity_id],
@@ -2619,16 +2619,16 @@ def update_entity_attribute(
         entity_repo = deps.entity_repository
 
         # Verificar que la entidad existe y pertenece al proyecto
-        entity = entity_repo.get_entity(entity_id)  # type: ignore[attr-defined]
+        entity = entity_repo.get_entity(entity_id)
         if not entity or entity.project_id != project_id:
             return ApiResponse(success=False, error="Entidad no encontrada")
 
         # Capturar valor anterior para historial
-        old_attrs = entity_repo.get_attributes_by_entity(entity_id)  # type: ignore[attr-defined]
+        old_attrs = entity_repo.get_attributes_by_entity(entity_id)
         old_attr = next((a for a in old_attrs if a["id"] == attribute_id), None)
 
         # Actualizar atributo
-        updated = entity_repo.update_attribute(  # type: ignore[attr-defined]
+        updated = entity_repo.update_attribute(
             attribute_id=attribute_id,
             attribute_key=body.name,
             attribute_value=body.value,
@@ -2675,7 +2675,7 @@ def update_entity_attribute(
             from routers._invalidation import emit_invalidation_event
 
             emit_invalidation_event(
-                deps.get_database(),  # type: ignore[misc]
+                deps.get_database(),
                 project_id,
                 "attribute_edit",
                 [entity_id],
@@ -2715,16 +2715,16 @@ def delete_entity_attribute(project_id: int, entity_id: int, attribute_id: int):
         entity_repo = deps.entity_repository
 
         # Verificar que la entidad existe y pertenece al proyecto
-        entity = entity_repo.get_entity(entity_id)  # type: ignore[attr-defined]
+        entity = entity_repo.get_entity(entity_id)
         if not entity or entity.project_id != project_id:
             return ApiResponse(success=False, error="Entidad no encontrada")
 
         # Capturar valor anterior para historial
-        old_attrs = entity_repo.get_attributes_by_entity(entity_id)  # type: ignore[attr-defined]
+        old_attrs = entity_repo.get_attributes_by_entity(entity_id)
         old_attr = next((a for a in old_attrs if a["id"] == attribute_id), None)
 
         # Eliminar atributo
-        deleted = entity_repo.delete_attribute(attribute_id)  # type: ignore[attr-defined]
+        deleted = entity_repo.delete_attribute(attribute_id)
 
         if not deleted:
             return ApiResponse(success=False, error="No se pudo eliminar el atributo")
@@ -2759,7 +2759,7 @@ def delete_entity_attribute(project_id: int, entity_id: int, attribute_id: int):
             from routers._invalidation import emit_invalidation_event
 
             emit_invalidation_event(
-                deps.get_database(),  # type: ignore[misc]
+                deps.get_database(),
                 project_id,
                 "attribute_delete",
                 [entity_id],

@@ -29,7 +29,7 @@ def get_project_relationships(project_id: int):
 
     # Check enrichment cache first (S8a-13)
     from routers._enrichment_cache import get_cached_enrichment
-    cached = get_cached_enrichment(deps.get_database(), project_id, "character_network", allow_stale=True)  # type: ignore[misc]
+    cached = get_cached_enrichment(deps.get_database(), project_id, "character_network", allow_stale=True)
     if cached:
         # Transform cached CharacterNetworkReport format (nodes/edges)
         # to the frontend-expected format (entities/relations)
@@ -606,7 +606,7 @@ def create_relationship(project_id: int, payload: deps.CreateRelationshipRequest
         from narrative_assistant.entities.repository import get_entity_repository
         from narrative_assistant.relationships.models import EntityRelationship, RelationType
         from narrative_assistant.relationships.repository import (
-            get_relationship_repository,  # type: ignore[attr-defined]
+            get_relationship_repository,
         )
 
         source_entity_id = payload.source_entity_id
@@ -626,16 +626,16 @@ def create_relationship(project_id: int, payload: deps.CreateRelationshipRequest
         # Mapear tipo de relación
         type_mapping = {
             "friend": RelationType.FRIEND,
-            "family": RelationType.FAMILY,  # type: ignore[attr-defined]
+            "family": RelationType.FAMILY,
             "enemy": RelationType.ENEMY,
-            "love": RelationType.LOVE,  # type: ignore[attr-defined]
+            "love": RelationType.LOVE,
             "colleague": RelationType.COLLEAGUE,
             "mentor": RelationType.MENTOR,
             "rival": RelationType.RIVAL,
             "ally": RelationType.ALLY,
             "acquaintance": RelationType.ACQUAINTANCE,
         }
-        relation_type = type_mapping.get(relation_type_str.lower(), RelationType.OTHER)  # type: ignore[attr-defined]
+        relation_type = type_mapping.get(relation_type_str.lower(), RelationType.OTHER)
 
         # Crear relación
         relationship = EntityRelationship(
@@ -709,7 +709,7 @@ def delete_relationship(project_id: int, relationship_id: str):
     """
     try:
         from narrative_assistant.relationships.repository import (
-            get_relationship_repository,  # type: ignore[attr-defined]
+            get_relationship_repository,
         )
 
         rel_repo = get_relationship_repository()
@@ -822,8 +822,8 @@ def analyze_character_behavior(project_id: int, character_id: int):
             )
 
         # Obtener atributos existentes
-        existing_attrs = {}  # type: ignore[var-annotated]
-        for attr in entity.attributes:  # type: ignore[attr-defined]
+        existing_attrs = {}
+        for attr in entity.attributes:
             if attr.attribute_name not in existing_attrs:
                 existing_attrs[attr.attribute_name] = []
             existing_attrs[attr.attribute_name].append(attr.value)
@@ -1043,7 +1043,7 @@ def get_emotional_analysis(project_id: int):
     """
     # Check enrichment cache first (S8a-13)
     from routers._enrichment_cache import get_cached_enrichment
-    cached = get_cached_enrichment(deps.get_database(), project_id, "emotional_analysis", allow_stale=True)  # type: ignore[misc]
+    cached = get_cached_enrichment(deps.get_database(), project_id, "emotional_analysis", allow_stale=True)
     if cached:
         return ApiResponse(success=True, data=cached)
 
@@ -1054,7 +1054,7 @@ def get_emotional_analysis(project_id: int):
         from narrative_assistant.nlp.dialogue import detect_dialogues
 
         # Obtener capítulos del proyecto
-        chapters = deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = deps.chapter_repository.get_by_project(project_id)
         if not chapters:
             return ApiResponse(
                 success=True,
@@ -1067,7 +1067,7 @@ def get_emotional_analysis(project_id: int):
             )
 
         # Obtener entidades (personajes)
-        entities = deps.entity_repository.get_entities_by_project(project_id)  # type: ignore[attr-defined]
+        entities = deps.entity_repository.get_entities_by_project(project_id)
         # entity_type es un enum, usar .value para comparar
         character_names = [
             e.canonical_name for e in entities
@@ -1165,7 +1165,7 @@ def get_character_emotional_profile(project_id: int, character_name: str):
         from narrative_assistant.nlp.sentiment import get_sentiment_analyzer
 
         # Obtener capítulos
-        chapters = deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = deps.chapter_repository.get_by_project(project_id)
         if not chapters:
             return ApiResponse(
                 success=True,
@@ -1279,7 +1279,7 @@ def get_vital_status_analysis(project_id: int):
         )
 
         # Obtener capítulos
-        chapters = deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = deps.chapter_repository.get_by_project(project_id)
         if not chapters:
             return ApiResponse(
                 success=True,
@@ -1293,7 +1293,7 @@ def get_vital_status_analysis(project_id: int):
             )
 
         # Obtener entidades (personajes, animales, criaturas)
-        all_entities = deps.entity_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        all_entities = deps.entity_repository.get_by_project(project_id)
 
         entities = [
             e.to_dict() for e in all_entities
@@ -1351,7 +1351,7 @@ def generate_vital_status_alerts(project_id: int):
         from narrative_assistant.analysis.vital_status import analyze_vital_status
 
         # Obtener capítulos
-        chapters = deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = deps.chapter_repository.get_by_project(project_id)
         if not chapters:
             return ApiResponse(
                 success=True,
@@ -1359,7 +1359,7 @@ def generate_vital_status_alerts(project_id: int):
             )
 
         # Obtener entidades
-        all_entities = deps.entity_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        all_entities = deps.entity_repository.get_by_project(project_id)
 
         entities = [
             e.to_dict() for e in all_entities
@@ -1451,7 +1451,7 @@ def get_character_locations(project_id: int):
     """
     # Check enrichment cache first (S8a-13)
     from routers._enrichment_cache import get_cached_enrichment
-    cached = get_cached_enrichment(deps.get_database(), project_id, "character_locations", allow_stale=True)  # type: ignore[misc]
+    cached = get_cached_enrichment(deps.get_database(), project_id, "character_locations", allow_stale=True)
     if cached:
         return ApiResponse(success=True, data=cached)
 
@@ -1461,7 +1461,7 @@ def get_character_locations(project_id: int):
         )
 
         # Obtener capítulos
-        chapters = deps.chapter_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        chapters = deps.chapter_repository.get_by_project(project_id)
         if not chapters:
             return ApiResponse(
                 success=True,
@@ -1477,7 +1477,7 @@ def get_character_locations(project_id: int):
             )
 
         # Obtener entidades (personajes y ubicaciones)
-        all_entities = deps.entity_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+        all_entities = deps.entity_repository.get_by_project(project_id)
 
         entities = [
             {
@@ -1538,7 +1538,7 @@ def get_character_archetypes(
     """
     # Check enrichment cache first (S8a-13)
     from routers._enrichment_cache import get_cached_enrichment
-    cached = get_cached_enrichment(deps.get_database(), project_id, "character_archetypes", allow_stale=True)  # type: ignore[misc]
+    cached = get_cached_enrichment(deps.get_database(), project_id, "character_archetypes", allow_stale=True)
     if cached:
         return ApiResponse(success=True, data=cached)
 
@@ -1546,7 +1546,7 @@ def get_character_archetypes(
         from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
         from narrative_assistant.analysis.character_archetypes import CharacterArchetypeAnalyzer
 
-        proj_result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        proj_result = deps.project_manager.get(project_id)
         if proj_result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
@@ -1560,7 +1560,7 @@ def get_character_archetypes(
         # Obtener entidades
         entities_data = []
         try:
-            entities = deps.entity_repository.get_by_project(project_id)  # type: ignore[attr-defined]
+            entities = deps.entity_repository.get_by_project(project_id)
             for ent in entities:
                 # Convertir entity_type enum a string
                 entity_type_raw = ent.entity_type if hasattr(ent, 'entity_type') else "character"
@@ -1597,7 +1597,7 @@ def get_character_archetypes(
         relationships_data = []
         try:
             from narrative_assistant.relationships.repository import (
-                get_relationship_repository,  # type: ignore[attr-defined]
+                get_relationship_repository,
             )
             rel_repo = get_relationship_repository()
             rels = rel_repo.get_by_project(project_id)
@@ -1706,7 +1706,7 @@ def get_character_network(project_id: int):
 
     # Check enrichment cache first (S8a-13)
     from routers._enrichment_cache import get_cached_enrichment
-    cached = get_cached_enrichment(deps.get_database(), project_id, "character_network", allow_stale=True)  # type: ignore[misc]
+    cached = get_cached_enrichment(deps.get_database(), project_id, "character_network", allow_stale=True)
     if cached:
         return ApiResponse(success=True, data=cached)
 
@@ -1808,7 +1808,7 @@ def get_character_timeline(project_id: int):
 
     # Check enrichment cache first (S8a-13)
     from routers._enrichment_cache import get_cached_enrichment
-    cached = get_cached_enrichment(deps.get_database(), project_id, "character_timeline", allow_stale=True)  # type: ignore[misc]
+    cached = get_cached_enrichment(deps.get_database(), project_id, "character_timeline", allow_stale=True)
     if cached:
         return ApiResponse(success=True, data=cached)
 
@@ -1911,7 +1911,7 @@ def get_character_profiles(project_id: int):
 
     # Check enrichment cache first (S8a-13)
     from routers._enrichment_cache import get_cached_enrichment
-    cached = get_cached_enrichment(deps.get_database(), project_id, "character_profiles", allow_stale=True)  # type: ignore[misc]
+    cached = get_cached_enrichment(deps.get_database(), project_id, "character_profiles", allow_stale=True)
     if cached:
         return ApiResponse(success=True, data=cached)
 
@@ -1986,7 +1986,7 @@ def get_stale_enrichments(project_id: int):
     try:
         from routers._invalidation import get_project_revision, get_stale_enrichment_types
 
-        db = deps.get_database()  # type: ignore[misc]
+        db = deps.get_database()
         revision = get_project_revision(db, project_id)
         stale_types = get_stale_enrichment_types(db, project_id)
 

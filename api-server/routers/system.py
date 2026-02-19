@@ -1329,10 +1329,10 @@ def change_data_location(request: ChangeDataLocationRequest):
     import shutil
 
     try:
-        new_path = Path(request.new_path).expanduser().resolve()  # type: ignore[attr-defined]
+        new_path = Path(request.new_path).expanduser().resolve()
 
         # Bloquear path traversal: rechazar rutas con ".."
-        if ".." in request.new_path:  # type: ignore[attr-defined]
+        if ".." in request.new_path:
             return ApiResponse(
                 success=False,
                 error="Ruta no permitida: contiene componentes de path traversal"
@@ -1385,7 +1385,7 @@ def change_data_location(request: ChangeDataLocationRequest):
         migrated_items = []
 
         # Migrar datos si se solicita
-        if request.migrate_data and old_path.exists():  # type: ignore[attr-defined]
+        if request.migrate_data and old_path.exists():
             items_to_migrate = ["projects.db", "projects", "cache"]
 
             for item in items_to_migrate:

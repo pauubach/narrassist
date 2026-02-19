@@ -1342,7 +1342,7 @@ def get_project_correction_config(project_id: int):
         from narrative_assistant.correction_config import get_config_for_project
 
         # Usar el deps.project_manager global en lugar de crear nueva instancia
-        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
+        result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
         project = result.value
@@ -1380,7 +1380,7 @@ def get_correction_config_diff(
     """
     try:
         from narrative_assistant.correction_config import (
-            get_config_diff,  # type: ignore[attr-defined]
+            get_config_diff,
         )
 
         diff = get_config_diff(type_code, subtype_code)
