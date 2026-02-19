@@ -773,6 +773,7 @@ def confirm_import(
         if preview_result.is_failure:
             return Result.failure(preview_result.error)
 
+        assert preview_result.value is not None  # is_success guarantees value
         preview = preview_result.value
         stats = {
             "entity_merges_applied": 0,
