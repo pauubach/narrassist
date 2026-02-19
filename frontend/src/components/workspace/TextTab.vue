@@ -122,6 +122,9 @@ function computeGutterMarkers() {
     const byMetaCategory = new Map<MetaCategoryKey, Alert[]>()
 
     for (const alert of chapterAlerts) {
+      // Skip si no tiene categoría
+      if (!alert.category) continue
+
       // Encontrar la meta-categoría de esta alerta
       let metaKey: MetaCategoryKey | null = null
       for (const [key, metaConfig] of Object.entries(META_CATEGORIES)) {
@@ -132,11 +135,14 @@ function computeGutterMarkers() {
         }
       }
 
-      if (metaKey) {
-        const list = byMetaCategory.get(metaKey) || []
-        list.push(alert)
-        byMetaCategory.set(metaKey, list)
+      // Fallback a 'suggestions' si no encontró meta-categoría
+      if (!metaKey) {
+        metaKey = 'suggestions'
       }
+
+      const list = byMetaCategory.get(metaKey) || []
+      list.push(alert)
+      byMetaCategory.set(metaKey, list)
     }
 
     // Crear badges ordenados por prioridad (errors, inconsistencies, quality, suggestions)
@@ -149,10 +155,10 @@ function computeGutterMarkers() {
         const meta = META_CATEGORIES[metaKey]
         badges.push({
           metaCategory: metaKey,
-          count: alerts.length,
-          color: meta.color,
-          label: meta.label,
-          alerts
+          count: alerts?.length || 0,
+          color: meta.color || 'var(--ds-color-text-secondary, #6b7280)',
+          label: meta.label || 'Otros',
+          alerts: alerts || []
         })
       }
     }
