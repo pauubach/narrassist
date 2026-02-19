@@ -203,6 +203,21 @@ function transformKnowledgeFact(api: ApiKnowledgeFact): KnowledgeFact {
   }
 }
 
+function transformDialogueAttributionStats(apiStats: any): DialogueAttributionStats {
+  const byConfidence = apiStats.by_confidence || {}
+  const byMethod = apiStats.by_method || {}
+
+  return {
+    total: apiStats.total_dialogues || 0,
+    attributed: apiStats.attributed_dialogues || 0,
+    highConfidence: byConfidence.high || 0,
+    mediumConfidence: byConfidence.medium || 0,
+    lowConfidence: byConfidence.low || 0,
+    unknown: byConfidence.unknown || 0,
+    byMethod: byMethod,
+  }
+}
+
 // =============================================================================
 // Store Definition
 // =============================================================================
@@ -350,7 +365,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
 
       dialogueAttributions.value[key] = {
         attributions: (data.attributions || []).map(transformDialogueAttribution),
-        stats: data.stats || null,
+        stats: data.stats ? transformDialogueAttributionStats(data.stats) : null,
       }
       return true
     } catch (err) {
