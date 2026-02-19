@@ -498,12 +498,17 @@ const project = computed(() => projectsStore.currentProject)
 const { entities, alerts, chapters, relationships, entitiesCount, alertsCount,
         loadEntities, loadAlerts, loadChapters, loadRelationships } = useProjectData()
 
+// Wrapper para loadChapters que coincide con la firma esperada por useAnalysisPolling
+const loadChaptersWrapper = async (projectId: number, forceReload = false) => {
+  await loadChapters(projectId, project.value ?? undefined, forceReload)
+}
+
 const { isAnalyzing, hasBeenAnalyzed, cancellingAnalysis,
         startPolling: startAnalysisPolling, stopPolling: stopAnalysisPolling,
         cancelAnalysis: handleCancelAnalysis } = useAnalysisPolling({
   project,
   entities, alerts, chapters,
-  loadEntities, loadAlerts, loadChapters,
+  loadEntities, loadAlerts, loadChapters: loadChaptersWrapper,
 })
 
 // Navegación de menciones - usar projectId reactivo
