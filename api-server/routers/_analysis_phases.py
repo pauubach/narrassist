@@ -10,6 +10,7 @@ S8a-14: Refactor monolito → funciones standalone.
 import json
 import threading
 import time
+import contextlib
 from collections import Counter
 from typing import Any
 
@@ -42,8 +43,10 @@ def _serialize_entities_for_cache(entities: list, entity_repo) -> str:
     cache_data = []
 
     for entity in entities:
-        # Obtener menciones de DB
-        mentions = entity_repo.get_mentions_for_entity(entity.id)
+        # Obtener menciones de DB.
+        # EntityRepository expone get_mentions_by_entity(); mantener
+        # este nombre evita fallos silenciosos de escritura de cache.
+        mentions = entity_repo.get_mentions_by_entity(entity.id)
 
         entity_dict = {
             "id": entity.id,
@@ -134,12 +137,20 @@ def _restore_entities_from_cache(
         # Restaurar menciones
         mentions_to_create = []
         for mention_dict in entity_dict.get("mentions", []):
+            start_char = mention_dict["start_char"]
+            # chapter_id cacheado puede quedar obsoleto porque run_structure
+            # recrea capítulos en cada análisis (IDs nuevos). Remapear por posición.
+            chapter_id = mention_dict.get("chapter_id")
+            if callable(find_chapter_id_for_position):
+                with contextlib.suppress(Exception):
+                    chapter_id = find_chapter_id_for_position(start_char)
+
             mention = EntityMention(
                 entity_id=entity_id,
                 surface_form=mention_dict["surface_form"],
-                start_char=mention_dict["start_char"],
+                start_char=start_char,
                 end_char=mention_dict["end_char"],
-                chapter_id=mention_dict.get("chapter_id"),
+                chapter_id=chapter_id,
                 confidence=mention_dict.get("confidence", 0.9),
                 source=mention_dict.get("source", "cache"),
             )
@@ -742,6 +753,7 @@ def apply_license_and_settings(ctx: dict, tracker: ProgressTracker):
 def run_parsing(ctx: dict, tracker: ProgressTracker):
     """Fase 1: Lee y parsea el documento."""
     from narrative_assistant.parsers.base import detect_format, get_parser
+    from narrative_assistant.persistence.document_fingerprint import generate_fingerprint
     from narrative_assistant.persistence.project import ProjectManager
 
     tmp_path = ctx["tmp_path"]
@@ -758,6 +770,7 @@ def run_parsing(ctx: dict, tracker: ProgressTracker):
     raw_document = parse_result.value
     full_text = raw_document.full_text  # type: ignore[union-attr]
     word_count = len(full_text.split())
+    document_fingerprint = generate_fingerprint(full_text).full_hash
 
     # S7c-03: Validar documento vacío
     if not full_text or not full_text.strip():
@@ -773,6 +786,7 @@ def run_parsing(ctx: dict, tracker: ProgressTracker):
     try:
         project = ctx["project"]
         project.word_count = word_count
+        project.document_fingerprint = document_fingerprint
         proj_manager = ProjectManager(ctx["db_session"])
         proj_manager.update(project)
         logger.debug(f"Updated project word_count to {word_count}")
@@ -785,6 +799,7 @@ def run_parsing(ctx: dict, tracker: ProgressTracker):
     ctx["raw_document"] = raw_document
     ctx["full_text"] = full_text
     ctx["word_count"] = word_count
+    ctx["document_fingerprint"] = document_fingerprint
 
 
 # ============================================================================
@@ -1149,9 +1164,12 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
     project_id = ctx["project_id"]
     full_text = ctx["full_text"]
     find_chapter_id_for_position = ctx["find_chapter_id_for_position"]
-    # Obtener fingerprint del proyecto (campo de BD, NO de ctx)
-    _fp_project = ctx.get("project")
-    document_fingerprint = getattr(_fp_project, "document_fingerprint", "") if _fp_project else ""
+    # Usar fingerprint recién parseado (fuente de verdad en esta ejecución).
+    # Fallback al proyecto por compatibilidad.
+    document_fingerprint = ctx.get("document_fingerprint", "")
+    if not document_fingerprint:
+        _fp_project = ctx.get("project")
+        document_fingerprint = getattr(_fp_project, "document_fingerprint", "") if _fp_project else ""
     analysis_config = ctx.get("analysis_config")
 
     tracker.start_phase("ner", 3, "Buscando personajes, lugares y otros elementos...")
