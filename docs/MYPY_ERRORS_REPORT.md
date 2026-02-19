@@ -10,29 +10,29 @@
 | Métrica | Valor |
 |---------|-------|
 | **Errores iniciales** | 306 |
-| **Errores actuales** | 231 |
-| **Errores corregidos** | 75 (-24.5%) |
-| **Progreso** | 🟩 Avance significativo |
+| **Errores actuales** | 167 |
+| **Errores corregidos** | 139 (-45.4%) |
+| **Progreso** | 🟢 Casi a la mitad |
 
 ---
 
 ## Distribución de Errores por Tipo
 
-| Tipo de Error | Cantidad | % del Total | Reducción | Prioridad |
-|---------------|----------|-------------|-----------|-----------|
-| `attr-defined` | 38 | 16.5% | -7% | 🔴 Alta |
-| `no-any-return` | 36 | 15.6% | -12% | 🟡 Media |
-| `assignment` | 33 | 14.3% | 0% | 🟡 Media |
-| `arg-type` | 32 | 13.9% | **-53%** ✅ | 🟡 Media |
-| `index` | 27 | 11.7% | **-23%** | 🟡 Media |
-| `return-value` | 22 | 9.5% | 0% | 🟡 Media |
-| `annotation-unchecked` | 12 | 5.2% | 0% | 🟢 Baja |
-| `operator` | 8 | 3.5% | 0% | 🟡 Media |
-| `union-attr` | 8 | 3.5% | **-60%** ✅ | 🟢 Baja |
-| `misc` | 8 | 3.5% | -11% | 🟢 Baja |
-| `call-overload` | 6 | 2.6% | 0% | 🟢 Baja |
-| `no-redef` | 5 | 2.2% | 0% | 🟢 Baja |
-| Otros | 10 | 4.3% | Varios | 🟢 Baja |
+| Tipo de Error | Cantidad | % del Total | Reducción vs Inicial | Prioridad |
+|---------------|----------|-------------|----------------------|-----------|
+| `attr-defined` | 37 | 22.2% | **-10%** (41→37) | 🔴 Alta |
+| `no-any-return` | 27 | 16.2% | **-36%** (42→27) ✅ | 🟡 Media |
+| `arg-type` | 23 | 13.8% | **-66%** (68→23) ✅✅ | 🟢 Baja |
+| `assignment` | 21 | 12.6% | **-36%** (33→21) ✅ | 🟡 Media |
+| `index` | 17 | 10.2% | **-51%** (35→17) ✅ | 🟢 Baja |
+| `return-value` | 12 | 7.2% | **-45%** (22→12) ✅ | 🟡 Media |
+| `annotation-unchecked` | 12 | 7.2% | 0% (12→12) | 🟢 Baja |
+| `operator` | 7 | 4.2% | **-13%** (8→7) | 🟡 Media |
+| `union-attr` | 6 | 3.6% | **-70%** (20→6) ✅✅ | 🟢 Baja |
+| `misc` | 6 | 3.6% | **-33%** (9→6) ✅ | 🟢 Baja |
+| `no-redef` | 5 | 3.0% | 0% (5→5) | 🟢 Baja |
+| `call-overload` | 1 | 0.6% | **-83%** (6→1) ✅✅ | 🟢 Baja |
+| Otros | 13 | 7.8% | Varios | 🟢 Baja |
 
 ---
 
@@ -60,7 +60,7 @@
 
 ## Correcciones Aplicadas
 
-### ✅ Completadas (75 errores)
+### ✅ Completadas (139 errores - 45.4% del total)
 
 1. **Imports faltantes** (7 errores)
    - Agregado `from typing import Any` en 5 archivos
@@ -86,7 +86,18 @@
    - Device preference validation en config.py
    - Memory monitor platform compatibility
 
-6. **Otros** (3 errores)
+6. **Parsers layer fixes** (25 errores)
+   - Fix return types en todos los parsers (Result[RawDocument])
+   - Null checks para Path en base.py, txt_parser.py, pdf_parser.py, epub_parser.py, docx_parser.py
+   - Structure detector heading_level validation
+
+7. **Core module fixes** (22 errores)
+   - Device detection con null handling (device.py)
+   - Model manager return types (model_manager.py)
+   - Singleton pattern typing (patterns.py)
+   - Resource manager type guards
+
+8. **Otros** (3 errores)
    - Type hints en voice/profiles.py (Counter variables)
    - Type hints en analysis/pacing.py, relationship_clustering.py
 
