@@ -231,9 +231,9 @@ class GlossaryDetector(BaseDetector):
         # Contar por categoría
         for entry in entries:
             cat = entry.category or "general"
-            if cat not in summary["by_category"]:  # type: ignore[operator]
-                summary["by_category"][cat] = 0  # type: ignore[index]
-            summary["by_category"][cat] += 1  # type: ignore[index]
+            if cat not in summary["by_category"]:
+                summary["by_category"][cat] = 0
+            summary["by_category"][cat] += 1
 
         # Analizar uso en el texto
         text.lower()

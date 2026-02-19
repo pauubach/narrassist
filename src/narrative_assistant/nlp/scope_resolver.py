@@ -329,7 +329,8 @@ class ScopeResolver:
                     for c in child.children
                 )
                 if has_de:
-                    return child  # type: ignore[no-any-return]
+                    # child es Token, el tipo de retorno es correcto
+                    return child
         return None
 
     def _expand_entity_span(self, token) -> str:
@@ -343,7 +344,8 @@ class ScopeResolver:
         if token.ent_type_:
             for ent in self.doc.ents:
                 if ent.start <= token.i < ent.end:
-                    return ent.text  # type: ignore[no-any-return]
+                    # ent.text es str, el tipo de retorno es correcto
+                    return ent.text
 
         # Si no, expandir con dependencias (compound, flat)
         tokens_in_span = [token]
@@ -1111,7 +1113,8 @@ class ScopeResolver:
                 f"Ambiguous context detected at position {position}, "
                 f"candidates: {candidates}"
             )
-            return AmbiguousResult(  # type: ignore[return-value]
+            # El tipo de retorno es AmbiguousResult, compatible
+            return AmbiguousResult(
                 candidates=candidates,
                 position=position,
                 context_text=context_text,
@@ -1146,7 +1149,7 @@ class ScopeResolver:
                     # entidades, preferir el nombre propio.
                     if identity_match:
                         is_descriptive_noun = (
-                            subject_token is not None and subject_token.pos_ == "NOUN"  # type: ignore[attr-defined]
+                            subject_token is not None and hasattr(subject_token, "pos_") and subject_token.pos_ == "NOUN"
                         )
                         if is_descriptive_noun or not subject_match:
                             logger.debug(
@@ -1541,7 +1544,8 @@ Responde SOLO con el nombre del candidato más probable, o "AMBIGUO" si no puede
         try:
             if llm is None or not hasattr(llm, 'generate'):
                 return None
-            response = llm.generate(prompt, max_tokens=50, temperature=0.1)  # type: ignore[attr-defined]
+            # LLM puede ser objeto dinámico, comprobamos método
+            response = llm.generate(prompt, max_tokens=50, temperature=0.1)
             if not response:
                 return None
 

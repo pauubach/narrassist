@@ -103,14 +103,14 @@ def list_alerts(
 
         # Obtener alertas - usar método priorizado si se especifica capítulo
         if current_chapter is not None:
-            result = alert_repo.get_by_project_prioritized(  # type: ignore[attr-defined]
+            result = alert_repo.get_by_project_prioritized(
                 project_id,
                 current_chapter=current_chapter,
                 chapter_min=chapter_min,
                 chapter_max=chapter_max,
             )
         else:
-            result = alert_repo.get_by_project(  # type: ignore[attr-defined]
+            result = alert_repo.get_by_project(
                 project_id,
                 chapter_min=chapter_min,
                 chapter_max=chapter_max,
@@ -252,7 +252,7 @@ def update_alert_status(project_id: int, alert_id: int, body: deps.AlertStatusRe
 
         # Actualizar el status
         alert.status = status_map[new_status_str]
-        deps.alert_repository.update(alert)  # type: ignore[attr-defined]
+        deps.alert_repository.update(alert)
 
         # Registrar en historial para undo (solo cambios de estado del usuario)
         if new_status_str in ('resolved', 'dismissed'):
@@ -347,7 +347,7 @@ def resolve_alert(project_id: int, alert_id: int):
     if error:
         return error
     alert.status = AlertStatus.RESOLVED
-    deps.alert_repository.update(alert)  # type: ignore[attr-defined]
+    deps.alert_repository.update(alert)
     return ApiResponse(success=True, message="Alerta marcada como resuelta")
 
 
@@ -358,7 +358,7 @@ def dismiss_alert(project_id: int, alert_id: int):
     if error:
         return error
     alert.status = AlertStatus.DISMISSED
-    deps.alert_repository.update(alert)  # type: ignore[attr-defined]
+    deps.alert_repository.update(alert)
     return ApiResponse(success=True, message="Alerta descartada")
 
 
@@ -369,7 +369,7 @@ def reopen_alert(project_id: int, alert_id: int):
     if error:
         return error
     alert.status = AlertStatus.OPEN
-    deps.alert_repository.update(alert)  # type: ignore[attr-defined]
+    deps.alert_repository.update(alert)
     return ApiResponse(success=True, message="Alerta reabierta")
 
 
@@ -419,7 +419,7 @@ def resolve_ambiguous_attribute(
     if body.entity_id is None:
         alert.status = AlertStatus.RESOLVED
         alert.resolution_note = "Usuario eligió no asignar el atributo"
-        deps.alert_repository.update(alert)  # type: ignore[attr-defined]
+        deps.alert_repository.update(alert)
         return ApiResponse(success=True, message="Atributo no asignado, alerta resuelta")
 
     # Verificar que entity_id está entre los candidatos
@@ -446,7 +446,7 @@ def resolve_ambiguous_attribute(
         }
         category = category_map.get(attribute_key, "physical")
 
-        entity_repo.create_attribute(  # type: ignore[attr-defined]
+        entity_repo.create_attribute(
             entity_id=body.entity_id,
             attribute_type=category,
             attribute_key=attribute_key,
@@ -458,7 +458,7 @@ def resolve_ambiguous_attribute(
         # Marcar alerta como resuelta
         alert.status = AlertStatus.RESOLVED
         alert.resolution_note = f"Atributo asignado a entidad {body.entity_id}"
-        deps.alert_repository.update(alert)  # type: ignore[attr-defined]
+        deps.alert_repository.update(alert)
 
         return ApiResponse(
             success=True,
@@ -532,7 +532,7 @@ def batch_resolve_ambiguous_attributes(
             if entity_id is None:
                 alert.status = AlertStatus.RESOLVED
                 alert.resolution_note = "Usuario eligió no asignar (batch)"
-                deps.alert_repository.update(alert)  # type: ignore[attr-defined]
+                deps.alert_repository.update(alert)
                 resolved_count += 1
                 continue
 
@@ -556,7 +556,7 @@ def batch_resolve_ambiguous_attributes(
             }
             category = category_map.get(attribute_key, "physical")
 
-            entity_repo.create_attribute(  # type: ignore[attr-defined]
+            entity_repo.create_attribute(
                 entity_id=entity_id,
                 attribute_type=category,
                 attribute_key=attribute_key,
@@ -568,7 +568,7 @@ def batch_resolve_ambiguous_attributes(
             # Marcar alerta como resuelta
             alert.status = AlertStatus.RESOLVED
             alert.resolution_note = f"Atributo asignado (batch) a entidad {entity_id}"
-            deps.alert_repository.update(alert)  # type: ignore[attr-defined]
+            deps.alert_repository.update(alert)
             resolved_count += 1
 
         except Exception as e:
@@ -600,7 +600,7 @@ def resolve_all_alerts(project_id: int):
         alert_repo = deps.alert_repository
 
         # Obtener todas las alertas del proyecto
-        result = alert_repo.get_by_project(project_id)  # type: ignore[attr-defined]
+        result = alert_repo.get_by_project(project_id)
         if result.is_failure:
             return ApiResponse(success=False, error="Error obteniendo alertas")
 
@@ -612,7 +612,7 @@ def resolve_all_alerts(project_id: int):
         for alert in all_alerts:
             if alert.status.value in ['new', 'open', 'acknowledged', 'in_progress']:
                 alert.status = AlertStatus.RESOLVED
-                alert_repo.update(alert)  # type: ignore[attr-defined]
+                alert_repo.update(alert)
                 resolved_count += 1
                 resolved_alerts.append(alert)
 
@@ -992,7 +992,7 @@ def mark_alert_resolved(project_id: int, alert_id: int, body: deps.MarkResolvedR
 
         alert.status = AlertStatus.RESOLVED
 
-        deps.alert_repository.update(alert)  # type: ignore[attr-defined]
+        deps.alert_repository.update(alert)
 
         # Write resolution_reason to DB
         try:

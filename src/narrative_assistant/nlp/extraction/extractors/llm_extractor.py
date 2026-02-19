@@ -340,7 +340,7 @@ class LLMExtractor(BaseExtractor):
             ]
 
         # Si no se especificaron, usar todos los disponibles que conocemos
-        available = self.get_available_models()  # type: ignore[assignment]
+        available = self.get_available_models()
         ensemble = []
         for config in RECOMMENDED_MODELS:
             model_base = config.name.split(":")[0]
@@ -387,7 +387,7 @@ class LLMExtractor(BaseExtractor):
         2. Recopila atributos de cada uno
         3. Vota para determinar atributos finales
         """
-        attributes = []  # type: ignore[var-annotated]
+        attributes = []
         errors = []
         model_results: list[SingleModelResult] = []
 
@@ -503,7 +503,7 @@ class LLMExtractor(BaseExtractor):
 
             if start >= 0 and end > start:
                 json_str = response_text[start:end]
-                return json.loads(json_str)  # type: ignore[no-any-return]
+                return json.loads(json_str)
 
             return []
 

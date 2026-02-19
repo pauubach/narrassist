@@ -1528,8 +1528,8 @@ JSON:"""
         # Solo retornar si la confianza es suficiente
         if best_similarity >= self.similarity_threshold:
             logger.info(
-                f"Resolved '{anaphoric_entity.canonical_name}' -> "
-                f"'{best_match.canonical_name}' (similarity: {best_similarity:.2f})"  # type: ignore[union-attr]
+                f"Resolved '{getattr(anaphoric_entity, 'canonical_name', '?')}' -> "
+                f"'{getattr(best_match, 'canonical_name', '?')}' (similarity: {best_similarity:.2f})"
             )
             return best_match
 

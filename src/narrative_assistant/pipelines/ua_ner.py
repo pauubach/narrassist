@@ -329,7 +329,7 @@ class PipelineNERMixin:
             logger.info(f"NER: processing full text ({total_chars} chars)")
             result = extractor.extract_entities(context.full_text)
             if result.is_success:
-                return result.value.entities if hasattr(result.value, "entities") else []  # type: ignore[union-attr, no-any-return]
+                return result.value.entities if hasattr(result.value, "entities") else []
             return []
 
         # Documentos grandes con capítulos: procesar capítulo por capítulo

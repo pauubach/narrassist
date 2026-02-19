@@ -185,7 +185,7 @@ class StickyReport:
             elif sent.severity == StickinessSeverity.MEDIUM:
                 weighted_sticky += 1
             else:
-                weighted_sticky += 0.5  # type: ignore[assignment]
+                weighted_sticky += 0.5
 
         max_penalty = self.total_sentences * 4
         penalty = weighted_sticky / max_penalty if max_penalty > 0 else 0
@@ -678,7 +678,7 @@ class StickySentenceDetector:
             result = self.analyze(content, chapter=chapter_num)
             if result.is_success:
                 results[chapter_num] = result.value
-        return results  # type: ignore[return-value]
+        return results
 
     def get_sentence_analysis(self, sentence: str) -> dict:
         """
@@ -706,7 +706,7 @@ class StickySentenceDetector:
             word_lower = word.lower()
             is_glue = word_lower in GLUE_WORDS
 
-            analysis["words"].append(  # type: ignore[attr-defined]
+            analysis["words"].append(
                 {
                     "word": word,
                     "is_glue": is_glue,
@@ -715,13 +715,13 @@ class StickySentenceDetector:
             )
 
             if is_glue:
-                analysis["glue_words"] += 1  # type: ignore[operator]
+                analysis["glue_words"] += 1
             else:
-                analysis["content_words"] += 1  # type: ignore[operator]
+                analysis["content_words"] += 1
 
-        if analysis["total_words"] > 0:  # type: ignore[operator]
-            analysis["glue_percentage"] = analysis["glue_words"] / analysis["total_words"]  # type: ignore[operator]
-            analysis["is_sticky"] = analysis["glue_percentage"] >= self.threshold  # type: ignore[operator]
+        if analysis["total_words"] > 0:
+            analysis["glue_percentage"] = analysis["glue_words"] / analysis["total_words"]
+            analysis["is_sticky"] = analysis["glue_percentage"] >= self.threshold
 
         return analysis
 
@@ -790,7 +790,7 @@ class StickySentenceDetector:
 
     def _generate_recommendations(self, report: StickyReport) -> list[str]:
         """Generar recomendaciones basadas en el análisis."""
-        recommendations = []  # type: ignore[var-annotated]
+        recommendations: list[str] = []
 
         if report.total_sentences == 0:
             return recommendations

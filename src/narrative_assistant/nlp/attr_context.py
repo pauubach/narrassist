@@ -144,7 +144,7 @@ class AttributeContextMixin:
         Returns:
             True si es probable que sea una metáfora
         """
-        for pattern in self._metaphor_patterns:  # type: ignore[attr-defined]
+        for pattern in getattr(self, '_metaphor_patterns', []):
             # Buscar TODAS las ocurrencias del patrón de metáfora en el contexto
             for metaphor_match in pattern.finditer(context):
                 metaphor_pos = metaphor_match.start()
@@ -203,7 +203,7 @@ class AttributeContextMixin:
         before_context = context[:match_pos]
 
         # Buscar negación simple cercana (últimos 30 caracteres)
-        return any(pattern.search(before_context[-30:]) for pattern in self._negation_patterns)  # type: ignore[attr-defined]
+        return any(pattern.search(before_context[-30:]) for pattern in getattr(self, '_negation_patterns', []))
 
     def _is_temporal_past(self, context: str, match_pos: int) -> bool:
         """
@@ -213,7 +213,7 @@ class AttributeContextMixin:
         """
         before_context = context[:match_pos]
 
-        return any(pattern.search(before_context[-60:]) for pattern in self._temporal_past_patterns)  # type: ignore[attr-defined]
+        return any(pattern.search(before_context[-60:]) for pattern in getattr(self, '_temporal_past_patterns', []))
 
     def _is_conditional(self, context: str, match_pos: int) -> bool:
         """
@@ -223,7 +223,7 @@ class AttributeContextMixin:
         """
         before_context = context[:match_pos]
 
-        return any(pattern.search(before_context[-50:]) for pattern in self._conditional_patterns)  # type: ignore[attr-defined]
+        return any(pattern.search(before_context[-50:]) for pattern in getattr(self, '_conditional_patterns', []))
 
     def _check_contrastive_correction(
         self, context: str, match_start: int, match_end: int, value: str
@@ -246,7 +246,7 @@ class AttributeContextMixin:
         from .attributes import COLORS
 
         # Buscar patrón "no es que... sino" o "no era/tenía... sino"
-        for pattern in self._contrastive_patterns:  # type: ignore[attr-defined]
+        for pattern in getattr(self, '_contrastive_patterns', []):
             match = pattern.search(context)
             if match:
                 # Verificar si nuestro valor está ANTES del "sino"

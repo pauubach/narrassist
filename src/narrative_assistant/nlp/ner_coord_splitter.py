@@ -129,7 +129,7 @@ class NERCoordSplitterMixin:
                 parts = self._simple_coord_split(entity.text)
                 if len(parts) >= 2:
                     for part_text, part_offset in parts:
-                        if self._is_valid_spacy_entity(part_text):  # type: ignore[attr-defined]
+                        if hasattr(self, "_is_valid_spacy_entity") and self._is_valid_spacy_entity(part_text):
                             new_ent = ExtractedEntity(
                                 text=part_text,
                                 label=entity.label,
@@ -171,7 +171,7 @@ class NERCoordSplitterMixin:
                 parts = self._simple_coord_split(entity.text)
                 if len(parts) >= 2:
                     for part_text, part_offset in parts:
-                        if self._is_valid_spacy_entity(part_text):  # type: ignore[attr-defined]
+                        if hasattr(self, "_is_valid_spacy_entity") and self._is_valid_spacy_entity(part_text):
                             new_ent = ExtractedEntity(
                                 text=part_text,
                                 label=entity.label,

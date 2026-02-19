@@ -489,7 +489,7 @@ class InteractionDetector:
         interactions: list[EntityInteraction],
     ) -> list[EntityInteraction]:
         """Elimina interacciones duplicadas."""
-        seen = {}  # type: ignore[var-annotated]
+        seen = {}
 
         for interaction in interactions:
             # Clave: participantes + posición aproximada

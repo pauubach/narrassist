@@ -218,7 +218,7 @@ class SnapshotRepository:
                     f"{alert_count} alerts, {entity_count} entities, "
                     f"{chapter_count} chapters"
                 )
-                return snapshot_id  # type: ignore[no-any-return]
+                return snapshot_id
 
         except Exception as e:
             logger.error(f"Error creating snapshot for project {project_id}: {e}")

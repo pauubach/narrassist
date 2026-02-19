@@ -451,11 +451,11 @@ def generate_synthetic_dataset(
     examples = []
 
     for scenario_name, scenario_data in SCENARIOS.items():
-        base_examples = scenario_data["examples"]
+        base_examples = scenario_data.get("examples", [])
 
         for base in base_examples:
             # Crear ejemplo base
-            scores = dict(base["scores"])  # type: ignore[index]
+            scores = dict(base.get("scores", {}))
 
             # Añadir ruido si está habilitado
             if add_noise:
@@ -464,14 +464,14 @@ def generate_synthetic_dataset(
                     scores[method] = max(0.0, min(1.0, scores[method] + noise))
 
             example = TrainingExample(
-                entity_name=base["entity"],  # type: ignore[index]
-                attribute_key=base["key"],  # type: ignore[index]
-                attribute_value=base["value"],  # type: ignore[index]
-                text_context=base["text"],  # type: ignore[index]
+                entity_name=base.get("entity", ""),
+                attribute_key=base.get("key", ""),
+                attribute_value=base.get("value", ""),
+                text_context=base.get("text", ""),
                 scores=scores,
-                is_correct=base["is_correct"],  # type: ignore[index]
+                is_correct=base.get("is_correct", False),
                 scenario=scenario_name,
-                notes=scenario_data["description"],  # type: ignore[arg-type]
+                notes=scenario_data.get("description", ""),
             )
             examples.append(example)
 
@@ -481,19 +481,19 @@ def generate_synthetic_dataset(
                 # Elegir un ejemplo base aleatorio y variar scores
                 base = random.choice(base_examples)
                 scores = {}
-                for method, score in base["scores"].items():  # type: ignore[index]
+                for method, score in base.get("scores", {}).items():
                     variation = random.uniform(-0.15, 0.15)
                     scores[method] = max(0.0, min(1.0, score + variation))
 
                 example = TrainingExample(
-                    entity_name=base["entity"],  # type: ignore[index]
-                    attribute_key=base["key"],  # type: ignore[index]
-                    attribute_value=base["value"],  # type: ignore[index]
-                    text_context=base["text"],  # type: ignore[index]
+                    entity_name=base.get("entity", ""),
+                    attribute_key=base.get("key", ""),
+                    attribute_value=base.get("value", ""),
+                    text_context=base.get("text", ""),
                     scores=scores,
-                    is_correct=base["is_correct"],  # type: ignore[index]
+                    is_correct=base.get("is_correct", False),
                     scenario=scenario_name,
-                    notes=f"Variación de: {scenario_data['description']}",
+                    notes=f"Variación de: {scenario_data.get('description', '')}",
                 )
                 examples.append(example)
 
@@ -571,30 +571,32 @@ def analyze_dataset(examples: list[TrainingExample]) -> dict:
 
     for example in examples:
         # Por escenario
-        if example.scenario not in stats["by_scenario"]:  # type: ignore[operator]
-            stats["by_scenario"][example.scenario] = {"total": 0, "correct": 0}  # type: ignore[index]
-        stats["by_scenario"][example.scenario]["total"] += 1  # type: ignore[index]
-        if example.is_correct:
-            stats["by_scenario"][example.scenario]["correct"] += 1  # type: ignore[index]
+        scenario = getattr(example, "scenario", None)
+        if scenario not in stats["by_scenario"]:
+            stats["by_scenario"][scenario] = {"total": 0, "correct": 0}
+        stats["by_scenario"][scenario]["total"] += 1
+        if getattr(example, "is_correct", False):
+            stats["by_scenario"][scenario]["correct"] += 1
 
         # Por atributo
-        if example.attribute_key not in stats["by_attribute"]:  # type: ignore[operator]
-            stats["by_attribute"][example.attribute_key] = {"total": 0, "correct": 0}  # type: ignore[index]
-        stats["by_attribute"][example.attribute_key]["total"] += 1  # type: ignore[index]
-        if example.is_correct:
-            stats["by_attribute"][example.attribute_key]["correct"] += 1  # type: ignore[index]
+        attribute_key = getattr(example, "attribute_key", None)
+        if attribute_key not in stats["by_attribute"]:
+            stats["by_attribute"][attribute_key] = {"total": 0, "correct": 0}
+        stats["by_attribute"][attribute_key]["total"] += 1
+        if getattr(example, "is_correct", False):
+            stats["by_attribute"][attribute_key]["correct"] += 1
 
         # Scores promedio
-        for method, score in example.scores.items():
-            if method in stats["method_avg_scores"]:  # type: ignore[operator]
-                stats["method_avg_scores"][method].append(score)  # type: ignore[index]
+        for method, score in getattr(example, "scores", {}).items():
+            if method in stats["method_avg_scores"]:
+                stats["method_avg_scores"][method].append(score)
 
     # Calcular promedios
-    for method in stats["method_avg_scores"]:  # type: ignore[attr-defined]
-        scores = stats["method_avg_scores"][method]  # type: ignore[index]
+    for method in stats["method_avg_scores"]:
+        scores = stats["method_avg_scores"][method]
         if scores:
-            stats["method_avg_scores"][method] = sum(scores) / len(scores)  # type: ignore[index]
+            stats["method_avg_scores"][method] = sum(scores) / len(scores)
         else:
-            stats["method_avg_scores"][method] = 0.0  # type: ignore[index]
+            stats["method_avg_scores"][method] = 0.0
 
     return stats

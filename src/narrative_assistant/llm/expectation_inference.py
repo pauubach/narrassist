@@ -293,7 +293,7 @@ Responde SIEMPRE en formato JSON válido."""
         try:
             from narrative_assistant.nlp.embeddings import get_embeddings_model
 
-            self._embeddings_model = get_embeddings_model()  # type: ignore[assignment]
+            self._embeddings_model = get_embeddings_model()
         except Exception as e:
             logger.debug(f"Error cargando modelo de embeddings para inferencia: {e}")
 
@@ -461,7 +461,7 @@ Responde SIEMPRE en formato JSON válido."""
             )
 
             safe_name = sanitize_for_prompt(character_name, max_length=200)
-            safe_attrs = sanitize_for_prompt(existing_attributes, max_length=2000) if existing_attributes else "Ninguno especificado"  # type: ignore[arg-type]
+            safe_attrs = sanitize_for_prompt(str(existing_attributes), max_length=2000) if existing_attributes else "Ninguno especificado"
             safe_text = sanitize_for_prompt(samples_text[:8000], max_length=8000)
 
             prompt = f"""Analiza el siguiente personaje basándote en los fragmentos de texto proporcionados.

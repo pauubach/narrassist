@@ -56,7 +56,7 @@ TEMPORAL_AGREEMENT_BONUS = 1.15
 def _get_default_temporal_methods() -> list[TemporalDetectionMethod]:
     """Retorna los métodos habilitados por defecto según el hardware."""
     try:
-        from ..core.device import get_device_config  # type: ignore[attr-defined]
+        from ..core.device import get_device_config
 
         device_config = get_device_config()
         has_gpu = device_config.device_type in ("cuda", "mps")
@@ -86,7 +86,7 @@ class TemporalDetectionConfig:
     min_confidence: float = 0.5
     consensus_threshold: float = 0.5
     ollama_model: str = "llama3.2"
-    use_llm: bool = field(default=None)  # type: ignore[assignment]
+    use_llm: bool = field(default=None)
 
     # Umbrales para detección
     impossible_sequence_days: int = 7  # Días para considerar secuencia imposible
@@ -387,7 +387,7 @@ class TemporalConsistencyChecker:
 
                 # Si comparten palabras de contexto o los años están muy cerca,
                 # es probable que se refieran al mismo evento
-                years_close = abs(m1.year - m2.year) <= 10  # type: ignore[operator]
+                years_close = abs(m1.year - m2.year) <= 10
 
                 if shared or years_close:
                     confidence = 0.6
@@ -1197,7 +1197,7 @@ class VotingTemporalChecker:
 
             # S3-01: Narrative-of-Thought - análisis complementario
             if text and len(text) >= 200:
-                entity_names = []  # type: ignore[var-annotated]
+                entity_names = []
                 for event in timeline.events[:20]:
                     entity_names.extend(
                         str(eid) for eid in getattr(event, "entity_ids", [])

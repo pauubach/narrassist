@@ -243,7 +243,7 @@ class TemporalMap:
                     best_delta_days = abs_delta
                     best_ref = ref
                     # Store signed delta for age calculation
-                    best_ref._delta_hours = delta  # type: ignore[attr-defined]
+                    best_ref._delta_hours = delta
 
         if best_ref is None:
             return None

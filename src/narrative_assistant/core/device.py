@@ -292,7 +292,7 @@ class DeviceDetector:
 
         # Forzar CUDA
         if prefer == "cuda":
-            device = self.detect_cuda()  # type: ignore[assignment]
+            device = self.detect_cuda()
             if device is None:
                 raise RuntimeError(
                     "CUDA solicitado pero no disponible. "
@@ -303,7 +303,7 @@ class DeviceDetector:
 
         # Forzar MPS
         if prefer == "mps":
-            device = self.detect_mps()  # type: ignore[assignment]
+            device = self.detect_mps()
             if device is None:
                 raise RuntimeError(
                     "MPS solicitado pero no disponible. Requiere macOS 12.3+ y Apple Silicon."
@@ -350,7 +350,9 @@ class DeviceDetector:
             DeviceType.MPS: "mps",
             DeviceType.CPU: "cpu",
         }
-        return device_map[self._detected_device.device_type]  # type: ignore[union-attr]
+        if hasattr(self._detected_device, 'device_type'):
+            return device_map[self._detected_device.device_type]
+        raise AttributeError("_detected_device missing 'device_type' attribute")
 
     def has_cupy_for_spacy(self) -> bool:
         """Indica si CuPy está disponible para spaCy."""

@@ -451,7 +451,7 @@ class PipelineConsistencyMixin:
 
                 # Manejar tanto Result como list directa
                 if hasattr(result, "is_success"):
-                    incoherences = result.value if result.is_success else []  # type: ignore[union-attr, attr-defined]
+                    incoherences = result.value if result.is_success else []
                 else:
                     incoherences = result if isinstance(result, list) else []
 
@@ -509,14 +509,14 @@ class PipelineConsistencyMixin:
                     continue
 
                 # Analizar arco emocional del capítulo
-                arc_result = analyzer.analyze_emotional_arc(  # type: ignore[call-arg]
+                arc_result = analyzer.analyze_emotional_arc(
                     text=content,
                     chapter_id=chapter_num,
                     segment_size=500,  # Dividir en segmentos de ~500 chars
                 )
 
-                if hasattr(arc_result, "is_success") and arc_result.is_success and arc_result.value:  # type: ignore[union-attr, attr-defined]
-                    arc = arc_result.value  # type: ignore[union-attr, attr-defined]
+                if hasattr(arc_result, "is_success") and arc_result.is_success and arc_result.value:
+                    arc = arc_result.value
                     sentiment_arcs.append(
                         {
                             "chapter": chapter_num,

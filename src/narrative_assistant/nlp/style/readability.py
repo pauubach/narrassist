@@ -857,7 +857,7 @@ class ReadabilityAnalyzer:
             # Primero, análisis base de legibilidad
             base_result = self.analyze(text)
             if base_result.is_failure:
-                return Result.failure(base_result.error)  # type: ignore[arg-type]
+                return Result.failure(base_result.error)
 
             base_report = base_result.value
             assert base_report is not None
@@ -932,9 +932,9 @@ class ReadabilityAnalyzer:
 
                 # Comparar con umbrales del grupo objetivo
                 if target_thresholds:
-                    max_wps = float(target_thresholds.get("max_words_per_sentence", 25))  # type: ignore[arg-type]
-                    max_spw = float(target_thresholds.get("max_syllables_per_word", 3.0))  # type: ignore[arg-type]
-                    min_sight = float(target_thresholds.get("min_sight_word_ratio", 0.0))  # type: ignore[arg-type]
+                    max_wps = float(target_thresholds.get("max_words_per_sentence", 25))
+                    max_spw = float(target_thresholds.get("max_syllables_per_word", 3.0))
+                    min_sight = float(target_thresholds.get("min_sight_word_ratio", 0.0))
 
                     # Evaluar longitud de oraciones
                     if base_report.avg_words_per_sentence > max_wps:

@@ -125,7 +125,7 @@ class RawDocument:
         """Obtiene el sistema de coordenadas, construyéndolo si es necesario."""
         if self._coordinate_system is None:
             self._build_coordinate_system()
-        return self._coordinate_system  # type: ignore[return-value]
+        return self._coordinate_system
 
     @property
     def full_text(self) -> str:
@@ -390,7 +390,7 @@ def get_parser(format_or_path: DocumentFormat | Path | str) -> DocumentParser:
             detected_format=fmt.value,
         )
 
-    return parsers[fmt]()  # type: ignore[no-any-return]
+    return parsers[fmt]()
 
 
 def calculate_page_and_line(

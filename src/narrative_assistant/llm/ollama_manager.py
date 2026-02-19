@@ -393,7 +393,7 @@ class OllamaManager:
             try:
                 req = urllib.request.Request(f"{self._config.host}/api/tags")
                 with urllib.request.urlopen(req, timeout=self._config.network_timeout) as resp:
-                    return resp.status == 200  # type: ignore[no-any-return]
+                    return resp.status == 200
             except Exception:
                 return False
         except Exception:
@@ -454,8 +454,9 @@ class OllamaManager:
 
     def _subprocess_kwargs(self) -> dict:
         """Kwargs comunes para subprocess en Windows (ocultar ventana de consola)."""
-        if self._platform == InstallationPlatform.WINDOWS:
-            return {"creationflags": subprocess.CREATE_NO_WINDOW}  # type: ignore[attr-defined]
+        if self._platform == InstallationPlatform.WINDOWS and hasattr(subprocess, "CREATE_NO_WINDOW"):
+            return {"creationflags": subprocess.CREATE_NO_WINDOW}
+        return {}
         return {}
 
     @property
@@ -534,8 +535,8 @@ class OllamaManager:
                     parts = output.split()
                     for i, part in enumerate(parts):
                         if part.lower() == "version" and i + 1 < len(parts):
-                            return parts[i + 1]  # type: ignore[no-any-return]
-                return output  # type: ignore[no-any-return]
+                            return parts[i + 1]
+                return output
         except Exception as e:
             logger.debug(f"Error obteniendo version: {e}")
 
@@ -619,7 +620,7 @@ class OllamaManager:
                     [str(installer_path), "/S"],
                     capture_output=True,
                     timeout=300.0,  # 5 minutos
-                    creationflags=subprocess.CREATE_NO_WINDOW,  # type: ignore[attr-defined]
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
                 if result.returncode != 0:
                     # Fallback a instalacion interactiva
@@ -888,7 +889,7 @@ class OllamaManager:
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                         env=env,
-                        creationflags=subprocess.CREATE_NO_WINDOW,  # type: ignore[attr-defined]
+                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                     )
                 else:
                     # Linux/macOS: iniciar en nueva sesion
@@ -1033,20 +1034,21 @@ class OllamaManager:
             _ansi_re = re.compile(r"\x1b\[[^a-zA-Z]*[a-zA-Z]|\[[\d;?]*[a-zA-Z]")
             last_error_line = ""
 
-            for line in process.stdout:  # type: ignore[union-attr]
-                # Limpiar ANSI escapes y caracteres de control
-                clean = _ansi_re.sub("", line).strip()
-                clean = "".join(c for c in clean if c.isprintable() or c in " \t")
-                clean = clean.strip()
+            if process.stdout is not None:
+                for line in process.stdout:
+                    # Limpiar ANSI escapes y caracteres de control
+                    clean = _ansi_re.sub("", line).strip()
+                    clean = "".join(c for c in clean if c.isprintable() or c in " \t")
+                    clean = clean.strip()
 
-                if not clean:
-                    continue
+                    if not clean:
+                        continue
 
-                logger.debug(f"ollama pull: {clean}")
+                    logger.debug(f"ollama pull: {clean}")
 
-                # Capturar líneas de error para mensajes útiles
-                if clean.lower().startswith("error"):
-                    last_error_line = clean
+                    # Capturar líneas de error para mensajes útiles
+                    if clean.lower().startswith("error"):
+                        last_error_line = clean
 
                 # Parsear progreso: Ollama emite "pulling xxx:  45% ▕...▏ 1.2 GB/2.0 GB"
                 pct_match = re.search(r"(\d+)%", clean)

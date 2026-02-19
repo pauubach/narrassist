@@ -126,16 +126,16 @@ def analyze_with_title_handling(nlp, text: str) -> TitleAwareAnalysisResult:
 
         if para.is_title:
             last_title_index = i
-            title_index_map[i] = (aware_doc, [])  # type: ignore[assignment]
+            title_index_map[i] = (aware_doc, [])
         else:
             # Asociar con el último título
             if last_title_index >= 0:
-                title_index_map[last_title_index][1].append(doc)  # type: ignore[index]
+                title_index_map[last_title_index][1].append(doc)
             else:
                 # Sin título previo
                 if None not in title_index_map:
-                    title_index_map[None] = (None, [])  # type: ignore[index, assignment]
-                title_index_map[None][1].append(doc)  # type: ignore[index]
+                    title_index_map[None] = (None, [])
+                title_index_map[None][1].append(doc)
 
     # Agrupar por título
     grouped = []
@@ -143,15 +143,15 @@ def analyze_with_title_handling(nlp, text: str) -> TitleAwareAnalysisResult:
     for para in processed.paragraphs:
         if para.is_title:
             # Buscar título en el mapa
-            for idx, (title_doc, content_docs) in title_index_map.items():  # type: ignore[misc]
-                if idx not in seen_titles and title_doc and title_doc.text == para.text:  # type: ignore[has-type]
-                    grouped.append((title_doc, content_docs))  # type: ignore[has-type]
+            for idx, (title_doc, content_docs) in title_index_map.items():
+                if idx not in seen_titles and title_doc is not None and hasattr(title_doc, 'text') and title_doc.text == para.text:
+                    grouped.append((title_doc, content_docs))
                     seen_titles.add(idx)
                     break
 
     # Añadir contenido sin título
     if None in title_index_map:
-        grouped.append((None, title_index_map[None][1]))  # type: ignore[index]
+        grouped.append((None, title_index_map[None][1]))
 
     logger.info(
         f"Análisis completado: {len(processed.get_titles())} títulos, "
@@ -234,11 +234,11 @@ def extract_entities_by_title(nlp, text: str, entity_labels: list[str] | None = 
     entities_by_title = {}
 
     for title_doc, content_docs in result.grouped_by_title:
-        title_text = title_doc.text if title_doc else "Sin título"  # type: ignore[attr-defined]
-        entities_by_label = {}  # type: ignore[var-annotated]
+        title_text = title_doc.text if title_doc is not None and hasattr(title_doc, 'text') else "Sin título"
+        entities_by_label: dict[str, list[str]] = {}
 
         for doc in content_docs:
-            for ent in doc.ents:  # type: ignore[attr-defined]
+            for ent in getattr(doc, 'ents', []):
                 # Filtrar por etiqueta si se especificó
                 if entity_labels and ent.label_ not in entity_labels:
                     continue
@@ -288,11 +288,11 @@ def extract_dependencies_by_title(nlp, text: str, dep_labels: list[str] | None =
     deps_by_title = {}
 
     for title_doc, content_docs in result.grouped_by_title:
-        title_text = title_doc.text if title_doc else "Sin título"  # type: ignore[attr-defined]
+        title_text = title_doc.text if title_doc is not None and hasattr(title_doc, 'text') else "Sin título"
         deps_list = []
 
         for doc in content_docs:
-            for token in doc:  # type: ignore[attr-defined]
+            for token in doc:
                 if token.dep_ == "ROOT":
                     continue
 

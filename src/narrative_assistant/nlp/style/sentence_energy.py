@@ -937,7 +937,7 @@ class SentenceEnergyDetector:
             result = self.analyze(content, chapter=chapter_num)
             if result.is_success:
                 results[chapter_num] = result.value
-        return results  # type: ignore[return-value]
+        return results
 
     # =========================================================================
     # Análisis de voz (activa vs pasiva)
@@ -1256,7 +1256,7 @@ class SentenceEnergyDetector:
 
     def _generate_recommendations(self, report: SentenceEnergyReport) -> list[str]:
         """Generar recomendaciones basadas en el análisis."""
-        recommendations = []  # type: ignore[var-annotated]
+        recommendations: list[str] = []
 
         if report.total_sentences == 0:
             return recommendations

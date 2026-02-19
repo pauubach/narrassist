@@ -479,23 +479,23 @@ class HistoryManager:
         try:
             # Dispatch por tipo de acción
             if action == "entity_merged":
-                self._undo_entity_merge(target_id, old_value)  # type: ignore[arg-type]
+                self._undo_entity_merge(target_id, old_value)
             elif action == "entity_created":
                 self._undo_entity_create(target_id)
             elif action == "entity_deleted":
-                self._undo_entity_delete(target_id, old_value)  # type: ignore[arg-type]
+                self._undo_entity_delete(target_id, old_value)
             elif action == "entity_updated":
-                self._undo_entity_update(target_id, old_value)  # type: ignore[arg-type]
+                self._undo_entity_update(target_id, old_value)
             elif action in ("alert_resolved", "alert_dismissed"):
-                self._undo_alert_status_change(target_id, old_value)  # type: ignore[arg-type]
+                self._undo_alert_status_change(target_id, old_value)
             elif action == "attribute_verified":
-                self._undo_attribute_verification(target_id, old_value)  # type: ignore[arg-type]
+                self._undo_attribute_verification(target_id, old_value)
             elif action in ("attribute_updated", "attribute_added"):
-                self._undo_attribute_change(target_id, old_value)  # type: ignore[arg-type]
+                self._undo_attribute_change(target_id, old_value)
             elif action == "attribute_deleted":
-                self._undo_attribute_delete(target_id, old_value)  # type: ignore[arg-type]
+                self._undo_attribute_delete(target_id, old_value)
             elif action in ("relationship_created", "relationship_updated", "relationship_deleted"):
-                self._undo_relationship_change(action, target_id, old_value)  # type: ignore[arg-type]
+                self._undo_relationship_change(action, target_id, old_value)
             else:
                 return UndoResult(
                     success=False,

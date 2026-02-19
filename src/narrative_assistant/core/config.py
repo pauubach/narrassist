@@ -72,7 +72,7 @@ class GPUConfig:
     def from_env(cls) -> "GPUConfig":
         """Crea configuración desde variables de entorno."""
         return cls(
-            device_preference=os.getenv("NA_DEVICE", "auto"),  # type: ignore[arg-type]
+            device_preference=str(os.getenv("NA_DEVICE", "auto")),
             spacy_gpu_enabled=os.getenv("NA_SPACY_GPU", "true").lower() == "true",
             embeddings_gpu_enabled=os.getenv("NA_EMBEDDINGS_GPU", "true").lower() == "true",
             embeddings_batch_size_gpu=int(os.getenv("NA_BATCH_SIZE_GPU", "64")),

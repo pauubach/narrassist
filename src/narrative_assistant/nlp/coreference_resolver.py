@@ -800,7 +800,7 @@ def _get_default_coref_methods() -> list[CorefMethod]:
     - Sin GPU: Solo métodos rápidos (sin LLM)
     """
     try:
-        from ..core.device import get_device_config  # type: ignore[attr-defined]
+        from ..core.device import get_device_config
 
         device_config = get_device_config()
         has_gpu = device_config.device_type in ("cuda", "mps")
@@ -1475,7 +1475,7 @@ class CoreferenceVotingResolver(
         for method in self.config.enabled_methods:
             if method in method_classes:
                 try:
-                    self._methods[method] = method_classes[method]()  # type: ignore[assignment]
+                    self._methods[method] = method_classes[method]()
                     logger.debug(f"Método {method.value} inicializado")
                 except Exception as e:
                     logger.warning(f"No se pudo inicializar {method.value}: {e}")

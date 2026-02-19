@@ -953,7 +953,7 @@ class PacingAnalyzer:
 
     def _check_chapter_balance(self, metrics: list[PacingMetrics]) -> list[PacingIssue]:
         """Detecta desequilibrios entre capítulos."""
-        issues = []  # type: ignore[var-annotated]
+        issues = []
 
         if len(metrics) < 2:
             return issues

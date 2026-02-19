@@ -360,11 +360,11 @@ class PipelineDeepExtractionMixin:
             # Analizar patrones de interacción
             if all_interactions:
                 pattern_analyzer = InteractionPatternAnalyzer(
-                    interactions=all_interactions,  # type: ignore[call-arg]
-                    entities=context.entities,  # type: ignore[call-arg]
+                    interactions=all_interactions,
+                    entities=context.entities,
                 )
 
-                patterns = pattern_analyzer.analyze()  # type: ignore[attr-defined]
+                patterns = pattern_analyzer.analyze()
                 context.interaction_patterns = [
                     p.to_dict() if hasattr(p, "to_dict") else p for p in patterns
                 ]

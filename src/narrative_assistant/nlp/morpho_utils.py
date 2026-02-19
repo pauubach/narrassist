@@ -97,7 +97,8 @@ def is_verb(token) -> bool:
 
 def is_auxiliary(token) -> bool:
     """Determina si un token es verbo auxiliar (haber, ser, estar)."""
-    return token.pos_ == "AUX"  # type: ignore[no-any-return]
+    # pos_ es str, el tipo de retorno es bool
+    return getattr(token, "pos_", None) == "AUX"
 
 
 def is_proper_noun(token) -> bool:
@@ -110,27 +111,27 @@ def is_proper_noun(token) -> bool:
     Returns:
         True si es nombre propio
     """
-    return token.pos_ == "PROPN"  # type: ignore[no-any-return]
+    return getattr(token, "pos_", None) == "PROPN"
 
 
 def is_noun(token) -> bool:
     """Determina si un token es sustantivo común."""
-    return token.pos_ == "NOUN"  # type: ignore[no-any-return]
+    return getattr(token, "pos_", None) == "NOUN"
 
 
 def is_adjective(token) -> bool:
     """Determina si un token es adjetivo."""
-    return token.pos_ == "ADJ"  # type: ignore[no-any-return]
+    return getattr(token, "pos_", None) == "ADJ"
 
 
 def is_pronoun(token) -> bool:
     """Determina si un token es pronombre."""
-    return token.pos_ == "PRON"  # type: ignore[no-any-return]
+    return getattr(token, "pos_", None) == "PRON"
 
 
 def is_determiner(token) -> bool:
     """Determina si un token es determinante (artículo, demostrativo)."""
-    return token.pos_ == "DET"  # type: ignore[no-any-return]
+    return getattr(token, "pos_", None) == "DET"
 
 
 def get_gender(token) -> str | None:
@@ -436,7 +437,7 @@ def is_comparison_como(token) -> bool:
     # dep_ == "advmod" → adverbio de manera ("como lo hizo")
     if token.dep_ == "advmod":
         # Verificar si modifica un verbo (manera) o un adjetivo (comparación)
-        return token.head.pos_ != "VERB"  # type: ignore[no-any-return]
+        return getattr(getattr(token, "head", None), "pos_", None) != "VERB"
 
     # dep_ == "case" → preposición/marcador de caso
     if token.dep_ == "case":

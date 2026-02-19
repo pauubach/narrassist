@@ -181,7 +181,7 @@ def _validate_item(
     # Validar valor según tipo
     if inst_type == "age":
         try:
-            value = int(value)  # type: ignore[arg-type]
+            value = int(value)
         except (ValueError, TypeError):
             return None
         if value < 0 or value > 130:
@@ -193,14 +193,14 @@ def _validate_item(
             return None
     elif inst_type == "year":
         try:
-            value = int(value)  # type: ignore[arg-type]
+            value = int(value)
         except (ValueError, TypeError):
             return None
         if value < 0 or value > 2100:
             return None
     elif inst_type == "offset":
         try:
-            value = int(value)  # type: ignore[arg-type]
+            value = int(value)
         except (ValueError, TypeError):
             return None
         if abs(value) > 200:
@@ -220,7 +220,7 @@ def _validate_item(
     return LLMTemporalInstance(
         entity_name=entity,
         instance_type=inst_type,
-        value=value,  # type: ignore[arg-type]
+        value=value,
         evidence=evidence,
         confidence=confidence,
     )

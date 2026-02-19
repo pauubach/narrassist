@@ -332,8 +332,8 @@ class InteractionCoherenceChecker:
         text_lower = text.lower()
 
         # Buscar comportamientos prohibidos
-        for forbidden in expectations.forbidden_behaviors:  # type: ignore[assignment]
-            if forbidden.lower() in text_lower:  # type: ignore[attr-defined]
+        for forbidden in expectations.forbidden_behaviors:
+            if forbidden.lower() in text_lower:
                 return CoherenceAlert(
                     code="COHERENCE_FORBIDDEN_BEHAVIOR",
                     alert_type="Comportamiento contradictorio",
@@ -620,7 +620,7 @@ class RelationshipAnalyzer:
         Returns:
             Lista de cambios detectados
         """
-        changes = []  # type: ignore[var-annotated]
+        changes = []
         prev_tone = None
 
         for interaction in sorted(interactions, key=lambda i: i.chapter):

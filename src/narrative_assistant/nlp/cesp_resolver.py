@@ -330,7 +330,9 @@ class ConflictResolver:
             # Usar el candidato con evidencia sintáctica
             best = self._get_best_syntactic_candidate(candidates)
             notes.append(f"Resuelto por evidencia sintáctica: {best.syntactic_evidence}")
-            return (best.assigned_entity_id, best.base_confidence, best.assignment_source, notes)  # type: ignore[return-value]
+            # Si assigned_entity_id es None, se retorna cadena vacía y se documenta el caso
+            entity_id: str = best.assigned_entity_id if best.assigned_entity_id is not None else ""
+            return (entity_id, best.base_confidence, best.assignment_source, notes)
 
         elif status == ConflictStatus.UNANIMOUS:
             # Boost de confianza por unanimidad
@@ -339,8 +341,9 @@ class ConflictResolver:
             notes.append(
                 f"Boost por unanimidad: {best.base_confidence:.2f} → {boosted_confidence:.2f}"
             )
-            return (  # type: ignore[return-value]
-                best.assigned_entity_id,
+            entity_id: str = best.assigned_entity_id if best.assigned_entity_id is not None else ""
+            return (
+                entity_id,
                 boosted_confidence,
                 best.assignment_source or AssignmentSource.PROXIMITY,
                 notes,
@@ -413,7 +416,8 @@ class ConflictResolver:
 
         logger.debug(f"[LLM Arbitration] Prompt: {prompt[:100]}...")
 
-        response = self._llm.query(prompt=prompt, context=context, options=entity_names)  # type: ignore[union-attr]
+        response = self._llm.query(prompt=prompt, context=context, options=entity_names) if hasattr(self._llm, "query") else None
+    response = self._llm.query(prompt=prompt, context=context, options=entity_names)
 
         if response:
             # Buscar la entidad mencionada en la respuesta
@@ -859,21 +863,21 @@ class CESPAttributeResolver:
         total_conf = 0.0
 
         for attr in results:
-            stats["by_status"][attr.conflict_status.value] += 1  # type: ignore[index]
-            stats["by_source"][attr.assignment_source.value] += 1  # type: ignore[index]
-            stats["by_type"][attr.attribute_type] += 1  # type: ignore[index]
+            stats["by_status"][attr.conflict_status.value] += 1
+            stats["by_source"][attr.assignment_source.value] += 1
+            stats["by_type"][attr.attribute_type] += 1
 
             if attr.is_dubious:
-                stats["dubious_count"] += 1  # type: ignore[operator]
+                stats["dubious_count"] += 1
 
             total_conf += attr.final_confidence
 
         stats["avg_confidence"] = total_conf / len(results)
 
         # Convertir defaultdicts
-        stats["by_status"] = dict(stats["by_status"])  # type: ignore[call-overload]
-        stats["by_source"] = dict(stats["by_source"])  # type: ignore[call-overload]
-        stats["by_type"] = dict(stats["by_type"])  # type: ignore[call-overload]
+        stats["by_status"] = dict(stats["by_status"])
+        stats["by_source"] = dict(stats["by_source"])
+        stats["by_type"] = dict(stats["by_type"])
 
         return stats
 

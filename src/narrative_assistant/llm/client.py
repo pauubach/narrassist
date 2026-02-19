@@ -653,9 +653,9 @@ class LocalLLMClient:
             # Extraer solo la respuesta del asistente
             if "<|assistant|>" in generated_text:
                 response = generated_text.split("<|assistant|>")[-1].strip()
-                return response  # type: ignore[no-any-return]
+                return response
 
-            return generated_text[len(full_prompt) :].strip()  # type: ignore[no-any-return]
+            return generated_text[len(full_prompt) :].strip()
 
         except Exception as e:
             logger.error(f"Error en Transformers: {e}")
@@ -707,7 +707,7 @@ class LocalLLMClient:
             if start_idx != -1 and end_idx > start_idx:
                 cleaned = cleaned[start_idx:end_idx]
 
-            return json.loads(cleaned)  # type: ignore[no-any-return]
+            return json.loads(cleaned)
 
         except json.JSONDecodeError as e:
             logger.error(f"Error parseando JSON: {e}")
@@ -982,7 +982,7 @@ def _load_config() -> LocalLLMConfig:
     )
 
     config = LocalLLMConfig(
-        backend=backend,  # type: ignore
+        backend=backend,
         ollama_host=ollama_host,
         ollama_model=os.getenv("NA_OLLAMA_MODEL", "llama3.2"),
     )

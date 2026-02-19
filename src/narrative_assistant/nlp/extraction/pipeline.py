@@ -125,14 +125,14 @@ class AttributeExtractionPipeline:
         if self.config.use_dependency:
             from .extractors.dependency_extractor import DependencyExtractor
 
-            extractors.append(DependencyExtractor())  # type: ignore[arg-type]
+            extractors.append(DependencyExtractor())
             logger.debug("DependencyExtractor enabled")
 
         if self.config.use_embeddings:
             try:
                 from .extractors.embeddings_extractor import EmbeddingsExtractor
 
-                extractors.append(EmbeddingsExtractor())  # type: ignore[arg-type]
+                extractors.append(EmbeddingsExtractor())
                 logger.debug("EmbeddingsExtractor enabled")
             except ImportError as e:
                 logger.warning(f"EmbeddingsExtractor not available: {e}")
@@ -141,12 +141,12 @@ class AttributeExtractionPipeline:
             try:
                 from .extractors.llm_extractor import LLMExtractor
 
-                extractors.append(LLMExtractor())  # type: ignore[arg-type]
+                extractors.append(LLMExtractor())
                 logger.debug("LLMExtractor enabled")
             except ImportError as e:
                 logger.warning(f"LLMExtractor not available: {e}")
 
-        return extractors  # type: ignore[return-value]
+        return extractors
 
     def extract(
         self,

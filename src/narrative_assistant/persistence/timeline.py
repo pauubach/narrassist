@@ -259,7 +259,7 @@ class TimelineRepository:
                 "SELECT COUNT(*) FROM timeline_events WHERE project_id = ?",
                 (project_id,),
             )
-            return cursor.fetchone()[0]  # type: ignore[no-any-return]
+            return cursor.fetchone()[0]
 
     def has_timeline(self, project_id: int) -> bool:
         """
@@ -277,7 +277,7 @@ class TimelineRepository:
             )
             count = cursor.fetchone()[0]
 
-        return count > 0  # type: ignore[no-any-return]
+        return count > 0
 
     def delete_events(self, project_id: int) -> int:
         """
@@ -397,7 +397,7 @@ class TimelineRepository:
             cursor = conn.execute(
                 "SELECT COUNT(*) FROM temporal_markers WHERE project_id = ?", (project_id,)
             )
-            return cursor.fetchone()[0]  # type: ignore[no-any-return]
+            return cursor.fetchone()[0]
 
     def delete_markers(self, project_id: int) -> int:
         """

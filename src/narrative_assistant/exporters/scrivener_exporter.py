@@ -421,7 +421,7 @@ def export_to_scrivener(
         pm = ProjectManager()
         result = pm.get(project_id)
         if result.is_failure:
-            return Result.failure(result.error)  # type: ignore[arg-type]
+            return Result.failure(result.error)
 
         project = result.value
         assert project is not None
@@ -472,7 +472,7 @@ def export_to_scrivener(
                     from ..nlp.attributes import get_attribute_extractor
 
                     extractor = get_attribute_extractor()
-                    entity_attrs = extractor.get_attributes_for_entity(entity.id)  # type: ignore[attr-defined]
+                    entity_attrs = extractor.get_attributes_for_entity(entity.id)
                     for attr in entity_attrs:
                         key = getattr(attr, "key", "")
                         value = getattr(attr, "value", "")

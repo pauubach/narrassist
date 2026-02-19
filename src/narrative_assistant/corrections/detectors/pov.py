@@ -233,7 +233,7 @@ class POVDetector(BaseDetector):
         """
         Detecta cambios de persona gramatical entre párrafos.
         """
-        issues = []  # type: ignore[var-annotated]
+        issues: list = []
 
         # Determinar el POV dominante del texto completo
         all_counts: Counter = Counter()
@@ -370,7 +370,7 @@ class POVDetector(BaseDetector):
         Heurística: busca párrafos en tercera persona con verbos de percepción
         donde el sujeto de esos verbos cambia sin transición clara.
         """
-        issues = []  # type: ignore[var-annotated]
+        issues: list = []
 
         # Solo aplicar si hay tercera persona dominante
         third_person_paragraphs = [
@@ -532,16 +532,16 @@ class POVDetector(BaseDetector):
         # Detectar inconsistencias: si la mayoría de párrafos tienen 0-1 focalizadores
         # pero algunos tienen 2+, puede indicar inconsistencia
         counts = [p["count"] for p in para_focalizations]
-        limited_paras = sum(1 for c in counts if c <= 1)  # type: ignore[operator, misc]
-        omniscient_paras = sum(1 for c in counts if c >= 2)  # type: ignore[operator, misc]
+        limited_paras = sum(1 for c in counts if isinstance(c, int) and c <= 1)
+        omniscient_paras = sum(1 for c in counts if isinstance(c, int) and c >= 2)
 
         # Si hay una mezcla clara (mayoría limitado, algunos omniscientes)
         if limited_paras >= 3 and omniscient_paras >= 1:
             # El texto parece mayormente limitado pero hay saltos a omnisciencia
             for pf in para_focalizations:
-                if pf["count"] >= 2:  # type: ignore[operator]
-                    para = pf["para"]  # type: ignore[assignment]
-                    focalizers = pf["focalizers"]  # type: ignore[assignment]
+                if isinstance(pf["count"], int) and pf["count"] >= 2:
+                    para = pf["para"]
+                    focalizers = pf["focalizers"]
 
                     issues.append(
                         CorrectionIssue(

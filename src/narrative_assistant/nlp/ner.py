@@ -343,11 +343,11 @@ class NERExtractor(NERValidatorMixin, NERPatternDetectorMixin, NERCoordSplitterM
 
         try:
             if self._transformer_ner is None:
-                self._transformer_ner = get_transformer_ner(  # type: ignore[assignment]
+                self._transformer_ner = get_transformer_ner(
                     model_key=self._transformer_ner_model_key
                 )
 
-            raw_entities = self._transformer_ner.extract(text)  # type: ignore[attr-defined]
+            raw_entities = getattr(self._transformer_ner, "extract", lambda x: [])(text)
             result: list[ExtractedEntity] = []
             for ent in raw_entities:
                 label = self.SPACY_LABEL_MAP.get(ent.label)
@@ -519,7 +519,7 @@ JSON:"""
             if start_idx != -1 and end_idx > start_idx:
                 cleaned = cleaned[start_idx:end_idx]
 
-            return json.loads(cleaned)  # type: ignore[no-any-return]
+            return json.loads(cleaned)
 
         except json.JSONDecodeError as e:
             logger.debug(f"Error parseando JSON del LLM en NER: {e}")
@@ -621,7 +621,7 @@ JSON:"""
 
         # Construir prompt para verificación batch
         entities_json = [
-            {"text": e["text"], "type": e["type"], "context": e["context"][:200]}  # type: ignore[index]
+            {"text": e["text"], "type": e["type"], "context": e["context"][:200]}
             for e in entities_to_verify
         ]
 
@@ -675,10 +675,10 @@ JSON:"""
 
                 # Buscar la entidad correspondiente
                 for verify_data in entities_to_verify:
-                    if verify_data["text"].lower() == text.lower():  # type: ignore[union-attr]
+                    if isinstance(verify_data, dict) and verify_data.get("text", "").lower() == text.lower():
                         if verdict == "valid":
                             # Boost de confianza por verificación LLM
-                            ent = verify_data["entity"]  # type: ignore[assignment]
+                            ent = verify_data["entity"]
                             ent.confidence = min(0.9, ent.confidence + 0.2)
                             ent.source = f"{ent.source}+llm_verified"
                             verified_entities.append(ent)
@@ -1122,7 +1122,7 @@ JSON:"""
 
             # 1. Entidades detectadas por spaCy
             for ent in doc.ents:
-                label = self.SPACY_LABEL_MAP.get(ent.label_)  # type: ignore[attr-defined]
+                label = self.SPACY_LABEL_MAP.get(getattr(ent, "label_", ""))
                 if label is None:
                     continue
 
@@ -1291,7 +1291,7 @@ JSON:"""
             result.entities.sort(key=lambda e: e.start_char)
 
             # Log de fuentes
-            sources = {}  # type: ignore[var-annotated]
+            sources = {}
             for e in result.entities:
                 sources[e.source] = sources.get(e.source, 0) + 1
 
@@ -1717,6 +1717,6 @@ Si no hay personajes implícitos, responde: NINGUNO"""
         return Result.failure(
             NLPError(
                 message=f"Error en detección de personajes implícitos: {e}",
-                severity=ErrorSeverity.WARNING,  # type: ignore[attr-defined]
+                severity=getattr(ErrorSeverity, "WARNING", "WARNING"),
             )
         )

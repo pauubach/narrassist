@@ -449,7 +449,7 @@ class LlamaCppManager:
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     # No crear ventana de consola en Windows
-                    creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0,  # type: ignore[attr-defined]
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if platform.system() == "Windows" else 0,
                 )
 
                 self._current_model = model_name

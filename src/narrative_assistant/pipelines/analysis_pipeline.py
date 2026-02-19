@@ -308,7 +308,10 @@ def run_full_analysis(
         # STEP 2: Parsear documento
         parse_result = _parse_document(path)
         if parse_result.is_failure:
-            return Result.failure(parse_result.error)  # type: ignore[arg-type]
+            if parse_result.error is not None:
+                return Result.failure(parse_result.error)
+            else:
+                return Result.failure(NarrativeError(message="Unknown parse error", severity=ErrorSeverity.FATAL))
 
         raw_document = parse_result.value
         assert raw_document is not None
@@ -344,17 +347,22 @@ def run_full_analysis(
             path, project_name, raw_document.full_text, fingerprint
         )
         if project_result.is_failure:
-            return Result.failure(project_result.error)  # type: ignore[arg-type]
+            if project_result.error is not None:
+                return Result.failure(project_result.error)
+            else:
+                return Result.failure(NarrativeError(message="Unknown project error", severity=ErrorSeverity.FATAL))
 
-        project_id: int = project_result.value  # type: ignore[assignment]
+        project_id = project_result.value
+        assert isinstance(project_id, int)
         report.project_id = project_id
 
         # STEP 4.5: Limpiar datos previos si es re-análisis forzado
         if config.force_reanalysis:
             logger.info("Force reanalysis: clearing previous data...")
-            clear_result = _clear_project_data(project_id)  # type: ignore[arg-type]
+            clear_result = _clear_project_data(project_id)
             if clear_result.is_failure:
-                report.errors.append(clear_result.error)  # type: ignore[arg-type]
+                if clear_result.error is not None:
+                    report.errors.append(clear_result.error)
                 logger.warning("Failed to clear project data, continuing anyway")
             else:
                 stats = clear_result.value
@@ -366,14 +374,19 @@ def run_full_analysis(
         # STEP 5: Crear sesión de análisis
         session_result = _create_session(project_id)
         if session_result.is_failure:
-            return Result.failure(session_result.error)  # type: ignore[arg-type]
+            if session_result.error is not None:
+                return Result.failure(session_result.error)
+            else:
+                return Result.failure(NarrativeError(message="Unknown session error", severity=ErrorSeverity.FATAL))
 
-        report.session_id = session_result.value  # type: ignore[assignment]
+        report.session_id = session_result.value
+        assert report.session_id is not None
 
         # STEP 6: Detectar estructura y guardar capítulos
         structure_result = _detect_structure(raw_document)
         if structure_result.is_failure:
-            report.errors.append(structure_result.error)  # type: ignore[arg-type]
+            if structure_result.error is not None:
+                report.errors.append(structure_result.error)
             logger.warning("Structure detection failed, continuing without it")
         else:
             structure = structure_result.value
@@ -435,9 +448,10 @@ def run_full_analysis(
                 report.chapters = chapters_info
 
                 # Persistir capítulos en la base de datos
-                persist_chapters_result = _persist_chapters(chapters_info, project_id)  # type: ignore[arg-type]
+                persist_chapters_result = _persist_chapters(chapters_info, project_id)
                 if persist_chapters_result.is_failure:
-                    report.errors.append(persist_chapters_result.error)  # type: ignore[arg-type]
+                    if persist_chapters_result.error is not None:
+                        report.errors.append(persist_chapters_result.error)
                     logger.warning("Chapter persistence failed")
                 else:
                     logger.info(f"Persisted {len(chapters_info)} chapters to database")
@@ -445,9 +459,10 @@ def run_full_analysis(
         # STEP 7: Extracción NER
         entities = []
         if config.run_ner:
-            ner_result = _run_ner(raw_document.full_text, project_id)  # type: ignore[arg-type]
+            ner_result = _run_ner(raw_document.full_text, project_id)
             if ner_result.is_failure:
-                report.errors.append(ner_result.error)  # type: ignore[arg-type]
+                if ner_result.error is not None:
+                    report.errors.append(ner_result.error)
                 logger.warning("NER failed, skipping entity extraction")
             else:
                 entities = ner_result.value or []
@@ -461,23 +476,25 @@ def run_full_analysis(
         attributes = []
         if config.run_attributes and entities:
             attr_result = _run_attribute_extraction(
-                raw_document.full_text, entities, config, report.chapters  # type: ignore[arg-type]
+                raw_document.full_text, entities, config, report.chapters
             )
             if attr_result.is_failure:
-                report.errors.append(attr_result.error)  # type: ignore[arg-type]
+                if attr_result.error is not None:
+                    report.errors.append(attr_result.error)
                 logger.warning("Attribute extraction failed")
             else:
-                attr_extraction = attr_result.value  # type: ignore[union-attr]
+                attr_extraction = attr_result.value
                 # attr_extraction es un AttributeExtractionResult con .attributes
                 if hasattr(attr_extraction, "attributes"):
-                    attributes = attr_extraction.attributes  # type: ignore[union-attr]
+                    attributes = getattr(attr_extraction, "attributes", [])
                 else:
                     attributes = attr_extraction if isinstance(attr_extraction, list) else []
 
                 # PERSISTIR ATRIBUTOS EN LA DB
-                persist_result = _persist_attributes(attributes, entities, project_id)  # type: ignore[arg-type]
+                persist_result = _persist_attributes(attributes, entities, project_id)
                 if persist_result.is_failure:
-                    report.errors.append(persist_result.error)  # type: ignore[arg-type]
+                    if persist_result.error is not None:
+                        report.errors.append(persist_result.error)
                     logger.warning("Attribute persistence failed")
                 else:
                     persisted_count = persist_result.value
@@ -489,14 +506,15 @@ def run_full_analysis(
                 # STEP 8a: Crear alertas de atributos ambiguos
                 # Si hay atributos con propiedad ambigua, crear alertas interactivas
                 if config.create_alerts and hasattr(attr_extraction, "ambiguous_attributes"):
-                    ambiguous_attrs = attr_extraction.ambiguous_attributes  # type: ignore[union-attr]
+                    ambiguous_attrs = getattr(attr_extraction, "ambiguous_attributes", None)
                     if ambiguous_attrs:
                         logger.info(f"Found {len(ambiguous_attrs)} ambiguous attributes")
                         ambig_alerts_result = _create_alerts_from_ambiguous_attributes(
                             project_id, ambiguous_attrs
                         )
                         if ambig_alerts_result.is_failure:
-                            report.errors.append(ambig_alerts_result.error)  # type: ignore[arg-type]
+                            if ambig_alerts_result.error is not None:
+                                report.errors.append(ambig_alerts_result.error)
                             logger.warning("Ambiguous attribute alert creation failed")
                         else:
                             ambig_alerts = ambig_alerts_result.value or []
@@ -507,9 +525,10 @@ def run_full_analysis(
         # IMPORTANTE: Después de extraer atributos para que se muevan automáticamente
         if entities:
             logger.info("Starting automatic entity fusion...")
-            fusion_result = _run_entity_fusion(project_id, report.session_id)  # type: ignore[arg-type]
+            fusion_result = _run_entity_fusion(project_id, report.session_id)
             if fusion_result.is_failure:
-                report.errors.append(fusion_result.error)  # type: ignore[arg-type]
+                if fusion_result.error is not None:
+                    report.errors.append(fusion_result.error)
                 logger.warning("Entity fusion failed")
             else:
                 merged_count = fusion_result.value or 0
@@ -541,23 +560,26 @@ def run_full_analysis(
                 if attributes_for_consistency:
                     consistency_result = _run_consistency_analysis(attributes_for_consistency)
                     if consistency_result.is_failure:
-                        report.errors.append(consistency_result.error)  # type: ignore[arg-type]
+                        if consistency_result.error is not None:
+                            report.errors.append(consistency_result.error)
                         logger.warning("Consistency analysis failed")
                     else:
                         inconsistencies = consistency_result.value or []
                         report.stats["inconsistencies_found"] = len(inconsistencies)
                         logger.info(f"Found {len(inconsistencies)} inconsistencies")
             else:
-                report.errors.append(reload_result.error)  # type: ignore[arg-type]
+                if reload_result.error is not None:
+                    report.errors.append(reload_result.error)
                 logger.warning("Failed to reload attributes from DB")
 
         # STEP 11: Crear alertas de atributos
         if config.create_alerts and inconsistencies:
             alerts_result = _create_alerts_from_inconsistencies(
-                project_id, inconsistencies, config.min_confidence  # type: ignore[arg-type]
+                project_id, inconsistencies, config.min_confidence
             )
             if alerts_result.is_failure:
-                report.errors.append(alerts_result.error)  # type: ignore[arg-type]
+                if alerts_result.error is not None:
+                    report.errors.append(alerts_result.error)
                 logger.warning("Alert creation failed")
             else:
                 report.alerts = alerts_result.value or []
@@ -568,18 +590,19 @@ def run_full_analysis(
         if config.run_temporal and report.chapters:
             temporal_result = _run_temporal_analysis(
                 raw_document.full_text,
-                report.chapters,  # type: ignore[arg-type]
+                getattr(report, "chapters", []),
                 project_id=project_id,
-                entities=report.entities,
+                entities=getattr(report, "entities", None),
             )
             if temporal_result.is_failure:
-                report.errors.append(temporal_result.error)  # type: ignore[arg-type]
+                if temporal_result.error is not None:
+                    report.errors.append(temporal_result.error)
                 logger.warning("Temporal analysis failed")
             else:
                 timeline_data = temporal_result.value
-                assert timeline_data is not None
-                report.timeline = timeline_data["timeline"]
-                report.temporal_inconsistencies = timeline_data["inconsistencies"]
+                if timeline_data is not None:
+                    report.timeline = timeline_data.get("timeline")
+                    report.temporal_inconsistencies = timeline_data.get("inconsistencies")
                 report.stats["temporal_markers"] = timeline_data["markers_count"]
                 report.stats["timeline_events"] = (
                     len(report.timeline.events) if report.timeline else 0
@@ -612,10 +635,10 @@ def run_full_analysis(
 
         # STEP 13: Análisis de voz y registro
         if config.run_voice and report.entities:
-            voice_result = _run_voice_analysis(report.chapters, report.entities)  # type: ignore[arg-type]
+            voice_result = _run_voice_analysis(report.chapters, report.entities)
             if voice_result.is_failure:
-                report.errors.append(voice_result.error)  # type: ignore[arg-type]
-                logger.warning(f"Voice analysis failed: {voice_result.error.message}")  # type: ignore[union-attr]
+                report.errors.append(voice_result.error)
+                logger.warning(f"Voice analysis failed: {voice_result.error.message}")
             else:
                 voice_data = voice_result.value
                 assert voice_data is not None
@@ -643,10 +666,10 @@ def run_full_analysis(
         # NOTA: Este paso requiere que el usuario haya declarado la focalización
         # de los capítulos. Si no hay declaraciones, se omite.
         if config.run_focalization and report.chapters and report.entities:
-            foc_result = _run_focalization_analysis(project_id, report.chapters, report.entities)  # type: ignore[arg-type]
+            foc_result = _run_focalization_analysis(project_id, report.chapters, report.entities)
             if foc_result.is_failure:
-                report.errors.append(foc_result.error)  # type: ignore[arg-type]
-                logger.warning(f"Focalization analysis failed: {foc_result.error.message}")  # type: ignore[union-attr]
+                report.errors.append(foc_result.error)
+                logger.warning(f"Focalization analysis failed: {foc_result.error.message}")
             else:
                 foc_data = foc_result.value
                 assert foc_data is not None
@@ -672,10 +695,10 @@ def run_full_analysis(
 
         # STEP 15: Análisis de coherencia emocional
         if config.run_emotional and report.chapters and report.entities:
-            emotional_result = _run_emotional_analysis(project_id, report.chapters, report.entities)  # type: ignore[arg-type]
+            emotional_result = _run_emotional_analysis(project_id, report.chapters, report.entities)
             if emotional_result.is_failure:
-                report.errors.append(emotional_result.error)  # type: ignore[arg-type]
-                logger.warning(f"Emotional analysis failed: {emotional_result.error.message}")  # type: ignore[union-attr]
+                report.errors.append(emotional_result.error)
+                logger.warning(f"Emotional analysis failed: {emotional_result.error.message}")
             else:
                 report.emotional_incoherences = emotional_result.value or []
                 report.stats["emotional_incoherences"] = len(report.emotional_incoherences)
@@ -738,7 +761,7 @@ def _get_or_create_project_with_text(
     existing = project_mgr.get_by_fingerprint(fingerprint.full_hash)
     if existing is not None:
         logger.info(f"Found existing project: {existing.name}")
-        return Result.success(existing.id)  # type: ignore[arg-type]
+        return Result.success(existing.id)
 
     # Crear nuevo proyecto
     doc_format = detect_format(path)
@@ -750,12 +773,12 @@ def _get_or_create_project_with_text(
         check_existing=False,  # Ya verificamos arriba
     )
     if create_result.is_failure:
-        return Result.failure(create_result.error)  # type: ignore[arg-type]
+        return Result.failure(create_result.error)
 
     project = create_result.value
     assert project is not None
     logger.info(f"Created new project: {name} (ID: {project.id})")
-    return Result.success(project.id)  # type: ignore[arg-type]
+    return Result.success(project.id)
 
 
 def _create_session(project_id: int) -> Result[int]:
@@ -763,7 +786,7 @@ def _create_session(project_id: int) -> Result[int]:
     try:
         session_mgr = SessionManager(project_id=project_id)
         session = session_mgr.start()
-        return Result.success(session.id)  # type: ignore[arg-type]
+        return Result.success(session.id)
     except Exception as e:
         error = NarrativeError(
             message=f"Failed to create session: {str(e)}",
@@ -918,7 +941,7 @@ def _run_ner(text: str, project_id: int) -> Result[list[Entity]]:
         # Extraer entidades con NER
         extraction_result = ner.extract_entities(text)
         if extraction_result.is_failure:
-            return Result.failure(extraction_result.error)  # type: ignore[arg-type]
+            return Result.failure(extraction_result.error)
 
         ner_result = extraction_result.value
 
@@ -1175,7 +1198,7 @@ def _run_entity_fusion(project_id: int, session_id: int) -> Result[int]:
                 # API correcta: entity_ids es lista, canonical_name es el nombre resultante
                 merge_result = fusion_service.merge_entities(
                     project_id=project_id,
-                    entity_ids=[suggestion.entity1.id, suggestion.entity2.id],  # type: ignore[list-item]
+                    entity_ids=[suggestion.entity1.id, suggestion.entity2.id],
                     canonical_name=canonical,
                     note=f"Auto-merge (similarity: {suggestion.similarity:.2f})",
                 )
@@ -1279,7 +1302,7 @@ def _persist_chapters(chapters: list["ChapterInfo"], project_id: int) -> Result[
             if ch.sections:
                 chapter_id = created_chapters[i].id
                 sections_created = _persist_sections_recursive(
-                    ch.sections, project_id, chapter_id, None, section_repo  # type: ignore[arg-type]
+                    ch.sections, project_id, chapter_id, None, section_repo
                 )
                 total_sections += sections_created
 
@@ -1450,7 +1473,7 @@ def _run_hybrid_attribute_extraction(
             def __init__(self, attributes):
                 self.attributes = attributes
 
-        return Result.success(AttributeExtractionResult(legacy_attrs))  # type: ignore[arg-type]
+        return Result.success(AttributeExtractionResult(legacy_attrs))
 
     except Exception as e:
         logger.exception("Hybrid attribute extraction failed")
@@ -1503,7 +1526,7 @@ def _run_legacy_attribute_extraction(text: str, entities: list[Entity]) -> Resul
         logger.debug(f"Found {len(entity_mentions)} entity mentions for attribute extraction")
 
         result = extractor.extract_attributes(text, entity_mentions)
-        return result  # type: ignore[return-value]
+        return result
 
     except Exception as e:
         error = NarrativeError(
@@ -1796,7 +1819,7 @@ def _create_alerts_from_inconsistencies(
                         project_id=project_id, name=incon.entity_name, fuzzy=True
                     )
                 if found_entities:
-                    entity_id = found_entities[0].id  # type: ignore[assignment]
+                    entity_id = found_entities[0].id
                     logger.debug(f"Found entity_id={entity_id} for '{incon.entity_name}'")
                 else:
                     logger.warning(f"Entity not found: {incon.entity_name}, skipping alert")
@@ -1865,7 +1888,7 @@ def _create_alerts_from_inconsistencies(
                 logger.warning(f"Failed to create alert: {alert_result.error}")
 
         logger.info(f"Created {len(alerts)} alerts from {len(inconsistencies)} inconsistencies")
-        return Result.success(alerts)  # type: ignore[arg-type]
+        return Result.success(alerts)
 
     except Exception as e:
         error = NarrativeError(
@@ -1948,7 +1971,7 @@ def _create_alerts_from_ambiguous_attributes(
                 logger.warning(f"Failed to create alert: {alert_result.error}")
 
         logger.info(f"Created {len(alerts)} ambiguous attribute alerts from {len(ambiguous_attrs)} ambiguous attributes")
-        return Result.success(alerts)  # type: ignore[arg-type]
+        return Result.success(alerts)
 
     except Exception as e:
         error = NarrativeError(
@@ -2234,7 +2257,7 @@ def _persist_timeline(
                 TemporalMarkerData(
                     id=None,
                     project_id=project_id,
-                    chapter=marker.chapter or 0,  # type: ignore[arg-type]
+                    chapter=marker.chapter or 0,
                     marker_type=marker.marker_type.value
                     if hasattr(marker.marker_type, "value")
                     else str(marker.marker_type),
@@ -2326,7 +2349,7 @@ def _create_alerts_from_temporal_inconsistencies(
                 description += f"\n\nSugerencia: {incon.suggestion}"
 
             # Crear alerta en la base de datos
-            alert_id = alert_repo.create_alert(  # type: ignore[attr-defined]
+            alert_id = alert_repo.create_alert(
                 project_id=project_id,
                 entity_id=None,  # Las alertas temporales no siempre tienen entidad
                 category=category.value,
@@ -2340,7 +2363,7 @@ def _create_alerts_from_temporal_inconsistencies(
 
             if alert_id:
                 # Recuperar la alerta creada
-                alert = alert_repo.get_alert_by_id(alert_id)  # type: ignore[attr-defined]
+                alert = alert_repo.get_alert_by_id(alert_id)
                 if alert:
                     alerts.append(alert)
                     logger.debug(f"Created temporal alert: {title}")
@@ -2400,7 +2423,7 @@ def _run_voice_analysis(
         builder = VoiceProfileBuilder(min_interventions=3)
         dialogues_all: list[Any] = []
         for ch in chapters_dict:
-            dialogues_all.extend(ch.get("dialogues", []))  # type: ignore[arg-type]
+            dialogues_all.extend(ch.get("dialogues", []))
 
         profiles = builder.build_profiles(dialogues_all, entities_dict)
 
@@ -2568,7 +2591,7 @@ def _create_alerts_from_voice_deviations(
                 description += f'\n\nTexto: "{text_preview}"'
 
             # Crear alerta en la base de datos
-            alert_id = alert_repo.create_alert(  # type: ignore[attr-defined]
+            alert_id = alert_repo.create_alert(
                 project_id=project_id,
                 entity_id=deviation.entity_id,
                 category=category.value,
@@ -2582,7 +2605,7 @@ def _create_alerts_from_voice_deviations(
 
             if alert_id:
                 # Recuperar la alerta creada
-                alert = alert_repo.get_alert_by_id(alert_id)  # type: ignore[attr-defined]
+                alert = alert_repo.get_alert_by_id(alert_id)
                 if alert:
                     alerts.append(alert)
                     logger.debug(f"Created voice alert: {title}")
@@ -2722,7 +2745,7 @@ def _create_alerts_from_focalization_violations(
                 description += f'\n\nTexto: "{excerpt}"'
 
             # Crear alerta
-            alert_id = alert_repo.create_alert(  # type: ignore[attr-defined]
+            alert_id = alert_repo.create_alert(
                 project_id=project_id,
                 entity_id=violation.entity_involved,
                 category=AlertCategory.FOCALIZATION.value,
@@ -2735,7 +2758,7 @@ def _create_alerts_from_focalization_violations(
             )
 
             if alert_id:
-                alert = alert_repo.get_alert_by_id(alert_id)  # type: ignore[attr-defined]
+                alert = alert_repo.get_alert_by_id(alert_id)
                 if alert:
                     alerts.append(alert)
                     logger.debug(f"Created focalization alert: {title}")
@@ -2802,7 +2825,7 @@ def _run_emotional_analysis(
                             d.start_char,
                             d.end_char,
                         )
-                        for d in dialogue_result.value.dialogues  # type: ignore[union-attr]
+                        for d in dialogue_result.value.dialogues
                     ]
 
                 # Analizar capítulo con diálogos
@@ -2914,12 +2937,12 @@ def _create_alerts_from_emotional_incoherences(
                 from ..entities.repository import get_entity_repository
 
                 entity_repo = get_entity_repository()
-                entity = entity_repo.find_by_name(project_id, incoherence.entity_name)  # type: ignore[attr-defined]
+                entity = entity_repo.find_by_name(project_id, incoherence.entity_name)
                 if entity:
                     entity_id = entity.id
 
             # Crear alerta
-            alert_id = alert_repo.create_alert(  # type: ignore[attr-defined]
+            alert_id = alert_repo.create_alert(
                 project_id=project_id,
                 entity_id=entity_id,
                 category=AlertCategory.EMOTIONAL.value,
@@ -2932,7 +2955,7 @@ def _create_alerts_from_emotional_incoherences(
             )
 
             if alert_id:
-                alert = alert_repo.get_alert_by_id(alert_id)  # type: ignore[attr-defined]
+                alert = alert_repo.get_alert_by_id(alert_id)
                 if alert:
                     alerts.append(alert)
                     logger.debug(f"Created emotional alert: {title}")

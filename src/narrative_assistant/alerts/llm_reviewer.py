@@ -8,7 +8,7 @@ y filtrar falsos positivos antes de mostrarlas al usuario.
 import logging
 from dataclasses import dataclass
 
-from ..llm.client import LLMClientError, get_llm_client  # type: ignore[attr-defined]
+from ..llm.client import LLMClientError, get_llm_client
 
 logger = logging.getLogger(__name__)
 

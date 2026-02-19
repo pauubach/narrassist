@@ -249,7 +249,7 @@ class OutOfCharacterDetector:
         chapter_dialogues: dict[int, list[dict]],
     ) -> list[OutOfCharacterEvent]:
         """Verifica coherencia del registro de habla por capítulo."""
-        events = []  # type: ignore[var-annotated]
+        events = []
         baseline_formality = profile.speech.formality_score
 
         # Si no hay datos de habla suficientes, no analizar
@@ -382,7 +382,7 @@ class OutOfCharacterDetector:
         chapter_texts: dict[int, str],
     ) -> list[OutOfCharacterEvent]:
         """Verifica cambios en agentividad (activo/pasivo)."""
-        events = []  # type: ignore[var-annotated]
+        events = []
         baseline_agency = profile.actions.agency_score
 
         if profile.actions.action_count < 5:

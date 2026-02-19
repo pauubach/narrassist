@@ -160,7 +160,8 @@ class BaseVoter:
 
     @property
     def is_available(self) -> bool:
-        return self._available  # type: ignore[no-any-return]
+        # _available es bool, el tipo de retorno es correcto
+        return self._available
 
     def check_word(self, word: str, context: str = "") -> Vote | None:
         """Verificar una palabra. Retorna None si no disponible."""
@@ -344,7 +345,8 @@ class SymSpellVoter(BaseVoter):
 
         # Intentar cargar diccionario personalizado
         if custom_path and custom_path.exists():
-            return self._symspell.load_dictionary(str(custom_path), term_index=0, count_index=1)  # type: ignore[no-any-return]
+            # El método load_dictionary retorna el tipo correcto
+            return self._symspell.load_dictionary(str(custom_path), term_index=0, count_index=1)
 
         # Buscar en ubicaciones comunes
         common_paths = [
@@ -538,7 +540,7 @@ class LanguageToolVoter(BaseVoter):
                 check_result = self._client.check(
                     text, language="es", disabled_rules=self._disabled_rules
                 )
-                for match in check_result.matches:  # type: ignore[attr-defined]
+                for match in getattr(check_result, "matches", []):
                     # Filtrar reglas deshabilitadas (por si el servidor no las filtró)
                     if match.rule_id in self._disabled_rules:
                         continue
@@ -1369,7 +1371,7 @@ class BETOVoter(BaseVoter):
             masked_context = context[: match.start()] + "[MASK]" + context[match.end() :]
 
             # Obtener predicciones
-            predictions = self._fill_mask(masked_context)  # type: ignore[misc]
+            predictions = self._fill_mask(masked_context)
 
             # Verificar si la palabra original está entre las predicciones
             predicted_words = [p["token_str"].lower().strip() for p in predictions]
@@ -1649,7 +1651,7 @@ class LLMArbitrator:
 
     @property
     def is_available(self) -> bool:
-        return self._available  # type: ignore[no-any-return]
+        return self._available
 
     def arbitrate(self, word: str, sentence: str, votes: list[Vote]) -> tuple[bool, float, str]:
         """
@@ -1765,25 +1767,25 @@ class VotingSpellingChecker:
 
         # 2. PySpellChecker (Pure Python, diccionario español)
         if use_pyspellchecker:
-            voter = PySpellCheckerVoter()  # type: ignore[assignment]
+            voter = PySpellCheckerVoter()
             if voter.is_available:
                 self._voters.append(voter)
 
         # 3. Hunspell (diccionario profesional)
         if use_hunspell:
-            voter = ChunspellVoter()  # type: ignore[assignment]
+            voter = ChunspellVoter()
             if voter.is_available:
                 self._voters.append(voter)
 
         # 4. SymSpell (basado en frecuencia, muy rápido)
         if use_symspell:
-            voter = SymSpellVoter()  # type: ignore[assignment]
+            voter = SymSpellVoter()
             if voter.is_available:
                 self._voters.append(voter)
 
         # 5. BETO (transformer español - más lento pero preciso)
         if use_beto:
-            voter = BETOVoter()  # type: ignore[assignment]
+            voter = BETOVoter()
             if voter.is_available:
                 self._voters.append(voter)
 
@@ -1901,7 +1903,7 @@ class VotingSpellingChecker:
 
             # Recoger votos de cada votante
             for voter in self._voters:
-                vote = voter.check_word(word, sentence)  # type: ignore[assignment]
+                vote = voter.check_word(word, sentence)
                 if vote:
                     result.votes.append(vote)
 

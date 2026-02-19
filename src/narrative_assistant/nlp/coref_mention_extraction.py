@@ -79,11 +79,11 @@ class CorefMentionExtractionMixin:
         for ent in doc.ents:
             if ent.label_ in ("PER", "PERSON", "LOC", "ORG"):
                 # Filtrar menciones inválidas
-                if not self._is_valid_mention(ent.text):  # type: ignore[attr-defined]
+                if hasattr(self, "_is_valid_mention") and not self._is_valid_mention(ent.text):
                     logger.debug(f"Mención filtrada: '{ent.text}'")
                     continue
 
-                gender, number = self._infer_gender_number(ent.text, doc[ent.start])  # type: ignore[attr-defined]
+                gender, number = self._infer_gender_number(ent.text, doc[ent.start])
                 mentions.append(
                     Mention(
                         text=ent.text,
@@ -94,7 +94,7 @@ class CorefMentionExtractionMixin:
                         number=number,
                         sentence_idx=get_sentence_idx(doc[ent.start]),
                         chapter_idx=get_chapter_idx(ent.start_char),
-                        context=self._get_context(  # type: ignore[attr-defined]
+                        context=self._get_context(
                             text, None, window=50, start=ent.start_char, end=ent.end_char
                         ),
                     )
@@ -117,7 +117,7 @@ class CorefMentionExtractionMixin:
                         number=number,
                         sentence_idx=get_sentence_idx(token),
                         chapter_idx=get_chapter_idx(token.idx),
-                        context=self._get_context(  # type: ignore[attr-defined]
+                        context=self._get_context(
                             text, None, window=50, start=token.idx, end=token.idx + len(token.text)
                         ),
                     )
@@ -153,7 +153,7 @@ class CorefMentionExtractionMixin:
                         number=number,
                         sentence_idx=get_sentence_idx(token),
                         chapter_idx=get_chapter_idx(token.idx),
-                        context=self._get_context(  # type: ignore[attr-defined]
+                        context=self._get_context(
                             text, None, window=50, start=token.idx, end=token.idx + len(token.text)
                         ),
                     )
@@ -298,7 +298,7 @@ class CorefMentionExtractionMixin:
                     sentence_idx=get_sentence_idx(head),
                     chapter_idx=get_chapter_idx(chunk.start_char),
                     head_text=head.text,
-                    context=self._get_context(  # type: ignore[attr-defined]
+                    context=self._get_context(
                         text, None, window=50, start=chunk.start_char, end=chunk.end_char
                     ),
                 )
@@ -403,7 +403,7 @@ class CorefMentionExtractionMixin:
             # Inferir género del contexto verbal:
             # Buscar participios/adjetivos que concuerden con el sujeto omitido
             # "Salió cansada" → femenino, "Llegó enfadado" → masculino
-            gender = self._infer_gender_from_context(token, doc)  # type: ignore[attr-defined]
+            gender = self._infer_gender_from_context(token, doc)
 
             # Representación textual: verbo entre corchetes (ASCII-safe)
             zero_text = f"[PRO {token.text}]"
@@ -418,7 +418,7 @@ class CorefMentionExtractionMixin:
                     number=number,
                     sentence_idx=get_sentence_idx(token),
                     chapter_idx=get_chapter_idx(token.idx),
-                    context=self._get_context(  # type: ignore[attr-defined]
+                    context=self._get_context(
                         text, None, window=50, start=token.idx, end=token.idx + len(token.text)
                     ),
                 )

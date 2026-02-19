@@ -72,7 +72,7 @@ class DictionaryDownloadError(NarrativeError):
     source_name: str = ""
     reason: str = ""
     message: str = ""
-    severity: ErrorSeverity = ErrorSeverity.ERROR  # type: ignore[attr-defined]
+    severity: ErrorSeverity = ErrorSeverity.FATAL
     user_message: str | None = None
 
     def __post_init__(self):
@@ -212,7 +212,7 @@ class DictionaryManager:
             return Result.failure(
                 NarrativeError(
                     message="Palabra vacía",
-                    severity=ErrorSeverity.WARNING,  # type: ignore[attr-defined]
+                    severity=ErrorSeverity.RECOVERABLE,
                     user_message="Por favor, introduce una palabra para buscar.",
                 )
             )
@@ -240,7 +240,7 @@ class DictionaryManager:
             return Result.failure(
                 NarrativeError(
                     message=f"Palabra no encontrada: {word}",
-                    severity=ErrorSeverity.INFO,  # type: ignore[attr-defined]
+                    severity=ErrorSeverity.DEGRADED,
                     user_message=f"No se encontró '{word}' en los diccionarios locales.",
                 )
             )
@@ -306,8 +306,8 @@ class DictionaryManager:
             Lista de sinónimos
         """
         result = self.lookup(word, sources=[DictionarySource.SYNONYMS])
-        if result.is_success:
-            return result.value.synonyms  # type: ignore[union-attr]
+        if result.is_success and result.value is not None:
+            return result.value.synonyms
         return []
 
     def get_antonyms(self, word: str) -> list[str]:
@@ -321,8 +321,8 @@ class DictionaryManager:
             Lista de antónimos
         """
         result = self.lookup(word, sources=[DictionarySource.SYNONYMS])
-        if result.is_success:
-            return result.value.antonyms  # type: ignore[union-attr]
+        if result.is_success and result.value is not None:
+            return result.value.antonyms
         return []
 
     def search_prefix(self, prefix: str, limit: int = 20) -> list[str]:
@@ -667,14 +667,14 @@ class DictionaryManager:
             return Result.failure(
                 NarrativeError(
                     message="Custom dictionary not available",
-                    severity=ErrorSeverity.ERROR,  # type: ignore[attr-defined]
+                    severity=ErrorSeverity.FATAL,
                 )
             )
         except Exception as e:
             return Result.failure(
                 NarrativeError(
                     message=f"Error adding word: {e}",
-                    severity=ErrorSeverity.ERROR,  # type: ignore[attr-defined]
+                    severity=ErrorSeverity.FATAL,
                 )
             )
 
@@ -696,14 +696,14 @@ class DictionaryManager:
             return Result.failure(
                 NarrativeError(
                     message="Custom dictionary not available",
-                    severity=ErrorSeverity.ERROR,  # type: ignore[attr-defined]
+                    severity=ErrorSeverity.FATAL,
                 )
             )
         except Exception as e:
             return Result.failure(
                 NarrativeError(
                     message=f"Error removing word: {e}",
-                    severity=ErrorSeverity.ERROR,  # type: ignore[attr-defined]
+                    severity=ErrorSeverity.FATAL,
                 )
             )
 

@@ -470,7 +470,7 @@ def _infer_birth_year(
 
     for chapter, year in year_instances.items():
         if chapter in age_instances and isinstance(year, int) and isinstance(age_instances[chapter], int):
-            birth_years.append(year - age_instances[chapter])  # type: ignore[operator]
+            birth_years.append(year - age_instances[chapter])
 
     if not birth_years:
         return None, 0.0, []
@@ -655,4 +655,4 @@ def build_entity_timelines(
 
     except Exception as e:
         logger.error(f"Level C cross-chapter linking failed: {e}")
-        return Result.failure(e)  # type: ignore[arg-type]
+        return Result.failure(e)

@@ -514,7 +514,7 @@ class RepetitionDetector:
             errors.append(RepetitionCheckError(original_error=str(e)))
 
         if errors:
-            return Result.partial(report, errors)  # type: ignore[arg-type]
+            return Result.partial(report, errors)
         return Result.success(report)
 
     def detect_lemma(
@@ -736,20 +736,20 @@ class RepetitionDetector:
         # Léxicas
         lexical = self.detect_lexical(text, min_distance)
         if lexical.is_success:
-            for rep in lexical.value.repetitions:  # type: ignore[union-attr]
+            for rep in getattr(lexical.value, 'repetitions', []):
                 combined.add_repetition(rep)
-            combined.processed_words = lexical.value.processed_words  # type: ignore[union-attr]
+            combined.processed_words = getattr(lexical.value, 'processed_words', 0)
 
         # Por lema
         lemma = self.detect_lemma(text, min_distance)
         if lemma.is_success:
-            for rep in lemma.value.repetitions:  # type: ignore[union-attr]
+            for rep in getattr(lemma.value, 'repetitions', []):
                 combined.add_repetition(rep)
 
         # Semánticas (menos estrictas)
         semantic = self.detect_semantic(text, min_distance * 2)
         if semantic.is_success:
-            for rep in semantic.value.repetitions:  # type: ignore[union-attr]
+            for rep in getattr(semantic.value, 'repetitions', []):
                 combined.add_repetition(rep)
 
         return Result.success(combined)

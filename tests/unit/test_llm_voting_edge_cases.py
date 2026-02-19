@@ -234,7 +234,7 @@ class TestResolveFallbacksEdgeCases:
         class FakeLevel:
             pass
 
-        slots = config.slot_for_level(FakeLevel())  # type: ignore[arg-type]
+        slots = config.slot_for_level(FakeLevel())
         assert len(slots) == 1
 
     def test_resolve_preserves_task_and_min_confidence(self):
@@ -1536,4 +1536,5 @@ def _import_without_psutil(name, *args, **kwargs):
     """Helper para simular que psutil no esta instalado."""
     if name == "psutil":
         raise ImportError("Mock: psutil not installed")
-    return __builtins__.__import__(name, *args, **kwargs)  # type: ignore[attr-defined]
+    import builtins
+    return builtins.__import__(name, *args, **kwargs)

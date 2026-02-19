@@ -745,7 +745,7 @@ def get_type_defaults(type_code: str) -> dict:
     if not type_info:
         # Default a ficción si no se encuentra
         type_info = TYPES_REGISTRY["FIC"]
-    return type_info.get("config", {})  # type: ignore[return-value]
+    return type_info.get("config", {})
 
 
 def get_subtype_overrides(subtype_code: str) -> dict:
@@ -761,7 +761,7 @@ def get_subtype_overrides(subtype_code: str) -> dict:
     subtype_info = SUBTYPES_REGISTRY.get(subtype_code.upper())
     if not subtype_info:
         return {}
-    return subtype_info.get("config", {})  # type: ignore[return-value]
+    return subtype_info.get("config", {})
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -894,9 +894,9 @@ def get_correction_config(
     # Crear config base
     config = CorrectionConfig(
         type_code=type_code,
-        type_name=type_name,  # type: ignore[arg-type]
+        type_name=type_name,
         subtype_code=subtype_code,
-        subtype_name=subtype_name,  # type: ignore[arg-type]
+        subtype_name=subtype_name,
     )
 
     # 1. Aplicar defaults del tipo
@@ -908,7 +908,7 @@ def get_correction_config(
             type_config["dialog"],
             "dialog",
             InheritanceSource.TYPE,
-            type_name,  # type: ignore[arg-type]
+            type_name,
             config,
         )
     if "repetition" in type_config:
@@ -917,7 +917,7 @@ def get_correction_config(
             type_config["repetition"],
             "repetition",
             InheritanceSource.TYPE,
-            type_name,  # type: ignore[arg-type]
+            type_name,
             config,
         )
     if "sentence" in type_config:
@@ -926,12 +926,12 @@ def get_correction_config(
             type_config["sentence"],
             "sentence",
             InheritanceSource.TYPE,
-            type_name,  # type: ignore[arg-type]
+            type_name,
             config,
         )
     if "style" in type_config:
         _apply_config_to_dataclass(
-            config.style, type_config["style"], "style", InheritanceSource.TYPE, type_name, config  # type: ignore[arg-type]
+            config.style, type_config["style"], "style", InheritanceSource.TYPE, type_name, config
         )
     if "structure" in type_config:
         _apply_config_to_dataclass(
@@ -939,7 +939,7 @@ def get_correction_config(
             type_config["structure"],
             "structure",
             InheritanceSource.TYPE,
-            type_name,  # type: ignore[arg-type]
+            type_name,
             config,
         )
     if "readability" in type_config:
@@ -948,7 +948,7 @@ def get_correction_config(
             type_config["readability"],
             "readability",
             InheritanceSource.TYPE,
-            type_name,  # type: ignore[arg-type]
+            type_name,
             config,
         )
     if "regional" in type_config:
@@ -957,7 +957,7 @@ def get_correction_config(
             type_config["regional"],
             "regional",
             InheritanceSource.TYPE,
-            type_name,  # type: ignore[arg-type]
+            type_name,
             config,
         )
 
@@ -975,64 +975,64 @@ def get_correction_config(
         if "dialog" in subtype_config:
             _apply_config_to_dataclass(
                 config.dialog,
-                subtype_config["dialog"],  # type: ignore[index]
+                subtype_config["dialog"],
                 "dialog",
                 InheritanceSource.SUBTYPE,
-                subtype_name,  # type: ignore[arg-type]
+                subtype_name,
                 config,
             )
         if "repetition" in subtype_config:
             _apply_config_to_dataclass(
                 config.repetition,
-                subtype_config["repetition"],  # type: ignore[index]
+                subtype_config["repetition"],
                 "repetition",
                 InheritanceSource.SUBTYPE,
-                subtype_name,  # type: ignore[arg-type]
+                subtype_name,
                 config,
             )
         if "sentence" in subtype_config:
             _apply_config_to_dataclass(
                 config.sentence,
-                subtype_config["sentence"],  # type: ignore[index]
+                subtype_config["sentence"],
                 "sentence",
                 InheritanceSource.SUBTYPE,
-                subtype_name,  # type: ignore[arg-type]
+                subtype_name,
                 config,
             )
         if "style" in subtype_config:
             _apply_config_to_dataclass(
                 config.style,
-                subtype_config["style"],  # type: ignore[index]
+                subtype_config["style"],
                 "style",
                 InheritanceSource.SUBTYPE,
-                subtype_name,  # type: ignore[arg-type]
+                subtype_name,
                 config,
             )
         if "structure" in subtype_config:
             _apply_config_to_dataclass(
                 config.structure,
-                subtype_config["structure"],  # type: ignore[index]
+                subtype_config["structure"],
                 "structure",
                 InheritanceSource.SUBTYPE,
-                subtype_name,  # type: ignore[arg-type]
+                subtype_name,
                 config,
             )
         if "readability" in subtype_config:
             _apply_config_to_dataclass(
                 config.readability,
-                subtype_config["readability"],  # type: ignore[index]
+                subtype_config["readability"],
                 "readability",
                 InheritanceSource.SUBTYPE,
-                subtype_name,  # type: ignore[arg-type]
+                subtype_name,
                 config,
             )
         if "regional" in subtype_config:
             _apply_config_to_dataclass(
                 config.regional,
-                subtype_config["regional"],  # type: ignore[index]
+                subtype_config["regional"],
                 "regional",
                 InheritanceSource.SUBTYPE,
-                subtype_name,  # type: ignore[arg-type]
+                subtype_name,
                 config,
             )
 

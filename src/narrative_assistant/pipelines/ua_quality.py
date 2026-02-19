@@ -142,7 +142,7 @@ class PipelineQualityMixin:
             start = _ch_val(ch, "start_char") or 0
             end = _ch_val(ch, "end_char") or 0
             if start <= position < end:
-                return _ch_num(ch)  # type: ignore[no-any-return]
+                return _ch_num(ch)
         return None
 
     def _assign_chapters_to_issues(

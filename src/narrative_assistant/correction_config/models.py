@@ -63,7 +63,7 @@ class QuoteType(str, Enum):
     @property
     def chars(self) -> tuple[str, str]:
         """Devuelve tupla (apertura, cierre)."""
-        return {  # type: ignore[return-value]
+        return {
             QuoteType.ANGULAR: ("«", "»"),
             QuoteType.DOUBLE: (""", """),
             QuoteType.SINGLE: ("'", "'"),
@@ -184,16 +184,16 @@ class DialogConfig:
     def _get_dash_char(self, dash) -> str:
         """Helper para obtener carácter de guión (enum o string)."""
         if hasattr(dash, "char"):
-            return dash.char  # type: ignore[no-any-return]
+            return dash.char
         # Es un string, convertir manualmente
         return {"em_dash": "—", "en_dash": "–", "hyphen": "-"}.get(dash, "")
 
     def _get_quote_chars(self, quote) -> tuple[str, str]:
         """Helper para obtener comillas (enum o string)."""
         if hasattr(quote, "chars"):
-            return quote.chars  # type: ignore[no-any-return]
+            return quote.chars
         # Es un string, convertir manualmente
-        return {  # type: ignore[return-value]
+        return {
             "angular": ("«", "»"),
             "double": (""", """),
             "single": ("'", "'"),
@@ -236,8 +236,8 @@ class DialogConfig:
     def _get_value(self, field) -> str:
         """Helper para obtener valor de un campo que puede ser enum o string."""
         if hasattr(field, "value"):
-            return field.value  # type: ignore[no-any-return]
-        return field  # type: ignore[no-any-return]
+            return field.value
+        return field
 
     def to_dict(self) -> dict:
         return {
@@ -644,10 +644,10 @@ class CorrectionConfig:
     def get_inheritance_info(self, category: str, param: str) -> InheritanceSource:
         """Obtiene información de herencia de un parámetro."""
         key = f"{category}.{param}"
-        return self._inheritance_info.get(key, InheritanceSource.DEFAULT)  # type: ignore[no-any-return]
+        return self._inheritance_info.get(key, InheritanceSource.DEFAULT)
 
     def set_inheritance_info(
-        self, category: str, param: str, source: InheritanceSource, source_name: str = None  # type: ignore[assignment]
+        self, category: str, param: str, source: InheritanceSource, source_name: str = None
     ):
         """Registra información de herencia de un parámetro."""
         key = f"{category}.{param}"

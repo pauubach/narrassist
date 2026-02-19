@@ -56,11 +56,12 @@ try:
     _VOTING_AVAILABLE = True
 except ImportError:
     _VOTING_AVAILABLE = False
-    VotingSpellingChecker = None  # type: ignore[assignment, misc]
-    get_voting_spelling_checker = None  # type: ignore[assignment]
-    reset_voting_spelling_checker = None  # type: ignore[assignment]
-    VotingResult = None  # type: ignore[assignment, misc]
-    Vote = None  # type: ignore[assignment, misc]
+    from typing import Optional, Any
+    VotingSpellingChecker: Optional[Any] = None
+    get_voting_spelling_checker: Optional[Any] = None
+    reset_voting_spelling_checker: Optional[Any] = None
+    VotingResult: Optional[Any] = None
+    Vote: Optional[Any] = None
 
 __all__ = [
     # Types

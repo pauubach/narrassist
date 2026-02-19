@@ -437,7 +437,7 @@ class ChapterSummaryAnalyzer:
     ):
         from ..persistence.database import get_database
 
-        self.db = get_database(db_path)  # type: ignore[arg-type]
+        self.db = get_database(db_path)
         self.mode = mode
         self.llm_model = llm_model
         self._ollama_client = None
@@ -1194,7 +1194,7 @@ class ChapterSummaryAnalyzer:
                 (project_id,),
             )
             row = cursor.fetchone()
-            return row["cnt"] if row else 0  # type: ignore[no-any-return]
+            return row["cnt"] if row else 0
 
 
 def analyze_chapter_progress(

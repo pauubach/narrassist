@@ -1102,7 +1102,7 @@ def export_review_report(
         result = exporter.export_to_docx(issues, options)
 
     if result.is_failure:
-        return Result.failure(result.error)  # type: ignore[arg-type]
+        return Result.failure(result.error)
 
     try:
         output_path.parent.mkdir(parents=True, exist_ok=True)

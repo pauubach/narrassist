@@ -465,7 +465,7 @@ class CharacterKnowledgeAnalyzer:
         "tomar",
     }
 
-    def __init__(self, project_id: int = 0, entities: list[dict] = None):  # type: ignore[assignment]
+    def __init__(self, project_id: int = 0, entities: Optional[list[dict]] = None):
         self.project_id = project_id
 
         # Datos extraídos
@@ -492,7 +492,7 @@ class CharacterKnowledgeAnalyzer:
         self,
         entity_id: int,
         name: str,
-        aliases: list[str] = None,  # type: ignore[assignment]
+        aliases: Optional[list[str]] = None,
         entity_type: str = "",
     ):
         """Registra una entidad para el análisis."""
@@ -1167,13 +1167,13 @@ class CharacterKnowledgeAnalyzer:
         """
         try:
             from ..core.device import get_device_detector
-            from ..llm.client import get_client  # type: ignore[attr-defined]
+            from ..llm.client import get_client
 
             # Verificar si hay LLM disponible
             client = get_client()
             if client and client.is_available():
                 detector = get_device_detector()
-                device_info = detector.get_info()  # type: ignore[attr-defined]
+                device_info = detector.get_info()
                 # Si hay GPU, usar HYBRID para mejor calidad
                 if device_info.get("cuda_available") or device_info.get("mps_available"):
                     return KnowledgeExtractionMode.HYBRID
@@ -1418,10 +1418,10 @@ class CharacterKnowledgeAnalyzer:
 
         Más lento pero mayor precisión (~90%).
         """
-        facts = []  # type: ignore[var-annotated]
+        facts: list = []
 
         try:
-            from ..llm.client import get_client  # type: ignore[attr-defined]
+            from ..llm.client import get_client
 
             client = get_client()
             if not client or not client.is_available():
@@ -1762,7 +1762,7 @@ def detect_knowledge_anachronisms(
     seen = set()
     unique = []
     for a in anachronisms:
-        key = (a["knower_name"], a["used_chapter"], a.get("learned_chapter"))  # type: ignore[assignment]
+        key = (a["knower_name"], a["used_chapter"], a.get("learned_chapter"))
         if key not in seen:
             seen.add(key)
             unique.append(a)

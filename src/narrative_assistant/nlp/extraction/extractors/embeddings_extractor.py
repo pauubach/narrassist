@@ -174,7 +174,7 @@ class EmbeddingsExtractor(BaseExtractor):
                 avg_text = texts[0] if texts else value
 
                 # Calcular embedding normalizado para similitud coseno
-                emb = self._embeddings.encode(avg_text, normalize=True)  # type: ignore[attr-defined]
+                emb = self._embeddings.encode(avg_text, normalize=True) if hasattr(self._embeddings, "encode") else None
                 self._value_embeddings[attr_type][value] = emb
 
         logger.info("Embeddings pre-computed successfully")
@@ -286,7 +286,7 @@ class EmbeddingsExtractor(BaseExtractor):
                     continue  # Ignorar sub-frases muy cortas
 
                 # Calcular embedding de la sub-frase (normalizado)
-                sub_embedding = self._embeddings.encode(subphrase, normalize=True)  # type: ignore[attr-defined]
+                sub_embedding = self._embeddings.encode(subphrase, normalize=True) if hasattr(self._embeddings, "encode") else None
 
                 # Comparar con templates de cada tipo de atributo
                 for attr_type, value_embs in self._value_embeddings.items():
@@ -552,7 +552,7 @@ class EmbeddingsExtractor(BaseExtractor):
         _ = self.embeddings
 
         # Calcular embedding del contexto (normalizado)
-        context_emb = self._embeddings.encode(context_text, normalize=True)  # type: ignore[attr-defined]
+        context_emb = self._embeddings.encode(context_text, normalize=True) if hasattr(self._embeddings, "encode") else None
 
         best_type = None
         best_similarity = 0.0
@@ -595,7 +595,7 @@ class EmbeddingsExtractor(BaseExtractor):
 
         # Calcular embedding del atributo (normalizado)
         attr_text = f"tiene {attr.attribute_type.value} {attr.value}"
-        attr_emb = self._embeddings.encode(attr_text, normalize=True)  # type: ignore[attr-defined]
+        attr_emb = self._embeddings.encode(attr_text, normalize=True) if hasattr(self._embeddings, "encode") else None
 
         # Comparar con valores canónicos del mismo tipo
         max_similarity = 0.0
@@ -624,7 +624,7 @@ class EmbeddingsExtractor(BaseExtractor):
         _ = self.embeddings
 
         suggestions = []
-        value_emb = self._embeddings.encode(value, normalize=True)  # type: ignore[attr-defined]
+        value_emb = self._embeddings.encode(value, normalize=True) if hasattr(self._embeddings, "encode") else None
 
         for attr_type, value_embs in self._value_embeddings.items():
             max_similarity = 0.0

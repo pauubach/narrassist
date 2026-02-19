@@ -115,7 +115,7 @@ def emit_invalidation_event(
                 f"entities={entity_ids}, revision={revision}, "
                 f"stale_types={len(affected_types)}"
             )
-            return revision  # type: ignore[no-any-return]
+            return revision
 
     except Exception as e:
         logger.warning(f"Failed to emit invalidation event: {e}")
@@ -176,7 +176,7 @@ def _mark_stale(
     if affected > 0:
         logger.debug(f"Marked {affected} enrichment entries as stale")
 
-    return affected  # type: ignore[no-any-return]
+    return affected
 
 
 def get_project_revision(db_session, project_id: int) -> int:

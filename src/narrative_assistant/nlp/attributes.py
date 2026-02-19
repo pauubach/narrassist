@@ -566,7 +566,7 @@ def _normalize_entity_mentions(
             logger.warning(f"entity_mention con formato inválido: {mention}")
             continue
 
-    return normalized  # type: ignore[return-value]
+    return normalized
 
 
 def _is_person_entity(entity_type: str | None) -> bool:
@@ -1672,11 +1672,12 @@ class AttributeExtractor(AttributeContextMixin, AttributeVotingMixin, AttributeE
         self._scope_resolver = None
         try:
             nlp = self._get_nlp()
-            if nlp:
+            if callable(nlp):
                 self._spacy_doc = nlp(text)
                 from .scope_resolver import ScopeResolver
-
                 self._scope_resolver = ScopeResolver(self._spacy_doc, text)
+            else:
+                logger.debug("nlp is not callable, skipping spaCy doc creation.")
         except Exception as e:
             logger.debug(f"Could not create spaCy doc for scope resolution: {e}")
 
@@ -2225,11 +2226,14 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                     entity_name, value = groups[0], groups[1]
                     # Patrón "Entidad + tenía/era + X" - sujeto explícito
                     assignment_source = AssignmentSource.EXPLICIT_SUBJECT
+                    # Ensure value is str or None
+                    if not isinstance(value, str):
+                        value = None
 
                 # Verificar patrón contrastivo "No es X, sino Y"
                 match_end_in_context = match.end() - context_start
                 is_contrastive, corrected_value = self._check_contrastive_correction(
-                    context, match_pos_in_context, match_end_in_context, value  # type: ignore[arg-type]
+                    context, match_pos_in_context, match_end_in_context, value if isinstance(value, str) else ""
                 )
                 if is_contrastive:
                     if corrected_value:
@@ -2244,7 +2248,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                         continue
 
                 # Validar valor
-                if not self._validate_value(key, value):  # type: ignore[arg-type]
+                if not isinstance(value, str) or not self._validate_value(key, value):
                     continue
 
                 # Ajustar confianza
@@ -2430,7 +2434,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
 
             if start_idx != -1 and end_idx > start_idx:
                 json_str = cleaned[start_idx:end_idx]
-                return json.loads(json_str)  # type: ignore[no-any-return]
+                return json.loads(json_str)
 
             # Fallback: parsear texto formateado con markdown
             # El LLM a veces responde con formato tipo "**key**: value"
@@ -2475,7 +2479,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
             if attr_match and current_entity:
                 key_raw = attr_match.group(1).strip().lower()
                 value = attr_match.group(2).strip()
-                evidence = attr_match.group(3) if attr_match.lastindex >= 3 else ""  # type: ignore[operator]
+                evidence = attr_match.group(3) if attr_match.lastindex >= 3 else ""
 
                 # Mapear key
                 key_mapping = {
@@ -2843,7 +2847,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
         subject_candidates = []
         object_entities = set()
 
-        for name, start, end, _entity_type in person_mentions:
+        for name, _start, _end, _entity_type in person_mentions:
             name_lower = name.lower()
             if name_lower not in sentence_lower:
                 continue
@@ -3487,12 +3491,18 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
 
         if result.is_success:
             # Ajustar posiciones al contexto global
-            for attr in result.value.attributes:  # type: ignore[union-attr]
-                attr.start_char += context_start
-                attr.end_char += context_start
-            return result.value.attributes  # type: ignore[union-attr]
-
-        return []
+            for attr in result.value.attributes:
+                if hasattr(result.value, "attributes") and result.value.attributes is not None:
+                    for attr in result.value.attributes:
+                        attr.start_char += context_start
+                        attr.end_char += context_start
+                    return result.value.attributes
+                else:
+                    logger.debug("result.value.attributes is None or missing.")
+                    return []
+        else:
+            logger.debug("result.is_success is False or result.value is None.")
+            return []
 
 
 def extract_attributes(
@@ -3825,7 +3835,7 @@ def load_trained_weights(path: "Path") -> dict[str, float]:
     set_method_weights(weights)
 
     logger.info(f"Pesos cargados desde {path}: {weights}")
-    return weights  # type: ignore[no-any-return]
+    return weights
 
 
 def reset_method_weights() -> None:

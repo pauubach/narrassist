@@ -623,7 +623,7 @@ class UnifiedAnalysisPipeline(
                 is_fatal=True,
             )
             if phase_result.is_failure:
-                return Result.failure(phase_result.error)  # type: ignore[arg-type]
+                return Result.failure(phase_result.error)
 
             self._clear_gpu_memory_if_needed()
 
@@ -1001,7 +1001,7 @@ class UnifiedAnalysisPipeline(
             parser = get_parser(path)
             parse_result = parser.parse(path)
             if parse_result.is_failure:
-                return Result.failure(parse_result.error)  # type: ignore[arg-type]
+                return Result.failure(parse_result.error)
 
             raw_doc = parse_result.value
             context.raw_document = raw_doc
@@ -1032,14 +1032,14 @@ class UnifiedAnalysisPipeline(
                     check_existing=False,
                 )
                 if create_result.is_failure:
-                    return Result.failure(create_result.error)  # type: ignore[arg-type]
+                    return Result.failure(create_result.error)
                 assert create_result.value is not None
-                context.project_id = create_result.value.id  # type: ignore[assignment]
+                context.project_id = create_result.value.id
 
             # 1.4 Sesión
             session_mgr = SessionManager(project_id=context.project_id)
             session = session_mgr.start()
-            context.session_id = session.id  # type: ignore[assignment]
+            context.session_id = session.id
 
             # 1.5 Estructura
             if self.config.run_structure:
@@ -1067,7 +1067,7 @@ class UnifiedAnalysisPipeline(
             from ..parsers.structure_detector import StructureDetector
 
             detector = StructureDetector()
-            result = detector.detect(context.raw_document)  # type: ignore[arg-type]
+            result = detector.detect(context.raw_document)
 
             if result.is_success and result.value is not None and hasattr(result.value, "chapters"):
                 for ch in result.value.chapters:

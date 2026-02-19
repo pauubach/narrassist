@@ -44,7 +44,7 @@ class ReportProtocol(Protocol):
 def _get_fingerprint(report: ReportProtocol) -> str:
     """Obtiene el fingerprint del informe (compatible con ambos tipos)."""
     # UnifiedReport usa 'fingerprint', AnalysisReport usa 'document_fingerprint'
-    fp: str = getattr(report, "document_fingerprint", None) or getattr(report, "fingerprint", "")  # type: ignore[assignment]
+    fp: str = getattr(report, "document_fingerprint", None) or getattr(report, "fingerprint", "")
     return fp
 
 

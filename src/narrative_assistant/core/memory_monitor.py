@@ -34,7 +34,8 @@ def get_process_memory_mb() -> float:
         import psutil
 
         process = psutil.Process(os.getpid())
-        return process.memory_info().rss / (1024 * 1024)  # type: ignore[no-any-return]
+        rss = process.memory_info().rss
+        return float(rss) / (1024 * 1024)
     except ImportError:
         pass
 
@@ -43,7 +44,10 @@ def get_process_memory_mb() -> float:
         import resource
 
         # maxrss en KB en Linux, bytes en macOS
-        usage = resource.getrusage(resource.RUSAGE_SELF)  # type: ignore[attr-defined]
+        if hasattr(resource, 'RUSAGE_SELF'):
+            usage = resource.getrusage(resource.RUSAGE_SELF)
+        else:
+            raise AttributeError("resource module missing RUSAGE_SELF attribute")
         maxrss = usage.ru_maxrss
         import platform
 

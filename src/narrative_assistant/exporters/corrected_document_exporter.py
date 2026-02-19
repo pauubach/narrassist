@@ -568,7 +568,7 @@ def export_with_track_changes(
     result = exporter.export(original_path, corrections, options)
 
     if result.is_failure:
-        return Result.failure(result.error)  # type: ignore[arg-type]
+        return Result.failure(result.error)
 
     # Determinar ruta de salida
     if output_path is None:

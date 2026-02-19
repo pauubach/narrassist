@@ -106,7 +106,7 @@ class SceneService:
                     start_char=parsed_scene.start_char,
                     end_char=parsed_scene.end_char,
                     separator_type=parsed_scene.separator_type,
-                    word_count=self._count_words(parsed_scene, chapter.content),  # type: ignore[attr-defined]
+                    word_count=self._count_words(parsed_scene, chapter.content),
                 )
                 scenes_to_save.append(scene)
 
@@ -342,7 +342,7 @@ class SceneService:
 
     def remove_custom_tag(self, scene_id: int, tag_name: str) -> bool:
         """Elimina una etiqueta personalizada de una escena."""
-        return self._repo.remove_custom_tag(scene_id, tag_name)  # type: ignore[no-any-return]
+        return self._repo.remove_custom_tag(scene_id, tag_name)
 
     # =========================================================================
     # Estadísticas y metadata

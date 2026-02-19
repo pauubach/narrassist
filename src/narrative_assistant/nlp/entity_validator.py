@@ -717,7 +717,7 @@ class EntityValidator:
 
         for entity in entities:
             instance_key = (entity.text, entity.start_char)
-            score = instance_scores.get(instance_key)  # type: ignore[assignment]
+            score = instance_scores.get(instance_key)
             if score and score.is_valid:
                 valid.append(entity)
             else:
@@ -1050,7 +1050,7 @@ class EntityValidator:
 
         # Agrupar entidades únicas con score borderline para validar
         # (las muy buenas y muy malas ya están decididas por heurísticas)
-        entities_to_validate = []  # type: ignore[var-annotated]
+        entities_to_validate = []
         for entity in entities:
             score = scores.get(entity.text)
             if score and 0.3 <= score.total_score <= 0.7:
@@ -1184,7 +1184,7 @@ JSON:"""
                 cleaned = cleaned[start:end]
 
             data = json.loads(cleaned)
-            return data.get("validations", [])  # type: ignore[no-any-return]
+            return data.get("validations", [])
 
         except json.JSONDecodeError as e:
             logger.debug(f"Error parseando JSON de validación LLM: {e}")

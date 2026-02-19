@@ -253,7 +253,7 @@ class SessionManager:
             self._current_session.last_position_char = char_position
 
         if updates:
-            params.append(self._current_session.id)  # type: ignore[arg-type]
+            params.append(self._current_session.id)
             self.db.execute(
                 f"UPDATE sessions SET {', '.join(updates)} WHERE id = ?",
                 tuple(params),
@@ -305,14 +305,14 @@ class SessionManager:
         )
 
         return {
-            "session_count": row["session_count"] or 0,  # type: ignore[index]
-            "total_duration_seconds": row["total_duration"] or 0,  # type: ignore[index]
-            "total_duration_hours": (row["total_duration"] or 0) / 3600,  # type: ignore[index]
-            "total_alerts_reviewed": row["total_alerts_reviewed"] or 0,  # type: ignore[index]
-            "total_alerts_resolved": row["total_alerts_resolved"] or 0,  # type: ignore[index]
-            "total_entities_merged": row["total_entities_merged"] or 0,  # type: ignore[index]
-            "first_session": row["first_session"],  # type: ignore[index]
-            "last_session": row["last_session"],  # type: ignore[index]
+            "session_count": row["session_count"] or 0,
+            "total_duration_seconds": row["total_duration"] or 0,
+            "total_duration_hours": (row["total_duration"] or 0) / 3600,
+            "total_alerts_reviewed": row["total_alerts_reviewed"] or 0,
+            "total_alerts_resolved": row["total_alerts_resolved"] or 0,
+            "total_entities_merged": row["total_entities_merged"] or 0,
+            "first_session": row["first_session"],
+            "last_session": row["last_session"],
         }
 
     def list_sessions(self, limit: int = 20) -> list[Session]:

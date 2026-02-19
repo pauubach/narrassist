@@ -10,8 +10,19 @@ import os
 # Añadir src al path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-# Importar directamente el módulo
-exec(open(os.path.join(os.path.dirname(__file__), '..', 'src/narrative_assistant/nlp/cesp_resolver.py')).read())
+
+# Importar clases necesarias explícitamente
+from narrative_assistant.nlp.cesp_resolver import (
+    AttributeDeduplicator,
+    ResolvedAttribute,
+    ConflictStatus,
+    AssignmentSource,
+    ConflictResolver,
+    AttributeCandidate,
+    ExtractorType,
+    CESPAttributeResolver,
+    EntityMention,
+)
 
 
 def run_tests():

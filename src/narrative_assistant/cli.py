@@ -271,12 +271,12 @@ def cmd_info() -> int:
 
     print("NLP:")
     print(f"  Modelo spaCy: {config.nlp.spacy_model}")
-    print(f"  Modelo embeddings: {config.nlp.embedding_model}")  # type: ignore[attr-defined]
+    print(f"  Modelo embeddings: {getattr(config.nlp, 'embedding_model', 'N/A')}")
     print()
 
     print("Directorios:")
-    print(f"  Datos: {config.persistence.data_dir}")  # type: ignore[attr-defined]
-    print(f"  Base de datos: {config.persistence.db_name}")  # type: ignore[attr-defined]
+    print(f"  Datos: {getattr(config.persistence, 'data_dir', 'N/A')}")
+    print(f"  Base de datos: {getattr(config.persistence, 'db_name', 'N/A')}")
 
     return 0
 
@@ -334,9 +334,10 @@ def cmd_analyze(document: Path, project_name: str | None) -> int:
         print("ERROR: El análisis falló")
         print("=" * 70)
         print()
-        print(f"Motivo: {result.error.user_message}")  # type: ignore[union-attr]
-        if hasattr(result.error, "context") and result.error.context:  # type: ignore[union-attr]
-            print(f"Contexto: {result.error.context}")  # type: ignore[union-attr]
+        if result.error is not None:
+            print(f"Motivo: {getattr(result.error, 'user_message', str(result.error))}")
+            if hasattr(result.error, "context") and getattr(result.error, "context", None):
+                print(f"Contexto: {getattr(result.error, 'context')}")
         return 1
 
     report = result.value
@@ -350,46 +351,46 @@ def cmd_analyze(document: Path, project_name: str | None) -> int:
 
     # Estadísticas básicas
     print("Estadísticas del Documento:")
-    print(f"  Caracteres: {report.stats.get('total_characters', 0):,}")  # type: ignore[union-attr]
-    print(f"  Capítulos detectados: {report.stats.get('chapters', 0)}")  # type: ignore[union-attr]
-    print(f"  Duración: {format_duration(report.duration_seconds)}")  # type: ignore[union-attr]
+    print(f"  Caracteres: {getattr(report, 'stats', {}).get('total_characters', 0):,}")
+    print(f"  Capítulos detectados: {getattr(report, 'stats', {}).get('chapters', 0)}")
+    print(f"  Duración: {format_duration(getattr(report, 'duration_seconds', 0))}")
     print()
 
     # Entidades
     print("Extracción de Entidades:")
-    print(f"  Total entidades: {len(report.entities)}")  # type: ignore[union-attr]
-    if report.entities:  # type: ignore[union-attr]
-        entity_types = {}  # type: ignore[var-annotated]
-        for e in report.entities:  # type: ignore[union-attr]
+    print(f"  Total entidades: {len(report.entities)}")
+    if report.entities:
+        entity_types = {}
+        for e in report.entities:
             entity_types[e.entity_type] = entity_types.get(e.entity_type, 0) + 1
         for etype, count in sorted(entity_types.items(), key=lambda x: -x[1]):
             print(f"    - {etype}: {count}")
     print()
 
     # Atributos
-    if "attributes_extracted" in report.stats:  # type: ignore[union-attr]
-        print(f"Atributos extraídos: {report.stats['attributes_extracted']}")  # type: ignore[union-attr]
+    if "attributes_extracted" in report.stats:
+        print(f"Atributos extraídos: {report.stats['attributes_extracted']}")
         print()
 
     # Inconsistencias
-    if "inconsistencies_found" in report.stats:  # type: ignore[union-attr]
-        print(f"Inconsistencias detectadas: {report.stats['inconsistencies_found']}")  # type: ignore[union-attr]
+    if "inconsistencies_found" in report.stats:
+        print(f"Inconsistencias detectadas: {report.stats['inconsistencies_found']}")
         print()
 
     # Alertas
     print("Alertas Generadas:")
-    print(f"  Total: {len(report.alerts)}")  # type: ignore[union-attr]
-    print(f"  Críticas: {len(report.critical_alerts)}")  # type: ignore[union-attr]
-    print(f"  Advertencias: {len(report.warning_alerts)}")  # type: ignore[union-attr]
+    print(f"  Total: {len(report.alerts)}")
+    print(f"  Críticas: {len(report.critical_alerts)}")
+    print(f"  Advertencias: {len(report.warning_alerts)}")
     print()
 
     # Mostrar alertas críticas
-    if report.critical_alerts:  # type: ignore[union-attr]
+    if report.critical_alerts:
         print("=" * 70)
         print("ALERTAS CRÍTICAS")
         print("=" * 70)
         print()
-        for i, alert in enumerate(report.critical_alerts[:10], 1):  # type: ignore[union-attr]
+        for i, alert in enumerate(report.critical_alerts[:10], 1):
             print(f"{i}. {alert.title}")
             print(f"   {alert.description}")
             if alert.chapter:
@@ -397,34 +398,34 @@ def cmd_analyze(document: Path, project_name: str | None) -> int:
             print(f"   Confianza: {alert.confidence:.0%}")
             print()
 
-        if len(report.critical_alerts) > 10:  # type: ignore[union-attr]
-            print(f"... y {len(report.critical_alerts) - 10} alertas críticas más")  # type: ignore[union-attr]
+        if len(report.critical_alerts) > 10:
+            print(f"... y {len(report.critical_alerts) - 10} alertas críticas más")
             print()
 
     # Mostrar advertencias
-    if report.warning_alerts:  # type: ignore[union-attr]
+    if report.warning_alerts:
         print("=" * 70)
-        print(f"ADVERTENCIAS ({len(report.warning_alerts)} total)")  # type: ignore[union-attr]
+        print(f"ADVERTENCIAS ({len(report.warning_alerts)} total)")
         print("=" * 70)
         print()
-        for i, alert in enumerate(report.warning_alerts[:5], 1):  # type: ignore[union-attr]
+        for i, alert in enumerate(report.warning_alerts[:5], 1):
             print(f"{i}. {alert.title}")
             print(f"   {alert.description}")
             if alert.chapter:
                 print(f"   Ubicación: Capítulo {alert.chapter}")
             print()
 
-        if len(report.warning_alerts) > 5:  # type: ignore[union-attr]
-            print(f"... y {len(report.warning_alerts) - 5} advertencias más")  # type: ignore[union-attr]
+        if len(report.warning_alerts) > 5:
+            print(f"... y {len(report.warning_alerts) - 5} advertencias más")
             print()
 
     # Errores no fatales
-    if report.errors:  # type: ignore[union-attr]
+    if report.errors:
         print("=" * 70)
         print("ADVERTENCIAS DEL SISTEMA")
         print("=" * 70)
         print()
-        for i, error in enumerate(report.errors, 1):  # type: ignore[union-attr]
+        for i, error in enumerate(report.errors, 1):
             print(f"{i}. {error.user_message}")
         print()
 
@@ -433,12 +434,12 @@ def cmd_analyze(document: Path, project_name: str | None) -> int:
     print("RESUMEN")
     print("=" * 70)
     print()
-    print(f"Proyecto ID: {report.project_id}")  # type: ignore[union-attr]
-    print(f"Sesión ID: {report.session_id}")  # type: ignore[union-attr]
-    print(f"Fingerprint: {report.document_fingerprint[:16]}...")  # type: ignore[union-attr]
+    print(f"Proyecto ID: {report.project_id}")
+    print(f"Sesión ID: {report.session_id}")
+    print(f"Fingerprint: {report.document_fingerprint[:16]}...")
     print()
 
-    if report.alerts:  # type: ignore[union-attr]
+    if report.alerts:
         print("Las alertas han sido guardadas en la base de datos.")
         print("Usa 'narrative-assistant export' para exportar el informe completo.")
     else:
@@ -450,7 +451,7 @@ def cmd_analyze(document: Path, project_name: str | None) -> int:
 
 def cmd_project(args) -> int:
     """Gestiona proyectos."""
-    from .persistence.project import get_project_repository  # type: ignore[attr-defined]
+    from .persistence.project import get_project_repository
 
     repo = get_project_repository()
 
@@ -522,7 +523,7 @@ def cmd_alerts(args) -> int:
 
         result = engine.get_alerts(project_id, alert_filter)
         if result.is_failure:
-            print(f"Error: {result.error.user_message}")  # type: ignore[union-attr]
+            print(f"Error: {result.error.user_message}")
             return 1
 
         alerts = result.value
@@ -539,12 +540,12 @@ def cmd_alerts(args) -> int:
             print(f"... y {len(alerts) - 30} alertas más")
 
     elif args.subcommand == "show":
-        result = engine.get_alert(args.id)  # type: ignore[assignment]
+        result = engine.get_alert(args.id)
         if result.is_failure:
             print(f"Alerta {args.id} no encontrada")
             return 1
 
-        a = result.value  # type: ignore[assignment]
+        a = result.value
         print(f"ID: {a.id}")
         print(f"Título: {a.title}")
         print(f"Descripción: {a.description}")
@@ -561,16 +562,16 @@ def cmd_alerts(args) -> int:
             print(f"Extracto: «{a.excerpt[:100]}...»")
 
     elif args.subcommand == "resolve":
-        result = engine.resolve_alert(args.id, args.note)  # type: ignore[assignment]
+        result = engine.resolve_alert(args.id, args.note)
         if result.is_failure:
-            print(f"Error: {result.error.user_message}")  # type: ignore[union-attr]
+            print(f"Error: {result.error.user_message}")
             return 1
         print(f"Alerta {args.id} marcada como resuelta.")
 
     elif args.subcommand == "dismiss":
-        result = engine.dismiss_alert(args.id, args.note)  # type: ignore[assignment]
+        result = engine.dismiss_alert(args.id, args.note)
         if result.is_failure:
-            print(f"Error: {result.error.user_message}")  # type: ignore[union-attr]
+            print(f"Error: {result.error.user_message}")
             return 1
         print(f"Alerta {args.id} descartada.")
 
@@ -617,7 +618,7 @@ def cmd_entities(args) -> int:
             print(f"... y {len(entities) - 50} entidades más")
 
     elif args.subcommand == "show":
-        entity = repo.get(args.id)  # type: ignore[attr-defined]
+        entity = repo.get(args.id)
         if not entity:
             print(f"Entidad {args.id} no encontrada")
             return 1
@@ -632,7 +633,7 @@ def cmd_entities(args) -> int:
             print(f"Atributos: {len(entity.attributes)}")
 
     elif args.subcommand == "suggest-merges":
-        from .entities.semantic_fusion import get_fusion_engine  # type: ignore[attr-defined]
+        from .entities.semantic_fusion import get_fusion_engine
 
         project_id = args.project or 1
         engine = get_fusion_engine()
@@ -675,7 +676,7 @@ def cmd_export(args) -> int:
         )
 
         repo = get_entity_repository()
-        entity = repo.get(args.entity_id)  # type: ignore[attr-defined]
+        entity = repo.get(args.entity_id)
 
         if not entity:
             print(f"Entidad {args.entity_id} no encontrada")
@@ -721,14 +722,14 @@ def cmd_export(args) -> int:
         result = generate_style_guide(project_id, f"Proyecto {project_id}")
 
         if result.is_failure:
-            print(f"Error: {result.error.user_message}")  # type: ignore[union-attr]
+            print(f"Error: {result.error.user_message}")
             return 1
 
         guide = result.value
         if args.format == "json":
-            output = guide.to_json()  # type: ignore[union-attr]
+            output = guide.to_json()
         else:
-            output = guide.to_markdown()  # type: ignore[union-attr]
+            output = guide.to_markdown()
 
         if args.output:
             with open(args.output, "w", encoding="utf-8") as f:

@@ -135,7 +135,7 @@ class Timeline:
         dated = [e for e in self.events if e.story_date]
         undated = [e for e in self.events if not e.story_date]
 
-        sorted_dated = sorted(dated, key=lambda e: e.story_date)  # type: ignore
+        sorted_dated = sorted(dated, key=lambda e: e.story_date)
         return sorted_dated + undated
 
     def get_discourse_order(self) -> list[TimelineEvent]:
@@ -160,7 +160,7 @@ class Timeline:
         if not dated:
             return None
         dates = [e.story_date for e in dated]
-        return min(dates), max(dates)  # type: ignore
+        return min(dates), max(dates)
 
 
 class TimelineBuilder:
@@ -300,7 +300,7 @@ class TimelineBuilder:
         """
         marker_instance = getattr(marker, "temporal_instance_id", None)
         if marker_instance:
-            return marker_instance  # type: ignore[no-any-return]
+            return marker_instance
 
         if marker.entity_id is None:
             return None
@@ -341,7 +341,7 @@ class TimelineBuilder:
         weekday = None
         for marker in relative_markers:
             if getattr(marker, "weekday", None):
-                weekday = marker.weekday  # type: ignore[attr-defined]
+                weekday = marker.weekday
                 break
 
         # Buscar el evento del primer capítulo
@@ -647,7 +647,7 @@ class TimelineBuilder:
                 description = f"Edad mencionada: {marker.text}"
             elif getattr(marker, "relative_year_offset", None) is not None:
                 offset = marker.relative_year_offset
-                sign = "+" if offset >= 0 else ""  # type: ignore[operator]
+                sign = "+" if offset >= 0 else ""
                 description = f"Instancia relativa ({sign}{offset} años): {marker.text}"
             else:
                 description = f"Instancia temporal: {marker.text}"
@@ -845,9 +845,9 @@ class TimelineBuilder:
             if self._non_linear_detector is None:
                 from .non_linear_detector import NonLinearNarrativeDetector
 
-                self._non_linear_detector = NonLinearNarrativeDetector()  # type: ignore[assignment]
+                self._non_linear_detector = NonLinearNarrativeDetector()
 
-            signals = self._non_linear_detector.detect_signals(  # type: ignore[attr-defined]
+            signals = self._non_linear_detector.detect_signals(
                 chapter_text, event.chapter,
             )
             matching = [s for s in signals if s.direction == direction]

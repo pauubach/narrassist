@@ -357,7 +357,7 @@ class FeatureProfile:
     def is_enabled(self, feature: str) -> bool:
         """Comprueba si una feature está habilitada."""
         val = getattr(self, feature, None)
-        return val == FeatureAvailability.ENABLED if val else False  # type: ignore[no-any-return]
+        return val == FeatureAvailability.ENABLED if val else False
 
     def is_available(self, feature: str) -> bool:
         """Comprueba si una feature está disponible (enabled u optional)."""

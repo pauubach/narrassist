@@ -455,7 +455,10 @@ class NERValidatorMixin:
         # 1. ANALISIS MORFOLOGICO CON SPACY
         # Si tenemos spaCy disponible, analizamos el contexto completo
         try:
-            doc = self.nlp(context)  # type: ignore[attr-defined]
+            if hasattr(self, 'nlp'):
+                doc = self.nlp(context)
+            else:
+                raise AttributeError("NERValidatorMixin missing 'nlp' attribute")
 
             # Encontrar el token correspondiente a la entidad
             entity_tokens = []
@@ -693,7 +696,7 @@ class NERValidatorMixin:
         text_lower = text_stripped.lower()
 
         # Filtrar entidades muy cortas (probablemente ruido)
-        if len(text_stripped) < self.MIN_ENTITY_LENGTH:  # type: ignore[attr-defined]
+        if hasattr(self, 'MIN_ENTITY_LENGTH') and len(text_stripped) < self.MIN_ENTITY_LENGTH:
             return False
 
         # Filtrar errores de segmentación obvios
@@ -755,7 +758,7 @@ class NERValidatorMixin:
         text_clean = text_stripped.rstrip("–—-,.;:!?¿¡ ")
         if text_clean != text_stripped:
             # Si había caracteres finales que limpiar, verificar el resultado
-            if len(text_clean) < self.MIN_ENTITY_LENGTH:  # type: ignore[attr-defined]
+            if hasattr(self, 'MIN_ENTITY_LENGTH') and len(text_clean) < self.MIN_ENTITY_LENGTH:
                 return False
 
         # Filtrar solo artículos/preposiciones sueltas

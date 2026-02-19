@@ -333,7 +333,7 @@ class GlossaryExtractor:
 
         except Exception as e:
             logger.error(f"Error en extracción de glosario: {e}", exc_info=True)
-            return Result.failure(e)  # type: ignore[arg-type]
+            return Result.failure(e)
 
     def _process_chapter(
         self,
@@ -376,8 +376,8 @@ class GlossaryExtractor:
                         word_contexts[word].append(context)
 
             # Buscar también términos técnicos
-            for pattern in self._compiled_technical:  # type: ignore[assignment]
-                for match in pattern.finditer(sentence):  # type: ignore[attr-defined]
+            for pattern in self._compiled_technical:
+                for match in pattern.finditer(sentence):
                     term = match.group()
                     if len(term) >= 3:
                         word_counts[term] += 1

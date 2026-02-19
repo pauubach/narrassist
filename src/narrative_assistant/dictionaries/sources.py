@@ -153,7 +153,7 @@ class WiktionarySource(BaseDictionarySource):
             conn = self._get_connection()
             cursor = conn.execute("SELECT COUNT(*) FROM words")
             count = cursor.fetchone()[0]
-            return count > 0  # type: ignore[no-any-return]
+            return bool(count > 0)
         except Exception as e:
             logger.warning(f"Wiktionary DB not available: {e}")
             return False
@@ -291,7 +291,8 @@ class WiktionarySource(BaseDictionarySource):
         try:
             conn = self._get_connection()
             cursor = conn.execute("SELECT COUNT(*) FROM words")
-            return cursor.fetchone()[0]  # type: ignore[no-any-return]
+            result = cursor.fetchone()
+            return result[0] if result else 0
         except Exception:
             return 0
 
@@ -334,7 +335,7 @@ class SynonymSource(BaseDictionarySource):
             conn = self._get_connection()
             cursor = conn.execute("SELECT COUNT(*) FROM synonyms")
             count = cursor.fetchone()[0]
-            return count > 0  # type: ignore[no-any-return]
+            return bool(count > 0)
         except Exception:
             return False
 
