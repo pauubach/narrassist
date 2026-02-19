@@ -16,9 +16,19 @@ import sys
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from narrative_assistant.alerts.repository import AlertRepository
+    from narrative_assistant.core.config import NarrativeConfig
+    from narrative_assistant.entities.repository import EntityRepository
+    from narrative_assistant.persistence.chapter import ChapterRepository
+    from narrative_assistant.persistence.database import Database as DatabaseType
+    from narrative_assistant.persistence.dismissal_repository import DismissalRepository
+    from narrative_assistant.persistence.project import ProjectManager
+    from narrative_assistant.scenes.repository import SectionRepository
 
 logger = logging.getLogger("narrative_assistant.api")
 
@@ -39,16 +49,16 @@ _log_file: Optional[Path] = None
 # Mutable global state (initialized by main.py)
 # ============================================================================
 
-project_manager = None
-entity_repository = None
-alert_repository = None
-dismissal_repository = None
-chapter_repository = None
-section_repository = None
-get_config = None
-get_database = None
+project_manager: Optional["ProjectManager"] = None
+entity_repository: Optional["EntityRepository"] = None
+alert_repository: Optional["AlertRepository"] = None
+dismissal_repository: Optional["DismissalRepository"] = None
+chapter_repository: Optional["ChapterRepository"] = None
+section_repository: Optional["SectionRepository"] = None
+get_config: Optional[Callable[[], "NarrativeConfig"]] = None
+get_database: Optional[Callable[[], "DatabaseType"]] = None
 NA_VERSION = BACKEND_VERSION
-Database = None
+Database: Optional[type["DatabaseType"]] = None
 MODULES_LOADED = False
 MODULES_ERROR: Optional[str] = None
 
