@@ -384,7 +384,7 @@ class CharacterProfiler:
             for p in self._profiles.values()
         }
 
-        for chapter_num, text in chapter_texts.items():
+        for _chapter_num, text in chapter_texts.items():
             # Buscar patrones nombre + verbo
             for match in SUBJECT_VERB_PATTERN.finditer(text):
                 name = match.group("name").lower()
@@ -504,7 +504,7 @@ class CharacterProfiler:
             lambda: defaultdict(lambda: {"pos": 0, "neg": 0, "total": 0})
         )
 
-        for chapter_num, text in chapter_texts.items():
+        for _chapter_num, text in chapter_texts.items():
             sentences = re.split(r"[.!?]+", text)
 
             for sentence in sentences:

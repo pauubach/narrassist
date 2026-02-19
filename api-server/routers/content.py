@@ -213,7 +213,7 @@ def import_glossary(
         merge: Si True, actualiza existentes; si False, salta duplicados
     """
     try:
-        result = deps.project_manager.get(project_id)
+        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
         _ = result.value
@@ -249,7 +249,7 @@ def search_glossary(
     Busca un término en el glosario (por término principal o variantes).
     """
     try:
-        result = deps.project_manager.get(project_id)
+        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
         _ = result.value
@@ -289,7 +289,7 @@ def get_glossary_summary(project_id: int) -> ApiResponse:
     Obtiene un resumen del glosario del proyecto.
     """
     try:
-        result = deps.project_manager.get(project_id)
+        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
         _ = result.value
@@ -360,7 +360,7 @@ def get_glossary_suggestions(
         max_suggestions: Máximo de sugerencias a devolver (default: 50)
     """
     try:
-        result = deps.project_manager.get(project_id)
+        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
         project = result.value
@@ -484,7 +484,7 @@ def accept_glossary_suggestion(
         is_proper_noun: Es nombre propio
     """
     try:
-        result = deps.project_manager.get(project_id)
+        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
 
@@ -569,7 +569,7 @@ def update_glossary_entry(
     Actualiza una entrada existente del glosario.
     """
     try:
-        result = deps.project_manager.get(project_id)
+        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
         _ = result.value
@@ -620,7 +620,7 @@ def delete_glossary_entry(
     Elimina una entrada del glosario.
     """
     try:
-        result = deps.project_manager.get(project_id)
+        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
         _ = result.value
@@ -837,10 +837,10 @@ def add_custom_word(request: CustomWordRequest):
         manager = get_dictionary_manager()
         result = manager.add_custom_word(
             word=request.word,
-            definition=request.definition,
-            category=request.category,
-            synonyms=request.synonyms,
-            antonyms=request.antonyms,
+            definition=request.definition,  # type: ignore[attr-defined]
+            category=request.category,  # type: ignore[attr-defined]
+            synonyms=request.synonyms,  # type: ignore[attr-defined]
+            antonyms=request.antonyms,  # type: ignore[attr-defined]
         )
 
         if result.is_failure:
@@ -990,7 +990,7 @@ def search_similar_text(
     """
     try:
         # Validar proyecto
-        result = deps.project_manager.get(project_id)
+        result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
         project = result.value
