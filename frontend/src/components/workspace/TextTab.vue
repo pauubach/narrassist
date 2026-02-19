@@ -79,21 +79,45 @@ const emit = defineEmits<{
 const gutterWidth = ref(20)
 const showGutter = computed(() => gutterMarkers.value.length > 0)
 
+// Helper: encontrar el capítulo que contiene una posición de carácter
+function findChapterForPosition(position: number): number | null {
+  for (const chapter of props.chapters) {
+    if (position >= chapter.positionStart && position <= chapter.positionEnd) {
+      return chapter.chapterNumber
+    }
+  }
+  return null
+}
+
 // Computed: alertas agrupadas por capítulo para el gutter
 const alertsByChapter = computed(() => {
   const grouped = new Map<number, Alert[]>()
   let withoutChapter = 0
+  let inferred = 0
+
   for (const alert of props.alerts) {
-    if (alert.chapter !== undefined && alert.chapter !== null) {
-      const list = grouped.get(alert.chapter) || []
+    let chapterNum = alert.chapter
+
+    // Si no tiene chapter pero tiene spanStart, inferir el capítulo
+    if ((chapterNum === undefined || chapterNum === null) && alert.spanStart !== undefined) {
+      chapterNum = findChapterForPosition(alert.spanStart)
+      if (chapterNum !== null) {
+        inferred++
+        console.log(`[TextTab] Capítulo inferido para "${alert.title}": cap ${chapterNum} (spanStart=${alert.spanStart})`)
+      }
+    }
+
+    if (chapterNum !== undefined && chapterNum !== null) {
+      const list = grouped.get(chapterNum) || []
       list.push(alert)
-      grouped.set(alert.chapter, list)
+      grouped.set(chapterNum, list)
     } else {
       withoutChapter++
-      console.warn(`[TextTab] Alert sin capítulo asignado:`, alert.title, alert)
+      console.warn(`[TextTab] Alert sin capítulo ni posición:`, alert.title, alert)
     }
   }
-  console.log(`[TextTab] Total alerts: ${props.alerts.length}, sin capítulo: ${withoutChapter}, agrupadas: ${Array.from(grouped.entries()).map(([ch, alerts]) => `cap${ch}=${alerts.length}`).join(', ')}`)
+
+  console.log(`[TextTab] Total alerts: ${props.alerts.length}, inferidos: ${inferred}, sin capítulo: ${withoutChapter}, agrupadas: ${Array.from(grouped.entries()).map(([ch, alerts]) => `cap${ch}=${alerts.length}`).join(', ')}`)
   return grouped
 })
 
