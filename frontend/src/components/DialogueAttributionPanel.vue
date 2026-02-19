@@ -99,10 +99,9 @@
         <div v-if="correctingIndex === idx" class="correction-form" @click.stop>
           <label class="correction-label">Hablante correcto:</label>
           <Select
-            v-model="correctedSpeakerId"
-            :options="speakerOptions || []"
+            v-model="correctedSpeakerOption"
+            :options="speakerOptions"
             option-label="label"
-            option-value="value"
             placeholder="Seleccionar hablante"
             class="correction-select"
             size="small"
@@ -202,7 +201,7 @@ const selectedChapter = ref<number | null>(props.initialChapter ?? null)
 
 // Speaker correction state
 const correctingIndex = ref<number | null>(null)
-const correctedSpeakerId = ref<number | null>(null)
+const correctedSpeakerOption = ref<{ label: string; value: number | null } | null>(null)
 const savingCorrection = ref(false)
 const correctedDialogues = ref<Map<string, { speakerName: string; speakerId: number | null }>>(new Map())
 
@@ -384,23 +383,22 @@ function startCorrection(idx: number, attr: DialogueAttribution) {
   }
 
   correctingIndex.value = idx
-  // Ensure modelValue exists in options; PrimeVue Select crashes if modelValue
-  // doesn't match any option (labelDataP accesses undefined.length)
-  const existsInOptions = speakerOptions.value.some(o => o.value === attr.speakerId)
-  correctedSpeakerId.value = existsInOptions ? attr.speakerId : null
+  // Find the matching option object, or default to "Desconocido" (null value)
+  const match = speakerOptions.value.find(o => o.value === attr.speakerId)
+  correctedSpeakerOption.value = match || speakerOptions.value.find(o => o.value === null) || null
 }
 
 function startCorrectionWithAlt(idx: number, attr: DialogueAttribution, altId: number) {
   startCorrection(idx, attr)
   if (correctingIndex.value !== null) {
-    const existsInOptions = speakerOptions.value.some(o => o.value === altId)
-    correctedSpeakerId.value = existsInOptions ? altId : null
+    const match = speakerOptions.value.find(o => o.value === altId)
+    if (match) correctedSpeakerOption.value = match
   }
 }
 
 function cancelCorrection() {
   correctingIndex.value = null
-  correctedSpeakerId.value = null
+  correctedSpeakerOption.value = null
 }
 
 function getDialogueKey(attr: DialogueAttribution & { chapterNumber?: number }): string {
@@ -422,6 +420,8 @@ async function saveCorrection(attr: DialogueAttribution & { chapterNumber?: numb
   const chapterNum = selectedChapter.value ?? attr.chapterNumber
   if (chapterNum === null || chapterNum === undefined) return
 
+  const selectedSpeakerId = correctedSpeakerOption.value?.value ?? null
+
   savingCorrection.value = true
   try {
     const data = await api.postRaw<any>(`/api/projects/${props.projectId}/speaker-corrections`, {
@@ -430,15 +430,14 @@ async function saveCorrection(attr: DialogueAttribution & { chapterNumber?: numb
       dialogue_end_char: attr.endChar,
       dialogue_text: attr.text,
       original_speaker_id: attr.speakerId,
-      corrected_speaker_id: correctedSpeakerId.value,
+      corrected_speaker_id: selectedSpeakerId,
     })
 
     if (data.success) {
       // Track locally which dialogues have been corrected
-      const selectedOption = speakerOptions.value.find(o => o.value === correctedSpeakerId.value)
       correctedDialogues.value.set(getDialogueKey(attr), {
-        speakerName: selectedOption?.label || 'Desconocido',
-        speakerId: correctedSpeakerId.value,
+        speakerName: correctedSpeakerOption.value?.label || 'Desconocido',
+        speakerId: selectedSpeakerId,
       })
       toast.add({ severity: 'success', summary: 'Corregido', detail: 'Hablante corregido correctamente', life: 2000 })
     } else {
@@ -450,7 +449,7 @@ async function saveCorrection(attr: DialogueAttribution & { chapterNumber?: numb
   } finally {
     savingCorrection.value = false
     correctingIndex.value = null
-    correctedSpeakerId.value = null
+    correctedSpeakerOption.value = null
   }
 }
 
