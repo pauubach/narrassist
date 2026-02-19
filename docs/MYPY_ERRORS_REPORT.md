@@ -10,29 +10,29 @@
 | Métrica | Valor |
 |---------|-------|
 | **Errores iniciales** | 306 |
-| **Errores actuales** | 283 |
-| **Errores corregidos** | 23 (-7.5%) |
-| **Progreso** | 🟨 En curso |
+| **Errores actuales** | 231 |
+| **Errores corregidos** | 75 (-24.5%) |
+| **Progreso** | 🟩 Avance significativo |
 
 ---
 
 ## Distribución de Errores por Tipo
 
-| Tipo de Error | Cantidad | % del Total | Prioridad |
-|---------------|----------|-------------|-----------|
-| `arg-type` | 54 | 19.1% | 🔴 Alta |
-| `no-any-return` | 41 | 14.5% | 🟡 Media |
-| `attr-defined` | 41 | 14.5% | 🔴 Alta |
-| `index` | 35 | 12.4% | 🟡 Media |
-| `assignment` | 33 | 11.7% | 🟡 Media |
-| `return-value` | 22 | 7.8% | 🟡 Media |
-| `union-attr` | 20 | 7.1% | 🔴 Alta |
-| `annotation-unchecked` | 12 | 4.2% | 🟢 Baja |
-| `misc` | 9 | 3.2% | 🟢 Baja |
-| `operator` | 8 | 2.8% | 🟡 Media |
-| `call-overload` | 6 | 2.1% | 🟢 Baja |
-| `no-redef` | 5 | 1.8% | 🟢 Baja |
-| Otros (str, name-defined, has-type, etc.) | 10 | 3.5% | 🟢 Baja |
+| Tipo de Error | Cantidad | % del Total | Reducción | Prioridad |
+|---------------|----------|-------------|-----------|-----------|
+| `attr-defined` | 38 | 16.5% | -7% | 🔴 Alta |
+| `no-any-return` | 36 | 15.6% | -12% | 🟡 Media |
+| `assignment` | 33 | 14.3% | 0% | 🟡 Media |
+| `arg-type` | 32 | 13.9% | **-53%** ✅ | 🟡 Media |
+| `index` | 27 | 11.7% | **-23%** | 🟡 Media |
+| `return-value` | 22 | 9.5% | 0% | 🟡 Media |
+| `annotation-unchecked` | 12 | 5.2% | 0% | 🟢 Baja |
+| `operator` | 8 | 3.5% | 0% | 🟡 Media |
+| `union-attr` | 8 | 3.5% | **-60%** ✅ | 🟢 Baja |
+| `misc` | 8 | 3.5% | -11% | 🟢 Baja |
+| `call-overload` | 6 | 2.6% | 0% | 🟢 Baja |
+| `no-redef` | 5 | 2.2% | 0% | 🟢 Baja |
+| Otros | 10 | 4.3% | Varios | 🟢 Baja |
 
 ---
 
@@ -60,7 +60,7 @@
 
 ## Correcciones Aplicadas
 
-### ✅ Completadas (23 errores)
+### ✅ Completadas (75 errores)
 
 1. **Imports faltantes** (7 errores)
    - Agregado `from typing import Any` en 5 archivos
@@ -79,7 +79,14 @@
    - Agregadas assertions para narrowing de Result.value/error en alerts/engine.py
    - Cast explícito en llm/sanitization.py
 
-5. **Otros** (3 errores)
+5. **Persistence layer fixes** (45 errores)
+   - Null checks en history.py (16 errores)
+   - Null checks en session.py (9 errores)
+   - Row indexing con null guards en database.py, timeline.py, snapshot.py
+   - Device preference validation en config.py
+   - Memory monitor platform compatibility
+
+6. **Otros** (3 errores)
    - Type hints en voice/profiles.py (Counter variables)
    - Type hints en analysis/pacing.py, relationship_clustering.py
 
