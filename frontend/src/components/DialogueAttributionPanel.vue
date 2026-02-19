@@ -139,7 +139,7 @@
               :key="altIdx"
               :label="`${alt.name} (${(alt.score * 100).toFixed(0)}%)`"
               class="alt-chip"
-              @click.stop="startCorrection(idx, attr); correctedSpeakerId = alt.id"
+              @click.stop="startCorrectionWithAlt(idx, attr, alt.id)"
             />
           </div>
         </div>
@@ -384,7 +384,18 @@ function startCorrection(idx: number, attr: DialogueAttribution) {
   }
 
   correctingIndex.value = idx
-  correctedSpeakerId.value = attr.speakerId
+  // Ensure modelValue exists in options; PrimeVue Select crashes if modelValue
+  // doesn't match any option (labelDataP accesses undefined.length)
+  const existsInOptions = speakerOptions.value.some(o => o.value === attr.speakerId)
+  correctedSpeakerId.value = existsInOptions ? attr.speakerId : null
+}
+
+function startCorrectionWithAlt(idx: number, attr: DialogueAttribution, altId: number) {
+  startCorrection(idx, attr)
+  if (correctingIndex.value !== null) {
+    const existsInOptions = speakerOptions.value.some(o => o.value === altId)
+    correctedSpeakerId.value = existsInOptions ? altId : null
+  }
 }
 
 function cancelCorrection() {
