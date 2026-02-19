@@ -13,10 +13,14 @@ Ejemplos:
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from ..base import BaseDetector, CorrectionIssue
 from ..config import TerminologyConfig
 from ..types import CorrectionCategory, TerminologyIssueType
+
+if TYPE_CHECKING:
+    from narrative_assistant.nlp.embeddings import EmbeddingsModel
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +94,7 @@ class TerminologyDetector(BaseDetector):
 
     def __init__(self, config: TerminologyConfig | None = None):
         self.config = config or TerminologyConfig()
-        self._embeddings_model = None
+        self._embeddings_model: "EmbeddingsModel | None" = None
         self._synonym_lookup = self._build_synonym_lookup()
 
     def _build_synonym_lookup(self) -> dict[str, set[str]]:
@@ -244,7 +248,7 @@ class TerminologyDetector(BaseDetector):
 
         try:
             # Obtener embeddings
-            embeddings = self._embeddings_model.encode(terms)  # type: ignore[attr-defined]
+            embeddings = self._embeddings_model.encode(terms)
 
             # Calcular similitudes
             from numpy import dot

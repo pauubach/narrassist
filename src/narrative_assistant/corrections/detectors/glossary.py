@@ -266,11 +266,11 @@ class GlossaryDetector(BaseDetector):
             )
 
         # Ordenar por uso
-        usage_data.sort(key=lambda x: x["count"], reverse=True)  # type: ignore[arg-type, return-value]
+        usage_data.sort(key=lambda x: x["count"], reverse=True)
 
         # Top 10 más usados
         summary["most_used"] = [
-            {"term": d["term"], "count": d["count"]} for d in usage_data[:10] if d["count"] > 0  # type: ignore[operator]
+            {"term": d["term"], "count": d["count"]} for d in usage_data[:10] if d["count"] > 0
         ]
 
         # Términos sin usar
@@ -279,7 +279,7 @@ class GlossaryDetector(BaseDetector):
         # Variantes encontradas
         for d in usage_data:
             if d["variant_counts"]:
-                summary["variants_found"].append(  # type: ignore[attr-defined]
+                summary["variants_found"].append(
                     {
                         "canonical": d["term"],
                         "variants": d["variant_counts"],

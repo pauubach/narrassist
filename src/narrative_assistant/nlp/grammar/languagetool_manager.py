@@ -258,7 +258,6 @@ class LanguageToolManager:
                 kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
             self._process = subprocess.Popen(cmd, **kwargs)
-            self._process = subprocess.Popen(cmd, **kwargs)
 
             if wait:
                 # Esperar a que esté listo
@@ -269,9 +268,7 @@ class LanguageToolManager:
                         return True
 
                     # Verificar que el proceso sigue vivo
-                    if hasattr(self._process, "poll") and self._process.poll() is not None:
-                                            if self._process.poll() is not None:
-                                    jar_file = self._lt_dir / "languagetool-server.jar"
+                    if self._process and self._process.poll() is not None:
                         logger.error("LanguageTool terminó inesperadamente")
                         self._process = None
                         return False
@@ -564,7 +561,11 @@ class LanguageToolInstaller:
 
             # Fase 6: Verificar (90-95%)
             self._report("verifying", "Verificando instalación", 90, "Comprobando archivos...")
-            jar_file = self._lt_dir / "languagetool-server.jar"  # type: ignore[operator]
+            if self._lt_dir is None:
+                msg = "Directorio de LanguageTool no configurado"
+                self._report_error(msg)
+                return False, msg
+            jar_file = self._lt_dir / "languagetool-server.jar"
             if not jar_file.exists():
                 msg = "No se encontró languagetool-server.jar después de la instalación"
                 self._report_error(msg)
@@ -720,16 +721,17 @@ class LanguageToolInstaller:
 
         java_url = arch_urls[arch]
         logger.info(f"Descargando Java para {system}/{arch}")
-        self._tools_dir.mkdir(parents=True, exist_ok=True)  # type: ignore[union-attr]
-    self._tools_dir.mkdir(parents=True, exist_ok=True)
+        if self._tools_dir is None:
+            logger.error("Directorio de herramientas no configurado")
+            return False
+        self._tools_dir.mkdir(parents=True, exist_ok=True)
 
         archive_name = (
             f"java-{JAVA_VERSION}-{arch}.zip"
             if system == "Windows"
             else f"java-{JAVA_VERSION}-{arch}.tar.gz"
         )
-        archive_path = self._tools_dir / archive_name  # type: ignore[operator]
-    archive_path = self._tools_dir / archive_name
+        archive_path = self._tools_dir / archive_name
 
         # Descargar (5-30%)
         if not archive_path.exists():
@@ -760,13 +762,11 @@ class LanguageToolInstaller:
                 import tarfile
 
                 with tarfile.open(archive_path, "r:gz") as tf:
-                    tf.extractall(self._tools_dir)  # type: ignore[arg-type]
                     tf.extractall(self._tools_dir)
 
             # Encontrar directorio extraído
             extracted_dirs = [
-                d for d in self._tools_dir.iterdir() if d.is_dir() and d.name.startswith("jdk-")  # type: ignore[union-attr]
-                            d for d in self._tools_dir.iterdir() if d.is_dir() and d.name.startswith("jdk-")
+                d for d in self._tools_dir.iterdir() if d.is_dir() and d.name.startswith("jdk-")
             ]
             if not extracted_dirs:
                 logger.error("No se encontró directorio Java extraído")
@@ -781,17 +781,13 @@ class LanguageToolInstaller:
                     shutil.move(str(contents_home), str(self._java_dir))
                     shutil.rmtree(extracted_dir)
                 else:
-                    extracted_dir.rename(self._java_dir)  # type: ignore[arg-type]
-                                extracted_dir.rename(self._java_dir)
-                            extracted_dir.rename(self._java_dir)
+                    extracted_dir.rename(self._java_dir)
             else:
-                extracted_dir.rename(self._java_dir)  # type: ignore[arg-type]
+                extracted_dir.rename(self._java_dir)
 
             # Hacer ejecutable en Unix
-            if system != "Windows":
-                java_exe = self._java_dir / "bin" / "java"  # type: ignore[operator]
-                                java_exe = self._java_dir / "bin" / "java"
-                    self._tools_dir.mkdir(parents=True, exist_ok=True)
+            if system != "Windows" and self._java_dir:
+                java_exe = self._java_dir / "bin" / "java"
                 if java_exe.exists():
                     java_exe.chmod(0o755)
 
@@ -804,9 +800,11 @@ class LanguageToolInstaller:
 
     def _download_languagetool(self) -> Path | None:
         """Descargar LanguageTool probando múltiples mirrors."""
-        self._tools_dir.mkdir(parents=True, exist_ok=True)  # type: ignore[union-attr]
-        zip_path = self._tools_dir / f"LanguageTool-{LT_VERSION}.zip"  # type: ignore[operator]
-    zip_path = self._tools_dir / f"LanguageTool-{LT_VERSION}.zip"
+        if self._tools_dir is None:
+            logger.error("Directorio de herramientas no configurado")
+            return None
+        self._tools_dir.mkdir(parents=True, exist_ok=True)
+        zip_path = self._tools_dir / f"LanguageTool-{LT_VERSION}.zip"
 
         if zip_path.exists():
             self._report("downloading_lt", "Descargando LanguageTool", 75, "Archivo ya descargado")
@@ -842,8 +840,10 @@ class LanguageToolInstaller:
             if self._lt_dir and self._lt_dir.exists():
                 shutil.rmtree(self._lt_dir, onerror=self._remove_readonly)
 
-            extract_dir = self._tools_dir / f"LanguageTool-{LT_VERSION}"  # type: ignore[operator]
-                        extract_dir = self._tools_dir / f"LanguageTool-{LT_VERSION}"
+            if self._tools_dir is None:
+                logger.error("Directorio de herramientas no configurado")
+                return False
+            extract_dir = self._tools_dir / f"LanguageTool-{LT_VERSION}"
             if extract_dir.exists():
                 shutil.rmtree(extract_dir, onerror=self._remove_readonly)
 
@@ -852,8 +852,7 @@ class LanguageToolInstaller:
 
             # Buscar directorio extraído
             if not extract_dir.exists():
-                for d in self._tools_dir.iterdir():  # type: ignore[union-attr]
-                                    for d in self._tools_dir.iterdir():
+                for d in self._tools_dir.iterdir():
                     if d.is_dir() and d.name.startswith("LanguageTool"):
                         extract_dir = d
                         break
