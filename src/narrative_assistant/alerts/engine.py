@@ -1513,7 +1513,7 @@ class AlertEngine:
                 if gender:
                     g = gender[0] if isinstance(gender, list) else gender
                     if g in ("Fem", "Masc"):
-                        return g
+                        return str(g)
         except Exception:
             pass
         return None
@@ -1555,7 +1555,7 @@ class AlertEngine:
                 if gender:
                     g = gender[0] if isinstance(gender, list) else gender
                     if g in ("Fem", "Masc"):
-                        return g
+                        return str(g)
         except Exception:
             pass
 

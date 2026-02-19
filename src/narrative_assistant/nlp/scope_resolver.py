@@ -329,7 +329,7 @@ class ScopeResolver:
                     for c in child.children
                 )
                 if has_de:
-                    return child
+                    return child  # type: ignore[return-value]
         return None
 
     def _expand_entity_span(self, token) -> str:
@@ -1111,7 +1111,7 @@ class ScopeResolver:
                 f"Ambiguous context detected at position {position}, "
                 f"candidates: {candidates}"
             )
-            return AmbiguousResult(
+            return AmbiguousResult(  # type: ignore[return-value]
                 candidates=candidates,
                 position=position,
                 context_text=context_text,
