@@ -64,6 +64,7 @@ export interface SystemCapabilities {
     gpu_blocked: { name: string; compute_capability: number; min_required: number } | null
     cpu: { name: string }
   }
+  embeddings_available: boolean
   ollama: {
     installed: boolean
     available: boolean

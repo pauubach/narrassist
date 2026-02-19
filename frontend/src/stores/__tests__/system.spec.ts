@@ -268,6 +268,7 @@ describe('systemStore', () => {
         gpu_blocked: null,
         cpu: { name: 'Intel Xeon E3-1505M' },
       },
+      embeddings_available: true,
       ollama: {
         installed: true,
         available: true,

@@ -1090,6 +1090,16 @@ def search_similar_text(
 
     except Exception as e:
         logger.error(f"Error searching similar text: {e}", exc_info=True)
+        # Friendly message for missing embeddings model
+        try:
+            from narrative_assistant.core.errors import ModelNotLoadedError
+            if isinstance(e, ModelNotLoadedError):
+                return ApiResponse(
+                    success=False,
+                    error="El modelo de embeddings no está disponible. Descárgalo desde Configuración o reinicia la aplicación.",
+                )
+        except ImportError:
+            pass
         return ApiResponse(success=False, error=f"Error en búsqueda: {str(e)}")
 
 

@@ -408,10 +408,50 @@ try:
     logger.info(f"Server starting - NA_VERSION: {deps.NA_VERSION}, MODULES_LOADED: {deps.MODULES_LOADED}")
     _early_logger.info("Creating FastAPI app instance...")
 
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def lifespan(application):
+        """Startup/shutdown lifecycle for the FastAPI application."""
+        _early_logger.info("=== Startup event triggered ===")
+
+        # S7c-01: Reset stuck "analyzing"/"queued" projects from previous crash
+        try:
+            db = deps.get_database()
+            stuck = db.fetchall(
+                "SELECT id, name FROM projects WHERE analysis_status IN ('analyzing', 'queued')"
+            )
+            if stuck:
+                for row in stuck:
+                    db.execute(
+                        "UPDATE projects SET analysis_status = 'pending', "
+                        "analysis_progress = 0 WHERE id = ?",
+                        (row['id'],)
+                    )
+                logger.info(f"Startup: reset {len(stuck)} stuck projects to 'pending': {[r['name'] for r in stuck]}")
+        except Exception as e:
+            logger.debug(f"Startup: could not reset stuck projects: {e}")
+
+        if not deps.MODULES_LOADED:
+            logger.info("Startup: attempting to load narrative_assistant modules...")
+            _early_logger.info("Startup: attempting to load narrative_assistant modules...")
+            deps.load_narrative_assistant_modules()
+            if deps.MODULES_LOADED:
+                logger.info("Startup: modules loaded successfully")
+                _early_logger.info("Startup: modules loaded successfully")
+            else:
+                logger.warning(f"Startup: modules not loaded - {deps.MODULES_ERROR}")
+                _early_logger.warning(f"Startup: modules not loaded - {deps.MODULES_ERROR}")
+        else:
+            _early_logger.info("Startup: modules already loaded")
+
+        yield
+
     app = FastAPI(
         title="Narrative Assistant API",
         description="API REST para el asistente de corrección narrativa",
         version=deps.NA_VERSION,
+        lifespan=lifespan,
     )
     _early_logger.info("FastAPI app created successfully")
 
@@ -616,47 +656,6 @@ except Exception as e:
     import traceback
     traceback.print_exc()
     sys.exit(1)
-
-# ============================================================================
-# Startup event
-# ============================================================================
-
-@app.on_event("startup")
-async def startup_load_modules():
-    """Try to load narrative_assistant modules on server startup."""
-    _early_logger.info("=== Startup event triggered ===")
-
-    # S7c-01: Reset stuck "analyzing"/"queued" projects from previous crash
-    # IMPORTANT: Must run ALWAYS on startup, even if modules already loaded
-    try:
-        db = deps.get_database()
-        stuck = db.fetchall(
-            "SELECT id, name FROM projects WHERE analysis_status IN ('analyzing', 'queued')"
-        )
-        if stuck:
-            for row in stuck:
-                db.execute(
-                    "UPDATE projects SET analysis_status = 'pending', "
-                    "analysis_progress = 0 WHERE id = ?",
-                    (row['id'],)
-                )
-            logger.info(f"Startup: reset {len(stuck)} stuck projects to 'pending': {[r['name'] for r in stuck]}")
-    except Exception as e:
-        logger.debug(f"Startup: could not reset stuck projects: {e}")
-
-    if not deps.MODULES_LOADED:
-        logger.info("Startup: attempting to load narrative_assistant modules...")
-        _early_logger.info("Startup: attempting to load narrative_assistant modules...")
-        deps.load_narrative_assistant_modules()
-        if deps.MODULES_LOADED:
-            logger.info("Startup: modules loaded successfully")
-            _early_logger.info("Startup: modules loaded successfully")
-        else:
-            logger.warning(f"Startup: modules not loaded - {deps.MODULES_ERROR}")
-            _early_logger.warning(f"Startup: modules not loaded - {deps.MODULES_ERROR}")
-    else:
-        _early_logger.info("Startup: modules already loaded")
-
 
 # ============================================================================
 # Main

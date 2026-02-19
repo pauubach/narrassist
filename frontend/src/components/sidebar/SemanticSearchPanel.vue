@@ -6,6 +6,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import DsBadge from '@/components/ds/DsBadge.vue'
 import DsEmptyState from '@/components/ds/DsEmptyState.vue'
 import { searchSimilarText, type SemanticMatch } from '@/services/semanticSearch'
+import { useSystemStore } from '@/stores/system'
 import type { Chapter } from '@/types'
 
 /**
@@ -35,11 +36,19 @@ const emit = defineEmits<{
 // Estado
 // ============================================================================
 
+const systemStore = useSystemStore()
+
 const query = ref(props.initialQuery || '')
 const loading = ref(false)
 const results = ref<SemanticMatch[]>([])
 const searchInfo = ref<{ count: number; total_chunks: number } | null>(null)
 const errorMessage = ref<string | null>(null)
+const downloadingModel = ref(false)
+
+/** Embeddings model is available locally */
+const embeddingsAvailable = computed(() =>
+  systemStore.systemCapabilities?.embeddings_available ?? true
+)
 
 // ============================================================================
 // Búsqueda
@@ -106,6 +115,19 @@ function getSimilarityLabel(score: number): string {
 }
 
 const hasSearched = computed(() => results.value.length > 0 || errorMessage.value !== null)
+
+async function downloadEmbeddings() {
+  downloadingModel.value = true
+  try {
+    const ok = await systemStore.downloadModels(['embeddings'])
+    if (ok) {
+      // Refresh capabilities to pick up the new model
+      await systemStore.refreshCapabilities()
+    }
+  } finally {
+    downloadingModel.value = false
+  }
+}
 </script>
 
 <template>
@@ -121,78 +143,95 @@ const hasSearched = computed(() => results.value.length > 0 || errorMessage.valu
       </p>
     </div>
 
-    <!-- Search box -->
-    <div class="search-box">
-      <InputText
-        v-model="query"
-        placeholder="Escribe el texto a buscar..."
-        class="search-input"
-        :disabled="loading"
-        @keypress="handleKeyPress"
+    <!-- Model not available -->
+    <template v-if="!embeddingsAvailable">
+      <div class="model-missing">
+        <i class="pi pi-download model-missing-icon"></i>
+        <h4>Modelo no disponible</h4>
+        <p>La búsqueda semántica necesita el modelo de embeddings (~470 MB).</p>
+        <Button
+          label="Descargar modelo"
+          icon="pi pi-download"
+          :loading="downloadingModel"
+          @click="downloadEmbeddings"
+        />
+      </div>
+    </template>
+
+    <template v-else>
+      <!-- Search box -->
+      <div class="search-box">
+        <InputText
+          v-model="query"
+          placeholder="Escribe el texto a buscar..."
+          class="search-input"
+          :disabled="loading"
+          @keypress="handleKeyPress"
+        />
+        <Button
+          label="Buscar"
+          icon="pi pi-search"
+          :loading="loading"
+          :disabled="!query.trim()"
+          @click="performSearch"
+        />
+      </div>
+
+      <!-- Results info -->
+      <div v-if="searchInfo && !loading" class="results-info">
+        <span class="info-text">
+          <strong>{{ searchInfo.count }}</strong> resultado{{ searchInfo.count !== 1 ? 's' : '' }}
+          <span class="info-detail">de {{ searchInfo.total_chunks }} fragmentos</span>
+        </span>
+      </div>
+
+      <!-- Error state -->
+      <DsEmptyState
+        v-if="errorMessage && !loading"
+        icon="pi pi-info-circle"
+        title="Sin resultados"
+        :description="errorMessage"
       />
-      <Button
-        label="Buscar"
+
+      <!-- Empty state (before search) -->
+      <DsEmptyState
+        v-if="!hasSearched && !loading"
         icon="pi pi-search"
-        :loading="loading"
-        :disabled="!query.trim()"
-        @click="performSearch"
+        title="Búsqueda semántica"
+        description="Ingresa un fragmento de texto para encontrar pasajes similares en el manuscrito"
       />
-    </div>
 
-    <!-- Results info -->
-    <div v-if="searchInfo && !loading" class="results-info">
-      <span class="info-text">
-        <strong>{{ searchInfo.count }}</strong> resultado{{ searchInfo.count !== 1 ? 's' : '' }}
-        <span class="info-detail">de {{ searchInfo.total_chunks }} fragmentos</span>
-      </span>
-    </div>
+      <!-- Loading -->
+      <div v-if="loading" class="loading-state">
+        <ProgressSpinner style="width: 40px; height: 40px" stroke-width="4" />
+        <p class="loading-text">Analizando el manuscrito...</p>
+      </div>
 
-    <!-- Error state -->
-    <DsEmptyState
-      v-if="errorMessage && !loading"
-      icon="pi pi-info-circle"
-      title="Sin resultados"
-      :description="errorMessage"
-    />
-
-    <!-- Empty state (before search) -->
-    <DsEmptyState
-      v-if="!hasSearched && !loading"
-      icon="pi pi-search"
-      title="Búsqueda semántica"
-      description="Ingresa un fragmento de texto para encontrar pasajes similares en el manuscrito"
-    />
-
-    <!-- Loading -->
-    <div v-if="loading" class="loading-state">
-      <ProgressSpinner style="width: 40px; height: 40px" stroke-width="4" />
-      <p class="loading-text">Analizando el manuscrito...</p>
-    </div>
-
-    <!-- Results list -->
-    <div v-if="results.length > 0 && !loading" class="results-list">
-      <div
-        v-for="(match, idx) in results"
-        :key="idx"
-        class="result-item"
-        @click="navigateToMatch(match)"
-      >
-        <div class="result-header">
-          <DsBadge
-            :severity="getSimilarityColor(match.similarity)"
-            size="sm"
-          >
-            {{ getSimilarityLabel(match.similarity) }}
-          </DsBadge>
-          <span v-if="match.chapter_title" class="result-chapter">
-            {{ match.chapter_title }}
-          </span>
-        </div>
-        <div class="result-text">
-          {{ match.text }}
+      <!-- Results list -->
+      <div v-if="results.length > 0 && !loading" class="results-list">
+        <div
+          v-for="(match, idx) in results"
+          :key="idx"
+          class="result-item"
+          @click="navigateToMatch(match)"
+        >
+          <div class="result-header">
+            <DsBadge
+              :severity="getSimilarityColor(match.similarity)"
+              size="sm"
+            >
+              {{ getSimilarityLabel(match.similarity) }}
+            </DsBadge>
+            <span v-if="match.chapter_title" class="result-chapter">
+              {{ match.chapter_title }}
+            </span>
+          </div>
+          <div class="result-text">
+            {{ match.text }}
+          </div>
         </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -332,6 +371,37 @@ const hasSearched = computed(() => results.value.length > 0 || errorMessage.valu
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Model missing state */
+.model-missing {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-6);
+  text-align: center;
+}
+
+.model-missing-icon {
+  font-size: 2.5rem;
+  color: var(--text-color-secondary);
+}
+
+.model-missing h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.model-missing p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-color-secondary);
+  max-width: 280px;
 }
 
 /* Dark mode */

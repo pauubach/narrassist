@@ -1027,6 +1027,15 @@ def system_capabilities():
         else:
             ollama_recommendations = ["llama3.2"]  # 3B funciona en CPU
 
+        # Verificar si el modelo de embeddings está disponible localmente
+        embeddings_available = False
+        try:
+            from narrative_assistant.core.model_manager import ModelType, get_model_manager
+            emb_path = get_model_manager().get_model_path(ModelType.EMBEDDINGS)
+            embeddings_available = emb_path is not None
+        except Exception:
+            pass
+
         return ApiResponse(
             success=True,
             data={
@@ -1041,6 +1050,7 @@ def system_capabilities():
                         "name": cpu_device.device_name,
                     },
                 },
+                "embeddings_available": embeddings_available,
                 "ollama": {
                     "installed": ollama_installed,
                     "available": ollama_available,
