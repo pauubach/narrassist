@@ -995,16 +995,14 @@ def search_similar_text(
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
         project = result.value
 
-        # Cargar documento
-        from narrative_assistant.persistence.document import get_document_repository
-        doc_repo = get_document_repository()
-        doc_result = doc_repo.get_by_project(project_id)
+        # Cargar texto completo desde capítulos
+        if not deps.chapter_repository:
+            raise HTTPException(status_code=500, detail="Chapter repository not initialized")
 
-        if doc_result.is_failure:
-            raise HTTPException(status_code=404, detail="Documento no encontrado")
+        chapters = deps.chapter_repository.get_by_project(project_id)
+        full_text = "\n\n".join(ch.content for ch in chapters if ch.content)
 
-        document = doc_result.value
-        if not document or not document.full_text:
+        if not full_text.strip():
             return ApiResponse(
                 success=True,
                 data={"matches": [], "query": query, "count": 0}
@@ -1017,7 +1015,7 @@ def search_similar_text(
         # Split en fragmentos (ventanas de ~200 palabras con overlap)
         from narrative_assistant.nlp.chunking import TextChunker
         chunker = TextChunker(chunk_size=200, overlap=50)
-        chunks = chunker.chunk_text(document.full_text)
+        chunks = chunker.chunk_text(full_text)
 
         # Compute embeddings para query y chunks
         query_emb = model.encode([query])[0]
