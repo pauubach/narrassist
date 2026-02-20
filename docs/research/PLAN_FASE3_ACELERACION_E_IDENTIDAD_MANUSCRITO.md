@@ -1,6 +1,6 @@
 # Plan Fase 3: Aceleración Incremental e Identidad de Manuscrito
 
-Fecha: 2026-02-19  
+Fecha: 2026-02-19
 Estado: Propuesta técnica detallada (lista para implementación por sprints)
 
 ## 1. Objetivo
@@ -106,7 +106,7 @@ Política de seguridad:
 5. Señal de reordenación de capítulos.
 6. Ratio de texto nuevo no presente en versión anterior.
 
-Nota clave:  
+Nota clave:
 `>40%` de capítulos modificados puede implicar `full run`, pero no implica manuscrito distinto.
 
 ## 6.2 Señales narrativas
@@ -133,7 +133,7 @@ Estrategia:
    - `rename` (mismo personaje, nombre cambiado),
    - `split/merge`,
    - `new/remove`.
-4. Mostrar en resumen de versión:  
+4. Mostrar en resumen de versión:
    “Personaje renombrado: A → B (confianza alta)”.
 
 ## 6.4 Clasificador final
@@ -221,11 +221,11 @@ Agregar campos agregados:
 
 ## 9.1 Endpoints nuevos/revisados
 
-1. `POST /api/projects/{id}/document/replace`  
+1. `POST /api/projects/{id}/document/replace`
    Ejecuta precheck de identidad y aplica política.
-2. `GET /api/projects/{id}/identity/last-check`  
+2. `GET /api/projects/{id}/identity/last-check`
    Solo para auditoría interna/soporte.
-3. `GET /api/projects/{id}/versions`  
+3. `GET /api/projects/{id}/versions`
    Extender payload con nuevos deltas y cambios de entidades.
 
 ## 9.2 Integración en pipeline
