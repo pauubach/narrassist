@@ -98,6 +98,28 @@ export interface VersionMetrics {
   healthScore: number | null
   formalityAvg: number | null
   dialogueRatio: number | null
+  alertsNewCount?: number
+  alertsResolvedCount?: number
+  alertsUnchangedCount?: number
+  criticalCount?: number
+  warningCount?: number
+  infoCount?: number
+  entitiesNewCount?: number
+  entitiesRemovedCount?: number
+  entitiesRenamedCount?: number
+  chapterAddedCount?: number
+  chapterRemovedCount?: number
+  chapterReorderedCount?: number
+  runMode?: string
+  durationTotalSec?: number
+  phaseDurationsJson?: string
+  modifiedChapters?: number
+  addedChapters?: number
+  removedChapters?: number
+  chapterChangeRatio?: number
+  renamedEntities?: number
+  newEntities?: number
+  removedEntities?: number
   createdAt: Date
 }
 
@@ -107,6 +129,10 @@ export interface VersionTrendPoint {
   alertCount: number
   healthScore: number | null
   wordCount: number
+  alertsNewCount?: number
+  alertsResolvedCount?: number
+  runMode?: string
+  durationTotalSec?: number
   createdAt: Date
 }
 

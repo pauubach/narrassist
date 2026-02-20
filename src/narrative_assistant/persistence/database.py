@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 30
+SCHEMA_VERSION = 33
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -1169,6 +1169,21 @@ CREATE TABLE IF NOT EXISTS version_metrics (
     health_score REAL,
     formality_avg REAL,
     dialogue_ratio REAL,
+    alerts_new_count INTEGER NOT NULL DEFAULT 0,
+    alerts_resolved_count INTEGER NOT NULL DEFAULT 0,
+    alerts_unchanged_count INTEGER NOT NULL DEFAULT 0,
+    critical_count INTEGER NOT NULL DEFAULT 0,
+    warning_count INTEGER NOT NULL DEFAULT 0,
+    info_count INTEGER NOT NULL DEFAULT 0,
+    entities_new_count INTEGER NOT NULL DEFAULT 0,
+    entities_removed_count INTEGER NOT NULL DEFAULT 0,
+    entities_renamed_count INTEGER NOT NULL DEFAULT 0,
+    chapter_added_count INTEGER NOT NULL DEFAULT 0,
+    chapter_removed_count INTEGER NOT NULL DEFAULT 0,
+    chapter_reordered_count INTEGER NOT NULL DEFAULT 0,
+    run_mode TEXT NOT NULL DEFAULT 'full',
+    duration_total_sec REAL NOT NULL DEFAULT 0.0,
+    phase_durations_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
     FOREIGN KEY (snapshot_id) REFERENCES analysis_snapshots(id) ON DELETE SET NULL
@@ -1176,6 +1191,86 @@ CREATE TABLE IF NOT EXISTS version_metrics (
 
 CREATE INDEX IF NOT EXISTS idx_version_metrics_project ON version_metrics(project_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_version_metrics_unique ON version_metrics(project_id, version_num);
+
+-- Diff entre versiones (texto + entidades)
+CREATE TABLE IF NOT EXISTS version_diffs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    version_num INTEGER NOT NULL,
+    snapshot_id INTEGER,
+    modified_chapters INTEGER NOT NULL DEFAULT 0,
+    added_chapters INTEGER NOT NULL DEFAULT 0,
+    removed_chapters INTEGER NOT NULL DEFAULT 0,
+    chapter_change_ratio REAL NOT NULL DEFAULT 0.0,
+    matched_entities INTEGER NOT NULL DEFAULT 0,
+    renamed_entities INTEGER NOT NULL DEFAULT 0,
+    new_entities INTEGER NOT NULL DEFAULT 0,
+    removed_entities INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (snapshot_id) REFERENCES analysis_snapshots(id) ON DELETE SET NULL,
+    UNIQUE(project_id, version_num)
+);
+CREATE INDEX IF NOT EXISTS idx_version_diffs_project ON version_diffs(project_id, version_num DESC);
+
+-- Enlaces entidad↔entidad entre snapshot y versión actual
+CREATE TABLE IF NOT EXISTS entity_version_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    snapshot_id INTEGER NOT NULL,
+    old_entity_id INTEGER,
+    new_entity_id INTEGER,
+    old_name TEXT,
+    new_name TEXT,
+    link_type TEXT NOT NULL,           -- same | renamed | removed | new
+    confidence REAL NOT NULL DEFAULT 0.0,
+    reason_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (snapshot_id) REFERENCES analysis_snapshots(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_entity_version_links_lookup
+    ON entity_version_links(project_id, snapshot_id, link_type);
+
+-- Clasificación de identidad de manuscritos por reemplazo de documento
+CREATE TABLE IF NOT EXISTS manuscript_identity_checks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    license_subject TEXT NOT NULL DEFAULT 'no_license',
+    previous_document_fingerprint TEXT NOT NULL DEFAULT '',
+    candidate_document_fingerprint TEXT NOT NULL DEFAULT '',
+    classification TEXT NOT NULL,           -- same_document | uncertain | different_document
+    confidence REAL NOT NULL DEFAULT 0.0,
+    score REAL NOT NULL DEFAULT 0.0,
+    signals_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_identity_checks_project
+    ON manuscript_identity_checks(project_id, id DESC);
+CREATE INDEX IF NOT EXISTS idx_identity_checks_subject_time
+    ON manuscript_identity_checks(license_subject, created_at DESC);
+
+-- Estado agregado de riesgo por sujeto de licencia (rolling 30d)
+CREATE TABLE IF NOT EXISTS manuscript_identity_risk_state (
+    license_subject TEXT PRIMARY KEY,
+    uncertain_count_30d INTEGER NOT NULL DEFAULT 0,
+    review_required INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Auditoría de eventos de riesgo para soporte/licencias
+CREATE TABLE IF NOT EXISTS manuscript_identity_risk_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    license_subject TEXT NOT NULL,
+    event_type TEXT NOT NULL,               -- e.g. uncertain_threshold_exceeded
+    details_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_identity_risk_events_subject_time
+    ON manuscript_identity_risk_events(license_subject, created_at DESC);
 
 -- ===================================================================
 -- Pesos adaptativos por proyecto (v23, nivel 3)
@@ -1343,7 +1438,7 @@ CREATE INDEX IF NOT EXISTS idx_ner_chapter_cache_lookup ON ner_chapter_cache(
 );
 
 -- Insertar versión del schema
-INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '30');
+INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '33');
 """
 
 
@@ -1648,6 +1743,88 @@ class Database:
                 UNIQUE(project_id, chapter_hash, config_hash)
             )""",
             "CREATE INDEX IF NOT EXISTS idx_ner_chapter_cache_lookup ON ner_chapter_cache(project_id, chapter_hash, config_hash)",
+            # v31: Identidad de manuscritos + riesgo por licencia
+            """CREATE TABLE IF NOT EXISTS manuscript_identity_checks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                license_subject TEXT NOT NULL DEFAULT 'no_license',
+                previous_document_fingerprint TEXT NOT NULL DEFAULT '',
+                candidate_document_fingerprint TEXT NOT NULL DEFAULT '',
+                classification TEXT NOT NULL,
+                confidence REAL NOT NULL DEFAULT 0.0,
+                score REAL NOT NULL DEFAULT 0.0,
+                signals_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_identity_checks_project ON manuscript_identity_checks(project_id, id DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_identity_checks_subject_time ON manuscript_identity_checks(license_subject, created_at DESC)",
+            """CREATE TABLE IF NOT EXISTS manuscript_identity_risk_state (
+                license_subject TEXT PRIMARY KEY,
+                uncertain_count_30d INTEGER NOT NULL DEFAULT 0,
+                review_required INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )""",
+            """CREATE TABLE IF NOT EXISTS manuscript_identity_risk_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                license_subject TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                details_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_identity_risk_events_subject_time ON manuscript_identity_risk_events(license_subject, created_at DESC)",
+            # v32: Diff de versiones + enlaces de entidades entre versiones
+            """CREATE TABLE IF NOT EXISTS version_diffs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                version_num INTEGER NOT NULL,
+                snapshot_id INTEGER,
+                modified_chapters INTEGER NOT NULL DEFAULT 0,
+                added_chapters INTEGER NOT NULL DEFAULT 0,
+                removed_chapters INTEGER NOT NULL DEFAULT 0,
+                chapter_change_ratio REAL NOT NULL DEFAULT 0.0,
+                matched_entities INTEGER NOT NULL DEFAULT 0,
+                renamed_entities INTEGER NOT NULL DEFAULT 0,
+                new_entities INTEGER NOT NULL DEFAULT 0,
+                removed_entities INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY (snapshot_id) REFERENCES analysis_snapshots(id) ON DELETE SET NULL,
+                UNIQUE(project_id, version_num)
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_version_diffs_project ON version_diffs(project_id, version_num DESC)",
+            """CREATE TABLE IF NOT EXISTS entity_version_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                snapshot_id INTEGER NOT NULL,
+                old_entity_id INTEGER,
+                new_entity_id INTEGER,
+                old_name TEXT,
+                new_name TEXT,
+                link_type TEXT NOT NULL,
+                confidence REAL NOT NULL DEFAULT 0.0,
+                reason_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY (snapshot_id) REFERENCES analysis_snapshots(id) ON DELETE CASCADE
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_entity_version_links_lookup ON entity_version_links(project_id, snapshot_id, link_type)",
+            # v33: métricas extendidas de versión
+            "ALTER TABLE version_metrics ADD COLUMN alerts_new_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE version_metrics ADD COLUMN alerts_resolved_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE version_metrics ADD COLUMN alerts_unchanged_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE version_metrics ADD COLUMN critical_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE version_metrics ADD COLUMN warning_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE version_metrics ADD COLUMN info_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE version_metrics ADD COLUMN entities_new_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE version_metrics ADD COLUMN entities_removed_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE version_metrics ADD COLUMN entities_renamed_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE version_metrics ADD COLUMN chapter_added_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE version_metrics ADD COLUMN chapter_removed_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE version_metrics ADD COLUMN chapter_reordered_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE version_metrics ADD COLUMN run_mode TEXT NOT NULL DEFAULT 'full'",
+            "ALTER TABLE version_metrics ADD COLUMN duration_total_sec REAL NOT NULL DEFAULT 0.0",
+            "ALTER TABLE version_metrics ADD COLUMN phase_durations_json TEXT NOT NULL DEFAULT '{}'",
         ]
         for sql in table_migrations:
             try:

@@ -43,6 +43,21 @@ const metrics = computed<MetricRow[]>(() => [
     invert: true,
   },
   {
+    label: 'Alertas nuevas',
+    icon: 'pi pi-plus-circle',
+    oldValue: props.older.alertsNewCount ?? 0,
+    newValue: props.newer.alertsNewCount ?? 0,
+    format: (v) => v.toString(),
+    invert: true,
+  },
+  {
+    label: 'Alertas resueltas',
+    icon: 'pi pi-check-circle',
+    oldValue: props.older.alertsResolvedCount ?? 0,
+    newValue: props.newer.alertsResolvedCount ?? 0,
+    format: (v) => v.toString(),
+  },
+  {
     label: 'Palabras',
     icon: 'pi pi-file-word',
     oldValue: props.older.wordCount,
@@ -54,6 +69,13 @@ const metrics = computed<MetricRow[]>(() => [
     icon: 'pi pi-users',
     oldValue: props.older.entityCount,
     newValue: props.newer.entityCount,
+    format: (v) => v.toString(),
+  },
+  {
+    label: 'Renombres',
+    icon: 'pi pi-pencil',
+    oldValue: props.older.entitiesRenamedCount ?? props.older.renamedEntities ?? 0,
+    newValue: props.newer.entitiesRenamedCount ?? props.newer.renamedEntities ?? 0,
     format: (v) => v.toString(),
   },
   {

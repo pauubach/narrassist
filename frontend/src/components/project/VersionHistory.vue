@@ -167,6 +167,18 @@ const comparisonVersions = computed(() => {
 
       <Column field="entityCount" header="Entidades" style="width: 6rem" />
 
+      <Column field="entitiesRenamedCount" header="Renombres" style="width: 6rem">
+        <template #body="{ data }">
+          {{ data.entitiesRenamedCount ?? data.renamedEntities ?? 0 }}
+        </template>
+      </Column>
+
+      <Column field="modifiedChapters" header="Cap. cambios" style="width: 7rem">
+        <template #body="{ data }">
+          {{ data.modifiedChapters ?? 0 }}
+        </template>
+      </Column>
+
       <Column field="healthScore" header="Salud" style="width: 5rem">
         <template #body="{ data }">
           <Tag
@@ -181,6 +193,18 @@ const comparisonVersions = computed(() => {
       <Column field="dialogueRatio" header="Diálogo" style="width: 5rem">
         <template #body="{ data }">
           {{ formatRatio(data.dialogueRatio) }}
+        </template>
+      </Column>
+
+      <Column field="runMode" header="Modo" style="width: 6rem">
+        <template #body="{ data }">
+          <Tag :value="data.runMode || 'full'" severity="info" />
+        </template>
+      </Column>
+
+      <Column field="durationTotalSec" header="Duración" style="width: 6rem">
+        <template #body="{ data }">
+          {{ (data.durationTotalSec ?? 0).toFixed(1) }}s
         </template>
       </Column>
 

@@ -30,6 +30,20 @@
           </div>
         </div>
         <div class="header-actions">
+          <input
+            ref="replaceDocumentInputRef"
+            type="file"
+            accept=".doc,.docx,.txt,.md,.pdf,.epub"
+            style="display: none"
+            @change="onReplaceDocumentSelected"
+          >
+          <Button
+            label="Reemplazar manuscrito"
+            icon="pi pi-upload"
+            outlined
+            size="small"
+            @click="openReplaceDocumentDialog"
+          />
           <Button
             v-tooltip.bottom="'Exportar Guía de Estilo'"
             icon="pi pi-book"
@@ -531,6 +545,7 @@ const tabStatuses = computed(() => {
 const loading = ref(true)
 const error = ref('')
 const showExportDialog = ref(false)
+const replaceDocumentInputRef = ref<HTMLInputElement | null>(null)
 const showReanalyzeDialog = ref(false)
 const correctionConfigModalRef = ref<InstanceType<typeof CorrectionConfigModal> | null>(null)
 const reanalyzing = ref(false)
@@ -1359,6 +1374,50 @@ const startReanalysis = async () => {
     }
   } finally {
     reanalyzing.value = false
+  }
+}
+
+const openReplaceDocumentDialog = () => {
+  replaceDocumentInputRef.value?.click()
+}
+
+const onReplaceDocumentSelected = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file || !project.value) return
+
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const result = await api.postForm<{
+      project_id: number
+      classification: string
+      confidence: number
+      recommended_full_run: boolean
+    }>(`/api/projects/${project.value.id}/document/replace`, formData, { timeout: 120000 })
+
+    toast.add({
+      severity: 'success',
+      summary: 'Documento reemplazado',
+      detail: `Clasificación: ${result.classification}. Ejecuta un nuevo análisis.`,
+      life: 4000,
+    })
+    await projectsStore.fetchProject(project.value.id)
+    await loadChapters(project.value.id, project.value)
+    entities.value = []
+    alerts.value = []
+  } catch (err) {
+    const detail = err instanceof Error
+      ? err.message
+      : 'No se pudo reemplazar el documento. Crea un proyecto nuevo para este archivo.'
+    toast.add({
+      severity: 'error',
+      summary: 'Reemplazo bloqueado',
+      detail,
+      life: 5000,
+    })
+  } finally {
+    input.value = ''
   }
 }
 </script>

@@ -188,6 +188,8 @@ def _run_enrichment(
     phase: int,
     compute_fn,
     label: str,
+    input_payload: Any | None = None,
+    ctx: dict | None = None,
 ) -> bool:
     """Run a single enrichment computation with error handling.
 
@@ -196,14 +198,75 @@ def _run_enrichment(
 
     Returns True if successful, False otherwise.
     """
+    if input_payload is None:
+        try:
+            with db_session.connection() as conn:
+                chapter_meta = conn.execute(
+                    """
+                    SELECT COUNT(*) AS c, COALESCE(MAX(updated_at), '') AS ts
+                    FROM chapters WHERE project_id = ?
+                    """,
+                    (project_id,),
+                ).fetchone()
+                entity_meta = conn.execute(
+                    """
+                    SELECT COUNT(*) AS c, COALESCE(MAX(updated_at), '') AS ts
+                    FROM entities WHERE project_id = ?
+                    """,
+                    (project_id,),
+                ).fetchone()
+                invalidation_meta = conn.execute(
+                    """
+                    SELECT COALESCE(MAX(revision), 0) AS rev
+                    FROM invalidation_events WHERE project_id = ?
+                    """,
+                    (project_id,),
+                ).fetchone()
+            input_payload = {
+                "enrichment_type": enrichment_type,
+                "phase": phase,
+                "chapter_count": int(chapter_meta["c"] if chapter_meta else 0),
+                "chapter_ts": chapter_meta["ts"] if chapter_meta else "",
+                "entity_count": int(entity_meta["c"] if entity_meta else 0),
+                "entity_ts": entity_meta["ts"] if entity_meta else "",
+                "invalidation_revision": int(invalidation_meta["rev"] if invalidation_meta else 0),
+            }
+        except Exception:
+            input_payload = {"enrichment_type": enrichment_type, "phase": phase}
+
+    input_hash = _hash_payload(input_payload)
+
+    # Fast skip por input_hash antes de computar (Sprint C).
+    if input_hash:
+        try:
+            with db_session.connection() as conn:
+                cached = conn.execute(
+                    """
+                    SELECT status, input_hash
+                    FROM enrichment_cache
+                    WHERE project_id = ? AND enrichment_type = ? AND entity_scope IS NULL
+                    LIMIT 1
+                    """,
+                    (project_id, enrichment_type),
+                ).fetchone()
+                if cached and cached[0] == "completed" and cached[1] == input_hash:
+                    logger.info(
+                        "[Enrichment] %s skipped (input_hash unchanged: %s)",
+                        label,
+                        input_hash,
+                    )
+                    return True
+        except Exception:
+            pass
+
     # Marcar como 'computing' antes de empezar (S8c-10)
     try:
         with db_session.connection() as conn:
             conn.execute(
                 """INSERT OR REPLACE INTO enrichment_cache
-                   (project_id, enrichment_type, entity_scope, status, phase, updated_at)
-                   VALUES (?, ?, NULL, 'computing', ?, datetime('now'))""",
-                (project_id, enrichment_type, phase),
+                   (project_id, enrichment_type, entity_scope, status, phase, input_hash, updated_at)
+                   VALUES (?, ?, NULL, 'computing', ?, ?, datetime('now'))""",
+                (project_id, enrichment_type, phase, input_hash),
             )
             conn.commit()
     except Exception:
@@ -214,6 +277,24 @@ def _run_enrichment(
         result = compute_fn()
         elapsed = time.time() - t0
         changed = _cache_result(db_session, project_id, enrichment_type, result, phase)
+        if input_hash:
+            try:
+                with db_session.connection() as conn:
+                    conn.execute(
+                        """
+                        UPDATE enrichment_cache
+                        SET input_hash = ?, updated_at = datetime('now')
+                        WHERE project_id = ? AND enrichment_type = ? AND entity_scope IS NULL
+                        """,
+                        (input_hash, project_id, enrichment_type),
+                    )
+                    conn.commit()
+            except Exception:
+                pass
+        if ctx is not None:
+            timings = ctx.setdefault("phase_durations_json", {})
+            if isinstance(timings, dict):
+                timings[enrichment_type] = round(elapsed, 3)
         cutoff_note = "" if changed else " (early cutoff)"
         logger.info(f"[Enrichment] {label} completed in {elapsed:.1f}s{cutoff_note}")
         return True
@@ -1146,7 +1227,7 @@ def _compute_narrative_health(progress_data, chapters_dicts, entities_dicts, tot
 # S15: Version metrics (post-Phase 13 hook)
 # ============================================================================
 
-def write_version_metrics(ctx: dict) -> None:
+def write_version_metrics(ctx: dict) -> int | None:
     """S15-03: Persist aggregated metrics for this analysis as a version.
 
     Called after Phase 13 completes. Reads metrics from enrichment_cache
@@ -1177,6 +1258,19 @@ def write_version_metrics(ctx: dict) -> None:
                 (project_id,),
             ).fetchone()
             alert_count = alert_row[0] if alert_row else 0
+            severity_rows = conn.execute(
+                """
+                SELECT severity, COUNT(*) AS cnt
+                FROM alerts
+                WHERE project_id = ? AND status != 'resolved'
+                GROUP BY severity
+                """,
+                (project_id,),
+            ).fetchall()
+            severity_counts = {str(r[0] or "").lower(): int(r[1]) for r in severity_rows}
+            critical_count = severity_counts.get("critical", 0) + severity_counts.get("high", 0)
+            warning_count = severity_counts.get("warning", 0) + severity_counts.get("medium", 0)
+            info_count = severity_counts.get("info", 0) + severity_counts.get("low", 0)
 
             # Word count + chapter count from project
             proj_row = conn.execute(
@@ -1233,13 +1327,61 @@ def write_version_metrics(ctx: dict) -> None:
             if dr_rows:
                 dialogue_ratio = sum(r[0] for r in dr_rows) / len(dr_rows)
 
+            prev_snapshot_id = ctx.get("pre_analysis_snapshot_id")
+            alerts_new_count = 0
+            alerts_resolved_count = 0
+            alerts_unchanged_count = 0
+            if prev_snapshot_id:
+                prev_alerts = conn.execute(
+                    """
+                    SELECT content_hash FROM snapshot_alerts
+                    WHERE snapshot_id = ?
+                    """,
+                    (prev_snapshot_id,),
+                ).fetchall()
+                current_alerts = conn.execute(
+                    """
+                    SELECT content_hash FROM alerts
+                    WHERE project_id = ? AND status != 'resolved'
+                    """,
+                    (project_id,),
+                ).fetchall()
+                prev_set = {str(r[0]) for r in prev_alerts if r[0]}
+                current_set = {str(r[0]) for r in current_alerts if r[0]}
+                if prev_set or current_set:
+                    alerts_new_count = len(current_set - prev_set)
+                    alerts_resolved_count = len(prev_set - current_set)
+                    alerts_unchanged_count = len(current_set & prev_set)
+
+            chapter_diff = ctx.get("version_chapter_diff", {}) or {}
+            entity_diff = ctx.get("version_entity_diff", {}) or {}
+            phase_durations_json = json.dumps(
+                ctx.get("phase_durations_json", {}), ensure_ascii=False, sort_keys=True
+            )
+            run_mode = str(ctx.get("run_mode") or "full")
+            duration_total_sec = float(ctx.get("duration_total_sec") or 0.0)
+
             conn.execute(
                 """INSERT OR REPLACE INTO version_metrics
                    (project_id, version_num, snapshot_id, alert_count, word_count,
-                    entity_count, chapter_count, health_score, formality_avg, dialogue_ratio)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    entity_count, chapter_count, health_score, formality_avg, dialogue_ratio,
+                    alerts_new_count, alerts_resolved_count, alerts_unchanged_count,
+                    critical_count, warning_count, info_count,
+                    entities_new_count, entities_removed_count, entities_renamed_count,
+                    chapter_added_count, chapter_removed_count, chapter_reordered_count,
+                    run_mode, duration_total_sec, phase_durations_json)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (project_id, next_version, snapshot_id, alert_count, word_count,
-                 entity_count, chapter_count, health_score, formality_avg, dialogue_ratio),
+                 entity_count, chapter_count, health_score, formality_avg, dialogue_ratio,
+                 alerts_new_count, alerts_resolved_count, alerts_unchanged_count,
+                 critical_count, warning_count, info_count,
+                 int(entity_diff.get("new_entities", 0)),
+                 int(entity_diff.get("removed_entities", 0)),
+                 int(entity_diff.get("renamed", entity_diff.get("renamed_entities", 0))),
+                 int(chapter_diff.get("added", 0)),
+                 int(chapter_diff.get("removed", 0)),
+                 0,  # chapter_reordered_count (pendiente de algoritmo dedicado)
+                 run_mode, duration_total_sec, phase_durations_json),
             )
             conn.commit()
 
@@ -1247,6 +1389,15 @@ def write_version_metrics(ctx: dict) -> None:
                 f"[S15] Version {next_version} metrics written for project {project_id}: "
                 f"alerts={alert_count}, words={word_count}, health={health_score}"
             )
+            return int(next_version)
 
     except Exception as e:
         logger.warning(f"[S15] Failed to write version metrics for project {project_id}: {e}")
+    return None
+def _hash_payload(payload: Any) -> str:
+    """Hash estable para detectar si los inputs de una fase cambiaron."""
+    try:
+        packed = json.dumps(payload, ensure_ascii=False, default=str, sort_keys=True)
+    except Exception:
+        packed = str(payload)
+    return hashlib.sha256(packed.encode("utf-8")).hexdigest()[:16]

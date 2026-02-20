@@ -2,15 +2,111 @@
 Router: projects
 """
 
+from pathlib import Path
 from typing import Optional
 
 import deps
 from deps import ApiResponse, ProjectResponse, _get_project_stats, logger
 from fastapi import APIRouter, Body, File, HTTPException, Query, UploadFile
+from fastapi.responses import JSONResponse
 
 from narrative_assistant.alerts.models import AlertStatus
+from narrative_assistant.persistence.document_fingerprint import generate_fingerprint
+from narrative_assistant.persistence.manuscript_identity import (
+    IDENTITY_DIFFERENT_DOCUMENT,
+    IDENTITY_UNCERTAIN,
+    ManuscriptIdentityRepository,
+    ManuscriptIdentityService,
+)
 
 router = APIRouter()
+
+
+def _get_license_subject() -> str:
+    """Obtiene un identificador estable de licencia para controles de riesgo."""
+    try:
+        from routers.license import get_license_verifier
+
+        verifier = get_license_verifier()
+        if not verifier:
+            return "no_license"
+        result = verifier.verify()
+        if result.is_failure or not result.value or not result.value.license:
+            return "no_license"
+        license_obj = result.value.license
+        if getattr(license_obj, "id", None):
+            return f"license:{license_obj.id}"
+        if getattr(license_obj, "license_key", None):
+            return f"license_key:{license_obj.license_key}"
+    except Exception:
+        pass
+    return "no_license"
+
+
+def _resolve_document_path(
+    file_path: Optional[str],
+    file: Optional[UploadFile],
+    allowed_extensions: set[str],
+) -> tuple[Path, bool]:
+    """
+    Resuelve y valida el path de documento.
+
+    Returns:
+        (path_resuelto, is_temp_upload)
+    """
+    import uuid
+
+    if file_path:
+        from narrative_assistant.parsers.sanitization import validate_file_path
+
+        return (
+            validate_file_path(
+                Path(file_path),
+                must_exist=True,
+                allowed_extensions=allowed_extensions,
+            ),
+            False,
+        )
+
+    if file and file.filename:
+        config = deps.get_config()
+        documents_dir = config.data_dir / "documents"
+        documents_dir.mkdir(parents=True, exist_ok=True)
+
+        unique_filename = f"{uuid.uuid4().hex}_{file.filename}"
+        permanent_path = documents_dir / unique_filename
+        max_upload_bytes = 50 * 1024 * 1024
+        total = 0
+        with open(permanent_path, "wb") as output:
+            while chunk := file.file.read(8192):
+                total += len(chunk)
+                if total > max_upload_bytes:
+                    permanent_path.unlink(missing_ok=True)
+                    raise HTTPException(status_code=400, detail="El archivo supera el límite de 50 MB")
+                output.write(chunk)
+        return permanent_path, True
+
+    raise HTTPException(status_code=400, detail="Se requiere file_path o file")
+
+
+def _parse_document(path: Path) -> tuple[str, str]:
+    """Parsea documento y devuelve (texto, formato_str)."""
+    from narrative_assistant.parsers import get_parser
+    from narrative_assistant.parsers.base import detect_format
+
+    doc_format = detect_format(path)
+    format_str = (
+        doc_format.value if hasattr(doc_format, "value") else str(doc_format).split(".")[-1].upper()
+    )
+    parser = get_parser(path)
+    parse_result = parser.parse(path)
+    if parse_result.is_failure:
+        raise HTTPException(status_code=400, detail=f"Error leyendo documento: {parse_result.error}")
+    raw_doc = parse_result.value
+    text = raw_doc.full_text if raw_doc else ""
+    if not text or not text.strip():
+        raise HTTPException(status_code=400, detail="El documento está vacío o no se pudo leer el contenido")
+    return text, format_str
 
 @router.get("/api/projects", response_model=ApiResponse)
 def list_projects():
@@ -598,6 +694,183 @@ def delete_project(project_id: int):
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
+@router.post("/api/projects/{project_id}/document/replace", response_model=ApiResponse)
+def replace_project_document(
+    project_id: int,
+    file_path: Optional[str] = Body(None),
+    file: Optional[UploadFile] = File(None),  # noqa: B008
+):
+    """
+    Reemplaza el documento del proyecto validando identidad de manuscrito.
+
+    Política:
+    - same_document: permitir reemplazo
+    - uncertain: permitir hasta umbral de riesgo por licencia
+    - different_document: bloquear y pedir crear proyecto nuevo
+    """
+    temp_upload_path: Optional[Path] = None
+    try:
+        if not deps.project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        project_result = deps.project_manager.get(project_id)
+        if project_result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        project = project_result.value
+        if project.analysis_status in ("analyzing", "queued"):
+            return ApiResponse(
+                success=False,
+                error="No se puede reemplazar el documento durante un análisis en curso.",
+            )
+
+        allowed_extensions = {".docx", ".doc", ".txt", ".md", ".pdf", ".epub"}
+        candidate_path, is_temp_upload = _resolve_document_path(
+            file_path=file_path,
+            file=file,
+            allowed_extensions=allowed_extensions,
+        )
+        if is_temp_upload:
+            temp_upload_path = candidate_path
+
+        if candidate_path.suffix.lower() not in allowed_extensions:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Formato de archivo no soportado: {candidate_path.suffix}. "
+                    f"Formatos permitidos: {', '.join(sorted(allowed_extensions))}"
+                ),
+            )
+
+        candidate_text, candidate_format = _parse_document(candidate_path)
+        candidate_fingerprint = generate_fingerprint(candidate_text).full_hash
+
+        previous_text = ""
+        previous_path = Path(project.document_path) if project.document_path else None
+        if previous_path and previous_path.exists():
+            try:
+                previous_text, _ = _parse_document(previous_path)
+            except Exception as parse_old_err:
+                logger.warning(
+                    "No se pudo parsear documento previo de proyecto %s: %s",
+                    project_id,
+                    parse_old_err,
+                )
+
+        identity_service = ManuscriptIdentityService()
+        if previous_text:
+            decision = identity_service.classify(previous_text, candidate_text)
+        else:
+            # Fallback conservador si no existe texto previo parseable.
+            if project.document_fingerprint and project.document_fingerprint == candidate_fingerprint:
+                decision = identity_service.classify(candidate_text, candidate_text)
+            else:
+                decision = identity_service.classify("", candidate_text)
+
+        db = deps.get_database()
+        identity_repo = ManuscriptIdentityRepository(db)
+        license_subject = _get_license_subject()
+        identity_repo.record_check(
+            project_id=project_id,
+            license_subject=license_subject,
+            previous_fingerprint=project.document_fingerprint or "",
+            candidate_fingerprint=candidate_fingerprint,
+            decision=decision,
+        )
+        if decision.classification == IDENTITY_UNCERTAIN:
+            identity_repo.append_risk_event(
+                license_subject=license_subject,
+                event_type="uncertain_detected",
+                details={
+                    "project_id": project_id,
+                    "confidence": round(decision.confidence, 4),
+                },
+            )
+
+        uncertain_count_30d = identity_repo.uncertain_count_rolling(license_subject, days=30)
+        review_required = uncertain_count_30d > 3
+        identity_repo.upsert_risk_state(
+            license_subject=license_subject,
+            uncertain_count_30d=uncertain_count_30d,
+            review_required=review_required,
+        )
+        if review_required:
+            identity_repo.append_risk_event(
+                license_subject=license_subject,
+                event_type="uncertain_threshold_exceeded",
+                details={"uncertain_count_30d": uncertain_count_30d},
+            )
+
+        if decision.classification == IDENTITY_DIFFERENT_DOCUMENT:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "success": False,
+                    "error": (
+                        "El documento no parece una nueva versión del manuscrito actual. "
+                        "Crea un proyecto nuevo para analizar este documento."
+                    ),
+                },
+            )
+
+        if decision.classification == IDENTITY_UNCERTAIN and review_required:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "success": False,
+                    "error": (
+                        "No se pudo confirmar con suficiente certeza que sea el mismo manuscrito. "
+                        "Crea un proyecto nuevo para continuar."
+                    ),
+                },
+            )
+
+        project.document_path = str(candidate_path)
+        project.document_fingerprint = candidate_fingerprint
+        project.document_format = candidate_format
+        project.word_count = len(candidate_text.split())
+        project.analysis_status = "pending"
+        project.analysis_progress = 0.0
+        update_result = deps.project_manager.update(project)
+        if update_result.is_failure:
+            return ApiResponse(success=False, error="No se pudo actualizar el proyecto.")
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "classification": decision.classification,
+                "confidence": round(decision.confidence, 4),
+                "recommended_full_run": decision.recommended_full_run,
+            },
+            message="Documento reemplazado correctamente. Ejecuta un nuevo análisis.",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error replacing document for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+    finally:
+        if temp_upload_path and temp_upload_path.exists():
+            # Se conserva archivo final al estar asociado al proyecto.
+            pass
+
+
+@router.get("/api/projects/{project_id}/identity/last-check", response_model=ApiResponse)
+def get_last_identity_check(project_id: int):
+    """Retorna el último check de identidad registrado para un proyecto."""
+    try:
+        db = deps.get_database()
+        identity_repo = ManuscriptIdentityRepository(db)
+        row = identity_repo.get_last_check(project_id)
+        if not row:
+            return ApiResponse(success=True, data=None)
+        return ApiResponse(success=True, data=row)
+    except Exception as e:
+        logger.error(f"Error getting identity check for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
 # ============================================================================
 # S15: Version Tracking (BK-28)
 # ============================================================================
@@ -614,12 +887,22 @@ def list_versions(project_id: int, limit: int = Query(50, ge=1, le=200)):
         db = deps.get_database()
         with db.connection() as conn:
             rows = conn.execute(
-                """SELECT id, project_id, version_num, snapshot_id,
-                          alert_count, word_count, entity_count, chapter_count,
-                          health_score, formality_avg, dialogue_ratio, created_at
-                   FROM version_metrics
-                   WHERE project_id = ?
-                   ORDER BY version_num DESC
+                """SELECT vm.id, vm.project_id, vm.version_num, vm.snapshot_id,
+                          vm.alert_count, vm.word_count, vm.entity_count, vm.chapter_count,
+                          vm.health_score, vm.formality_avg, vm.dialogue_ratio, vm.created_at,
+                          vm.alerts_new_count, vm.alerts_resolved_count, vm.alerts_unchanged_count,
+                          vm.critical_count, vm.warning_count, vm.info_count,
+                          vm.entities_new_count, vm.entities_removed_count, vm.entities_renamed_count,
+                          vm.chapter_added_count, vm.chapter_removed_count, vm.chapter_reordered_count,
+                          vm.run_mode, vm.duration_total_sec, vm.phase_durations_json,
+                          vd.modified_chapters, vd.added_chapters, vd.removed_chapters,
+                          vd.chapter_change_ratio, vd.renamed_entities,
+                          vd.new_entities, vd.removed_entities
+                   FROM version_metrics vm
+                   LEFT JOIN version_diffs vd
+                          ON vd.project_id = vm.project_id AND vd.version_num = vm.version_num
+                   WHERE vm.project_id = ?
+                   ORDER BY vm.version_num DESC
                    LIMIT ?""",
                 (project_id, limit),
             ).fetchall()
@@ -639,6 +922,28 @@ def list_versions(project_id: int, limit: int = Query(50, ge=1, le=200)):
                 "formality_avg": r[9],
                 "dialogue_ratio": r[10],
                 "created_at": r[11],
+                "alerts_new_count": r[12] or 0,
+                "alerts_resolved_count": r[13] or 0,
+                "alerts_unchanged_count": r[14] or 0,
+                "critical_count": r[15] or 0,
+                "warning_count": r[16] or 0,
+                "info_count": r[17] or 0,
+                "entities_new_count": r[18] or 0,
+                "entities_removed_count": r[19] or 0,
+                "entities_renamed_count": r[20] or 0,
+                "chapter_added_count": r[21] or 0,
+                "chapter_removed_count": r[22] or 0,
+                "chapter_reordered_count": r[23] or 0,
+                "run_mode": r[24] or "full",
+                "duration_total_sec": float(r[25] or 0.0),
+                "phase_durations_json": r[26] or "{}",
+                "modified_chapters": r[27] or 0,
+                "added_chapters": r[28] or 0,
+                "removed_chapters": r[29] or 0,
+                "chapter_change_ratio": float(r[30] or 0.0),
+                "renamed_entities": r[31] or 0,
+                "new_entities": r[32] or 0,
+                "removed_entities": r[33] or 0,
             })
 
         return ApiResponse(success=True, data=versions)
@@ -659,7 +964,8 @@ def get_version_trend(project_id: int, limit: int = Query(10, ge=2, le=50)):
         db = deps.get_database()
         with db.connection() as conn:
             rows = conn.execute(
-                """SELECT version_num, alert_count, health_score, word_count, created_at
+                """SELECT version_num, alert_count, health_score, word_count, created_at,
+                          alerts_new_count, alerts_resolved_count, run_mode, duration_total_sec
                    FROM version_metrics
                    WHERE project_id = ?
                    ORDER BY version_num DESC
@@ -676,6 +982,10 @@ def get_version_trend(project_id: int, limit: int = Query(10, ge=2, le=50)):
                 "health_score": r[2],
                 "word_count": r[3],
                 "created_at": r[4],
+                "alerts_new_count": r[5] or 0,
+                "alerts_resolved_count": r[6] or 0,
+                "run_mode": r[7] or "full",
+                "duration_total_sec": float(r[8] or 0.0),
             })
 
         # Calculate deltas if at least 2 versions
@@ -696,6 +1006,209 @@ def get_version_trend(project_id: int, limit: int = Query(10, ge=2, le=50)):
         return ApiResponse(success=True, data={"trend": trend, "delta": delta})
     except Exception as e:
         logger.error(f"Error getting version trend for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.get("/api/projects/{project_id}/versions/summary", response_model=ApiResponse)
+def get_version_summary(project_id: int):
+    """
+    Resumen compacto de evolución de versiones + último check de identidad.
+    """
+    try:
+        db = deps.get_database()
+        with db.connection() as conn:
+            latest = conn.execute(
+                """
+                SELECT vm.version_num, vm.alert_count, vm.health_score, vm.created_at,
+                       vd.modified_chapters, vd.chapter_change_ratio,
+                       vd.renamed_entities, vd.new_entities, vd.removed_entities
+                FROM version_metrics vm
+                LEFT JOIN version_diffs vd
+                       ON vd.project_id = vm.project_id AND vd.version_num = vm.version_num
+                WHERE vm.project_id = ?
+                ORDER BY vm.version_num DESC
+                LIMIT 1
+                """,
+                (project_id,),
+            ).fetchone()
+
+            previous = conn.execute(
+                """
+                SELECT version_num, alert_count, health_score
+                FROM version_metrics
+                WHERE project_id = ?
+                ORDER BY version_num DESC
+                LIMIT 1 OFFSET 1
+                """,
+                (project_id,),
+            ).fetchone()
+
+            identity = conn.execute(
+                """
+                SELECT classification, confidence, score, created_at
+                FROM manuscript_identity_checks
+                WHERE project_id = ?
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (project_id,),
+            ).fetchone()
+
+        if not latest:
+            return ApiResponse(success=True, data=None)
+
+        delta = {
+            "alert_count": 0,
+            "health_score": 0.0,
+        }
+        if previous:
+            delta["alert_count"] = int(latest["alert_count"] or 0) - int(previous["alert_count"] or 0)
+            if latest["health_score"] is not None and previous["health_score"] is not None:
+                delta["health_score"] = round(
+                    float(latest["health_score"]) - float(previous["health_score"]),
+                    3,
+                )
+
+        data = {
+            "latest_version": int(latest["version_num"]),
+            "created_at": latest["created_at"],
+            "alert_count": int(latest["alert_count"] or 0),
+            "health_score": float(latest["health_score"] or 0.0),
+            "delta": delta,
+            "chapter_diff": {
+                "modified_chapters": int(latest["modified_chapters"] or 0),
+                "chapter_change_ratio": float(latest["chapter_change_ratio"] or 0.0),
+            },
+            "entity_diff": {
+                "renamed_entities": int(latest["renamed_entities"] or 0),
+                "new_entities": int(latest["new_entities"] or 0),
+                "removed_entities": int(latest["removed_entities"] or 0),
+            },
+            "identity_last_check": (
+                {
+                    "classification": identity["classification"],
+                    "confidence": float(identity["confidence"] or 0.0),
+                    "score": float(identity["score"] or 0.0),
+                    "created_at": identity["created_at"],
+                }
+                if identity
+                else None
+            ),
+        }
+        return ApiResponse(success=True, data=data)
+    except Exception as e:
+        logger.error(f"Error getting version summary for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.get("/api/projects/{project_id}/versions/{version_num}/entity-links", response_model=ApiResponse)
+def get_version_entity_links(project_id: int, version_num: int):
+    """Detalle de continuidad de entidades para una versión."""
+    try:
+        db = deps.get_database()
+        with db.connection() as conn:
+            row = conn.execute(
+                """
+                SELECT snapshot_id
+                FROM version_diffs
+                WHERE project_id = ? AND version_num = ?
+                """,
+                (project_id, version_num),
+            ).fetchone()
+            if not row or not row["snapshot_id"]:
+                return ApiResponse(success=True, data=[])
+
+            snapshot_id = int(row["snapshot_id"])
+            links = conn.execute(
+                """
+                SELECT old_entity_id, new_entity_id, old_name, new_name,
+                       link_type, confidence, reason_json, created_at
+                FROM entity_version_links
+                WHERE project_id = ? AND snapshot_id = ?
+                ORDER BY confidence DESC, id ASC
+                """,
+                (project_id, snapshot_id),
+            ).fetchall()
+
+        data = []
+        for link in links:
+            data.append(
+                {
+                    "old_entity_id": link["old_entity_id"],
+                    "new_entity_id": link["new_entity_id"],
+                    "old_name": link["old_name"],
+                    "new_name": link["new_name"],
+                    "link_type": link["link_type"],
+                    "confidence": float(link["confidence"] or 0.0),
+                    "reason_json": link["reason_json"] or "{}",
+                    "created_at": link["created_at"],
+                }
+            )
+        return ApiResponse(success=True, data=data)
+    except Exception as e:
+        logger.error(
+            f"Error getting entity links for project {project_id} version {version_num}: {e}",
+            exc_info=True,
+        )
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.get("/api/projects/{project_id}/versions/compare", response_model=ApiResponse)
+def compare_versions(project_id: int, from_version: int = Query(..., ge=1), to_version: int = Query(..., ge=1)):
+    """Comparativa detallada entre dos versiones."""
+    try:
+        db = deps.get_database()
+        with db.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT version_num, alert_count, word_count, entity_count, chapter_count,
+                       health_score, alerts_new_count, alerts_resolved_count,
+                       entities_new_count, entities_removed_count, entities_renamed_count,
+                       chapter_added_count, chapter_removed_count, run_mode, duration_total_sec
+                FROM version_metrics
+                WHERE project_id = ? AND version_num IN (?, ?)
+                """,
+                (project_id, from_version, to_version),
+            ).fetchall()
+            if len(rows) != 2:
+                return ApiResponse(success=False, error="No se encontraron ambas versiones para comparar.")
+
+        ordered = sorted(rows, key=lambda x: int(x["version_num"]))
+        older = ordered[0]
+        newer = ordered[1]
+
+        def _delta_num(key: str) -> float:
+            return float(newer[key] or 0) - float(older[key] or 0)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "from_version": int(older["version_num"]),
+                "to_version": int(newer["version_num"]),
+                "from": dict(older),
+                "to": dict(newer),
+                "delta": {
+                    "alert_count": int(_delta_num("alert_count")),
+                    "word_count": int(_delta_num("word_count")),
+                    "entity_count": int(_delta_num("entity_count")),
+                    "chapter_count": int(_delta_num("chapter_count")),
+                    "health_score": round(_delta_num("health_score"), 3),
+                    "alerts_new_count": int(_delta_num("alerts_new_count")),
+                    "alerts_resolved_count": int(_delta_num("alerts_resolved_count")),
+                    "entities_new_count": int(_delta_num("entities_new_count")),
+                    "entities_removed_count": int(_delta_num("entities_removed_count")),
+                    "entities_renamed_count": int(_delta_num("entities_renamed_count")),
+                    "chapter_added_count": int(_delta_num("chapter_added_count")),
+                    "chapter_removed_count": int(_delta_num("chapter_removed_count")),
+                    "duration_total_sec": round(_delta_num("duration_total_sec"), 3),
+                },
+            },
+        )
+    except Exception as e:
+        logger.error(
+            f"Error comparing versions for project {project_id} ({from_version} vs {to_version}): {e}",
+            exc_info=True,
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
@@ -825,5 +1338,3 @@ def validate_dialogue_style(
     except Exception as e:
         logger.error(f"Error validating dialogue style for project {project_id}: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
-
-

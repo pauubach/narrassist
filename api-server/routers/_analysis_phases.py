@@ -625,8 +625,9 @@ def run_snapshot(ctx: dict, tracker: ProgressTracker):
         from narrative_assistant.persistence.snapshot import SnapshotRepository
 
         snapshot_repo = SnapshotRepository()
-        snapshot_repo.create_snapshot(ctx["project_id"])
+        snapshot_id = snapshot_repo.create_snapshot(ctx["project_id"])
         snapshot_repo.cleanup_old_snapshots(ctx["project_id"])
+        ctx["pre_analysis_snapshot_id"] = snapshot_id
         logger.info(f"Pre-reanalysis snapshot created for project {ctx['project_id']}")
     except Exception as snap_err:
         logger.warning(f"Snapshot creation failed (continuing): {snap_err}")
@@ -731,8 +732,15 @@ def run_cleanup(ctx: dict, tracker: ProgressTracker):
                 (project_id,),
             )
             conn.execute("DELETE FROM analysis_runs WHERE project_id = ?", (project_id,))
-            # Borrar enrichment cache (S8a-16)
-            conn.execute("DELETE FROM enrichment_cache WHERE project_id = ?", (project_id,))
+            # Sprint C: no borrar cache completo; marcar stale para recalcular solo lo necesario.
+            conn.execute(
+                """
+                UPDATE enrichment_cache
+                SET status = 'stale', updated_at = datetime('now')
+                WHERE project_id = ?
+                """,
+                (project_id,),
+            )
 
         logger.info(f"Cleared existing data for project {project_id}")
     except Exception as clear_err:
@@ -3980,6 +3988,12 @@ def run_completion(ctx: dict, tracker: ProgressTracker):
             "words": metrics.get("word_count", word_count),
             "duration": total_duration,
         }
+        if ctx.get("version_chapter_diff"):
+            storage["stats"]["chapter_diff"] = ctx["version_chapter_diff"]
+        if ctx.get("version_entity_diff"):
+            storage["stats"]["entity_diff"] = ctx["version_entity_diff"]
+        if ctx.get("run_mode"):
+            storage["stats"]["run_mode"] = ctx["run_mode"]
 
     project.analysis_status = "completed"
     project.analysis_progress = 1.0

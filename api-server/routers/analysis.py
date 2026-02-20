@@ -399,6 +399,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
             """Ejecuta el análisis real — orquestador que delega en funciones de fase."""
             import concurrent.futures
 
+            from narrative_assistant.persistence.version_diff import VersionDiffRepository
             from routers._analysis_phases import (
                 ProgressTracker,
                 _emit_consistency_alerts,
@@ -435,6 +436,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 run_voice_enrichment,
                 write_version_metrics,
             )
+            from routers._incremental_planner import build_incremental_plan
 
             start_time = time.time()
             with deps._progress_lock:
@@ -639,6 +641,21 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 run_classification(ctx, tracker)
                 run_structure(ctx, tracker)
 
+                incremental_plan = build_incremental_plan(
+                    db=db_session,
+                    project_id=project_id,
+                    snapshot_id=ctx.get("pre_analysis_snapshot_id"),
+                    chapters_data=ctx.get("chapters_data", []),
+                )
+                ctx["incremental_plan"] = incremental_plan
+                logger.info(
+                    "[INCREMENTAL_PLAN] project=%s mode=%s reason=%s chapter_diff=%s",
+                    project_id,
+                    incremental_plan.get("mode"),
+                    incremental_plan.get("reason"),
+                    incremental_plan.get("chapter_diff"),
+                )
+
                 # Tier 2 gate: claim heavy slot or queue
                 got_slot = claim_heavy_slot_or_queue(ctx, tracker)
                 if not got_slot:
@@ -699,18 +716,76 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 entity_fp = capture_entity_fingerprint(ctx["db_session"], project_id)
 
                 # Tier 3: Enrichment phases (CPU-only, independent of each other)
+                incremental_plan = ctx.get("incremental_plan") or {}
+                run_relationships = bool(incremental_plan.get("run_relationships", True))
+                run_voice = bool(incremental_plan.get("run_voice", True))
+                run_prose = bool(incremental_plan.get("run_prose", True))
+                run_health = bool(incremental_plan.get("run_health", True))
+
+                def _mark_incremental_skip(phase_key: str, phase_index: int, message: str) -> None:
+                    tracker.start_phase(phase_key, phase_index, message)
+                    tracker.set_action("Planner incremental: fase omitida por bajo impacto.")
+                    tracker.end_phase(phase_key, phase_index)
+
                 with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-                    futures = [
-                        pool.submit(run_relationships_enrichment, ctx, tracker),
-                        pool.submit(run_voice_enrichment, ctx, tracker),
-                        pool.submit(run_prose_enrichment, ctx, tracker),
-                        pool.submit(run_health_enrichment, ctx, tracker),
-                    ]
+                    futures = []
+                    if run_relationships:
+                        futures.append(pool.submit(run_relationships_enrichment, ctx, tracker))
+                    else:
+                        _mark_incremental_skip(
+                            "relationships", 9, "Relaciones omitidas (cambio acotado)."
+                        )
+
+                    if run_voice:
+                        futures.append(pool.submit(run_voice_enrichment, ctx, tracker))
+                    else:
+                        _mark_incremental_skip("voice", 10, "Voz omitida (cambio acotado).")
+
+                    if run_prose:
+                        futures.append(pool.submit(run_prose_enrichment, ctx, tracker))
+                    else:
+                        _mark_incremental_skip("prose", 11, "Prosa omitida por planner.")
+
+                    if run_health:
+                        futures.append(pool.submit(run_health_enrichment, ctx, tracker))
+                    else:
+                        _mark_incremental_skip("health", 12, "Salud omitida por planner.")
+
                     for f in concurrent.futures.as_completed(futures):
                         f.result()  # Propagate exceptions
 
+                version_diff_repo = VersionDiffRepository(ctx["db_session"])
+                chapter_diff = version_diff_repo.compute_chapter_diff(
+                    snapshot_id=ctx.get("pre_analysis_snapshot_id"),
+                    chapters_data=ctx.get("chapters_data", []),
+                )
+                entity_diff = version_diff_repo.compute_and_store_entity_links(
+                    project_id=project_id,
+                    snapshot_id=ctx.get("pre_analysis_snapshot_id"),
+                )
+
+                ctx["version_chapter_diff"] = chapter_diff.to_dict()
+                ctx["version_entity_diff"] = entity_diff.to_dict()
+                ctx["phase_durations_json"] = {
+                    key: round(value, 3) for key, value in tracker.phase_durations.items()
+                }
+                ctx["duration_total_sec"] = round(time.time() - start_time, 3)
+                ctx["run_mode"] = (
+                    "incremental"
+                    if str((ctx.get("incremental_plan") or {}).get("mode")) == "incremental"
+                    else "full"
+                )
+
                 # S15: Write version metrics after all enrichment phases
-                write_version_metrics(ctx)
+                version_num = write_version_metrics(ctx)
+                if version_num is not None:
+                    version_diff_repo.upsert_version_diff(
+                        project_id=project_id,
+                        version_num=version_num,
+                        snapshot_id=ctx.get("pre_analysis_snapshot_id"),
+                        chapter_metrics=chapter_diff,
+                        entity_metrics=entity_diff,
+                    )
 
                 # S8a-17: Check for entity mutations during enrichment
                 invalidate_enrichment_if_mutated(ctx["db_session"], project_id, entity_fp)

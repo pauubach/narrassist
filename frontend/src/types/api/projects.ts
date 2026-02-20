@@ -80,6 +80,28 @@ export interface ApiVersionMetrics {
   health_score: number | null
   formality_avg: number | null
   dialogue_ratio: number | null
+  alerts_new_count?: number
+  alerts_resolved_count?: number
+  alerts_unchanged_count?: number
+  critical_count?: number
+  warning_count?: number
+  info_count?: number
+  entities_new_count?: number
+  entities_removed_count?: number
+  entities_renamed_count?: number
+  chapter_added_count?: number
+  chapter_removed_count?: number
+  chapter_reordered_count?: number
+  run_mode?: 'fast_path' | 'incremental' | 'full' | string
+  duration_total_sec?: number
+  phase_durations_json?: string
+  modified_chapters?: number
+  added_chapters?: number
+  removed_chapters?: number
+  chapter_change_ratio?: number
+  renamed_entities?: number
+  new_entities?: number
+  removed_entities?: number
   created_at: string
 }
 
@@ -89,6 +111,10 @@ export interface ApiVersionTrendPoint {
   alert_count: number
   health_score: number | null
   word_count: number
+  alerts_new_count?: number
+  alerts_resolved_count?: number
+  run_mode?: 'fast_path' | 'incremental' | 'full' | string
+  duration_total_sec?: number
   created_at: string
 }
 
