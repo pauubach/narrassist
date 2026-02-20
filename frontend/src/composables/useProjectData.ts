@@ -52,6 +52,7 @@ export function useProjectData() {
       if (data.success) {
         entities.value = transformEntities(data.data || [])
         entitiesLoaded.value = true
+        lastLoadedProjectId.value = projectId
         console.log('[useProjectData] Entities loaded successfully:', entities.value.length)
       }
     } catch (err) {
@@ -63,10 +64,9 @@ export function useProjectData() {
   }
 
   async function loadAlerts(projectId: number, forceReload = false) {
-    // Cache: si ya están cargadas para este proyecto, no recargar
-    if (!forceReload && alertsLoaded.value && lastLoadedProjectId.value === projectId && alerts.value.length > 0) {
-      console.log('[useProjectData] Alerts already loaded from cache')
-      return
+    // Alertas cambian con frecuencia (resolve/dismiss/config), evitar cache agresivo.
+    if (forceReload) {
+      alertsLoaded.value = false
     }
 
     // Si ya está cargando, esperar
@@ -84,6 +84,7 @@ export function useProjectData() {
       if (data.success) {
         alerts.value = transformAlerts(data.data || [])
         alertsLoaded.value = true
+        lastLoadedProjectId.value = projectId
         console.log('[useProjectData] Alerts loaded successfully:', alerts.value.length)
       }
     } catch (err) {
@@ -162,6 +163,7 @@ export function useProjectData() {
       if (data.success) {
         relationships.value = data.data
         relationshipsLoaded.value = true
+        lastLoadedProjectId.value = projectId
         console.log('[useProjectData] Relationships loaded successfully')
       }
     } catch (err) {

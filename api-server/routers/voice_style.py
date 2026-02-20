@@ -10,10 +10,41 @@ from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter()
 
+
+def _ensure_speaker_corrections_schema(conn) -> None:
+    """Garantiza tabla/índice de correcciones de hablante en instalaciones antiguas."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS speaker_corrections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            chapter_number INTEGER NOT NULL,
+            dialogue_start_char INTEGER NOT NULL,
+            dialogue_end_char INTEGER NOT NULL,
+            dialogue_text TEXT NOT NULL DEFAULT '',
+            original_speaker_id INTEGER,
+            corrected_speaker_id INTEGER,
+            notes TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+            FOREIGN KEY (original_speaker_id) REFERENCES entities(id) ON DELETE SET NULL,
+            FOREIGN KEY (corrected_speaker_id) REFERENCES entities(id) ON DELETE SET NULL,
+            UNIQUE (project_id, chapter_number, dialogue_start_char, dialogue_end_char)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_speaker_corrections_project
+        ON speaker_corrections(project_id, chapter_number)
+        """
+    )
+
+
 @router.get("/api/projects/{project_id}/voice-profiles", response_model=ApiResponse)
 def get_voice_profiles(
     project_id: int,
-    force_refresh: bool = Query(False, description="Forzar recálculo ignorando caché")
+    force_refresh: bool = Query(False, description="Forzar recálculo ignorando caché"),
 ):
     """
     Obtiene perfiles de voz de los personajes del proyecto.
@@ -31,7 +62,10 @@ def get_voice_profiles(
     # Check enrichment cache first (S8a-13) — only when not forcing refresh
     if not force_refresh:
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "voice_profiles", allow_stale=True)
+
+        cached = get_cached_enrichment(
+            deps.get_database(), project_id, "voice_profiles", allow_stale=True
+        )
         if cached:
             return ApiResponse(success=True, data=cached)
 
@@ -60,7 +94,7 @@ def get_voice_profiles(
                         """SELECT entity_id, characteristic_words
                            FROM voice_profiles
                            WHERE project_id = ?""",
-                        (project_id,)
+                        (project_id,),
                     ).fetchall()
 
                 if cached_rows:
@@ -68,13 +102,19 @@ def get_voice_profiles(
                     for row in cached_rows:
                         try:
                             profile_data = json_mod.loads(row[1]) if row[1] else None
-                            if profile_data and isinstance(profile_data, dict) and "metrics" in profile_data:
+                            if (
+                                profile_data
+                                and isinstance(profile_data, dict)
+                                and "metrics" in profile_data
+                            ):
                                 cached_profiles.append(profile_data)
                         except (json_mod.JSONDecodeError, TypeError):
                             pass
 
                     if cached_profiles:
-                        logger.debug(f"Returning {len(cached_profiles)} cached voice profiles for project {project_id}")
+                        logger.debug(
+                            f"Returning {len(cached_profiles)} cached voice profiles for project {project_id}"
+                        )
                         return ApiResponse(
                             success=True,
                             data={
@@ -86,7 +126,7 @@ def get_voice_profiles(
                                     "chapters_analyzed": 0,
                                 },
                                 "cached": True,
-                            }
+                            },
                         )
             except Exception as cache_err:
                 logger.debug(f"Cache miss for voice profiles: {cache_err}")
@@ -102,8 +142,8 @@ def get_voice_profiles(
                 data={
                     "project_id": project_id,
                     "profiles": [],
-                    "message": "No hay personajes para analizar"
-                }
+                    "message": "No hay personajes para analizar",
+                },
             )
 
         # Obtener capítulos y extraer diálogos
@@ -115,13 +155,15 @@ def get_voice_profiles(
             dialogue_result = detect_dialogues(chapter.content)
             if dialogue_result.is_success:
                 for d in dialogue_result.value.dialogues:
-                    dialogues.append({
-                        "text": d.text,
-                        "speaker_id": d.speaker_id,
-                        "speaker_hint": d.speaker_hint,
-                        "chapter": chapter.chapter_number,
-                        "position": d.start_char,
-                    })
+                    dialogues.append(
+                        {
+                            "text": d.text,
+                            "speaker_id": d.speaker_id,
+                            "speaker_hint": d.speaker_hint,
+                            "chapter": chapter.chapter_number,
+                            "position": d.start_char,
+                        }
+                    )
 
         if not dialogues:
             return ApiResponse(
@@ -129,14 +171,13 @@ def get_voice_profiles(
                 data={
                     "project_id": project_id,
                     "profiles": [],
-                    "message": "No se encontraron diálogos para analizar"
-                }
+                    "message": "No se encontraron diálogos para analizar",
+                },
             )
 
         # Construir perfiles de voz
         entity_data = [
-            {"id": e.id, "name": e.canonical_name, "aliases": e.aliases}
-            for e in characters
+            {"id": e.id, "name": e.canonical_name, "aliases": e.aliases} for e in characters
         ]
 
         builder = VoiceProfileBuilder()
@@ -173,14 +214,18 @@ def get_voice_profiles(
                                 metrics.get("type_token_ratio", 0),
                                 metrics.get("formality_score", 0),
                                 metrics.get("total_interventions", 0),
-                                json_mod.dumps(profile_dict),  # Full profile in characteristic_words column
+                                json_mod.dumps(
+                                    profile_dict
+                                ),  # Full profile in characteristic_words column
                                 json_mod.dumps(metrics.get("top_fillers", [])),
                                 metrics.get("exclamation_ratio", 0),
                                 metrics.get("question_ratio", 0),
-                            )
+                            ),
                         )
                     conn.commit()
-                    logger.debug(f"Cached {len(profiles_data)} voice profiles for project {project_id}")
+                    logger.debug(
+                        f"Cached {len(profiles_data)} voice profiles for project {project_id}"
+                    )
             except Exception as cache_err:
                 logger.warning(f"Failed to cache voice profiles: {cache_err}")
 
@@ -195,7 +240,7 @@ def get_voice_profiles(
                     "chapters_analyzed": len(chapters),
                 },
                 "cached": False,
-            }
+            },
         )
 
     except HTTPException:
@@ -252,21 +297,22 @@ def compare_voice_profiles(
             dialogue_result = detect_dialogues(chapter.content)
             if dialogue_result.is_success:
                 for d in dialogue_result.value.dialogues:
-                    dialogues.append({
-                        "text": d.text,
-                        "speaker_id": d.speaker_id,
-                        "speaker_hint": d.speaker_hint,
-                        "chapter": chapter.chapter_number,
-                        "position": d.start_char,
-                    })
+                    dialogues.append(
+                        {
+                            "text": d.text,
+                            "speaker_id": d.speaker_id,
+                            "speaker_hint": d.speaker_hint,
+                            "chapter": chapter.chapter_number,
+                            "position": d.start_char,
+                        }
+                    )
 
         if not dialogues:
             return ApiResponse(success=False, error="No se encontraron diálogos para analizar")
 
         # Construir perfiles
         entity_data = [
-            {"id": e.id, "name": e.canonical_name, "aliases": e.aliases}
-            for e in characters
+            {"id": e.id, "name": e.canonical_name, "aliases": e.aliases} for e in characters
         ]
         builder = VoiceProfileBuilder()
         profiles = builder.build_profiles(dialogues, entity_data)
@@ -282,8 +328,7 @@ def compare_voice_profiles(
             if not profile_b:
                 missing.append(entity_map[entity_b].canonical_name)
             return ApiResponse(
-                success=False,
-                error=f"No hay suficientes diálogos para: {', '.join(missing)}"
+                success=False, error=f"No hay suficientes diálogos para: {', '.join(missing)}"
             )
 
         # Comparar metricas
@@ -390,7 +435,7 @@ def compare_voice_profiles(
                     "unique_to_a": unique_a,
                     "unique_to_b": unique_b,
                 },
-            }
+            },
         )
 
     except HTTPException:
@@ -419,7 +464,10 @@ def get_voice_deviations(
     # Check enrichment cache first (S8a-13) — only when no chapter filter
     if chapter_number is None:
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "voice_deviations", allow_stale=True)
+
+        cached = get_cached_enrichment(
+            deps.get_database(), project_id, "voice_deviations", allow_stale=True
+        )
         if cached:
             return ApiResponse(success=True, data=cached)
 
@@ -449,8 +497,8 @@ def get_voice_deviations(
                 data={
                     "project_id": project_id,
                     "deviations": [],
-                    "message": "No hay personajes para analizar"
-                }
+                    "message": "No hay personajes para analizar",
+                },
             )
 
         # Obtener capítulos
@@ -466,8 +514,8 @@ def get_voice_deviations(
                 data={
                     "project_id": project_id,
                     "deviations": [],
-                    "message": "No hay capítulos para analizar"
-                }
+                    "message": "No hay capítulos para analizar",
+                },
             )
 
         # Extraer diálogos de cada capítulo
@@ -476,13 +524,15 @@ def get_voice_deviations(
             dialogue_result = detect_dialogues(chapter.content)
             if dialogue_result.is_success:
                 for d in dialogue_result.value.dialogues:
-                    dialogues.append({
-                        "text": d.text,
-                        "speaker_id": d.speaker_id,
-                        "speaker_hint": d.speaker_hint,
-                        "chapter": chapter.chapter_number,
-                        "position": d.start_char,
-                    })
+                    dialogues.append(
+                        {
+                            "text": d.text,
+                            "speaker_id": d.speaker_id,
+                            "speaker_hint": d.speaker_hint,
+                            "chapter": chapter.chapter_number,
+                            "position": d.start_char,
+                        }
+                    )
 
         if not dialogues:
             return ApiResponse(
@@ -490,14 +540,13 @@ def get_voice_deviations(
                 data={
                     "project_id": project_id,
                     "deviations": [],
-                    "message": "No se encontraron diálogos para analizar"
-                }
+                    "message": "No se encontraron diálogos para analizar",
+                },
             )
 
         # Construir perfiles de voz
         entity_data = [
-            {"id": e.id, "name": e.canonical_name, "aliases": e.aliases}
-            for e in characters
+            {"id": e.id, "name": e.canonical_name, "aliases": e.aliases} for e in characters
         ]
 
         builder = VoiceProfileBuilder()
@@ -509,8 +558,8 @@ def get_voice_deviations(
                 data={
                     "project_id": project_id,
                     "deviations": [],
-                    "message": "No se pudieron construir perfiles de voz"
-                }
+                    "message": "No se pudieron construir perfiles de voz",
+                },
             )
 
         # Detectar desviaciones
@@ -521,8 +570,7 @@ def get_voice_deviations(
         severity_order = {"low": 0, "medium": 1, "high": 2}
         min_sev_value = severity_order.get(min_severity, 0)
         filtered = [
-            dev for dev in deviations
-            if severity_order.get(dev.severity.value, 0) >= min_sev_value
+            dev for dev in deviations if severity_order.get(dev.severity.value, 0) >= min_sev_value
         ]
 
         # Serializar
@@ -538,7 +586,11 @@ def get_voice_deviations(
             by_character[name]["types"].add(dev.deviation_type.value)
 
         summary = {
-            name: {"entity_id": info["entity_id"], "count": info["count"], "types": list(info["types"])}
+            name: {
+                "entity_id": info["entity_id"],
+                "count": info["count"],
+                "types": list(info["types"]),
+            }
             for name, info in by_character.items()
         }
 
@@ -555,8 +607,8 @@ def get_voice_deviations(
                     "dialogues_analyzed": len(dialogues),
                     "chapters_analyzed": len(chapters),
                     "min_severity_filter": min_severity,
-                }
-            }
+                },
+            },
         )
 
     except HTTPException:
@@ -570,7 +622,7 @@ def get_voice_deviations(
 def get_register_analysis(
     project_id: int,
     min_severity: str = Query("medium", description="Severidad mínima: low, medium, high"),
-    chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo")
+    chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo"),
 ):
     """
     Analiza el registro narrativo del proyecto.
@@ -584,7 +636,10 @@ def get_register_analysis(
     # Check enrichment cache first (S8a-13) — only when no chapter filter
     if chapter_number is None:
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "register_analysis", allow_stale=True)
+
+        cached = get_cached_enrichment(
+            deps.get_database(), project_id, "register_analysis", allow_stale=True
+        )
         if cached:
             return ApiResponse(success=True, data=cached)
 
@@ -615,8 +670,8 @@ def get_register_analysis(
                     "analyses": [],
                     "changes": [],
                     "summary": {},
-                    "message": "No hay capítulos para analizar"
-                }
+                    "message": "No hay capítulos para analizar",
+                },
             )
 
         # Construir segmentos: (texto, capítulo, posición, es_diálogo)
@@ -629,27 +684,18 @@ def get_register_analysis(
             dialogue_ranges = []
             if dialogue_result.is_success:
                 dialogue_ranges = [
-                    (d.start_char, d.end_char)
-                    for d in dialogue_result.value.dialogues
+                    (d.start_char, d.end_char) for d in dialogue_result.value.dialogues
                 ]
 
             # Dividir contenido en párrafos
-            paragraphs = chapter.content.split('\n\n')
+            paragraphs = chapter.content.split("\n\n")
             position = 0
 
             for para in paragraphs:
                 if para.strip():
                     # Determinar si es diálogo
-                    is_dialogue = any(
-                        start <= position <= end
-                        for start, end in dialogue_ranges
-                    )
-                    segments.append((
-                        para.strip(),
-                        chapter.chapter_number,
-                        position,
-                        is_dialogue
-                    ))
+                    is_dialogue = any(start <= position <= end for start, end in dialogue_ranges)
+                    segments.append((para.strip(), chapter.chapter_number, position, is_dialogue))
                 position += len(para) + 2  # +2 por '\n\n'
 
         if not segments:
@@ -660,8 +706,8 @@ def get_register_analysis(
                     "analyses": [],
                     "changes": [],
                     "summary": {},
-                    "message": "No hay segmentos para analizar"
-                }
+                    "message": "No hay segmentos para analizar",
+                },
             )
 
         # Analizar registro
@@ -706,7 +752,9 @@ def get_register_analysis(
             if ch not in chapter_summaries:
                 chapter_summaries[ch] = {"registers": {}, "total": 0, "changes": 0}
             reg = a.primary_register.value
-            chapter_summaries[ch]["registers"][reg] = chapter_summaries[ch]["registers"].get(reg, 0) + 1
+            chapter_summaries[ch]["registers"][reg] = (
+                chapter_summaries[ch]["registers"].get(reg, 0) + 1
+            )
             chapter_summaries[ch]["total"] += 1
 
         for c in changes:
@@ -717,16 +765,22 @@ def get_register_analysis(
         per_chapter = []
         for ch_num in sorted(chapter_summaries.keys()):
             cs = chapter_summaries[ch_num]
-            dominant = max(cs["registers"], key=cs["registers"].get) if cs["registers"] else "neutral"
-            consistency = (cs["registers"].get(dominant, 0) / cs["total"] * 100) if cs["total"] > 0 else 100
-            per_chapter.append({
-                "chapter_number": ch_num,
-                "dominant_register": dominant,
-                "consistency_pct": round(consistency, 1),
-                "segment_count": cs["total"],
-                "change_count": cs["changes"],
-                "distribution": cs["registers"],
-            })
+            dominant = (
+                max(cs["registers"], key=cs["registers"].get) if cs["registers"] else "neutral"
+            )
+            consistency = (
+                (cs["registers"].get(dominant, 0) / cs["total"] * 100) if cs["total"] > 0 else 100
+            )
+            per_chapter.append(
+                {
+                    "chapter_number": ch_num,
+                    "dominant_register": dominant,
+                    "consistency_pct": round(consistency, 1),
+                    "segment_count": cs["total"],
+                    "change_count": cs["changes"],
+                    "distribution": cs["registers"],
+                }
+            )
 
         # Compute aggregated stats
         total_segs = summary.get("total_segments", 0)
@@ -735,8 +789,7 @@ def get_register_analysis(
         if total_segs > 0 and dominant:
             consistency_pct = round(distribution.get(dominant, 0) / total_segs * 100, 1)
             distribution_pct = {
-                reg: round(count / total_segs * 100, 1)
-                for reg, count in distribution.items()
+                reg: round(count / total_segs * 100, 1) for reg, count in distribution.items()
             }
         else:
             consistency_pct = 100.0
@@ -758,8 +811,8 @@ def get_register_analysis(
                     "segments_analyzed": len(analyses),
                     "changes_detected": len(changes),
                     "chapters_analyzed": len(chapters),
-                }
-            }
+                },
+            },
         )
 
     except HTTPException:
@@ -771,13 +824,13 @@ def get_register_analysis(
 
 @router.get("/api/projects/{project_id}/speaker-corrections", response_model=ApiResponse)
 def list_speaker_corrections(
-    project_id: int,
-    chapter_number: Optional[int] = Query(None, description="Filtrar por capítulo")
+    project_id: int, chapter_number: Optional[int] = Query(None, description="Filtrar por capítulo")
 ):
     """Lista correcciones manuales de atribución de hablantes."""
     try:
         db = deps.get_database()
         with db.connect() as conn:
+            _ensure_speaker_corrections_schema(conn)
             if chapter_number is not None:
                 rows = conn.execute(
                     """SELECT sc.id, sc.chapter_number, sc.dialogue_start_char,
@@ -791,7 +844,7 @@ def list_speaker_corrections(
                        LEFT JOIN entities e_corr ON sc.corrected_speaker_id = e_corr.id
                        WHERE sc.project_id = ? AND sc.chapter_number = ?
                        ORDER BY sc.dialogue_start_char""",
-                    (project_id, chapter_number)
+                    (project_id, chapter_number),
                 ).fetchall()
             else:
                 rows = conn.execute(
@@ -806,30 +859,35 @@ def list_speaker_corrections(
                        LEFT JOIN entities e_corr ON sc.corrected_speaker_id = e_corr.id
                        WHERE sc.project_id = ?
                        ORDER BY sc.chapter_number, sc.dialogue_start_char""",
-                    (project_id,)
+                    (project_id,),
                 ).fetchall()
 
         corrections = []
         for row in rows:
-            corrections.append({
-                "id": row[0],
-                "chapterNumber": row[1],
-                "dialogueStartChar": row[2],
-                "dialogueEndChar": row[3],
-                "dialogueText": row[4],
-                "originalSpeakerId": row[5],
-                "correctedSpeakerId": row[6],
-                "notes": row[7],
-                "createdAt": row[8],
-                "originalSpeakerName": row[9],
-                "correctedSpeakerName": row[10],
-            })
+            corrections.append(
+                {
+                    "id": row[0],
+                    "chapterNumber": row[1],
+                    "dialogueStartChar": row[2],
+                    "dialogueEndChar": row[3],
+                    "dialogueText": row[4],
+                    "originalSpeakerId": row[5],
+                    "correctedSpeakerId": row[6],
+                    "notes": row[7],
+                    "createdAt": row[8],
+                    "originalSpeakerName": row[9],
+                    "correctedSpeakerName": row[10],
+                }
+            )
 
-        return ApiResponse(success=True, data={
-            "projectId": project_id,
-            "corrections": corrections,
-            "totalCorrections": len(corrections),
-        })
+        return ApiResponse(
+            success=True,
+            data={
+                "projectId": project_id,
+                "corrections": corrections,
+                "totalCorrections": len(corrections),
+            },
+        )
     except Exception as e:
         logger.error(f"Error listing speaker corrections: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
@@ -860,12 +918,13 @@ def create_speaker_correction(project_id: int, payload: deps.DialogueCorrectionR
 
         db = deps.get_database()
         with db.connect() as conn:
+            _ensure_speaker_corrections_schema(conn)
             # Verificar si ya existe corrección para este diálogo
             existing = conn.execute(
                 """SELECT id FROM speaker_corrections
                    WHERE project_id = ? AND chapter_number = ?
                    AND dialogue_start_char = ? AND dialogue_end_char = ?""",
-                (project_id, chapter_num, dialogue_start, dialogue_end)
+                (project_id, chapter_num, dialogue_start, dialogue_end),
             ).fetchone()
 
             if existing:
@@ -873,7 +932,7 @@ def create_speaker_correction(project_id: int, payload: deps.DialogueCorrectionR
                     """UPDATE speaker_corrections
                        SET corrected_speaker_id = ?, notes = ?, created_at = datetime('now')
                        WHERE id = ?""",
-                    (corrected_speaker_id, notes, existing[0])
+                    (corrected_speaker_id, notes, existing[0]),
                 )
                 correction_id = existing[0]
             else:
@@ -882,31 +941,45 @@ def create_speaker_correction(project_id: int, payload: deps.DialogueCorrectionR
                        (project_id, chapter_number, dialogue_start_char, dialogue_end_char,
                         dialogue_text, original_speaker_id, corrected_speaker_id, notes)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (project_id, chapter_num, dialogue_start, dialogue_end,
-                     dialogue_text, original_speaker_id, corrected_speaker_id, notes)
+                    (
+                        project_id,
+                        chapter_num,
+                        dialogue_start,
+                        dialogue_end,
+                        dialogue_text,
+                        original_speaker_id,
+                        corrected_speaker_id,
+                        notes,
+                    ),
                 )
                 correction_id = cursor.lastrowid
 
             conn.commit()
 
-        return ApiResponse(success=True, data={
-            "correctionId": correction_id,
-            "applied": True,
-        })
+        return ApiResponse(
+            success=True,
+            data={
+                "correctionId": correction_id,
+                "applied": True,
+            },
+        )
     except Exception as e:
         logger.error(f"Error creating speaker correction: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.delete("/api/projects/{project_id}/speaker-corrections/{correction_id}", response_model=ApiResponse)
+@router.delete(
+    "/api/projects/{project_id}/speaker-corrections/{correction_id}", response_model=ApiResponse
+)
 def delete_speaker_correction(project_id: int, correction_id: int):
     """Elimina una corrección manual de atribución de hablante."""
     try:
         db = deps.get_database()
         with db.connect() as conn:
+            _ensure_speaker_corrections_schema(conn)
             result = conn.execute(
                 "DELETE FROM speaker_corrections WHERE id = ? AND project_id = ?",
-                (correction_id, project_id)
+                (correction_id, project_id),
             )
             conn.commit()
 
@@ -945,7 +1018,7 @@ def get_project_focalizations(project_id: int):
                 "project_id": project_id,
                 "declarations": [d.to_dict() for d in declarations],
                 "total": len(declarations),
-            }
+            },
         )
     except HTTPException:
         raise
@@ -979,7 +1052,9 @@ def create_focalization(project_id: int, data: dict):
         try:
             foc_type = FocalizationType(foc_type_str)
         except ValueError:
-            return ApiResponse(success=False, error=f"Tipo de focalización inválido: {foc_type_str}")
+            return ApiResponse(
+                success=False, error=f"Tipo de focalización inválido: {foc_type_str}"
+            )
 
         repo = SQLiteFocalizationRepository()
         service = FocalizationDeclarationService(repository=repo)
@@ -1024,7 +1099,9 @@ def update_focalization(project_id: int, declaration_id: int, data: dict):
             try:
                 foc_type = FocalizationType(data["focalization_type"])
             except ValueError:
-                return ApiResponse(success=False, error=f"Tipo inválido: {data['focalization_type']}")
+                return ApiResponse(
+                    success=False, error=f"Tipo inválido: {data['focalization_type']}"
+                )
 
         repo = SQLiteFocalizationRepository()
         service = FocalizationDeclarationService(repository=repo)
@@ -1045,7 +1122,9 @@ def update_focalization(project_id: int, declaration_id: int, data: dict):
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.delete("/api/projects/{project_id}/focalization/{declaration_id}", response_model=ApiResponse)
+@router.delete(
+    "/api/projects/{project_id}/focalization/{declaration_id}", response_model=ApiResponse
+)
 def delete_focalization(project_id: int, declaration_id: int):
     """Elimina una declaración de focalización."""
     try:
@@ -1080,7 +1159,10 @@ def detect_focalization_violations(project_id: int):
     """Detecta violaciones de focalización en todo el proyecto."""
     # Check enrichment cache first (S8a-13)
     from routers._enrichment_cache import get_cached_enrichment
-    cached = get_cached_enrichment(deps.get_database(), project_id, "focalization_violations", allow_stale=True)
+
+    cached = get_cached_enrichment(
+        deps.get_database(), project_id, "focalization_violations", allow_stale=True
+    )
     if cached:
         return ApiResponse(success=True, data=cached)
 
@@ -1135,13 +1217,18 @@ def detect_focalization_violations(project_id: int):
             "total": len(all_violations),
             "by_type": {},
             "by_severity": {},
-            "chapters_with_violations": sum(1 for ch in by_chapter.values() if ch["violations_count"] > 0),
+            "chapters_with_violations": sum(
+                1 for ch in by_chapter.values() if ch["violations_count"] > 0
+            ),
         }
         for v in all_violations:
             stats["by_type"][v["violation_type"]] = stats["by_type"].get(v["violation_type"], 0) + 1
             stats["by_severity"][v["severity"]] = stats["by_severity"].get(v["severity"], 0) + 1
 
-        return ApiResponse(success=True, data={"violations": all_violations, "by_chapter": by_chapter, "stats": stats})
+        return ApiResponse(
+            success=True,
+            data={"violations": all_violations, "by_chapter": by_chapter, "stats": stats},
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -1149,11 +1236,17 @@ def detect_focalization_violations(project_id: int):
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/projects/{project_id}/register-analysis/genre-comparison", response_model=ApiResponse)
+@router.get(
+    "/api/projects/{project_id}/register-analysis/genre-comparison", response_model=ApiResponse
+)
 def get_register_genre_comparison(
     project_id: int,
-    genre_code: str = Query(..., description="Código de género para comparar (FIC, MEM, TEC, etc.)"),
-    min_severity: str = Query("low", description="Severidad mínima para contar cambios: low, medium, high"),
+    genre_code: str = Query(
+        ..., description="Código de género para comparar (FIC, MEM, TEC, etc.)"
+    ),
+    min_severity: str = Query(
+        "low", description="Severidad mínima para contar cambios: low, medium, high"
+    ),
 ):
     """
     Compara las métricas de registro del proyecto contra benchmarks del género.
@@ -1181,7 +1274,9 @@ def get_register_genre_comparison(
         chapters = chapter_repo.get_by_project(project_id)
 
         if not chapters:
-            return ApiResponse(success=True, data={"comparison": None, "message": "No hay capítulos"})
+            return ApiResponse(
+                success=True, data={"comparison": None, "message": "No hay capítulos"}
+            )
 
         # Construir segmentos
         segments = []
@@ -1190,28 +1285,21 @@ def get_register_genre_comparison(
             dialogue_ranges = []
             if dialogue_result.is_success:
                 dialogue_ranges = [
-                    (d.start_char, d.end_char)
-                    for d in dialogue_result.value.dialogues
+                    (d.start_char, d.end_char) for d in dialogue_result.value.dialogues
                 ]
 
-            paragraphs = chapter.content.split('\n\n')
+            paragraphs = chapter.content.split("\n\n")
             position = 0
             for para in paragraphs:
                 if para.strip():
-                    is_dialogue = any(
-                        start <= position <= end
-                        for start, end in dialogue_ranges
-                    )
-                    segments.append((
-                        para.strip(),
-                        chapter.chapter_number,
-                        position,
-                        is_dialogue
-                    ))
+                    is_dialogue = any(start <= position <= end for start, end in dialogue_ranges)
+                    segments.append((para.strip(), chapter.chapter_number, position, is_dialogue))
                 position += len(para) + 2
 
         if not segments:
-            return ApiResponse(success=True, data={"comparison": None, "message": "No hay segmentos"})
+            return ApiResponse(
+                success=True, data={"comparison": None, "message": "No hay segmentos"}
+            )
 
         # Analizar registro
         detector = RegisterChangeDetector()
@@ -1229,7 +1317,7 @@ def get_register_genre_comparison(
             available = list(REGISTER_GENRE_BENCHMARKS.keys())
             return ApiResponse(
                 success=False,
-                error=f"Género '{genre_code}' no encontrado. Disponibles: {', '.join(available)}"
+                error=f"Género '{genre_code}' no encontrado. Disponibles: {', '.join(available)}",
             )
 
         return ApiResponse(
@@ -1240,12 +1328,10 @@ def get_register_genre_comparison(
                 "changes_count": len(changes),
                 "high_severity_count": high_severity,
                 "comparison": comparison,
-            }
+            },
         )
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error comparing register with genre: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
-
-

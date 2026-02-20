@@ -14,7 +14,7 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import cast
+from typing import ContextManager, cast
 
 from ..core.config import get_config
 
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 33
+SCHEMA_VERSION = 34
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -139,6 +139,26 @@ CREATE INDEX IF NOT EXISTS idx_dialogues_project ON dialogues(project_id);
 CREATE INDEX IF NOT EXISTS idx_dialogues_chapter ON dialogues(chapter_id);
 CREATE INDEX IF NOT EXISTS idx_dialogues_type ON dialogues(dialogue_type);
 CREATE INDEX IF NOT EXISTS idx_dialogues_position ON dialogues(chapter_id, start_char);
+
+-- Correcciones manuales de atribución de hablantes (voz/diálogo)
+CREATE TABLE IF NOT EXISTS speaker_corrections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    chapter_number INTEGER NOT NULL,
+    dialogue_start_char INTEGER NOT NULL,
+    dialogue_end_char INTEGER NOT NULL,
+    dialogue_text TEXT NOT NULL DEFAULT '',
+    original_speaker_id INTEGER,
+    corrected_speaker_id INTEGER,
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (original_speaker_id) REFERENCES entities(id) ON DELETE SET NULL,
+    FOREIGN KEY (corrected_speaker_id) REFERENCES entities(id) ON DELETE SET NULL,
+    UNIQUE (project_id, chapter_number, dialogue_start_char, dialogue_end_char)
+);
+
+CREATE INDEX IF NOT EXISTS idx_speaker_corrections_project ON speaker_corrections(project_id, chapter_number);
 
 -- Secciones dentro de capítulos (H2, H3, H4)
 CREATE TABLE IF NOT EXISTS sections (
@@ -1825,6 +1845,24 @@ class Database:
             "ALTER TABLE version_metrics ADD COLUMN run_mode TEXT NOT NULL DEFAULT 'full'",
             "ALTER TABLE version_metrics ADD COLUMN duration_total_sec REAL NOT NULL DEFAULT 0.0",
             "ALTER TABLE version_metrics ADD COLUMN phase_durations_json TEXT NOT NULL DEFAULT '{}'",
+            # v34: Correcciones manuales de hablante
+            """CREATE TABLE IF NOT EXISTS speaker_corrections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                chapter_number INTEGER NOT NULL,
+                dialogue_start_char INTEGER NOT NULL,
+                dialogue_end_char INTEGER NOT NULL,
+                dialogue_text TEXT NOT NULL DEFAULT '',
+                original_speaker_id INTEGER,
+                corrected_speaker_id INTEGER,
+                notes TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY (original_speaker_id) REFERENCES entities(id) ON DELETE SET NULL,
+                FOREIGN KEY (corrected_speaker_id) REFERENCES entities(id) ON DELETE SET NULL,
+                UNIQUE (project_id, chapter_number, dialogue_start_char, dialogue_end_char)
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_speaker_corrections_project ON speaker_corrections(project_id, chapter_number)",
         ]
         for sql in table_migrations:
             try:
@@ -2058,6 +2096,14 @@ class Database:
         """Ejecuta SQL múltiples veces."""
         with self.connection() as conn:
             return conn.executemany(sql, params_list)
+
+    def connect(self) -> ContextManager[sqlite3.Connection]:
+        """
+        Alias de compatibilidad para código legacy que usa `db.connect()`.
+
+        Retorna el mismo context manager que `connection()`.
+        """
+        return self.connection()
 
     def fetchone(self, sql: str, params: tuple = ()) -> sqlite3.Row | None:
         """Ejecuta y retorna una fila."""

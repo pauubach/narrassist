@@ -79,20 +79,6 @@
             <i class="pi pi-language"></i>
           </template>
         </Button>
-        <!-- Toggle atribución de diálogos -->
-        <Button
-          v-tooltip.bottom="showDialoguePanel ? 'Ocultar atribución de diálogos' : 'Mostrar atribución de diálogos'"
-          :text="!showDialoguePanel"
-          :outlined="showDialoguePanel"
-          rounded
-          size="small"
-          :class="{ 'dialogue-toggle-active': showDialoguePanel }"
-          @click="showDialoguePanel = !showDialoguePanel"
-        >
-          <template #icon>
-            <i class="pi pi-comments"></i>
-          </template>
-        </Button>
         <span class="toolbar-divider"></span>
         <Button
           v-tooltip.bottom="'Exportar'"
@@ -165,23 +151,6 @@
         </div>
       </div>
     </div>
-
-    <!-- Drawer para atribución de diálogos -->
-    <Drawer
-      :visible="showDialoguePanel"
-      position="right"
-      :style="{ width: '400px' }"
-      header="Atribución de Diálogos"
-      @update:visible="showDialoguePanel = $event"
-    >
-      <DialogueAttributionPanel
-        v-if="showDialoguePanel"
-        :project-id="projectId"
-        :chapters="chaptersForPanel"
-        :entities="entities"
-        @select-dialogue="onDialogueSelected"
-      />
-    </Drawer>
   </div>
 </template>
 
@@ -189,13 +158,11 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
-import Drawer from 'primevue/drawer'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import type { Chapter } from '@/types'
 import type { ApiChapter } from '@/types/api/projects'
 import { transformChapters } from '@/types/transformers/projects'
-import DialogueAttributionPanel from '@/components/DialogueAttributionPanel.vue'
 import { apiUrl } from '@/config/api'
 import { api } from '@/services/apiClient'
 import { sanitizeHtml } from '@/utils/sanitizeHtml'
@@ -297,7 +264,12 @@ const touchChapter = (chapterId: number) => {
     const oldestId = chapterAccessOrder.value.shift()
     if (oldestId !== undefined && !visibleChapters.value.has(oldestId)) {
       loadedChapters.value.delete(oldestId)
-      chapterAnnotations.value.delete(oldestId)
+      highlightedContentCache.value.delete(oldestId)
+      const oldestChapter = chapters.value.find(ch => ch.id === oldestId)
+      if (oldestChapter) {
+        chapterAnnotations.value.delete(oldestChapter.chapterNumber)
+        chapterDialogues.value.delete(oldestChapter.chapterNumber)
+      }
     }
   }
 }
@@ -412,39 +384,6 @@ const contentStyle = computed(() => ({
   lineHeight: lineHeight.value
 }))
 
-// Chapters formatted for DialogueAttributionPanel
-const chaptersForPanel = computed(() => {
-  return chapters.value.map(ch => ({
-    id: ch.id,
-    number: ch.chapterNumber,
-    title: ch.title
-  }))
-})
-
-// Handler for dialogue selection from panel
-const onDialogueSelected = (attribution: { startChar: number; endChar: number; text: string; chapterNumber?: number }) => {
-  // Encontrar el capítulo que contiene este diálogo
-  let targetChapter: Chapter | undefined
-
-  if (attribution.chapterNumber) {
-    targetChapter = chapters.value.find(ch => ch.chapterNumber === attribution.chapterNumber)
-  }
-
-  if (!targetChapter) {
-    // Fallback: buscar en todos los capítulos basándose en la posición
-    // Asumimos que startChar es relativo al capítulo
-    console.warn('No chapter number in attribution, cannot scroll precisely')
-    return
-  }
-
-  // Usar scrollToMention para ir al diálogo
-  scrollToMention({
-    chapterId: targetChapter.id,
-    position: attribution.startChar,
-    text: attribution.text
-  })
-}
-
 // Cargar atribuciones de diálogo para un capítulo
 const loadChapterDialogues = async (chapterNumber: number) => {
   if (chapterDialogues.value.has(chapterNumber)) return
@@ -531,6 +470,10 @@ const loadDocument = async () => {
   // Resetear estado de lazy loading
   loadedChapters.value.clear()
   visibleChapters.value.clear()
+  chapterAccessOrder.value = []
+  chapterAnnotations.value.clear()
+  chapterDialogues.value.clear()
+  highlightedContentCache.value.clear()
   chapterRefs.clear()
 
   try {
@@ -576,8 +519,8 @@ const loadDocument = async () => {
 }
 
 // Cargar anotaciones de gramática/ortografía para un capítulo
-const loadChapterAnnotations = async (chapterNumber: number) => {
-  if (chapterAnnotations.value.has(chapterNumber)) return
+const loadChapterAnnotations = async (chapterNumber: number, forceReload = false) => {
+  if (!forceReload && chapterAnnotations.value.has(chapterNumber)) return
 
   try {
     const data = await api.getRaw<{ success: boolean; data?: any }>(`/api/projects/${props.projectId}/chapters/${chapterNumber}/annotations`)
@@ -588,6 +531,17 @@ const loadChapterAnnotations = async (chapterNumber: number) => {
   } catch (err) {
     console.error(`Error loading annotations for chapter ${chapterNumber}:`, err)
   }
+}
+
+const refreshVisibleChapterAnnotations = async () => {
+  const chapterNumbers = chapters.value
+    .filter(ch => loadedChapters.value.has(ch.id))
+    .map(ch => ch.chapterNumber)
+
+  if (chapterNumbers.length === 0) return
+
+  highlightedContentCache.value.clear()
+  await Promise.all(chapterNumbers.map(chNum => loadChapterAnnotations(chNum, true)))
 }
 
 // Calcular cuántos caracteres se eliminan del título
@@ -688,8 +642,12 @@ const getHighlightedContent = (chapter: Chapter): string => {
 
     // Filtrar por tipo según los toggles activos
     const filteredAnnotations = annotations.filter(a => {
-      if (a.type === 'grammar' && !showGrammarErrors.value) return false
-      if ((a.type === 'spelling' || a.type === 'orthography') && !showSpellingErrors.value) return false
+      const type = (a.type || '').toLowerCase()
+      const isGrammarType = type === 'grammar' || type === 'agreement'
+      const isSpellingType = type === 'spelling' || type === 'orthography' || type === 'typography' || type === 'punctuation'
+
+      if (isGrammarType && !showGrammarErrors.value) return false
+      if (isSpellingType && !showSpellingErrors.value) return false
       return true
     })
 
@@ -701,7 +659,11 @@ const getHighlightedContent = (chapter: Chapter): string => {
     sortedAnnotations.forEach(annotation => {
       // Calcular posición ajustada (el HTML escaping puede cambiar longitudes)
       // Por simplicidad, aplicamos sobre el contenido escapado
-      const annotationClass = annotation.type === 'grammar' ? 'grammar-error' : 'spelling-error'
+      const type = (annotation.type || '').toLowerCase()
+      const annotationClass =
+        type === 'grammar' || type === 'agreement'
+          ? 'grammar-error'
+          : 'spelling-error'
       const severityClass = `severity-${annotation.severity}`
       const tooltip = annotation.suggestion
         ? `${annotation.title}. Sugerencia: ${annotation.suggestion}`
@@ -1509,6 +1471,10 @@ watch(() => props.externalChapters, (newChapters) => {
     })
   }
 }, { deep: true })
+
+watch(() => props.chapterBadges, () => {
+  void refreshVisibleChapterAnnotations()
+})
 
 // Watch para resaltar múltiples rangos de alerta (inconsistencias)
 watch(() => props.alertHighlightRanges, async (ranges) => {

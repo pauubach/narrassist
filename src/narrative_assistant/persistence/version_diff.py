@@ -14,6 +14,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from narrative_assistant.analysis.entity_continuity_service import EntityContinuityService
+
 
 @dataclass(frozen=True)
 class ChapterDiffMetrics:
@@ -54,6 +56,7 @@ class EntityDiffMetrics:
 class VersionDiffRepository:
     def __init__(self, db: Any):
         self.db = db
+        self.continuity_service = EntityContinuityService()
 
     def _normalize_name(self, value: str) -> str:
         normalized = value.lower().strip()
@@ -242,90 +245,10 @@ class VersionDiffRepository:
 
         old_entities = self._load_snapshot_entities(snapshot_id)
         new_entities = self._load_current_entities(project_id)
-
-        unmatched_new = {e["entity_id"]: e for e in new_entities}
-        links: list[dict[str, Any]] = []
-        matched = 0
-        renamed = 0
-        removed = 0
-
-        for old in old_entities:
-            best: dict[str, Any] | None = None
-            best_score = 0.0
-            best_reason = "none"
-            old_type = old["entity_type"]
-            old_aliases = {self._normalize_name(a) for a in old["aliases"]}
-            old_aliases.add(self._normalize_name(old["canonical_name"]))
-
-            for new in unmatched_new.values():
-                new_type = new["entity_type"]
-                if old_type and new_type and old_type != new_type:
-                    continue
-                new_aliases = {self._normalize_name(a) for a in new["aliases"]}
-                new_aliases.add(self._normalize_name(new["canonical_name"]))
-                score, reason = self._name_score(
-                    old_name=old["canonical_name"],
-                    old_aliases=old_aliases,
-                    new_name=new["canonical_name"],
-                    new_aliases=new_aliases,
-                    old_mentions=int(old.get("mention_count", 0)),
-                    new_mentions=int(new.get("mention_count", 0)),
-                    old_importance=str(old.get("importance", "")),
-                    new_importance=str(new.get("importance", "")),
-                )
-                if score > best_score:
-                    best = new
-                    best_score = score
-                    best_reason = reason
-
-            if best and best_score >= 0.78:
-                matched += 1
-                link_type = (
-                    "same"
-                    if self._normalize_name(old["canonical_name"])
-                    == self._normalize_name(best["canonical_name"])
-                    else "renamed"
-                )
-                if link_type == "renamed":
-                    renamed += 1
-                links.append(
-                    {
-                        "old_entity_id": old["entity_id"],
-                        "new_entity_id": best["entity_id"],
-                        "old_name": old["canonical_name"],
-                        "new_name": best["canonical_name"],
-                        "link_type": link_type,
-                        "confidence": best_score,
-                        "reason": best_reason,
-                    }
-                )
-                unmatched_new.pop(best["entity_id"], None)
-            else:
-                removed += 1
-                links.append(
-                    {
-                        "old_entity_id": old["entity_id"],
-                        "new_entity_id": None,
-                        "old_name": old["canonical_name"],
-                        "new_name": None,
-                        "link_type": "removed",
-                        "confidence": 0.0,
-                        "reason": "not_matched",
-                    }
-                )
-
-        for new in unmatched_new.values():
-            links.append(
-                {
-                    "old_entity_id": None,
-                    "new_entity_id": new["entity_id"],
-                    "old_name": None,
-                    "new_name": new["canonical_name"],
-                    "link_type": "new",
-                    "confidence": 0.0,
-                    "reason": "new_entity",
-                }
-            )
+        links, metrics = self.continuity_service.match_entities_between_versions(
+            old_entities=old_entities,
+            new_entities=new_entities,
+        )
 
         with self.db.connection() as conn:
             conn.execute(
@@ -359,10 +282,10 @@ class VersionDiffRepository:
                 )
 
         return EntityDiffMetrics(
-            matched=matched,
-            renamed=renamed,
-            new_entities=len(unmatched_new),
-            removed_entities=removed,
+            matched=metrics.matched,
+            renamed=metrics.renamed,
+            new_entities=metrics.new_entities,
+            removed_entities=metrics.removed_entities,
         )
 
     def upsert_version_diff(

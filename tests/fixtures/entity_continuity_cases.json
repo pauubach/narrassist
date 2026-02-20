@@ -1,0 +1,118 @@
+[
+  {
+    "name": "exact_same_entity",
+    "old_entities": [
+      {
+        "entity_id": 1,
+        "entity_type": "character",
+        "canonical_name": "Elena Montero",
+        "aliases": ["Elena"],
+        "mention_count": 15,
+        "importance": "high"
+      }
+    ],
+    "new_entities": [
+      {
+        "entity_id": 101,
+        "entity_type": "character",
+        "canonical_name": "Elena Montero",
+        "aliases": ["Elena"],
+        "mention_count": 16,
+        "importance": "high"
+      }
+    ],
+    "expected": {
+      "matched": 1,
+      "renamed": 0,
+      "new_entities": 0,
+      "removed_entities": 0
+    }
+  },
+  {
+    "name": "rename_detected_by_alias",
+    "old_entities": [
+      {
+        "entity_id": 2,
+        "entity_type": "character",
+        "canonical_name": "Pepe Garcia",
+        "aliases": ["Jose Garcia"],
+        "mention_count": 12,
+        "importance": "high"
+      }
+    ],
+    "new_entities": [
+      {
+        "entity_id": 202,
+        "entity_type": "character",
+        "canonical_name": "Jose Garcia",
+        "aliases": ["Pepe Garcia"],
+        "mention_count": 14,
+        "importance": "high"
+      }
+    ],
+    "expected": {
+      "matched": 1,
+      "renamed": 1,
+      "new_entities": 0,
+      "removed_entities": 0
+    }
+  },
+  {
+    "name": "removed_and_new_entities",
+    "old_entities": [
+      {
+        "entity_id": 3,
+        "entity_type": "character",
+        "canonical_name": "Don Ramiro Estebanez",
+        "aliases": ["Ramiro"],
+        "mention_count": 9,
+        "importance": "medium"
+      }
+    ],
+    "new_entities": [
+      {
+        "entity_id": 303,
+        "entity_type": "character",
+        "canonical_name": "Lucia Ferrer",
+        "aliases": ["Lucia"],
+        "mention_count": 10,
+        "importance": "medium"
+      }
+    ],
+    "expected": {
+      "matched": 0,
+      "renamed": 0,
+      "new_entities": 1,
+      "removed_entities": 1
+    }
+  },
+  {
+    "name": "accented_name_rename",
+    "old_entities": [
+      {
+        "entity_id": 4,
+        "entity_type": "character",
+        "canonical_name": "Ramón Tejada",
+        "aliases": ["Ramon"],
+        "mention_count": 8,
+        "importance": "low"
+      }
+    ],
+    "new_entities": [
+      {
+        "entity_id": 404,
+        "entity_type": "character",
+        "canonical_name": "Ramon Tejada",
+        "aliases": ["Ramón"],
+        "mention_count": 7,
+        "importance": "low"
+      }
+    ],
+    "expected": {
+      "matched": 1,
+      "renamed": 0,
+      "new_entities": 0,
+      "removed_entities": 0
+    }
+  }
+]

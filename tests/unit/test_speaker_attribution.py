@@ -42,6 +42,8 @@ class MockDialogue:
     chapter: int
     context_after: str = ""
     context_before: str = ""
+    attribution_text: str = ""
+    speaker_hint: str = ""
 
 
 @dataclass
@@ -158,6 +160,202 @@ class TestSpeakerAttributor:
         assert attributions[0].speaker_name == "Juan"  # Nombre canonico
         assert attributions[0].confidence == AttributionConfidence.HIGH
 
+    def test_explicit_attribution_with_accented_verb_and_title(self):
+        """Reconoce verbos acentuados y nombres con título/apellido."""
+        entities = [
+            MockEntity(1, "Don Ramiro Estebanez", ["Ramiro"]),
+            MockEntity(2, "Elena Montero", ["Elena"]),
+        ]
+        attributor = SpeakerAttributor(entities)
+
+        dialogues = [
+            MockDialogue(
+                text="El honor es mío, profesor.",
+                start_char=100,
+                end_char=132,
+                chapter=1,
+                context_after=" - respondió Elena.",
+            ),
+        ]
+
+        attributions = attributor.attribute_dialogues(dialogues)
+
+        assert len(attributions) == 1
+        assert attributions[0].speaker_name == "Elena Montero"
+        assert attributions[0].confidence == AttributionConfidence.HIGH
+        assert attributions[0].attribution_method == AttributionMethod.EXPLICIT_VERB
+
+    def test_explicit_context_has_priority_over_wrong_speaker_hint(self):
+        """
+        Si speaker_hint viene mal, debe ganar la atribución explícita local.
+        Caso típico: primer diálogo con "dijo Don Ramiro", segundo con "respondió Elena".
+        """
+        entities = [
+            MockEntity(1, "Don Ramiro", ["Ramiro"]),
+            MockEntity(2, "Elena Montero", ["Elena", "Montero"]),
+            MockEntity(3, "Isabel", ["Isabel"]),
+        ]
+        attributor = SpeakerAttributor(entities)
+
+        dialogues = [
+            MockDialogue(
+                text="Señorita Montero, es un honor recibirla en mi humilde morada",
+                start_char=100,
+                end_char=170,
+                chapter=1,
+                context_after=(
+                    " - dijo Don Ramiro con una reverencia leve.\n"
+                    "- El honor es mío, profesor. Su carta mencionaba un asunto de suma gravedad - respondió Elena."
+                ),
+                speaker_hint="Elena",  # Hint incorrecto: no debe imponerse
+            ),
+            MockDialogue(
+                text="El honor es mío, profesor. Su carta mencionaba un asunto de suma gravedad",
+                start_char=220,
+                end_char=305,
+                chapter=1,
+                context_after=" - respondió Elena.",
+            ),
+            MockDialogue(
+                text="En efecto. Mi sobrina Isabel ha desaparecido hace tres días. La policía no encuentra indicios.",
+                start_char=340,
+                end_char=435,
+                chapter=1,
+                context_after="",
+            ),
+        ]
+
+        entity_mentions = [
+            (1, 176, 186),  # Don Ramiro
+            (2, 318, 323),  # Elena
+        ]
+
+        attributions = attributor.attribute_dialogues(dialogues, entity_mentions)
+
+        assert len(attributions) == 3
+        assert attributions[0].speaker_name == "Don Ramiro"
+        assert attributions[0].attribution_method == AttributionMethod.EXPLICIT_VERB
+        assert attributions[1].speaker_name == "Elena Montero"
+        # Tercera línea: alternancia natural tras Ramiro/Elena
+        assert attributions[2].speaker_name == "Don Ramiro"
+        assert attributions[2].attribution_method in {
+            AttributionMethod.ALTERNATION,
+            AttributionMethod.PROXIMITY,
+        }
+
+    def test_implicit_subject_from_previous_mention_when_only_verb_present(self):
+        """
+        Atribuye por sujeto implícito cuando hay verbo de habla sin nombre:
+        "— ... — murmuró entre lágrimas."
+        """
+        entities = [
+            MockEntity(1, "Don Ramiro", ["Ramiro"]),
+            MockEntity(2, "Isabel"),
+        ]
+        attributor = SpeakerAttributor(entities)
+
+        dialogues = [
+            MockDialogue(
+                text="Mi pequeña Isabel... ¿Quién haría algo así?",
+                start_char=120,
+                end_char=170,
+                chapter=1,
+                context_before=(
+                    "Don Ramiro recibió la terrible noticia con el rostro descompuesto. "
+                    "El anciano se derrumbó en su sillón."
+                ),
+                context_after=" - murmuró entre lágrimas.",
+            ),
+        ]
+
+        entity_mentions = [
+            (1, 0, 10),  # Don Ramiro antes del diálogo
+            (2, 140, 146),  # Isabel dentro del diálogo
+        ]
+
+        attributions = attributor.attribute_dialogues(dialogues, entity_mentions)
+
+        assert len(attributions) == 1
+        assert attributions[0].speaker_name == "Don Ramiro"
+        assert attributions[0].attribution_method == AttributionMethod.EXPLICIT_VERB
+        assert attributions[0].speech_verb in {"murmuro", "murmuró"}
+
+    def test_multispeaker_turn_scoring_avoids_vocative_target(self):
+        """
+        En escenas con 3+ participantes, evita atribuir al destinatario vocativo
+        y prioriza el ritmo de turnos recientes.
+        """
+        entities = [
+            MockEntity(1, "Don Ramiro", ["Ramiro"]),
+            MockEntity(2, "Elena Montero", ["Elena", "Montero"]),
+            MockEntity(3, "Isabel"),
+        ]
+        attributor = SpeakerAttributor(entities)
+
+        dialogues = [
+            MockDialogue(
+                text="Pase, señorita Montero.",
+                start_char=100,
+                end_char=130,
+                chapter=1,
+                context_after=" —dijo Don Ramiro.",
+            ),
+            MockDialogue(
+                text="Gracias, profesor.",
+                start_char=160,
+                end_char=182,
+                chapter=1,
+                context_after=" —respondió Elena.",
+            ),
+            MockDialogue(
+                text="Isabel, trae la lámpara y no hagas ruido.",
+                start_char=220,
+                end_char=270,
+                chapter=1,
+                context_after="",
+            ),
+        ]
+
+        entity_mentions = [
+            (1, 135, 145),  # Don Ramiro (narración)
+            (2, 186, 191),  # Elena (narración)
+            (3, 225, 231),  # Isabel (vocativo dentro del diálogo)
+        ]
+
+        attributions = attributor.attribute_dialogues(dialogues, entity_mentions)
+
+        assert len(attributions) == 3
+        assert attributions[2].speaker_name == "Don Ramiro"
+        assert attributions[2].attribution_method in {
+            AttributionMethod.ALTERNATION,
+            AttributionMethod.PROXIMITY,
+        }
+
+    def test_explicit_name_clause_verb_after_dialogue(self):
+        """Reconoce patrón compuesto tras diálogo: '—... —Don X, ..., murmuró.'"""
+        entities = [
+            MockEntity(1, "Don Ramiro", ["Ramiro"]),
+            MockEntity(2, "Elena Montero", ["Elena"]),
+        ]
+        attributor = SpeakerAttributor(entities)
+
+        dialogues = [
+            MockDialogue(
+                text="No podemos seguir ocultándolo.",
+                start_char=100,
+                end_char=135,
+                chapter=1,
+                context_after=" —Don Ramiro, con la voz quebrada, murmuró.",
+            ),
+        ]
+
+        attributions = attributor.attribute_dialogues(dialogues)
+
+        assert len(attributions) == 1
+        assert attributions[0].speaker_name == "Don Ramiro"
+        assert attributions[0].confidence == AttributionConfidence.HIGH
+        assert attributions[0].attribution_method == AttributionMethod.EXPLICIT_VERB
+
     def test_alternation_two_speakers(self):
         """Test alternancia entre dos hablantes."""
         entities = [
@@ -211,6 +409,37 @@ class TestSpeakerAttributor:
         # Tercero es Maria (explicito)
         assert attributions[2].speaker_name == "Maria"
         assert attributions[2].confidence == AttributionConfidence.HIGH
+
+    def test_alternation_with_extra_scene_mentions(self):
+        """Mantiene alternancia aunque haya más de dos menciones en escena."""
+        entities = [
+            MockEntity(1, "Juan"),
+            MockEntity(2, "Maria"),
+            MockEntity(3, "Pedro"),
+        ]
+        attributor = SpeakerAttributor(entities)
+
+        dialogues = [
+            MockDialogue("Hola", 10, 20, 1, context_after=" —dijo Juan."),
+            MockDialogue("Buenos días", 40, 60, 1, context_after=" —respondio Maria."),
+            MockDialogue("¿Seguimos?", 90, 110, 1, context_after=""),  # Turno sin pista explícita
+        ]
+
+        # Tres participantes en ventana para forzar que el caso clásico de 2 no aplique.
+        entity_mentions = [
+            (1, 25, 29),
+            (2, 65, 70),
+            (3, 75, 80),
+        ]
+
+        attributions = attributor.attribute_dialogues(dialogues, entity_mentions)
+
+        assert len(attributions) == 3
+        assert attributions[2].speaker_name in {"Juan", "Maria"}
+        assert attributions[2].attribution_method in {
+            AttributionMethod.ALTERNATION,
+            AttributionMethod.PROXIMITY,
+        }
 
     def test_voice_profile_matching(self):
         """Test matching por perfil de voz."""

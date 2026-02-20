@@ -202,15 +202,15 @@ function getEntityIcon(type: string): string {
   align-items: center;
   gap: var(--ds-space-3);
   padding: var(--ds-space-3) var(--ds-space-4);
-  border-bottom: 1px solid var(--surface-border);
+  border-bottom: var(--ds-border-1) solid var(--surface-border);
 }
 
 .header-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: var(--ds-space-9);
+  height: var(--ds-space-9);
   background: var(--primary-100);
   border-radius: var(--border-radius);
   color: var(--primary-color);
@@ -225,12 +225,12 @@ function getEntityIcon(type: string): string {
 
 .header-title {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: var(--ds-font-sm);
   color: var(--text-color);
 }
 
 .header-chapter {
-  font-size: 0.8rem;
+  font-size: var(--ds-font-xs);
   color: var(--text-color-secondary);
 }
 
@@ -247,12 +247,12 @@ function getEntityIcon(type: string): string {
   background: var(--surface-50);
   padding: var(--ds-space-3);
   border-radius: var(--border-radius);
-  border-left: 3px solid var(--primary-color);
+  border-left: calc(var(--ds-border-2) + var(--ds-border-1)) solid var(--primary-color);
 }
 
 .text-preview p {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--ds-font-sm);
   line-height: 1.6;
   color: var(--text-color);
   font-style: italic;
@@ -275,13 +275,13 @@ function getEntityIcon(type: string): string {
 }
 
 .stat-value {
-  font-size: 1.25rem;
+  font-size: var(--ds-font-xl);
   font-weight: 700;
   color: var(--text-color);
 }
 
 .stat-label {
-  font-size: 0.75rem;
+  font-size: var(--ds-font-xs);
   color: var(--text-color-secondary);
 }
 
@@ -295,7 +295,7 @@ function getEntityIcon(type: string): string {
   display: flex;
   align-items: center;
   gap: var(--ds-space-2);
-  font-size: 0.75rem;
+  font-size: var(--ds-font-xs);
   font-weight: 600;
   color: var(--text-color-secondary);
   text-transform: uppercase;
@@ -320,7 +320,7 @@ function getEntityIcon(type: string): string {
   background: var(--surface-ground);
   border-radius: var(--border-radius);
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color var(--ds-duration-normal) var(--ds-ease-in-out);
 }
 
 .entity-item:hover {
@@ -329,11 +329,11 @@ function getEntityIcon(type: string): string {
 
 .entity-item i {
   color: var(--text-color-secondary);
-  font-size: 0.9rem;
+  font-size: var(--ds-font-sm);
 }
 
 .entity-name {
-  font-size: 0.9rem;
+  font-size: var(--ds-font-sm);
   color: var(--text-color);
 }
 
@@ -342,7 +342,7 @@ function getEntityIcon(type: string): string {
   flex-direction: column;
   gap: var(--ds-space-2);
   padding: var(--ds-space-3) var(--ds-space-4);
-  border-top: 1px solid var(--surface-border);
+  border-top: var(--ds-border-1) solid var(--surface-border);
 }
 
 .inspector-actions .primary-action {

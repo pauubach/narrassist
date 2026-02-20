@@ -131,6 +131,129 @@ def capture_entity_fingerprint(db_session: Any, project_id: int) -> str:
         return ""
 
 
+def _build_chapter_signature(db_session: Any, project_id: int) -> tuple[str, int]:
+    """Firma estable de capítulos basada en número/título/contenido."""
+    try:
+        with db_session.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT chapter_number, title, content
+                FROM chapters
+                WHERE project_id = ?
+                ORDER BY chapter_number
+                """,
+                (project_id,),
+            ).fetchall()
+        hasher = hashlib.sha256()
+        for row in rows:
+            hasher.update(str(row["chapter_number"]).encode("utf-8"))
+            hasher.update(b"|")
+            hasher.update(str(row["title"] or "").encode("utf-8"))
+            hasher.update(b"|")
+            content = str(row["content"] or "")
+            hasher.update(hashlib.sha256(content.encode("utf-8")).digest())
+            hasher.update(b"\n")
+        return hasher.hexdigest()[:16], len(rows)
+    except Exception:
+        return "", 0
+
+
+def _build_entity_signature(db_session: Any, project_id: int) -> tuple[str, int]:
+    """Firma estable de entidades activas, sin depender de IDs o timestamps."""
+    try:
+        with db_session.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT canonical_name, entity_type, importance, mention_count
+                FROM entities
+                WHERE project_id = ? AND is_active = 1
+                ORDER BY canonical_name, entity_type
+                """,
+                (project_id,),
+            ).fetchall()
+        hasher = hashlib.sha256()
+        for row in rows:
+            hasher.update(str(row["canonical_name"] or "").encode("utf-8"))
+            hasher.update(b"|")
+            hasher.update(str(row["entity_type"] or "").encode("utf-8"))
+            hasher.update(b"|")
+            hasher.update(str(row["importance"] or "").encode("utf-8"))
+            hasher.update(b"|")
+            hasher.update(str(int(row["mention_count"] or 0)).encode("utf-8"))
+            hasher.update(b"\n")
+        return hasher.hexdigest()[:16], len(rows)
+    except Exception:
+        return "", 0
+
+
+def _build_mentions_signature(db_session: Any, project_id: int) -> str:
+    """Firma estable de distribución de menciones por entidad/capítulo."""
+    try:
+        with db_session.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT e.canonical_name AS canonical_name,
+                       COALESCE(ch.chapter_number, 0) AS chapter_number,
+                       COUNT(*) AS mention_count
+                FROM entity_mentions em
+                JOIN entities e ON em.entity_id = e.id
+                LEFT JOIN chapters ch ON em.chapter_id = ch.id
+                WHERE e.project_id = ? AND e.is_active = 1
+                GROUP BY e.canonical_name, ch.chapter_number
+                ORDER BY e.canonical_name, ch.chapter_number
+                """,
+                (project_id,),
+            ).fetchall()
+        hasher = hashlib.sha256()
+        for row in rows:
+            hasher.update(str(row["canonical_name"] or "").encode("utf-8"))
+            hasher.update(b"|")
+            hasher.update(str(int(row["chapter_number"] or 0)).encode("utf-8"))
+            hasher.update(b"|")
+            hasher.update(str(int(row["mention_count"] or 0)).encode("utf-8"))
+            hasher.update(b"\n")
+        return hasher.hexdigest()[:16]
+    except Exception:
+        return ""
+
+
+def _build_default_input_payload(
+    db_session: Any,
+    project_id: int,
+    enrichment_type: str,
+    phase: int,
+) -> dict[str, Any]:
+    """Payload base para input_hash, estable entre ejecuciones equivalentes."""
+    chapter_signature, chapter_count = _build_chapter_signature(db_session, project_id)
+    entity_signature, entity_count = _build_entity_signature(db_session, project_id)
+    mentions_signature = _build_mentions_signature(db_session, project_id)
+    invalidation_revision = 0
+    try:
+        with db_session.connection() as conn:
+            row = conn.execute(
+                """
+                SELECT COALESCE(MAX(revision), 0) AS rev
+                FROM invalidation_events
+                WHERE project_id = ?
+                """,
+                (project_id,),
+            ).fetchone()
+        invalidation_revision = int(row["rev"] if row else 0)
+    except Exception:
+        invalidation_revision = 0
+
+    return {
+        "enrichment_type": enrichment_type,
+        "phase": phase,
+        "chapter_count": chapter_count,
+        "chapter_signature": chapter_signature,
+        "entity_count": entity_count,
+        "entity_signature": entity_signature,
+        "mentions_signature": mentions_signature,
+        "invalidation_revision": invalidation_revision,
+    }
+
+
 def invalidate_enrichment_if_mutated(
     db_session: Any, project_id: int, saved_fingerprint: str
 ) -> bool:
@@ -200,37 +323,12 @@ def _run_enrichment(
     """
     if input_payload is None:
         try:
-            with db_session.connection() as conn:
-                chapter_meta = conn.execute(
-                    """
-                    SELECT COUNT(*) AS c, COALESCE(MAX(updated_at), '') AS ts
-                    FROM chapters WHERE project_id = ?
-                    """,
-                    (project_id,),
-                ).fetchone()
-                entity_meta = conn.execute(
-                    """
-                    SELECT COUNT(*) AS c, COALESCE(MAX(updated_at), '') AS ts
-                    FROM entities WHERE project_id = ?
-                    """,
-                    (project_id,),
-                ).fetchone()
-                invalidation_meta = conn.execute(
-                    """
-                    SELECT COALESCE(MAX(revision), 0) AS rev
-                    FROM invalidation_events WHERE project_id = ?
-                    """,
-                    (project_id,),
-                ).fetchone()
-            input_payload = {
-                "enrichment_type": enrichment_type,
-                "phase": phase,
-                "chapter_count": int(chapter_meta["c"] if chapter_meta else 0),
-                "chapter_ts": chapter_meta["ts"] if chapter_meta else "",
-                "entity_count": int(entity_meta["c"] if entity_meta else 0),
-                "entity_ts": entity_meta["ts"] if entity_meta else "",
-                "invalidation_revision": int(invalidation_meta["rev"] if invalidation_meta else 0),
-            }
+            input_payload = _build_default_input_payload(
+                db_session=db_session,
+                project_id=project_id,
+                enrichment_type=enrichment_type,
+                phase=phase,
+            )
         except Exception:
             input_payload = {"enrichment_type": enrichment_type, "phase": phase}
 
@@ -242,17 +340,32 @@ def _run_enrichment(
             with db_session.connection() as conn:
                 cached = conn.execute(
                     """
-                    SELECT status, input_hash
+                    SELECT status, input_hash, result_json
                     FROM enrichment_cache
                     WHERE project_id = ? AND enrichment_type = ? AND entity_scope IS NULL
                     LIMIT 1
                     """,
                     (project_id, enrichment_type),
                 ).fetchone()
-                if cached and cached[0] == "completed" and cached[1] == input_hash:
+                if (
+                    cached
+                    and cached[1] == input_hash
+                    and cached[0] in ("completed", "stale")
+                    and cached[2]
+                ):
+                    conn.execute(
+                        """
+                        UPDATE enrichment_cache
+                        SET status = 'completed', updated_at = datetime('now')
+                        WHERE project_id = ? AND enrichment_type = ? AND entity_scope IS NULL
+                        """,
+                        (project_id, enrichment_type),
+                    )
+                    conn.commit()
                     logger.info(
-                        "[Enrichment] %s skipped (input_hash unchanged: %s)",
+                        "[Enrichment] %s skipped (%s, input_hash unchanged: %s)",
                         label,
+                        cached[0],
                         input_hash,
                     )
                     return True

@@ -4,7 +4,7 @@ import DocumentViewer from '@/components/DocumentViewer.vue'
 import TextFindBar from '@/components/workspace/TextFindBar.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { META_CATEGORIES, type MetaCategoryKey } from '@/composables/useAlertUtils'
-import type { Alert, Chapter } from '@/types'
+import type { Alert, Chapter, DialogueAttribution } from '@/types'
 
 const workspaceStore = useWorkspaceStore()
 
@@ -12,6 +12,7 @@ const workspaceStore = useWorkspaceStore()
 const textTabContainer = ref<HTMLElement | null>(null)
 const showFindBar = ref(false)
 const findBarRef = ref<InstanceType<typeof TextFindBar> | null>(null)
+const documentViewerRef = ref<InstanceType<typeof DocumentViewer> | null>(null)
 
 function openFindBar() {
   if (showFindBar.value) {
@@ -22,7 +23,17 @@ function openFindBar() {
   }
 }
 
-defineExpose({ openFindBar })
+function scrollToDialogue(attribution: DialogueAttribution) {
+  const chapter = props.chapters.find(ch => ch.chapterNumber === attribution.chapterNumber)
+  if (!chapter) return
+  documentViewerRef.value?.scrollToMention({
+    chapterId: chapter.id,
+    position: attribution.startChar,
+    text: attribution.text,
+  })
+}
+
+defineExpose({ openFindBar, scrollToDialogue })
 
 /**
  * TextTab - Pestaña principal de visualización de texto
@@ -122,9 +133,6 @@ const alertsByChapter = computed(() => {
 })
 
 // Computed: posiciones relativas de alertas para el gutter
-// Memoización de gutterMarkers con hash (performance optimization #6)
-const gutterMarkersCache = ref<{ hash: string; value: any[] } | null>(null)
-
 function computeGutterMarkers() {
   const markers: Array<{
     id: number
@@ -231,19 +239,7 @@ function computeGutterMarkers() {
 }
 
 const gutterMarkers = computed(() => {
-  // Hash basado en chapters length y alerts length
-  const hash = `${props.chapters.length}-${props.alerts.length}`
-
-  if (gutterMarkersCache.value?.hash === hash) {
-    return gutterMarkersCache.value.value
-  }
-
-  const markers = computeGutterMarkers()
-  // Side effect en nextTick para no violar regla de computed
-  nextTick(() => {
-    gutterMarkersCache.value = { hash, value: markers }
-  })
-  return markers
+  return computeGutterMarkers()
 })
 
 // Computed: convertir gutterMarkers a Map<chapterId, badges[]> para DocumentViewer
@@ -363,6 +359,7 @@ onMounted(async () => {
     <!-- Document Viewer -->
     <div class="document-area">
       <DocumentViewer
+        ref="documentViewerRef"
         :project-id="projectId"
         :document-title="documentTitle"
         :highlight-entity-id="highlightEntityId"

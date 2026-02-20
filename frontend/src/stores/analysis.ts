@@ -23,6 +23,14 @@ export interface AnalysisProgress {
     alerts_generated?: number
   }
   estimated_seconds_remaining?: number
+  subphase?: {
+    phase_id?: string
+    id: string
+    label: string
+    progress: number
+    step?: number
+    total_steps?: number
+  }
   error?: string
 }
 

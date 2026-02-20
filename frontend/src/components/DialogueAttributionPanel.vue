@@ -43,7 +43,7 @@
 
     <!-- Loading -->
     <div v-if="loading" class="loading-state">
-      <ProgressSpinner style="width: 30px; height: 30px" />
+      <ProgressSpinner class="loading-spinner" />
       <p>Cargando atribuciones...</p>
     </div>
 
@@ -61,7 +61,7 @@
         :key="idx"
         class="attribution-item"
         :class="getConfidenceClass(attr.confidence)"
-        @click="selectedChapter !== null && $emit('select-dialogue', { ...attr, chapterNumber: selectedChapter })"
+        @click="$emit('select-dialogue', { ...attr, chapterNumber: selectedChapter ?? attr.chapterNumber })"
       >
         <div class="dialogue-header">
           <div class="speaker-info">
@@ -99,29 +99,18 @@
         <div v-if="correctingIndex === idx" class="correction-form" @click.stop>
           <label class="correction-label">Hablante correcto:</label>
           <Select
-            v-model="correctedSpeakerOption"
+            v-model="correctedSpeakerId"
             :options="speakerOptions"
             option-label="label"
+            option-value="value"
             placeholder="Seleccionar hablante"
             class="correction-select"
             size="small"
+            :disabled="savingCorrection"
+            @change="onCorrectionSelectionChange(attr)"
           />
           <span v-if="speakerOptions.length === 0" class="no-entities-message">No hay personajes disponibles</span>
-          <div class="correction-actions">
-            <Button
-              icon="pi pi-check"
-              size="small"
-              :disabled="speakerOptions.length === 0"
-              :loading="savingCorrection"
-              @click.stop="saveCorrection(attr)"
-            />
-            <Button
-              icon="pi pi-times"
-              size="small"
-              text
-              @click.stop="cancelCorrection"
-            />
-          </div>
+          <span class="auto-save-hint">Se guarda al seleccionar</span>
         </div>
 
         <div class="dialogue-text">
@@ -174,9 +163,12 @@ import type { DialogueAttribution, DialogueAttributionStats } from '@/types'
 
 interface SpeakerEntity {
   id: number
-  name: string
+  name?: string
+  canonical_name?: string
+  canonicalName?: string
   type?: string
   entity_type?: string
+  entityType?: string
 }
 
 const props = defineProps<{
@@ -201,7 +193,7 @@ const selectedChapter = ref<number | null>(props.initialChapter ?? null)
 
 // Speaker correction state
 const correctingIndex = ref<number | null>(null)
-const correctedSpeakerOption = ref<{ label: string; value: number | null } | null>(null)
+const correctedSpeakerId = ref<number | null>(null)
 const savingCorrection = ref(false)
 const correctedDialogues = ref<Map<string, { speakerName: string; speakerId: number | null }>>(new Map())
 
@@ -213,11 +205,11 @@ const speakerOptions = computed(() => {
   }
 
   const characters = props.entities.filter(e => {
-    const t = e.type || e.entity_type || ''
-    return t === 'character'
+    const t = String(e.type || e.entity_type || e.entityType || '').toLowerCase()
+    return t === 'character' || t === 'animal' || t === 'creature' || t === 'per' || t === 'person'
   })
   const options: Array<{ label: string; value: number | null }> = characters.map(e => ({
-    label: e.name,
+    label: e.name || e.canonical_name || e.canonicalName || `Entidad ${e.id}`,
     value: e.id
   }))
 
@@ -227,6 +219,12 @@ const speakerOptions = computed(() => {
   }
 
   return options
+})
+
+watch(speakerOptions, (options) => {
+  if (!options.some(opt => opt.value === correctedSpeakerId.value)) {
+    correctedSpeakerId.value = null
+  }
 })
 
 // Chapter options for dropdown
@@ -383,22 +381,26 @@ function startCorrection(idx: number, attr: DialogueAttribution) {
   }
 
   correctingIndex.value = idx
-  // Find the matching option object, or default to "Desconocido" (null value)
-  const match = speakerOptions.value.find(o => o.value === attr.speakerId)
-  correctedSpeakerOption.value = match || speakerOptions.value.find(o => o.value === null) || null
+  // Seleccionar hablante actual o fallback a "Desconocido".
+  correctedSpeakerId.value = speakerOptions.value.some(o => o.value === attr.speakerId)
+    ? (attr.speakerId ?? null)
+    : null
 }
 
 function startCorrectionWithAlt(idx: number, attr: DialogueAttribution, altId: number) {
   startCorrection(idx, attr)
   if (correctingIndex.value !== null) {
-    const match = speakerOptions.value.find(o => o.value === altId)
-    if (match) correctedSpeakerOption.value = match
+    if (speakerOptions.value.some(o => o.value === altId)) {
+      correctedSpeakerId.value = altId
+    }
   }
 }
 
-function cancelCorrection() {
-  correctingIndex.value = null
-  correctedSpeakerOption.value = null
+async function onCorrectionSelectionChange(attr: DialogueAttribution & { chapterNumber?: number }) {
+  if (correctingIndex.value === null || savingCorrection.value) {
+    return
+  }
+  await saveCorrection(attr)
 }
 
 function getDialogueKey(attr: DialogueAttribution & { chapterNumber?: number }): string {
@@ -420,7 +422,7 @@ async function saveCorrection(attr: DialogueAttribution & { chapterNumber?: numb
   const chapterNum = selectedChapter.value ?? attr.chapterNumber
   if (chapterNum === null || chapterNum === undefined) return
 
-  const selectedSpeakerId = correctedSpeakerOption.value?.value ?? null
+  const selectedSpeakerId = correctedSpeakerId.value ?? null
 
   savingCorrection.value = true
   try {
@@ -434,9 +436,10 @@ async function saveCorrection(attr: DialogueAttribution & { chapterNumber?: numb
     })
 
     if (data.success) {
+      const selectedOption = speakerOptions.value.find(o => o.value === selectedSpeakerId) || null
       // Track locally which dialogues have been corrected
       correctedDialogues.value.set(getDialogueKey(attr), {
-        speakerName: correctedSpeakerOption.value?.label || 'Desconocido',
+        speakerName: selectedOption?.label || 'Desconocido',
         speakerId: selectedSpeakerId,
       })
       toast.add({ severity: 'success', summary: 'Corregido', detail: 'Hablante corregido correctamente', life: 2000 })
@@ -449,7 +452,7 @@ async function saveCorrection(attr: DialogueAttribution & { chapterNumber?: numb
   } finally {
     savingCorrection.value = false
     correctingIndex.value = null
-    correctedSpeakerOption.value = null
+    correctedSpeakerId.value = null
   }
 }
 
@@ -470,53 +473,66 @@ watch(selectedChapter, () => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   background: var(--surface-card);
+  overflow: hidden;
+}
+
+.dialogue-attribution-panel,
+.dialogue-attribution-panel * {
+  box-sizing: border-box;
 }
 
 .panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  border-bottom: 1px solid var(--surface-border);
+  padding: var(--ds-space-4);
+  border-bottom: var(--ds-border-1) solid var(--surface-border);
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: var(--ds-space-3);
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--ds-space-2);
 }
 
 .header-left h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--ds-font-base);
   font-weight: 600;
 }
 
 .header-left i {
   color: var(--primary-color);
-  font-size: 1.25rem;
+  font-size: var(--ds-font-xl);
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--ds-space-2);
+  min-width: 0;
 }
 
 .chapter-selector {
-  width: 180px;
+  width: min(calc(var(--ds-space-10) * 4.5), 100%);
+  max-width: 100%;
 }
 
 /* Stats Bar */
 .stats-bar {
   display: flex;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-3) var(--ds-space-4);
   background: var(--surface-ground);
-  border-bottom: 1px solid var(--surface-border);
+  border-bottom: var(--ds-border-1) solid var(--surface-border);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .stat-item {
@@ -524,20 +540,24 @@ watch(selectedChapter, () => {
   flex-direction: column;
   align-items: center;
   flex: 1;
-  padding: 0.5rem;
+  padding: var(--ds-space-2);
   background: var(--surface-card);
   border-radius: var(--app-radius);
+  min-width: 0;
 }
 
 .stat-item .stat-value {
-  font-size: 1.125rem;
+  font-size: var(--ds-font-lg);
   font-weight: 700;
   color: var(--text-color);
 }
 
 .stat-item .stat-label {
-  font-size: 0.7rem;
+  font-size: calc(var(--ds-font-xs) * 0.933);
   color: var(--text-color-secondary);
+  text-align: center;
+  line-height: var(--ds-leading-tight);
+  overflow-wrap: anywhere;
 }
 
 .stat-item.success .stat-value {
@@ -560,9 +580,14 @@ watch(selectedChapter, () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 3rem;
+  padding: var(--ds-space-12);
   flex: 1;
   color: var(--text-color-secondary);
+}
+
+.loading-spinner {
+  width: calc(var(--ds-space-6) + var(--ds-space-1-5));
+  height: calc(var(--ds-space-6) + var(--ds-space-1-5));
 }
 
 .error-state {
@@ -571,33 +596,39 @@ watch(selectedChapter, () => {
 
 .error-state i,
 .empty-icon {
-  font-size: 2.5rem;
+  font-size: var(--ds-font-2xl);
   opacity: 0.4;
-  margin-bottom: 1rem;
+  margin-bottom: var(--ds-space-4);
 }
 
 /* Attributions List */
 .attributions-list {
   flex: 1;
   overflow-y: auto;
-  padding: 0.75rem;
+  overflow-x: hidden;
+  min-height: 0;
+  scrollbar-gutter: stable;
+  padding: var(--ds-space-3);
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--ds-space-3);
 }
 
 .attribution-item {
-  padding: 1rem;
+  padding: var(--ds-space-4);
   background: var(--surface-ground);
   border-radius: var(--app-radius);
-  border-left: 4px solid var(--primary-color);
+  border-left: var(--ds-border-4) solid var(--primary-color);
   cursor: pointer;
-  transition: background 0.2s, transform 0.1s;
+  transition: background var(--ds-duration-normal) var(--ds-ease-in-out),
+    transform var(--ds-duration-fast) var(--ds-ease-in-out);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .attribution-item:hover {
   background: var(--surface-hover);
-  transform: translateX(2px);
+  transform: translateX(var(--ds-space-0-5));
 }
 
 .attribution-item.confidence-high {
@@ -620,85 +651,107 @@ watch(selectedChapter, () => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--ds-space-3);
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--ds-space-2);
+  min-width: 0;
 }
 
 .speaker-info {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--ds-space-2);
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .speaker-info i {
   color: var(--primary-color);
-  font-size: 0.875rem;
+  font-size: var(--ds-font-sm);
 }
 
 .speaker-name {
   font-weight: 600;
   color: var(--text-color);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .attribution-meta {
   display: flex;
-  gap: 0.375rem;
+  gap: var(--ds-space-1-5);
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .attribution-meta :deep(.p-tag) {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
+  padding: var(--ds-space-1) var(--ds-space-2);
+  font-size: var(--ds-font-xs);
 }
 
 .dialogue-text {
   display: flex;
-  gap: 0.5rem;
-  padding: 0.75rem;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-3);
   background: var(--surface-card);
   border-radius: var(--app-radius);
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--ds-space-2);
+  min-width: 0;
 }
 
 .quote-icon {
   color: var(--text-color-secondary);
-  font-size: 0.75rem;
+  font-size: var(--ds-font-xs);
   flex-shrink: 0;
-  margin-top: 0.25rem;
+  margin-top: var(--ds-space-1);
 }
 
 .dialogue-text p {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--ds-font-sm);
   line-height: 1.5;
   color: var(--text-color);
   font-style: italic;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .alternatives {
-  margin-top: 0.5rem;
+  margin-top: var(--ds-space-2);
 }
 
 .alternatives-label {
-  font-size: 0.75rem;
+  font-size: var(--ds-font-xs);
   color: var(--text-color-secondary);
   display: block;
-  margin-bottom: 0.375rem;
+  margin-bottom: var(--ds-space-1-5);
 }
 
 .alternatives-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.375rem;
+  gap: var(--ds-space-1-5);
+  min-width: 0;
 }
 
 .alternatives-list :deep(.p-chip) {
-  font-size: 0.7rem;
+  font-size: calc(var(--ds-font-xs) * 0.933);
+  max-width: 100%;
+}
+
+.alternatives-list :deep(.p-chip-label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .speech-verb {
-  margin-top: 0.5rem;
+  margin-top: var(--ds-space-2);
   color: var(--text-color-secondary);
 }
 
@@ -709,9 +762,9 @@ watch(selectedChapter, () => {
 /* Speaker correction */
 .correct-btn {
   opacity: 0;
-  transition: opacity 0.15s;
-  width: 1.5rem !important;
-  height: 1.5rem !important;
+  transition: opacity var(--ds-duration-fast);
+  width: var(--ds-space-6) !important;
+  height: var(--ds-space-6) !important;
   padding: 0 !important;
 }
 
@@ -722,27 +775,29 @@ watch(selectedChapter, () => {
 .speaker-corrected {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--ds-space-2);
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .corrected-tag {
-  font-size: 0.65rem;
+  font-size: calc(var(--ds-font-xs) * 0.867);
 }
 
 .correction-form {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.5rem;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  margin-bottom: var(--ds-space-2);
   background: var(--primary-50);
-  border: 1px solid var(--primary-200);
+  border: var(--ds-border-1) solid var(--primary-200);
   border-radius: var(--app-radius);
   flex-wrap: wrap;
 }
 
 .correction-label {
-  font-size: 0.8rem;
+  font-size: var(--ds-font-xs);
   font-weight: 500;
   color: var(--text-color-secondary);
   white-space: nowrap;
@@ -750,12 +805,12 @@ watch(selectedChapter, () => {
 
 .correction-select {
   flex: 1;
-  min-width: 150px;
+  min-width: calc(var(--ds-space-10) * 3.75);
 }
 
-.correction-actions {
-  display: flex;
-  gap: 0.25rem;
+.auto-save-hint {
+  font-size: var(--ds-font-xs);
+  color: var(--text-color-secondary);
 }
 
 .alt-chip {
@@ -767,7 +822,7 @@ watch(selectedChapter, () => {
 }
 
 .no-entities-message {
-  font-size: 0.8rem;
+  font-size: var(--ds-font-xs);
   color: var(--text-color-secondary);
   font-style: italic;
 }

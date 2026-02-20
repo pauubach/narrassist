@@ -120,6 +120,11 @@ export interface VersionMetrics {
   renamedEntities?: number
   newEntities?: number
   removedEntities?: number
+  topEntityRenames?: Array<{
+    oldName: string
+    newName: string
+    confidence: number
+  }>
   createdAt: Date
 }
 

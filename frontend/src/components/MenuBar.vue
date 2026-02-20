@@ -126,20 +126,32 @@ const menus = computed<Menu[]>(() => {
     )
   }
 
+  const fileItems: MenuItem[] = [
+    { label: 'Nuevo Proyecto', action: 'newProject', icon: 'plus', shortcut: 'Ctrl+N' },
+    { label: 'Abrir Proyecto', action: 'openProject', icon: 'folder-open', shortcut: 'Ctrl+O' },
+    { label: 'Cerrar Proyecto', action: 'closeProject', icon: 'times', disabled: !isInProject.value },
+  ]
+
+  if (isInProject.value) {
+    fileItems.push(
+      { divider: true, label: '' },
+      { label: 'Actualizar manuscrito...', action: 'updateManuscript', icon: 'upload' },
+    )
+  }
+
+  fileItems.push(
+    { divider: true, label: '' },
+    { label: 'Exportar', action: 'export', icon: 'download', shortcut: 'Ctrl+E', disabled: !isInProject.value },
+    { divider: true, label: '' },
+    { label: 'Configuración', action: 'settings', icon: 'cog', shortcut: 'Ctrl+,' },
+    { divider: true, label: '' },
+    { label: 'Salir', action: 'exit', icon: 'sign-out', shortcut: 'Ctrl+Q' },
+  )
+
   return [
     {
       label: 'Archivo',
-      items: [
-        { label: 'Nuevo Proyecto', action: 'newProject', icon: 'plus', shortcut: 'Ctrl+N' },
-        { label: 'Abrir Proyecto', action: 'openProject', icon: 'folder-open', shortcut: 'Ctrl+O' },
-        { label: 'Cerrar Proyecto', action: 'closeProject', icon: 'times', disabled: !isInProject.value },
-        { divider: true, label: '' },
-        { label: 'Exportar', action: 'export', icon: 'download', shortcut: 'Ctrl+E', disabled: !isInProject.value },
-        { divider: true, label: '' },
-        { label: 'Configuración', action: 'settings', icon: 'cog', shortcut: 'Ctrl+,' },
-        { divider: true, label: '' },
-        { label: 'Salir', action: 'exit', icon: 'sign-out', shortcut: 'Ctrl+Q' },
-      ]
+      items: fileItems
     },
     {
       label: 'Edición',
@@ -303,6 +315,9 @@ const handleMenuAction = (item: MenuItem) => {
     case 'export':
       // Trigger export dialog
       window.dispatchEvent(new CustomEvent('menubar:export'))
+      break
+    case 'updateManuscript':
+      window.dispatchEvent(new CustomEvent('menubar:update-manuscript'))
       break
     case 'settings':
       router.push('/settings')

@@ -10,6 +10,9 @@ _api_server = str(Path(__file__).resolve().parents[2] / "api-server")
 if _api_server not in sys.path:
     sys.path.insert(0, _api_server)
 
+from routers._incremental_planner import build_incremental_plan, build_phase_plan
+from routers.projects import router as projects_router
+
 
 def _insert_project(db: Database, project_id: int = 1) -> None:
     with db.connection() as conn:
@@ -103,8 +106,6 @@ def test_entity_links_detect_rename_using_aliases(tmp_path):
 
 
 def test_incremental_planner_skips_entity_enrichment_for_small_changes(tmp_path):
-    from routers._incremental_planner import build_incremental_plan
-
     db = Database(db_path=tmp_path / "plan.db")
     _insert_project(db)
 
@@ -146,10 +147,71 @@ def test_incremental_planner_skips_entity_enrichment_for_small_changes(tmp_path)
     assert plan["run_voice"] is False
 
 
-def test_projects_router_exposes_version_diff_endpoints():
-    from routers.projects import router
+def test_incremental_planner_forces_full_on_structure_change(tmp_path):
+    db = Database(db_path=tmp_path / "plan_full.db")
+    _insert_project(db)
 
-    paths = [r.path for r in router.routes]
+    with db.connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO analysis_snapshots (id, project_id, document_fingerprint, alert_count, entity_count, status)
+            VALUES (1, 1, 'old_fp', 0, 0, 'complete')
+            """
+        )
+        for chapter_num in range(1, 5):
+            conn.execute(
+                """
+                INSERT INTO snapshot_chapters (snapshot_id, project_id, chapter_number, content_hash, content_text)
+                VALUES (1, 1, ?, ?, ?)
+                """,
+                (chapter_num, f"h{chapter_num}", f"Texto capitulo {chapter_num}"),
+            )
+
+    plan = build_incremental_plan(
+        db=db,
+        project_id=1,
+        snapshot_id=1,
+        chapters_data=[
+            {"chapter_number": 1, "content": "Texto capitulo 1"},
+            {"chapter_number": 2, "content": "Texto capitulo 2"},
+            {"chapter_number": 3, "content": "Texto capitulo 3"},
+            {"chapter_number": 4, "content": "Texto capitulo 4"},
+            {"chapter_number": 5, "content": "Capitulo nuevo"},  # añadido -> full
+        ],
+    )
+
+    assert plan["mode"] == "full"
+    assert plan["run_relationships"] is True
+    assert plan["run_voice"] is True
+
+
+def test_phase_plan_dependency_closure_adds_health():
+    from narrative_assistant.persistence.version_diff import ChapterDiffMetrics
+
+    chapter_diff = ChapterDiffMetrics(
+        total_previous=10,
+        total_current=10,
+        modified=1,
+        added=0,
+        removed=0,
+        changed_ratio=0.15,
+    )
+
+    plan = build_phase_plan(
+        chapter_diff=chapter_diff,
+        entity_changes={"has_ner_delta": True, "has_attribute_delta": False},
+        invalidations={},
+    )
+
+    assert plan["mode"] == "incremental"
+    assert plan["run_relationships"] is True
+    assert plan["run_voice"] is True
+    assert plan["run_health"] is True
+    assert "health" in plan["impacted_nodes"]
+
+
+def test_projects_router_exposes_version_diff_endpoints():
+    paths = [r.path for r in projects_router.routes]
     assert "/api/projects/{project_id}/versions/summary" in paths
     assert "/api/projects/{project_id}/versions/{version_num}/entity-links" in paths
     assert "/api/projects/{project_id}/versions/compare" in paths

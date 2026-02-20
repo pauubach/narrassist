@@ -163,6 +163,11 @@ export function transformVersionMetrics(api: ApiVersionMetrics): VersionMetrics 
     renamedEntities: api.renamed_entities ?? 0,
     newEntities: api.new_entities ?? 0,
     removedEntities: api.removed_entities ?? 0,
+    topEntityRenames: (api.top_entity_renames ?? []).map(rename => ({
+      oldName: rename.old_name,
+      newName: rename.new_name,
+      confidence: rename.confidence,
+    })),
     createdAt: safeDate(api.created_at, new Date())!,
   }
 }

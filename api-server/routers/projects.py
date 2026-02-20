@@ -3,7 +3,7 @@ Router: projects
 """
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import deps
 from deps import ApiResponse, ProjectResponse, _get_project_stats, logger
@@ -113,6 +113,26 @@ def _parse_document(path: Path) -> tuple[str, str]:
             status_code=400, detail="El documento está vacío o no se pudo leer el contenido"
         )
     return text, format_str
+
+
+def _load_project_text_from_db(project_id: int) -> str:
+    """Carga texto previo desde capítulos persistidos si el archivo original no se puede parsear."""
+    try:
+        db = deps.get_database()
+        with db.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT content
+                FROM chapters
+                WHERE project_id = ?
+                ORDER BY chapter_number
+                """,
+                (project_id,),
+            ).fetchall()
+        parts = [str(r["content"] or "").strip() for r in rows if r["content"]]
+        return "\n\n".join(p for p in parts if p)
+    except Exception:
+        return ""
 
 
 @router.get("/api/projects", response_model=ApiResponse)
@@ -755,6 +775,7 @@ def replace_project_document(
     - different_document: bloquear y pedir crear proyecto nuevo
     """
     temp_upload_path: Optional[Path] = None
+    retain_uploaded_file = False
     try:
         if not deps.project_manager:
             return ApiResponse(success=False, error="Project manager not initialized")
@@ -802,6 +823,13 @@ def replace_project_document(
                     project_id,
                     parse_old_err,
                 )
+        if not previous_text:
+            previous_text = _load_project_text_from_db(project_id)
+            if previous_text:
+                logger.info(
+                    "replace_project_document: usando capítulos persistidos como baseline para proyecto %s",
+                    project_id,
+                )
 
         identity_service = ManuscriptIdentityService()
         if previous_text:
@@ -836,8 +864,15 @@ def replace_project_document(
                 },
             )
 
+        uncertain_limit = 3
+        try:
+            config = deps.get_config()
+            uncertain_limit = int(config.persistence.identity_uncertain_limit_30d or 3)
+        except Exception:
+            uncertain_limit = 3
+
         uncertain_count_30d = identity_repo.uncertain_count_rolling(license_subject, days=30)
-        review_required = uncertain_count_30d > 3
+        review_required = uncertain_count_30d > uncertain_limit
         identity_repo.upsert_risk_state(
             license_subject=license_subject,
             uncertain_count_30d=uncertain_count_30d,
@@ -847,7 +882,10 @@ def replace_project_document(
             identity_repo.append_risk_event(
                 license_subject=license_subject,
                 event_type="uncertain_threshold_exceeded",
-                details={"uncertain_count_30d": uncertain_count_30d},
+                details={
+                    "uncertain_count_30d": uncertain_count_30d,
+                    "threshold": uncertain_limit,
+                },
             )
 
         if decision.classification == IDENTITY_DIFFERENT_DOCUMENT:
@@ -884,6 +922,9 @@ def replace_project_document(
         if update_result.is_failure:
             return ApiResponse(success=False, error="No se pudo actualizar el proyecto.")
 
+        if temp_upload_path is not None:
+            retain_uploaded_file = True
+
         return ApiResponse(
             success=True,
             data={
@@ -892,7 +933,7 @@ def replace_project_document(
                 "confidence": round(decision.confidence, 4),
                 "recommended_full_run": decision.recommended_full_run,
             },
-            message="Documento reemplazado correctamente. Ejecuta un nuevo análisis.",
+            message="Manuscrito actualizado correctamente. Ejecuta un nuevo análisis.",
         )
     except HTTPException:
         raise
@@ -900,9 +941,14 @@ def replace_project_document(
         logger.error(f"Error replacing document for project {project_id}: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
     finally:
-        if temp_upload_path and temp_upload_path.exists():
-            # Se conserva archivo final al estar asociado al proyecto.
-            pass
+        if temp_upload_path and temp_upload_path.exists() and not retain_uploaded_file:
+            try:
+                temp_upload_path.unlink(missing_ok=True)
+            except Exception:
+                logger.debug(
+                    "replace_project_document: no se pudo eliminar upload temporal %s",
+                    temp_upload_path,
+                )
 
 
 @router.get("/api/projects/{project_id}/identity/last-check", response_model=ApiResponse)
@@ -955,47 +1001,69 @@ def list_versions(project_id: int, limit: int = Query(50, ge=1, le=200)):
                    LIMIT ?""",
                 (project_id, limit),
             ).fetchall()
+            versions = []
+            for r in rows:
+                top_entity_renames: list[dict[str, Any]] = []
+                snapshot_id = r[3]
+                if snapshot_id:
+                    rename_rows = conn.execute(
+                        """
+                        SELECT old_name, new_name, confidence
+                        FROM entity_version_links
+                        WHERE project_id = ? AND snapshot_id = ? AND link_type = 'renamed'
+                        ORDER BY confidence DESC, id ASC
+                        LIMIT 5
+                        """,
+                        (project_id, int(snapshot_id)),
+                    ).fetchall()
+                    top_entity_renames = [
+                        {
+                            "old_name": rr["old_name"] or "",
+                            "new_name": rr["new_name"] or "",
+                            "confidence": float(rr["confidence"] or 0.0),
+                        }
+                        for rr in rename_rows
+                    ]
 
-        versions = []
-        for r in rows:
-            versions.append(
-                {
-                    "id": r[0],
-                    "project_id": r[1],
-                    "version_num": r[2],
-                    "snapshot_id": r[3],
-                    "alert_count": r[4],
-                    "word_count": r[5],
-                    "entity_count": r[6],
-                    "chapter_count": r[7],
-                    "health_score": r[8],
-                    "formality_avg": r[9],
-                    "dialogue_ratio": r[10],
-                    "created_at": r[11],
-                    "alerts_new_count": r[12] or 0,
-                    "alerts_resolved_count": r[13] or 0,
-                    "alerts_unchanged_count": r[14] or 0,
-                    "critical_count": r[15] or 0,
-                    "warning_count": r[16] or 0,
-                    "info_count": r[17] or 0,
-                    "entities_new_count": r[18] or 0,
-                    "entities_removed_count": r[19] or 0,
-                    "entities_renamed_count": r[20] or 0,
-                    "chapter_added_count": r[21] or 0,
-                    "chapter_removed_count": r[22] or 0,
-                    "chapter_reordered_count": r[23] or 0,
-                    "run_mode": r[24] or "full",
-                    "duration_total_sec": float(r[25] or 0.0),
-                    "phase_durations_json": r[26] or "{}",
-                    "modified_chapters": r[27] or 0,
-                    "added_chapters": r[28] or 0,
-                    "removed_chapters": r[29] or 0,
-                    "chapter_change_ratio": float(r[30] or 0.0),
-                    "renamed_entities": r[31] or 0,
-                    "new_entities": r[32] or 0,
-                    "removed_entities": r[33] or 0,
-                }
-            )
+                versions.append(
+                    {
+                        "id": r[0],
+                        "project_id": r[1],
+                        "version_num": r[2],
+                        "snapshot_id": r[3],
+                        "alert_count": r[4],
+                        "word_count": r[5],
+                        "entity_count": r[6],
+                        "chapter_count": r[7],
+                        "health_score": r[8],
+                        "formality_avg": r[9],
+                        "dialogue_ratio": r[10],
+                        "created_at": r[11],
+                        "alerts_new_count": r[12] or 0,
+                        "alerts_resolved_count": r[13] or 0,
+                        "alerts_unchanged_count": r[14] or 0,
+                        "critical_count": r[15] or 0,
+                        "warning_count": r[16] or 0,
+                        "info_count": r[17] or 0,
+                        "entities_new_count": r[18] or 0,
+                        "entities_removed_count": r[19] or 0,
+                        "entities_renamed_count": r[20] or 0,
+                        "chapter_added_count": r[21] or 0,
+                        "chapter_removed_count": r[22] or 0,
+                        "chapter_reordered_count": r[23] or 0,
+                        "run_mode": r[24] or "full",
+                        "duration_total_sec": float(r[25] or 0.0),
+                        "phase_durations_json": r[26] or "{}",
+                        "modified_chapters": r[27] or 0,
+                        "added_chapters": r[28] or 0,
+                        "removed_chapters": r[29] or 0,
+                        "chapter_change_ratio": float(r[30] or 0.0),
+                        "renamed_entities": r[31] or 0,
+                        "new_entities": r[32] or 0,
+                        "removed_entities": r[33] or 0,
+                        "top_entity_renames": top_entity_renames,
+                    }
+                )
 
         return ApiResponse(success=True, data=versions)
     except Exception as e:
@@ -1072,7 +1140,7 @@ def get_version_summary(project_id: int):
         with db.connection() as conn:
             latest = conn.execute(
                 """
-                SELECT vm.version_num, vm.alert_count, vm.health_score, vm.created_at,
+                SELECT vm.version_num, vm.alert_count, vm.health_score, vm.created_at, vm.snapshot_id,
                        vd.modified_chapters, vd.chapter_change_ratio,
                        vd.renamed_entities, vd.new_entities, vd.removed_entities
                 FROM version_metrics vm
@@ -1107,6 +1175,28 @@ def get_version_summary(project_id: int):
                 (project_id,),
             ).fetchone()
 
+            top_entity_renames: list[dict[str, Any]] = []
+            latest_snapshot_id = int(latest["snapshot_id"] or 0) if latest else 0
+            if latest_snapshot_id > 0:
+                rename_rows = conn.execute(
+                    """
+                    SELECT old_name, new_name, confidence
+                    FROM entity_version_links
+                    WHERE project_id = ? AND snapshot_id = ? AND link_type = 'renamed'
+                    ORDER BY confidence DESC, id ASC
+                    LIMIT 5
+                    """,
+                    (project_id, latest_snapshot_id),
+                ).fetchall()
+                top_entity_renames = [
+                    {
+                        "old_name": rr["old_name"] or "",
+                        "new_name": rr["new_name"] or "",
+                        "confidence": float(rr["confidence"] or 0.0),
+                    }
+                    for rr in rename_rows
+                ]
+
         if not latest:
             return ApiResponse(success=True, data=None)
 
@@ -1139,6 +1229,7 @@ def get_version_summary(project_id: int):
                 "new_entities": int(latest["new_entities"] or 0),
                 "removed_entities": int(latest["removed_entities"] or 0),
             },
+            "top_entity_renames": top_entity_renames,
             "identity_last_check": (
                 {
                     "classification": identity["classification"],

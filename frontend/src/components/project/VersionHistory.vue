@@ -80,6 +80,13 @@ function formatRatio(ratio: number | null): string {
   return (ratio * 100).toFixed(0) + '%'
 }
 
+type EntityRename = NonNullable<VersionMetrics['topEntityRenames']>[number]
+
+function formatRenameTooltip(renames: EntityRename[] | undefined): string {
+  if (!renames || renames.length === 0) return ''
+  return renames.map((rename) => `${rename.oldName} → ${rename.newName}`).join('\n')
+}
+
 /** Delta indicator between consecutive versions */
 function alertDelta(version: VersionMetrics, index: number): string | null {
   // versions are desc, so index+1 is the previous version
@@ -169,7 +176,16 @@ const comparisonVersions = computed(() => {
 
       <Column field="entitiesRenamedCount" header="Renombres" style="width: 6rem">
         <template #body="{ data }">
-          {{ data.entitiesRenamedCount ?? data.renamedEntities ?? 0 }}
+          <div class="rename-cell">
+            <span>{{ data.entitiesRenamedCount ?? data.renamedEntities ?? 0 }}</span>
+            <small
+              v-if="data.topEntityRenames && data.topEntityRenames.length > 0"
+              class="rename-hint"
+              :title="formatRenameTooltip(data.topEntityRenames)"
+            >
+              {{ data.topEntityRenames[0].oldName }} → {{ data.topEntityRenames[0].newName }}
+            </small>
+          </div>
         </template>
       </Column>
 
@@ -267,6 +283,21 @@ const comparisonVersions = computed(() => {
 
 .text-muted {
   color: var(--text-color-secondary);
+}
+
+.rename-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rename-hint {
+  font-size: 0.675rem;
+  color: var(--text-color-secondary);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .empty-message {

@@ -37,6 +37,7 @@ interface MenuEventHandlers {
   onCloseProject?: () => void
   onImport?: () => void
   onExport?: () => void
+  onUpdateManuscript?: () => void
   onSettings?: () => void
   onViewChange?: (view: string) => void
   onToggleInspector?: () => void
@@ -98,6 +99,10 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
 
       case 'export':
         invoke('export', handlers.onExport)
+        break
+
+      case 'update_manuscript':
+        invoke('update_manuscript', handlers.onUpdateManuscript)
         break
 
       case 'settings':

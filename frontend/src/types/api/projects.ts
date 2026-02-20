@@ -102,6 +102,11 @@ export interface ApiVersionMetrics {
   renamed_entities?: number
   new_entities?: number
   removed_entities?: number
+  top_entity_renames?: Array<{
+    old_name: string
+    new_name: string
+    confidence: number
+  }>
   created_at: string
 }
 

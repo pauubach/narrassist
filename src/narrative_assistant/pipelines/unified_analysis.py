@@ -396,6 +396,7 @@ class AnalysisContext:
     # Correferencias (FASE 3)
     coreference_chains: list = field(default_factory=list)
     mention_to_entity: dict = field(default_factory=dict)  # {mention_text: entity_name}
+    pronoun_resolution_map: dict = field(default_factory=dict)  # {(start, end): entity_name}
     coref_voting_details: dict = field(default_factory=dict)  # {(start, end): MentionVotingDetail}
 
     # Atributos y relaciones (FASE 4)
@@ -440,7 +441,9 @@ class AnalysisContext:
     chekhov_threads: list = field(default_factory=list)  # Hilos narrativos abandonados (Chekhov)
     shallow_characters: list = field(default_factory=list)  # Personajes planos
     knowledge_anachronisms: list = field(default_factory=list)  # Anacronismos de conocimiento
-    speech_change_alerts: list = field(default_factory=list)  # Cambios de habla por personaje (v0.10.13)
+    speech_change_alerts: list = field(
+        default_factory=list
+    )  # Cambios de habla por personaje (v0.10.13)
 
     # Alertas
     alerts: list = field(default_factory=list)
@@ -785,9 +788,7 @@ class UnifiedAnalysisPipeline(
                 rm.relieve_memory_pressure(aggressive=True)
                 pressure = rm.check_memory_pressure()
                 if pressure == "danger" and not is_fatal:
-                    logger.error(
-                        f"Memoria insuficiente para '{phase_name}' — saltando fase"
-                    )
+                    logger.error(f"Memoria insuficiente para '{phase_name}' — saltando fase")
                     context.skipped_phases.add(phase_name)
                     return Result.failure(
                         NarrativeError(
@@ -797,8 +798,7 @@ class UnifiedAnalysisPipeline(
                     )
             elif pressure in ("critical", "warning"):
                 logger.info(
-                    f"Presión de memoria ({pressure}) antes de '{phase_name}' — "
-                    f"liberando memoria"
+                    f"Presión de memoria ({pressure}) antes de '{phase_name}' — liberando memoria"
                 )
                 rm.relieve_memory_pressure(aggressive=(pressure == "critical"))
         except Exception as e:
@@ -1176,6 +1176,7 @@ class UnifiedAnalysisPipeline(
                             "type": dialogue.dialogue_type.value
                             if hasattr(dialogue.dialogue_type, "value")
                             else str(dialogue.dialogue_type),
+                            "attribution_text": dialogue.attribution_text,
                             "speaker_hint": dialogue.speaker_hint,
                         }
                     )
@@ -1189,9 +1190,21 @@ class UnifiedAnalysisPipeline(
                     for d in context.dialogues:
                         d_start = d.get("start_char", 0)
                         for ch in context.chapters:
-                            ch_start = ch.get("start_char", 0) if isinstance(ch, dict) else getattr(ch, "start_char", 0)
-                            ch_end = ch.get("end_char", 0) if isinstance(ch, dict) else getattr(ch, "end_char", 0)
-                            ch_num = ch.get("number", 0) if isinstance(ch, dict) else getattr(ch, "number", 0)
+                            ch_start = (
+                                ch.get("start_char", 0)
+                                if isinstance(ch, dict)
+                                else getattr(ch, "start_char", 0)
+                            )
+                            ch_end = (
+                                ch.get("end_char", 0)
+                                if isinstance(ch, dict)
+                                else getattr(ch, "end_char", 0)
+                            )
+                            ch_num = (
+                                ch.get("number", 0)
+                                if isinstance(ch, dict)
+                                else getattr(ch, "number", 0)
+                            )
                             if ch_start <= d_start <= ch_end:
                                 d["chapter"] = ch_num
                                 break

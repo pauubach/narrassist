@@ -113,6 +113,7 @@ const isQueuedForHeavy = computed(() => analysisStore.currentAnalysis?.status ==
 const progress = computed(() => analysisStore.currentAnalysis?.progress ?? 0)
 const currentStep = computed(() => analysisStore.currentAnalysis?.current_phase ?? '')
 const currentAction = computed(() => analysisStore.currentAnalysis?.current_action ?? '')
+const currentSubphase = computed(() => analysisStore.currentAnalysis?.subphase ?? null)
 
 // Si hay análisis completado pero no hay currentAnalysis (recargó la página después del análisis)
 const isCompletedWithoutDetails = computed(() => {
@@ -376,6 +377,22 @@ function toggleDetails() {
         <div v-if="currentAction" class="current-action">
           <span class="activity-indicator"></span>
           <span class="action-text">{{ currentAction }}</span>
+        </div>
+
+        <div v-if="currentSubphase" class="current-subphase">
+          <div class="subphase-header">
+            <span class="subphase-label">{{ currentSubphase.label }}</span>
+            <span
+              v-if="currentSubphase.step !== undefined && currentSubphase.total_steps !== undefined"
+              class="subphase-step"
+            >
+              {{ currentSubphase.step }}/{{ currentSubphase.total_steps }}
+            </span>
+            <span class="subphase-percent">{{ currentSubphase.progress }}%</span>
+          </div>
+          <div class="subphase-progress-bar">
+            <div class="subphase-progress-fill" :style="{ width: `${currentSubphase.progress}%` }"></div>
+          </div>
         </div>
 
         <div class="details-steps">
@@ -754,6 +771,56 @@ function toggleDetails() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.current-subphase {
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  background: var(--surface-50);
+  border: 1px solid var(--surface-300);
+  border-radius: var(--app-radius);
+}
+
+.subphase-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.75rem;
+}
+
+.subphase-label {
+  flex: 1;
+  font-weight: 600;
+  color: var(--text-color);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.subphase-step {
+  font-size: 0.6875rem;
+  color: var(--text-color-secondary);
+}
+
+.subphase-percent {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--p-primary-600, #2563eb);
+}
+
+.subphase-progress-bar {
+  height: 4px;
+  background: var(--surface-300);
+  border-radius: var(--app-radius-sm);
+  overflow: hidden;
+}
+
+.subphase-progress-fill {
+  height: 100%;
+  background: var(--p-primary-500, #3b82f6);
+  border-radius: var(--app-radius-sm);
+  transition: width 0.2s ease;
 }
 
 .step-completed {

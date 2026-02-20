@@ -12,6 +12,7 @@ from narrative_assistant.alerts.models import AlertStatus
 
 router = APIRouter()
 
+
 @router.get("/api/projects/{project_id}/chapters", response_model=ApiResponse)
 def list_chapters(project_id: int):
     """
@@ -48,7 +49,7 @@ def list_chapters(project_id: int):
                 "heading_level": section.heading_level,
                 "start_char": section.start_char,
                 "end_char": section.end_char,
-                "subsections": [section_to_dict(s) for s in section.subsections]
+                "subsections": [section_to_dict(s) for s in section.subsections],
             }
 
         # Convertir a formato de respuesta con secciones
@@ -59,20 +60,22 @@ def list_chapters(project_id: int):
             if deps.section_repository:
                 sections = deps.section_repository.get_by_chapter_hierarchical(ch.id)
 
-            chapters_data.append({
-                "id": ch.id,
-                "project_id": ch.project_id,
-                "title": ch.title or f"Capítulo {ch.chapter_number}",
-                "content": ch.content,
-                "chapter_number": ch.chapter_number,
-                "word_count": ch.word_count,
-                "position_start": ch.start_char,
-                "position_end": ch.end_char,
-                "structure_type": ch.structure_type,
-                "created_at": ch.created_at,
-                "updated_at": ch.updated_at,
-                "sections": [section_to_dict(s) for s in sections]
-            })
+            chapters_data.append(
+                {
+                    "id": ch.id,
+                    "project_id": ch.project_id,
+                    "title": ch.title or f"Capítulo {ch.chapter_number}",
+                    "content": ch.content,
+                    "chapter_number": ch.chapter_number,
+                    "word_count": ch.word_count,
+                    "position_start": ch.start_char,
+                    "position_end": ch.end_char,
+                    "structure_type": ch.structure_type,
+                    "created_at": ch.created_at,
+                    "updated_at": ch.updated_at,
+                    "sections": [section_to_dict(s) for s in sections],
+                }
+            )
 
         return ApiResponse(success=True, data=chapters_data)
     except HTTPException:
@@ -82,7 +85,9 @@ def list_chapters(project_id: int):
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/projects/{project_id}/chapters/{chapter_number}/annotations", response_model=ApiResponse)
+@router.get(
+    "/api/projects/{project_id}/chapters/{chapter_number}/annotations", response_model=ApiResponse
+)
 def get_chapter_annotations(project_id: int, chapter_number: int):
     """
     Obtiene anotaciones de gramática y ortografía para un capítulo.
@@ -111,12 +116,26 @@ def get_chapter_annotations(project_id: int, chapter_number: int):
 
         # Filtrar por categoría y capítulo
         annotations = []
-        grammar_categories = {'grammar', 'orthography', 'spelling'}
-        active_statuses = {AlertStatus.NEW, AlertStatus.OPEN, AlertStatus.ACKNOWLEDGED, AlertStatus.IN_PROGRESS}
+        grammar_categories = {
+            "grammar",
+            "orthography",
+            "spelling",
+            "typography",
+            "punctuation",
+            "agreement",
+        }
+        active_statuses = {
+            AlertStatus.NEW,
+            AlertStatus.OPEN,
+            AlertStatus.ACKNOWLEDGED,
+            AlertStatus.IN_PROGRESS,
+        }
 
         for alert in all_alerts:
             # Solo incluir alertas de gramática/ortografía
-            category_value = alert.category.value if hasattr(alert.category, 'value') else str(alert.category)
+            category_value = (
+                alert.category.value if hasattr(alert.category, "value") else str(alert.category)
+            )
             if category_value not in grammar_categories:
                 continue
 
@@ -128,23 +147,30 @@ def get_chapter_annotations(project_id: int, chapter_number: int):
             if alert.status not in active_statuses:
                 continue
 
-            annotations.append({
-                "id": alert.id,
-                "type": category_value,
-                "severity": alert.severity.value if hasattr(alert.severity, 'value') else str(alert.severity),
-                "title": alert.title,
-                "description": alert.description,
-                "start_char": getattr(alert, 'start_char', None),
-                "end_char": getattr(alert, 'end_char', None),
-                "suggestion": alert.suggestion,
-                "excerpt": getattr(alert, 'excerpt', None),
-            })
+            annotations.append(
+                {
+                    "id": alert.id,
+                    "type": category_value,
+                    "severity": alert.severity.value
+                    if hasattr(alert.severity, "value")
+                    else str(alert.severity),
+                    "title": alert.title,
+                    "description": alert.description,
+                    "start_char": getattr(alert, "start_char", None),
+                    "end_char": getattr(alert, "end_char", None),
+                    "suggestion": alert.suggestion,
+                    "excerpt": getattr(alert, "excerpt", None),
+                }
+            )
 
-        return ApiResponse(success=True, data={
-            "chapter_number": chapter_number,
-            "annotations": annotations,
-            "total_count": len(annotations)
-        })
+        return ApiResponse(
+            success=True,
+            data={
+                "chapter_number": chapter_number,
+                "annotations": annotations,
+                "total_count": len(annotations),
+            },
+        )
 
     except Exception as e:
         logger.error(f"Error getting chapter annotations: {e}", exc_info=True)
@@ -192,9 +218,7 @@ def get_style_guide(project_id: int, format: str = "json", preview: bool = False
         from narrative_assistant.exporters.style_guide import generate_style_guide
 
         style_result = generate_style_guide(
-            project_id=project_id,
-            project_name=project.name,
-            text=full_text
+            project_id=project_id, project_name=project.name, text=full_text
         )
 
         if style_result.is_failure:
@@ -214,24 +238,28 @@ def get_style_guide(project_id: int, format: str = "json", preview: bool = False
                 "organizations_count": len(style_guide.organizations),
                 "has_style_analysis": style_guide.style_analysis is not None,
                 "spelling_decisions_preview": [
-                    {
-                        "canonical_form": d.canonical_form,
-                        "variants_count": len(d.variants)
-                    }
+                    {"canonical_form": d.canonical_form, "variants_count": len(d.variants)}
                     for d in style_guide.spelling_decisions[:5]
                 ],
                 "characters_preview": [
                     {
                         "name": c.canonical_name,
                         "importance": c.importance,
-                        "aliases_count": len(c.aliases)
+                        "aliases_count": len(c.aliases),
                     }
                     for c in sorted(
                         style_guide.characters,
-                        key=lambda x: {"principal": 0, "critical": 0, "high": 1, "medium": 2, "low": 3, "minimal": 4}.get(x.importance, 5)
+                        key=lambda x: {
+                            "principal": 0,
+                            "critical": 0,
+                            "high": 1,
+                            "medium": 2,
+                            "low": 3,
+                            "minimal": 4,
+                        }.get(x.importance, 5),
                     )[:10]
                 ],
-                "style_summary": None
+                "style_summary": None,
             }
 
             if style_guide.style_analysis:
@@ -242,22 +270,24 @@ def get_style_guide(project_id: int, format: str = "json", preview: bool = False
                     "total_words": sa.statistics.total_words,
                     "total_sentences": sa.statistics.total_sentences,
                     "consistency_issues_count": len(sa.consistency_issues),
-                    "recommendations_count": len(sa.recommendations)
+                    "recommendations_count": len(sa.recommendations),
                 }
 
-            return ApiResponse(success=True, data={
-                "format": "preview",
-                "preview": preview_data,
-                "project_name": project.name
-            })
+            return ApiResponse(
+                success=True,
+                data={"format": "preview", "preview": preview_data, "project_name": project.name},
+            )
 
         # Devolver en el formato solicitado
         if format == "markdown":
-            return ApiResponse(success=True, data={
-                "format": "markdown",
-                "content": style_guide.to_markdown(),
-                "project_name": project.name
-            })
+            return ApiResponse(
+                success=True,
+                data={
+                    "format": "markdown",
+                    "content": style_guide.to_markdown(),
+                    "project_name": project.name,
+                },
+            )
         elif format == "pdf":
             # Generar PDF como base64 string
             import base64
@@ -278,18 +308,37 @@ def get_style_guide(project_id: int, format: str = "json", preview: bool = False
                 )
 
                 buffer = io.BytesIO()
-                doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+                doc = SimpleDocTemplate(
+                    buffer,
+                    pagesize=A4,
+                    leftMargin=2 * cm,
+                    rightMargin=2 * cm,
+                    topMargin=2 * cm,
+                    bottomMargin=2 * cm,
+                )
                 styles = getSampleStyleSheet()
 
                 # Estilos personalizados
-                title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=18, spaceAfter=20)
-                heading_style = ParagraphStyle('CustomHeading', parent=styles['Heading2'], fontSize=14, spaceAfter=10, spaceBefore=15)
-                normal_style = ParagraphStyle('CustomNormal', parent=styles['Normal'], fontSize=10, spaceAfter=6)
+                title_style = ParagraphStyle(
+                    "CustomTitle", parent=styles["Heading1"], fontSize=18, spaceAfter=20
+                )
+                heading_style = ParagraphStyle(
+                    "CustomHeading",
+                    parent=styles["Heading2"],
+                    fontSize=14,
+                    spaceAfter=10,
+                    spaceBefore=15,
+                )
+                normal_style = ParagraphStyle(
+                    "CustomNormal", parent=styles["Normal"], fontSize=10, spaceAfter=6
+                )
 
                 elements = []
 
                 # Título
-                elements.append(Paragraph(f"Guía de Estilo - {style_guide.project_name}", title_style))
+                elements.append(
+                    Paragraph(f"Guía de Estilo - {style_guide.project_name}", title_style)
+                )
                 elements.append(Paragraph(f"Generado: {style_guide.generated_date}", normal_style))
                 elements.append(Spacer(1, 20))
 
@@ -302,23 +351,31 @@ def get_style_guide(project_id: int, format: str = "json", preview: bool = False
                     ["Organizaciones", str(len(style_guide.organizations))],
                     ["Variaciones de grafía", str(style_guide.total_spelling_variants)],
                 ]
-                summary_table = Table(summary_data, colWidths=[8*cm, 4*cm])
-                summary_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, -1), colors.whitesmoke),
-                    ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                    ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-                    ('FONTSIZE', (0, 0), (-1, -1), 10),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ]))
+                summary_table = Table(summary_data, colWidths=[8 * cm, 4 * cm])
+                summary_table.setStyle(
+                    TableStyle(
+                        [
+                            ("BACKGROUND", (0, 0), (-1, -1), colors.whitesmoke),
+                            ("TEXTCOLOR", (0, 0), (-1, -1), colors.black),
+                            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                            ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                            ("FONTSIZE", (0, 0), (-1, -1), 10),
+                            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                        ]
+                    )
+                )
                 elements.append(summary_table)
                 elements.append(Spacer(1, 15))
 
                 # Personajes principales
                 if style_guide.characters:
                     elements.append(Paragraph("Personajes Principales", heading_style))
-                    main_chars = [c for c in style_guide.characters if c.importance in ("principal", "critical", "high")][:10]
+                    main_chars = [
+                        c
+                        for c in style_guide.characters
+                        if c.importance in ("principal", "critical", "high")
+                    ][:10]
                     for char in main_chars:
                         char_text = f"<b>{char.canonical_name}</b>"
                         if char.aliases:
@@ -356,15 +413,18 @@ def get_style_guide(project_id: int, format: str = "json", preview: bool = False
                 # Construir PDF
                 doc.build(elements)
                 pdf_bytes = buffer.getvalue()
-                pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+                pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
 
-                return ApiResponse(success=True, data={
-                    "format": "pdf",
-                    "content": pdf_base64,
-                    "content_type": "application/pdf",
-                    "filename": f"guia_estilo_{project.name}.pdf",
-                    "project_name": project.name
-                })
+                return ApiResponse(
+                    success=True,
+                    data={
+                        "format": "pdf",
+                        "content": pdf_base64,
+                        "content_type": "application/pdf",
+                        "filename": f"guia_estilo_{project.name}.pdf",
+                        "project_name": project.name,
+                    },
+                )
 
             except ImportError:
                 # Si reportlab no está disponible, devolver error con sugerencia
@@ -375,15 +435,18 @@ def get_style_guide(project_id: int, format: str = "json", preview: bool = False
                         "format": "pdf",
                         "fallback_format": "markdown",
                         "content": style_guide.to_markdown(),
-                        "project_name": project.name
-                    }
+                        "project_name": project.name,
+                    },
                 )
         else:
-            return ApiResponse(success=True, data={
-                "format": "json",
-                "content": style_guide.to_dict(),
-                "project_name": project.name
-            })
+            return ApiResponse(
+                success=True,
+                data={
+                    "format": "json",
+                    "content": style_guide.to_dict(),
+                    "project_name": project.name,
+                },
+            )
 
     except HTTPException:
         raise
@@ -433,21 +496,23 @@ def get_project_timeline(project_id: int, force_refresh: bool = False):
         if not force_refresh and timeline_repo.has_timeline(project_id):
             # Leer desde BD (rápido)
             total_count = timeline_repo.count_events(project_id)
-            events = timeline_repo.get_events(
-                project_id, max_events=MAX_TIMELINE_EVENTS
-            )
+            events = timeline_repo.get_events(project_id, max_events=MAX_TIMELINE_EVENTS)
             truncated = total_count > MAX_TIMELINE_EVENTS
             markers_count = timeline_repo.get_markers_count(project_id)
 
             # Contar tipos de eventos
-            anchor_count = sum(1 for e in events if e.story_date_resolution in ("EXACT_DATE", "MONTH", "YEAR"))
+            anchor_count = sum(
+                1 for e in events if e.story_date_resolution in ("EXACT_DATE", "MONTH", "YEAR")
+            )
             analepsis_count = sum(1 for e in events if e.narrative_order == "ANALEPSIS")
             prolepsis_count = sum(1 for e in events if e.narrative_order == "PROLEPSIS")
 
             # Convertir a formato esperado por el frontend
             events_data = [e.to_dict() for e in events]
 
-            logger.info(f"Timeline loaded from DB for project {project_id}: {len(events)} events (total: {total_count})")
+            logger.info(
+                f"Timeline loaded from DB for project {project_id}: {len(events)} events (total: {total_count})"
+            )
 
             return ApiResponse(
                 success=True,
@@ -464,7 +529,7 @@ def get_project_timeline(project_id: int, force_refresh: bool = False):
                     "truncated": truncated,
                     "total_events": total_count,
                 },
-                message="Timeline cargado desde base de datos"
+                message="Timeline cargado desde base de datos",
             )
 
         # Si no hay datos en BD o se fuerza refresh, calcular
@@ -481,7 +546,7 @@ def get_project_timeline(project_id: int, force_refresh: bool = False):
                     "mermaid": "No hay capítulos para analizar.",
                     "inconsistencies": [],
                 },
-                message="El proyecto no tiene capítulos para analizar"
+                message="El proyecto no tiene capítulos para analizar",
             )
 
         # Importar módulo temporal
@@ -502,10 +567,13 @@ def get_project_timeline(project_id: int, force_refresh: bool = False):
         try:
             if deps.entity_repository:
                 entities = deps.entity_repository.get_entities_by_project(
-                    project_id, active_only=True,
+                    project_id,
+                    active_only=True,
                 )
                 entity_mentions_by_chapter = load_entity_mentions_by_chapter(
-                    entities, chapters, deps.entity_repository,
+                    entities,
+                    chapters,
+                    deps.entity_repository,
                 )
         except Exception as e:
             logger.debug(f"Could not load entity mentions for temporal extraction: {e}")
@@ -524,9 +592,13 @@ def get_project_timeline(project_id: int, force_refresh: bool = False):
                     chapter=chapter.chapter_number,
                 )
             all_markers.extend(chapter_markers)
-            logger.debug(f"Chapter {chapter.chapter_number}: {len(chapter_markers)} markers, text length: {len(chapter.content)}")
+            logger.debug(
+                f"Chapter {chapter.chapter_number}: {len(chapter_markers)} markers, text length: {len(chapter.content)}"
+            )
 
-        logger.info(f"Timeline extraction: {len(chapters)} chapters, {len(all_markers)} total markers")
+        logger.info(
+            f"Timeline extraction: {len(chapters)} chapters, {len(all_markers)} total markers"
+        )
 
         # Construir timeline (con contenido para análisis lingüístico)
         builder = TimelineBuilder()
@@ -560,47 +632,61 @@ def get_project_timeline(project_id: int, force_refresh: bool = False):
             events_data = []
             for event in timeline.events:
                 story_date_str = event.story_date.isoformat() if event.story_date else None
-                events_data.append(TimelineEventData(
-                    id=None,
-                    project_id=project_id,
-                    event_id=event.id,
-                    chapter=event.chapter,
-                    paragraph=event.paragraph,
-                    description=event.description,
-                    story_date=story_date_str,
-                    story_date_resolution=event.story_date_resolution.value if event.story_date_resolution else "UNKNOWN",
-                    narrative_order=event.narrative_order.value if event.narrative_order else "CHRONOLOGICAL",
-                    discourse_position=event.discourse_position,
-                    confidence=event.confidence,
-                    # Importante: estos campos deben persistirse para que el timeline
-                    # cacheado en BD conserve exactamente la semántica temporal de memoria.
-                    # Si se omiten, al leer desde caché se pierden Día 0/dayOffset y la
-                    # instancia temporal (A@40 vs A@45), generando inconsistencias de UI/lógica.
-                    day_offset=event.day_offset,
-                    weekday=event.weekday,
-                    temporal_instance_id=event.temporal_instance_id,
-                ))
+                events_data.append(
+                    TimelineEventData(
+                        id=None,
+                        project_id=project_id,
+                        event_id=event.id,
+                        chapter=event.chapter,
+                        paragraph=event.paragraph,
+                        description=event.description,
+                        story_date=story_date_str,
+                        story_date_resolution=event.story_date_resolution.value
+                        if event.story_date_resolution
+                        else "UNKNOWN",
+                        narrative_order=event.narrative_order.value
+                        if event.narrative_order
+                        else "CHRONOLOGICAL",
+                        discourse_position=event.discourse_position,
+                        confidence=event.confidence,
+                        # Importante: estos campos deben persistirse para que el timeline
+                        # cacheado en BD conserve exactamente la semántica temporal de memoria.
+                        # Si se omiten, al leer desde caché se pierden Día 0/dayOffset y la
+                        # instancia temporal (A@40 vs A@45), generando inconsistencias de UI/lógica.
+                        day_offset=event.day_offset,
+                        weekday=event.weekday,
+                        temporal_instance_id=event.temporal_instance_id,
+                    )
+                )
 
             markers_data = []
             for marker in all_markers:
-                markers_data.append(TemporalMarkerData(
-                    id=None,
-                    project_id=project_id,
-                    chapter=marker.chapter,
-                    marker_type=marker.marker_type.value if hasattr(marker.marker_type, 'value') else str(marker.marker_type),
-                    text=marker.text,
-                    start_char=marker.start_char,
-                    end_char=marker.end_char,
-                    confidence=marker.confidence,
-                    year=marker.year,
-                    month=marker.month,
-                    day=marker.day,
-                    direction=marker.direction.value if hasattr(marker, 'direction') and marker.direction and hasattr(marker.direction, 'value') else getattr(marker, 'direction', None),
-                    quantity=getattr(marker, 'quantity', None),
-                    magnitude=getattr(marker, 'magnitude', None),
-                    age=getattr(marker, 'age', None),
-                    entity_id=getattr(marker, 'entity_id', None),
-                ))
+                markers_data.append(
+                    TemporalMarkerData(
+                        id=None,
+                        project_id=project_id,
+                        chapter=marker.chapter,
+                        marker_type=marker.marker_type.value
+                        if hasattr(marker.marker_type, "value")
+                        else str(marker.marker_type),
+                        text=marker.text,
+                        start_char=marker.start_char,
+                        end_char=marker.end_char,
+                        confidence=marker.confidence,
+                        year=marker.year,
+                        month=marker.month,
+                        day=marker.day,
+                        direction=marker.direction.value
+                        if hasattr(marker, "direction")
+                        and marker.direction
+                        and hasattr(marker.direction, "value")
+                        else getattr(marker, "direction", None),
+                        quantity=getattr(marker, "quantity", None),
+                        magnitude=getattr(marker, "magnitude", None),
+                        age=getattr(marker, "age", None),
+                        entity_id=getattr(marker, "entity_id", None),
+                    )
+                )
 
             timeline_repo.save_events(project_id, events_data)
             timeline_repo.save_markers(project_id, markers_data)
@@ -643,24 +729,24 @@ def get_project_timeline(project_id: int, force_refresh: bool = False):
                 "from_cache": False,
                 "truncated": truncated,
                 "total_events": total_events,
-            }
+            },
         )
 
     except HTTPException:
         raise
     except ImportError as e:
         logger.error(f"Temporal module not available: {e}")
-        return ApiResponse(
-            success=False,
-            error="Módulo de análisis temporal no disponible"
-        )
+        return ApiResponse(success=False, error="Módulo de análisis temporal no disponible")
     except Exception as e:
         logger.error(f"Error getting timeline for project {project_id}: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/temporal-markers", response_model=ApiResponse)
-def get_temporal_markers(project_id: int, chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo")):
+def get_temporal_markers(
+    project_id: int,
+    chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo"),
+):
     """
     Obtiene los marcadores temporales detectados en el proyecto.
 
@@ -682,11 +768,7 @@ def get_temporal_markers(project_id: int, chapter_number: Optional[int] = Query(
             chapters = [ch for ch in chapters if ch.chapter_number == chapter_number]
 
         if not chapters:
-            return ApiResponse(
-                success=True,
-                data=[],
-                message="No se encontraron capítulos"
-            )
+            return ApiResponse(success=True, data=[], message="No se encontraron capítulos")
 
         # Importar y extraer marcadores
         from narrative_assistant.temporal import TemporalMarkerExtractor
@@ -697,21 +779,23 @@ def get_temporal_markers(project_id: int, chapter_number: Optional[int] = Query(
         for ch in chapters:
             markers = extractor.extract(ch.content, chapter=ch.chapter_number)
             for m in markers:
-                all_markers.append({
-                    "text": m.text,
-                    "type": m.marker_type.value,
-                    "chapter": m.chapter,
-                    "start_char": m.start_char,
-                    "end_char": m.end_char,
-                    "direction": m.direction,
-                    "magnitude": m.magnitude,
-                    "quantity": m.quantity,
-                    "age": m.age,
-                    "year": m.year,
-                    "month": m.month,
-                    "day": m.day,
-                    "confidence": m.confidence,
-                })
+                all_markers.append(
+                    {
+                        "text": m.text,
+                        "type": m.marker_type.value,
+                        "chapter": m.chapter,
+                        "start_char": m.start_char,
+                        "end_char": m.end_char,
+                        "direction": m.direction,
+                        "magnitude": m.magnitude,
+                        "quantity": m.quantity,
+                        "age": m.age,
+                        "year": m.year,
+                        "month": m.month,
+                        "day": m.day,
+                        "confidence": m.confidence,
+                    }
+                )
 
         return ApiResponse(success=True, data=all_markers)
 
@@ -720,7 +804,10 @@ def get_temporal_markers(project_id: int, chapter_number: Optional[int] = Query(
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/projects/{project_id}/chapters/{chapter_number}/emotional-analysis", response_model=ApiResponse)
+@router.get(
+    "/api/projects/{project_id}/chapters/{chapter_number}/emotional-analysis",
+    response_model=ApiResponse,
+)
 def get_chapter_emotional_analysis(project_id: int, chapter_number: int):
     """
     Obtiene el análisis emocional de un capítulo específico.
@@ -732,18 +819,17 @@ def get_chapter_emotional_analysis(project_id: int, chapter_number: int):
         from narrative_assistant.nlp.dialogue import detect_dialogues
 
         # Obtener el capítulo
-        chapter = getattr(deps.chapter_repository, "get_chapter", lambda *_: None)(project_id, chapter_number)
+        chapter = getattr(deps.chapter_repository, "get_chapter", lambda *_: None)(
+            project_id, chapter_number
+        )
         if not chapter:
-            return ApiResponse(
-                success=False,
-                error=f"Capítulo {chapter_number} no encontrado"
-            )
+            return ApiResponse(success=False, error=f"Capítulo {chapter_number} no encontrado")
 
         # Obtener personajes
-        entities = getattr(deps.entity_repository, "get_entities_by_project", lambda *_: [])(project_id)
-        character_names = [
-            e.canonical_name for e in entities if deps.is_character_entity(e)
-        ]
+        entities = getattr(deps.entity_repository, "get_entities_by_project", lambda *_: [])(
+            project_id
+        )
+        character_names = [e.canonical_name for e in entities if deps.is_character_entity(e)]
 
         # Extraer diálogos
         dialogue_result = detect_dialogues(chapter.content)
@@ -777,25 +863,25 @@ def get_chapter_emotional_analysis(project_id: int, chapter_number: int):
                 "incoherences": [inc.to_dict() for inc in incoherences],
                 "dialogues_analyzed": len(dialogues),
                 "characters_checked": len(character_names),
-            }
+            },
         )
 
     except ImportError as e:
         logger.error(f"Module import error: {e}")
-        return ApiResponse(
-            success=False,
-            error="Módulo de análisis emocional no disponible"
-        )
+        return ApiResponse(success=False, error="Módulo de análisis emocional no disponible")
     except Exception as e:
         logger.error(f"Error in chapter emotional analysis: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/projects/{project_id}/chapters/{chapter_number}/register-analysis", response_model=ApiResponse)
+@router.get(
+    "/api/projects/{project_id}/chapters/{chapter_number}/register-analysis",
+    response_model=ApiResponse,
+)
 def get_chapter_register_analysis(
     project_id: int,
     chapter_number: int,
-    min_severity: str = Query("low", description="Severidad mínima: low, medium, high")
+    min_severity: str = Query("low", description="Severidad mínima: low, medium, high"),
 ):
     """
     Analiza el registro narrativo de un capítulo específico.
@@ -831,28 +917,17 @@ def get_chapter_register_analysis(
         dialogue_result = detect_dialogues(chapter.content)
         dialogue_ranges = []
         if dialogue_result.is_success:
-            dialogue_ranges = [
-                (d.start_char, d.end_char)
-                for d in dialogue_result.value.dialogues
-            ]
+            dialogue_ranges = [(d.start_char, d.end_char) for d in dialogue_result.value.dialogues]
 
         # Segment by paragraph
         segments = []
-        paragraphs = chapter.content.split('\n\n')
+        paragraphs = chapter.content.split("\n\n")
         position = 0
 
         for para in paragraphs:
             if para.strip():
-                is_dialogue = any(
-                    start <= position <= end
-                    for start, end in dialogue_ranges
-                )
-                segments.append((
-                    para.strip(),
-                    chapter.chapter_number,
-                    position,
-                    is_dialogue
-                ))
+                is_dialogue = any(start <= position <= end for start, end in dialogue_ranges)
+                segments.append((para.strip(), chapter.chapter_number, position, is_dialogue))
             position += len(para) + 2
 
         if not segments:
@@ -864,7 +939,7 @@ def get_chapter_register_analysis(
                     "analyses": [],
                     "changes": [],
                     "summary": {},
-                }
+                },
             )
 
         # Analyze
@@ -890,7 +965,9 @@ def get_chapter_register_analysis(
 
         # Consistency: % of segments with the dominant register
         total_segs = len(analyses)
-        consistency = (register_counts.get(dominant, 0) / total_segs * 100) if total_segs > 0 else 100
+        consistency = (
+            (register_counts.get(dominant, 0) / total_segs * 100) if total_segs > 0 else 100
+        )
 
         analyses_data = [
             {
@@ -925,7 +1002,7 @@ def get_chapter_register_analysis(
             data={
                 "project_id": project_id,
                 "chapter_number": chapter_number,
-                "chapter_title": getattr(chapter, 'title', '') or '',
+                "chapter_title": getattr(chapter, "title", "") or "",
                 "analyses": analyses_data,
                 "changes": changes_data,
                 "summary": {
@@ -936,7 +1013,7 @@ def get_chapter_register_analysis(
                     "narrative_segments": narrative_count,
                     "dialogue_segments": dialogue_count,
                 },
-            }
+            },
         )
 
     except HTTPException:
@@ -946,7 +1023,10 @@ def get_chapter_register_analysis(
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/projects/{project_id}/chapters/{chapter_number}/dialogue-attributions", response_model=ApiResponse)
+@router.get(
+    "/api/projects/{project_id}/chapters/{chapter_number}/dialogue-attributions",
+    response_model=ApiResponse,
+)
 def get_dialogue_attributions(project_id: int, chapter_number: int):
     """
     Obtiene atribución de hablantes para los diálogos de un capítulo.
@@ -1005,8 +1085,8 @@ def get_dialogue_attributions(project_id: int, chapter_number: int):
                     "chapter_number": chapter_number,
                     "attributions": [],
                     "stats": {},
-                    "message": "No se pudieron detectar diálogos"
-                }
+                    "message": "No se pudieron detectar diálogos",
+                },
             )
 
         dialogues = dialogue_result.value.dialogues
@@ -1018,17 +1098,17 @@ def get_dialogue_attributions(project_id: int, chapter_number: int):
                     "chapter_number": chapter_number,
                     "attributions": [],
                     "stats": {},
-                    "message": "No hay diálogos en este capítulo"
-                }
+                    "message": "No hay diálogos en este capítulo",
+                },
             )
 
         # Preparar datos de entidades para el atribuidor
         entity_data = [
-            type('Entity', (), {
-                'id': e.id,
-                'canonical_name': e.canonical_name,
-                'aliases': e.aliases or []
-            })()
+            type(
+                "Entity",
+                (),
+                {"id": e.id, "canonical_name": e.canonical_name, "aliases": e.aliases or []},
+            )()
             for e in characters
         ]
 
@@ -1040,16 +1120,16 @@ def get_dialogue_attributions(project_id: int, chapter_number: int):
 
         # Atribuir hablantes
         attributor = SpeakerAttributor(entity_data, voice_profiles)
-        attributions = attributor.attribute_dialogues(
-            dialogues, entity_mentions, chapter.content
-        )
+        attributions = attributor.attribute_dialogues(dialogues, entity_mentions, chapter.content)
         stats = attributor.get_attribution_stats(attributions)
 
         # Serializar atribuciones
         attributions_data = [
             {
                 "dialogue_index": i,
-                "text": dialogues[i].text[:100] + "..." if len(dialogues[i].text) > 100 else dialogues[i].text,
+                "text": dialogues[i].text[:100] + "..."
+                if len(dialogues[i].text) > 100
+                else dialogues[i].text,
                 "start_char": dialogues[i].start_char,
                 "end_char": dialogues[i].end_char,
                 "speaker_id": attr.speaker_id,
@@ -1068,22 +1148,20 @@ def get_dialogue_attributions(project_id: int, chapter_number: int):
         # Aplicar correcciones del usuario (override con máxima confianza)
         try:
             from narrative_assistant.persistence.database import get_database
+
             db = get_database()
             corrections = db.fetchall(
                 """
                 SELECT sc.dialogue_start_char, sc.dialogue_end_char,
-                       sc.corrected_speaker_id, e.name as corrected_speaker_name
+                       sc.corrected_speaker_id, e.canonical_name as corrected_speaker_name
                 FROM speaker_corrections sc
-                JOIN entities e ON e.id = sc.corrected_speaker_id
+                LEFT JOIN entities e ON e.id = sc.corrected_speaker_id
                 WHERE sc.project_id = ? AND sc.chapter_number = ?
                 """,
                 (project_id, chapter_number),
             )
 
-            corr_map = {
-                (c["dialogue_start_char"], c["dialogue_end_char"]): c
-                for c in corrections
-            }
+            corr_map = {(c["dialogue_start_char"], c["dialogue_end_char"]): c for c in corrections}
             for attr_data in attributions_data:
                 key = (attr_data["start_char"], attr_data["end_char"])
                 if key in corr_map:
@@ -1102,7 +1180,7 @@ def get_dialogue_attributions(project_id: int, chapter_number: int):
                 "chapter_number": chapter_number,
                 "attributions": attributions_data,
                 "stats": stats,
-            }
+            },
         )
 
     except HTTPException:
@@ -1112,7 +1190,10 @@ def get_dialogue_attributions(project_id: int, chapter_number: int):
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/projects/{project_id}/chapters/{chapter_number}/focalization/suggest", response_model=ApiResponse)
+@router.get(
+    "/api/projects/{project_id}/chapters/{chapter_number}/focalization/suggest",
+    response_model=ApiResponse,
+)
 def suggest_chapter_focalization(project_id: int, chapter_number: int):
     """Sugiere la focalización más probable para un capítulo."""
     try:
@@ -1143,7 +1224,9 @@ def suggest_chapter_focalization(project_id: int, chapter_number: int):
 
         repo = SQLiteFocalizationRepository()
         service = FocalizationDeclarationService(repository=repo)
-        suggestion = service.suggest_focalization(project_id, chapter_number, chapter.content, characters)
+        suggestion = service.suggest_focalization(
+            project_id, chapter_number, chapter.content, characters
+        )
 
         focalizer_names = []
         for fid in suggestion.get("suggested_focalizers", []):
@@ -1156,11 +1239,13 @@ def suggest_chapter_focalization(project_id: int, chapter_number: int):
             data={
                 "chapter_number": chapter_number,
                 "chapter_title": chapter.title or f"Capítulo {chapter_number}",
-                "suggested_type": suggestion["suggested_type"].value if suggestion["suggested_type"] else None,
+                "suggested_type": suggestion["suggested_type"].value
+                if suggestion["suggested_type"]
+                else None,
                 "suggested_focalizers": focalizer_names,
                 "confidence": suggestion["confidence"],
                 "evidence": suggestion["evidence"],
-            }
+            },
         )
     except HTTPException:
         raise
@@ -1221,12 +1306,16 @@ def suggest_all_focalizations(project_id: int, auto_apply: bool = False):
             for fid in suggestion.get("suggested_focalizers", []):
                 entity = next((e for e in characters if e.id == fid), None)
                 if entity:
-                    focalizer_names.append({"id": fid, "name": entity.canonical_name or entity.name})
+                    focalizer_names.append(
+                        {"id": fid, "name": entity.canonical_name or entity.name}
+                    )
 
             sug_data = {
                 "chapter_number": chapter.chapter_number,
                 "chapter_title": chapter.title or f"Capítulo {chapter.chapter_number}",
-                "suggested_type": suggestion["suggested_type"].value if suggestion["suggested_type"] else None,
+                "suggested_type": suggestion["suggested_type"].value
+                if suggestion["suggested_type"]
+                else None,
                 "suggested_focalizers": focalizer_names,
                 "confidence": suggestion["confidence"],
                 "evidence": suggestion["evidence"],
@@ -1247,7 +1336,9 @@ def suggest_all_focalizations(project_id: int, auto_apply: bool = False):
                     sug_data["applied"] = True
                     applied += 1
                 except Exception as e:
-                    logger.warning(f"Error applying suggestion for ch {chapter.chapter_number}: {e}")
+                    logger.warning(
+                        f"Error applying suggestion for ch {chapter.chapter_number}: {e}"
+                    )
 
             suggestions.append(sug_data)
 
@@ -1260,7 +1351,7 @@ def suggest_all_focalizations(project_id: int, auto_apply: bool = False):
                 "already_declared": len(declared_chapters),
                 "suggested": len(suggestions),
                 "auto_applied": applied,
-            }
+            },
         )
     except HTTPException:
         raise
@@ -1269,7 +1360,9 @@ def suggest_all_focalizations(project_id: int, auto_apply: bool = False):
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/projects/{project_id}/chapters/{chapter_number}/scenes", response_model=ApiResponse)
+@router.get(
+    "/api/projects/{project_id}/chapters/{chapter_number}/scenes", response_model=ApiResponse
+)
 def get_chapter_scenes(project_id: int, chapter_number: int):
     """Obtiene las escenas de un capítulo específico."""
     try:
@@ -1299,17 +1392,21 @@ def get_chapter_scenes(project_id: int, chapter_number: int):
                         "word_count": s.scene.word_count,
                         "excerpt": s.excerpt,
                         "tags": {
-                            "scene_type": s.tags.scene_type.value if s.tags and s.tags.scene_type else None,
+                            "scene_type": s.tags.scene_type.value
+                            if s.tags and s.tags.scene_type
+                            else None,
                             "tone": s.tags.tone.value if s.tags and s.tags.tone else None,
                             "location_name": s.location_name,
                             "participant_names": s.participant_names,
                             "summary": s.tags.summary if s.tags else None,
-                        } if s.tags else None,
+                        }
+                        if s.tags
+                        else None,
                         "custom_tags": [ct.tag_name for ct in s.custom_tags],
                     }
                     for s in scenes
                 ],
-            }
+            },
         )
     except HTTPException:
         raise
@@ -1363,7 +1460,7 @@ def get_project_continuity(project_id: int):
                     "total_issues": 0,
                     "issues_by_severity": {"critical": [], "high": [], "medium": [], "low": []},
                     "issues_by_type": {},
-                }
+                },
             )
 
         # Cargar modelo spaCy
@@ -1379,7 +1476,7 @@ def get_project_continuity(project_id: int):
                 chapter_number=chapter.chapter_number,
                 nlp=nlp,
                 enable_llm=False,  # Sin LLM para análisis rápido
-                prev_chapter_text=prev_chapter_text
+                prev_chapter_text=prev_chapter_text,
             )
             events_by_chapter[chapter.chapter_number] = events
             prev_chapter_text = chapter.content
@@ -1432,7 +1529,7 @@ def get_project_continuity(project_id: int):
                 "total_issues": len(issues),
                 "issues_by_severity": issues_by_severity,
                 "issues_by_type": issues_by_type,
-            }
+            },
         )
     except HTTPException:
         raise

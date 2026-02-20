@@ -66,7 +66,11 @@ class PipelineResolutionMixin:
     def _run_coreference(self, context: AnalysisContext) -> None:
         """Ejecutar resolución de correferencias."""
         try:
-            from ..nlp.coreference_resolver import CorefConfig, resolve_coreferences_voting
+            from ..nlp.coreference_resolver import (
+                CorefConfig,
+                build_pronoun_resolution_map,
+                resolve_coreferences_voting,
+            )
 
             # Preparar datos de capítulos para correferencia
             chapters_data = None
@@ -99,6 +103,9 @@ class PipelineResolutionMixin:
                     entity_name = chain.main_mention
                     for mention in chain.mentions:
                         context.mention_to_entity[mention.text.lower()] = entity_name
+
+                # Reusar mapa de pronombres por posición para desambiguación contextual.
+                context.pronoun_resolution_map = build_pronoun_resolution_map(result)
 
                 context.stats["coreference_chains"] = len(result.chains)
 
@@ -275,6 +282,90 @@ class PipelineResolutionMixin:
             except Exception as e:
                 logger.debug(f"Could not load entity mentions: {e}")
 
+            def _normalize_name(value: str) -> str:
+                return " ".join((value or "").strip().lower().split())
+
+            # Índice de nombres/aliases para mapear resoluciones de coref a entidades reales.
+            canonical_by_norm: dict[str, tuple[str, int | None]] = {}
+            for entity in character_entities:
+                entity_id = getattr(entity, "id", None)
+                canonical_name = getattr(entity, "canonical_name", None) or getattr(
+                    entity, "name", ""
+                )
+                canonical_name = (canonical_name or "").strip()
+                if canonical_name:
+                    canonical_by_norm[_normalize_name(canonical_name)] = (
+                        canonical_name,
+                        entity_id,
+                    )
+                for alias in getattr(entity, "aliases", []) or []:
+                    alias_norm = _normalize_name(alias)
+                    if alias_norm and alias_norm not in canonical_by_norm:
+                        canonical_by_norm[alias_norm] = (canonical_name or alias, entity_id)
+
+            def _resolve_to_character(name: str) -> tuple[str, int | None]:
+                normalized = _normalize_name(name)
+                if not normalized:
+                    return name, None
+
+                direct = canonical_by_norm.get(normalized)
+                if direct:
+                    return direct
+
+                # Fallback tolerante para casos "Don Ramiro" vs "Ramiro Estébanez".
+                for key, resolved in canonical_by_norm.items():
+                    if normalized in key or key in normalized:
+                        return resolved
+
+                return name, None
+
+            pronoun_resolution_map: dict[tuple[int, int], str] = (
+                getattr(context, "pronoun_resolution_map", {}) or {}
+            )
+            pronoun_hints = {
+                "el",
+                "él",
+                "ella",
+                "ellos",
+                "ellas",
+                "le",
+                "les",
+                "lo",
+                "la",
+                "los",
+                "las",
+                "su",
+                "sus",
+            }
+
+            def _resolve_pronoun_near_dialogue(dialogue_data: dict) -> str | None:
+                if not pronoun_resolution_map:
+                    return None
+
+                start = int(dialogue_data.get("start_char", 0) or 0)
+                end = int(dialogue_data.get("end_char", start) or start)
+                best_name: str | None = None
+                best_distance: int | None = None
+
+                for (m_start, m_end), resolved_name in pronoun_resolution_map.items():
+                    if not resolved_name:
+                        continue
+
+                    if start <= m_start <= end or start <= m_end <= end:
+                        distance = 0
+                    elif end < m_start <= end + 120:
+                        distance = m_start - end
+                    elif start - 120 <= m_end < start:
+                        distance = start - m_end
+                    else:
+                        continue
+
+                    if best_distance is None or distance < best_distance:
+                        best_distance = distance
+                        best_name = resolved_name
+
+                return best_name
+
             # Convertir diálogos dict a objetos para compatibilidad con getattr()
             dialogue_objects = []
             for d in context.dialogues:
@@ -284,6 +375,7 @@ class PipelineResolutionMixin:
                         start_char=d.get("start_char", 0),
                         end_char=d.get("end_char", 0),
                         chapter=d.get("chapter", 1),
+                        attribution_text=d.get("attribution_text", ""),
                         speaker_hint=d.get("speaker_hint", ""),
                     )
                 )
@@ -310,15 +402,29 @@ class PipelineResolutionMixin:
             # Resolver con correferencias para los no atribuidos
             for dialogue in context.dialogues:
                 if not dialogue.get("resolved_speaker"):
-                    speaker = dialogue.get("speaker_hint", "")
+                    speaker = (dialogue.get("speaker_hint") or "").strip()
                     if speaker:
-                        speaker_lower = speaker.lower()
+                        speaker_lower = _normalize_name(speaker)
+                        resolved_name: str | None = None
+                        method = "hint_only"
+
                         if speaker_lower in context.mention_to_entity:
-                            dialogue["resolved_speaker"] = context.mention_to_entity[speaker_lower]
-                            dialogue["attribution_method"] = "coreference"
-                        else:
-                            dialogue["resolved_speaker"] = speaker
-                            dialogue["attribution_method"] = "hint_only"
+                            resolved_name = context.mention_to_entity[speaker_lower]
+                            method = "coreference"
+                        elif speaker_lower in pronoun_hints:
+                            resolved_name = _resolve_pronoun_near_dialogue(dialogue)
+                            if resolved_name:
+                                method = "coreference_pronoun"
+
+                        canonical_name, speaker_id = _resolve_to_character(resolved_name or speaker)
+                        dialogue["resolved_speaker"] = canonical_name
+                        dialogue["attribution_method"] = method
+                        if speaker_id is not None:
+                            dialogue["speaker_id"] = speaker_id
+                        if method.startswith("coreference"):
+                            dialogue["attribution_confidence"] = dialogue.get(
+                                "attribution_confidence", "medium"
+                            )
 
             # Aplicar correcciones del usuario (override con máxima confianza)
             try:
@@ -352,9 +458,7 @@ class PipelineResolutionMixin:
                             break
 
                 if corrections_applied > 0:
-                    logger.info(
-                        f"Applied {corrections_applied} user speaker corrections"
-                    )
+                    logger.info(f"Applied {corrections_applied} user speaker corrections")
             except Exception as e:
                 logger.debug(f"Could not apply speaker corrections: {e}")
 

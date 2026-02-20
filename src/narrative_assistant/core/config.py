@@ -227,6 +227,7 @@ class PersistenceConfig:
     # Fingerprinting de documentos
     fingerprint_sample_size: int = 10000  # Caracteres a usar para fingerprint
     similarity_threshold_same_doc: float = 0.95  # Umbral para considerar mismo doc
+    identity_uncertain_limit_30d: int = 3  # Escalado local de riesgo por licencia
 
 
 def _find_project_root() -> Path | None:
@@ -349,6 +350,16 @@ class AppConfig:
         if log_level := os.getenv("NA_LOG_LEVEL"):
             config.log_level = log_level
 
+        if uncertain_limit := os.getenv("NA_IDENTITY_UNCERTAIN_LIMIT_30D"):
+            try:
+                config.persistence.identity_uncertain_limit_30d = max(1, int(uncertain_limit))
+            except ValueError:
+                logger.warning(
+                    "NA_IDENTITY_UNCERTAIN_LIMIT_30D inválido '%s', usando %s",
+                    uncertain_limit,
+                    config.persistence.identity_uncertain_limit_30d,
+                )
+
         if data_dir := os.getenv("NA_DATA_DIR"):
             config.data_dir = Path(data_dir)
             config.cache_dir = config.data_dir / "cache"
@@ -453,6 +464,9 @@ class AppConfig:
                         similarity_threshold_same_doc=persistence_data.get(
                             "similarity_threshold_same_doc", 0.95
                         ),
+                        identity_uncertain_limit_30d=persistence_data.get(
+                            "identity_uncertain_limit_30d", 3
+                        ),
                     )
 
                 # Mapear directorios y logging
@@ -533,6 +547,7 @@ class AppConfig:
                 "keep_dismissed_alerts": self.persistence.keep_dismissed_alerts,
                 "fingerprint_sample_size": self.persistence.fingerprint_sample_size,
                 "similarity_threshold_same_doc": self.persistence.similarity_threshold_same_doc,
+                "identity_uncertain_limit_30d": self.persistence.identity_uncertain_limit_30d,
             },
             "data_dir": str(self.data_dir),
             "log_level": self.log_level,

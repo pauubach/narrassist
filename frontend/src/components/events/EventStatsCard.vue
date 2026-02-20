@@ -36,7 +36,7 @@
       <div class="stat-section empty">
         <div class="stat-label">
           <i class="pi pi-file"></i>
-          Capítulos Sin Eventos Tier 1
+          Capítulos sin eventos base
         </div>
         <div class="stat-value">{{ stats.emptyChapters.length }}</div>
         <div v-if="stats.emptyChapters.length > 0" class="stat-details">

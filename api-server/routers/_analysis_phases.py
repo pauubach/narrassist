@@ -338,13 +338,13 @@ class ProgressTracker:
         self.phase_start_times[phase_key] = time.time()
         pct_start, _ = self.get_phase_progress_range(phase_key)
         self.phases[phase_index]["current"] = True
-        self._write(progress=pct_start, current_phase=message)
+        self._write(progress=pct_start, current_phase=message, subphase=None)
 
     def end_phase(self, phase_key: str, phase_index: int):
         """Marca el fin de una fase."""
         _, pct_end = self.get_phase_progress_range(phase_key)
         self.phase_durations[phase_key] = time.time() - self.phase_start_times[phase_key]
-        self._write(progress=pct_end)
+        self._write(progress=pct_end, subphase=None)
         self.phases[phase_index]["completed"] = True
         self.phases[phase_index]["current"] = False
         self.phases[phase_index]["duration"] = round(self.phase_durations[phase_key], 1)
@@ -1799,6 +1799,60 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
     fusion_pct_start, fusion_pct_end = tracker.get_phase_progress_range("fusion")
     coref_result = None
     merged_entity_ids = set()
+    fusion_progress = 0.0
+
+    def _update_fusion_progress(
+        target_fraction: float,
+        action: str | None = None,
+        *,
+        subphase_id: str | None = None,
+        subphase_label: str | None = None,
+        subphase_progress: float | None = None,
+        subphase_step: int | None = None,
+        subphase_total_steps: int | None = None,
+    ) -> None:
+        """Actualiza progreso interno de la fase fusion y su sub-etapa activa."""
+        nonlocal fusion_progress
+
+        bounded = max(0.0, min(0.99, target_fraction))
+        if bounded < fusion_progress:
+            bounded = fusion_progress
+
+        progress_changed = abs(bounded - fusion_progress) >= 0.001
+        if progress_changed:
+            fusion_progress = bounded
+
+        updates: dict[str, Any] = {}
+        if "fusion" not in tracker.phase_durations:
+            pct = fusion_pct_start + int((fusion_pct_end - fusion_pct_start) * fusion_progress)
+            updates["progress"] = min(fusion_pct_end, pct)
+        if action is not None:
+            updates["current_action"] = action
+
+        if subphase_id and subphase_label:
+            raw_sub = subphase_progress if subphase_progress is not None else fusion_progress
+            bounded_sub = max(0.0, min(1.0, raw_sub))
+            subphase_payload: dict[str, Any] = {
+                "phase_id": "fusion",
+                "id": subphase_id,
+                "label": subphase_label,
+                "progress": int(round(bounded_sub * 100)),
+            }
+            if (
+                subphase_step is not None
+                and subphase_total_steps is not None
+                and int(subphase_total_steps) > 0
+            ):
+                subphase_payload["step"] = max(0, int(subphase_step))
+                subphase_payload["total_steps"] = max(1, int(subphase_total_steps))
+            updates["subphase"] = subphase_payload
+
+        if not updates:
+            return
+
+        _update_storage(project_id, **updates)
+        if progress_changed:
+            tracker.update_time_remaining()
 
     try:
         from narrative_assistant.entities.semantic_fusion import get_semantic_fusion_service
@@ -1807,7 +1861,13 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
         entity_repo = get_entity_repository()
         ctx["entity_repo"] = entity_repo
 
-        _update_storage(project_id, current_action=f"Comparando {len(entities)} entidades...")
+        _update_fusion_progress(
+            0.06,
+            f"Comparando {len(entities)} entidades...",
+            subphase_id="compare",
+            subphase_label="Comparando entidades candidatas",
+            subphase_progress=0.0,
+        )
 
         # 1. Fusión semántica por tipo
         entities_by_type: dict[EntityType, list] = {}
@@ -1817,6 +1877,13 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             entities_by_type[ent.entity_type].append(ent)
 
         fusion_pairs: list[tuple] = []
+        total_pairs = sum(
+            (len(type_entities) * (len(type_entities) - 1)) // 2
+            for type_entities in entities_by_type.values()
+            if len(type_entities) >= 2
+        )
+        checked_pairs = 0
+        compare_update_every = max(1, total_pairs // 25) if total_pairs else 1
 
         for entity_type, type_entities in entities_by_type.items():
             if len(type_entities) < 2:
@@ -1829,6 +1896,10 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                 for j, ent2 in enumerate(type_entities):
                     if i >= j:
                         continue
+
+                    checked_pairs += 1
+                    if checked_pairs % 50 == 0:
+                        tracker.check_cancelled()
 
                     name1 = ent1.canonical_name
                     name2 = ent2.canonical_name
@@ -1857,16 +1928,61 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                         else:
                             fusion_pairs.append((ent2, ent1))
 
-        # Ejecutar fusiones
-        if fusion_pairs:
-            _update_storage(
-                project_id,
-                current_action=f"Unificando {len(fusion_pairs)} pares de nombres similares...",
+                    if checked_pairs % compare_update_every == 0 or checked_pairs == total_pairs:
+                        compare_fraction = checked_pairs / total_pairs if total_pairs else 1.0
+                        _update_fusion_progress(
+                            0.08 + compare_fraction * 0.32,
+                            f"Comparando nombres similares ({checked_pairs}/{total_pairs})",
+                            subphase_id="compare",
+                            subphase_label="Comparando entidades candidatas",
+                            subphase_progress=compare_fraction,
+                            subphase_step=checked_pairs,
+                            subphase_total_steps=total_pairs,
+                        )
+
+        if total_pairs == 0:
+            _update_fusion_progress(
+                0.40,
+                "No hay pares comparables para unificación",
+                subphase_id="compare",
+                subphase_label="Comparando entidades candidatas",
+                subphase_progress=1.0,
+            )
+        else:
+            _update_fusion_progress(
+                0.40,
+                f"Comparación completada: {len(fusion_pairs)} pares candidatos",
+                subphase_id="compare",
+                subphase_label="Comparando entidades candidatas",
+                subphase_progress=1.0,
+                subphase_step=total_pairs,
+                subphase_total_steps=total_pairs,
             )
 
-        for idx, (keep_entity, merge_entity) in enumerate(fusion_pairs):
+        # Ejecutar fusiones
+        if fusion_pairs:
+            _update_fusion_progress(
+                0.42,
+                f"Unificando {len(fusion_pairs)} pares de nombres similares...",
+                subphase_id="merge",
+                subphase_label="Uniendo entidades duplicadas",
+                subphase_progress=0.0,
+            )
+        else:
+            _update_fusion_progress(
+                0.62,
+                "No se detectaron duplicados para unificar",
+                subphase_id="merge",
+                subphase_label="Uniendo entidades duplicadas",
+                subphase_progress=1.0,
+            )
+
+        total_fusion_pairs = len(fusion_pairs)
+        merge_update_every = max(1, total_fusion_pairs // 20) if total_fusion_pairs else 1
+
+        for idx, (keep_entity, merge_entity) in enumerate(fusion_pairs, start=1):
             # Check for cancellation every 10 pairs
-            if idx % 10 == 0:
+            if idx % 10 == 1:
                 tracker.check_cancelled()
 
             if merge_entity.id in merged_entity_ids:
@@ -1929,13 +2045,16 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                     f"'{keep_entity.canonical_name}'"
                 )
 
-                if (idx + 1) % 5 == 0:
-                    _update_storage(
-                        project_id,
-                        current_action=(
-                            f"Unificando nombres: {keep_entity.canonical_name}... "
-                            f"({idx + 1}/{len(fusion_pairs)})"
-                        ),
+                if idx % merge_update_every == 0 or idx == total_fusion_pairs:
+                    merge_fraction = idx / total_fusion_pairs
+                    _update_fusion_progress(
+                        0.42 + merge_fraction * 0.20,
+                        f"Unificando nombres ({idx}/{total_fusion_pairs})",
+                        subphase_id="merge",
+                        subphase_label="Uniendo entidades duplicadas",
+                        subphase_progress=merge_fraction,
+                        subphase_step=idx,
+                        subphase_total_steps=total_fusion_pairs,
                     )
 
             except Exception as e:
@@ -1946,30 +2065,59 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
 
         entities = [e for e in entities if e.id not in merged_entity_ids]
 
-        if fusion_pairs:
-            _update_storage(
-                project_id,
-                current_action=f"Unificados {len(merged_entity_ids)} personajes duplicados",
-            )
+        _update_fusion_progress(
+            0.62,
+            f"Unificados {len(merged_entity_ids)} personajes duplicados",
+            subphase_id="merge",
+            subphase_label="Uniendo entidades duplicadas",
+            subphase_progress=1.0,
+            subphase_step=total_fusion_pairs,
+            subphase_total_steps=total_fusion_pairs,
+        )
 
         # Reconciliar contadores
+        _update_fusion_progress(
+            0.68,
+            "Sincronizando menciones tras la unificación...",
+            subphase_id="reconcile",
+            subphase_label="Sincronizando menciones",
+            subphase_progress=0.2,
+        )
         try:
             reconciled = entity_repo.reconcile_all_mention_counts(project_id)
             logger.info(f"Reconciliados contadores de menciones para {reconciled} entidades")
             entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+            _update_fusion_progress(
+                0.74,
+                "Menciones reconciliadas",
+                subphase_id="reconcile",
+                subphase_label="Sincronizando menciones",
+                subphase_progress=0.7,
+            )
         except Exception as recon_err:
             logger.warning(f"Error reconciliando contadores de menciones: {recon_err}")
 
         # SP-1: Re-aplicar merges de usuario que no haya descubierto la fusión automática
         _reapply_user_merges(project_id, entity_repo, entities)
-
-        _update_storage(project_id, progress=57)
-        tracker.update_time_remaining()
+        _update_fusion_progress(
+            0.78,
+            "Aplicando fusiones manuales previas",
+            subphase_id="reconcile",
+            subphase_label="Sincronizando menciones",
+            subphase_progress=1.0,
+        )
 
         # 2. Resolución de correferencias
         _update_storage(
             project_id,
             current_phase="Identificando referencias cruzadas entre personajes...",
+        )
+        _update_fusion_progress(
+            0.80,
+            "Resolviendo correferencias...",
+            subphase_id="coref",
+            subphase_label="Resolviendo correferencias",
+            subphase_progress=0.0,
         )
 
         try:
@@ -2007,14 +2155,23 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                 f"{coref_result.total_mentions} menciones, "
                 f"{len(coref_result.unresolved)} sin resolver"
             )
+            _update_fusion_progress(
+                0.88,
+                f"Correferencias detectadas: {coref_result.total_chains} cadenas",
+                subphase_id="coref",
+                subphase_label="Resolviendo correferencias",
+                subphase_progress=0.2,
+            )
 
             for method, count in coref_result.method_contributions.items():
                 logger.debug(f"  Método {method.value}: {count} resoluciones")
 
             # Vincular cadenas con entidades
             character_entities = [e for e in entities if e.entity_type == EntityType.CHARACTER]
+            total_chains = len(coref_result.chains)
+            chain_update_every = max(1, total_chains // 20) if total_chains else 1
 
-            for chain in coref_result.chains:
+            for chain_idx, chain in enumerate(coref_result.chains, start=1):
                 if not chain.main_mention:
                     logger.debug(
                         f"Cadena de correferencia ignorada (solo pronombres): "
@@ -2109,24 +2266,29 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                         except Exception as e:
                             logger.warning(f"Error actualizando aliases: {e}")
 
+                if chain_idx % chain_update_every == 0 or chain_idx == total_chains:
+                    chain_fraction = chain_idx / total_chains if total_chains else 1.0
+                    _update_fusion_progress(
+                        0.88 + chain_fraction * 0.06,
+                        f"Vinculando correferencias ({chain_idx}/{total_chains})",
+                        subphase_id="coref",
+                        subphase_label="Resolviendo correferencias",
+                        subphase_progress=0.2 + chain_fraction * 0.8,
+                        subphase_step=chain_idx,
+                        subphase_total_steps=total_chains,
+                    )
+
         except ImportError as e:
             logger.warning(f"Módulo de correferencias no disponible: {e}")
         except Exception as e:
             logger.warning(f"Error en resolución de correferencias: {e}")
 
-        # Marcar fin de fase (entities_found se marca más abajo, después de MentionFinder)
-        _update_storage(
-            project_id,
-            progress=fusion_pct_end,
-            current_action=f"Encontrados {len(entities)} personajes y elementos únicos",
-        )
-        tracker.end_phase("fusion", 4)
-
-        logger.info(
-            f"Fusión de entidades completada en "
-            f"{tracker.phase_durations.get('fusion', 0):.1f}s: "
-            f"{len(merged_entity_ids)} entidades fusionadas, "
-            f"{len(entities)} entidades activas"
+        _update_fusion_progress(
+            0.94,
+            "Afinando menciones y relevancia de entidades...",
+            subphase_id="finalize",
+            subphase_label="Consolidando resultados",
+            subphase_progress=0.0,
         )
 
         # Buscar menciones adicionales
@@ -2134,7 +2296,13 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             from narrative_assistant.nlp.mention_finder import get_mention_finder
 
             mention_finder = get_mention_finder()
-            _update_storage(project_id, current_action="Buscando menciones adicionales...")
+            _update_fusion_progress(
+                0.95,
+                "Buscando menciones adicionales...",
+                subphase_id="mentions",
+                subphase_label="Buscando menciones adicionales",
+                subphase_progress=0.0,
+            )
 
             entity_names = [e.canonical_name for e in entities if e.canonical_name]
             aliases_dict = {}
@@ -2164,7 +2332,11 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                 mentions_by_entity[am.entity_name].append(am)
 
             additional_count = 0
-            for entity in entities:
+            total_entities_for_mentions = len(entities)
+            mention_update_every = (
+                max(1, total_entities_for_mentions // 20) if total_entities_for_mentions else 1
+            )
+            for idx, entity in enumerate(entities, start=1):
                 name = entity.canonical_name
                 if name in mentions_by_entity:
                     new_mentions = mentions_by_entity[name]
@@ -2185,11 +2357,26 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                         except Exception:
                             pass
 
+                if idx % mention_update_every == 0 or idx == total_entities_for_mentions:
+                    mention_fraction = idx / total_entities_for_mentions
+                    _update_fusion_progress(
+                        0.95 + mention_fraction * 0.02,
+                        f"Buscando menciones adicionales ({idx}/{total_entities_for_mentions})",
+                        subphase_id="mentions",
+                        subphase_label="Buscando menciones adicionales",
+                        subphase_progress=mention_fraction,
+                        subphase_step=idx,
+                        subphase_total_steps=total_entities_for_mentions,
+                    )
+
             if additional_count > 0:
                 logger.info(f"MentionFinder: Added {additional_count} additional mentions")
-                _update_storage(
-                    project_id,
-                    current_action=f"Encontradas {additional_count} menciones adicionales",
+                _update_fusion_progress(
+                    0.97,
+                    f"Encontradas {additional_count} menciones adicionales",
+                    subphase_id="mentions",
+                    subphase_label="Buscando menciones adicionales",
+                    subphase_progress=1.0,
                 )
 
         except Exception as mf_err:
@@ -2197,8 +2384,19 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
 
         # Recalcular importancia final
         logger.info("Recalculando importancia de entidades...")
+        _update_fusion_progress(
+            0.97,
+            "Recalculando relevancia de entidades...",
+            subphase_id="importance",
+            subphase_label="Recalculando relevancia",
+            subphase_progress=0.0,
+        )
         db = deps.get_database()
-        for entity in entities:
+        total_entities_for_importance = len(entities)
+        importance_update_every = (
+            max(1, total_entities_for_importance // 20) if total_entities_for_importance else 1
+        )
+        for idx, entity in enumerate(entities, start=1):
             try:
                 with db.connection() as conn:
                     cursor = conn.execute(
@@ -2241,10 +2439,38 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             except Exception as e:
                 logger.warning(f"Error recalculando importancia de '{entity.canonical_name}': {e}")
 
+            if idx % importance_update_every == 0 or idx == total_entities_for_importance:
+                importance_fraction = idx / total_entities_for_importance
+                _update_fusion_progress(
+                    0.97 + importance_fraction * 0.025,
+                    f"Actualizando relevancia de entidades ({idx}/{total_entities_for_importance})",
+                    subphase_id="importance",
+                    subphase_label="Recalculando relevancia",
+                    subphase_progress=importance_fraction,
+                    subphase_step=idx,
+                    subphase_total_steps=total_entities_for_importance,
+                )
+
         # AHORA sí: marcar entities_found después de MentionFinder + recalcular importancia
         _update_storage(
             project_id,
             metrics_update={"entities_found": len(entities)},
+        )
+
+        _update_fusion_progress(
+            0.99,
+            f"Encontrados {len(entities)} personajes y elementos únicos",
+            subphase_id="finalize",
+            subphase_label="Consolidando resultados",
+            subphase_progress=1.0,
+        )
+        tracker.end_phase("fusion", 4)
+
+        logger.info(
+            f"Fusión de entidades completada en "
+            f"{tracker.phase_durations.get('fusion', 0):.1f}s: "
+            f"{len(merged_entity_ids)} entidades fusionadas, "
+            f"{len(entities)} entidades activas"
         )
 
     except Exception as e:
@@ -2255,6 +2481,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
         tracker.phases[4]["completed"] = True
         tracker.phases[4]["current"] = False
         tracker.phases[4]["duration"] = round(tracker.phase_durations["fusion"], 1)
+        _update_storage(project_id, subphase=None)
 
     tracker.check_cancelled()
 

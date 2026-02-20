@@ -20,6 +20,7 @@ pub mod file_menu {
     pub const OPEN_PROJECT: &str = "open_project";
     pub const CLOSE_PROJECT: &str = "close_project";
     pub const IMPORT: &str = "import";
+    pub const UPDATE_MANUSCRIPT: &str = "update_manuscript";
     pub const EXPORT: &str = "export";
     pub const SETTINGS: &str = "settings";
 }
@@ -62,6 +63,7 @@ const ALL_MENU_IDS: &[&str] = &[
     file_menu::OPEN_PROJECT,
     file_menu::CLOSE_PROJECT,
     file_menu::IMPORT,
+    file_menu::UPDATE_MANUSCRIPT,
     file_menu::EXPORT,
     file_menu::SETTINGS,
     view_menu::CHAPTERS,
@@ -117,6 +119,13 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
         true,
         Some("CmdOrCtrl+I"),
     )?;
+    let update_manuscript = MenuItem::with_id(
+        app,
+        file_menu::UPDATE_MANUSCRIPT,
+        "Actualizar manuscrito...",
+        true,
+        None::<&str>,
+    )?;
     let export = MenuItem::with_id(
         app,
         file_menu::EXPORT,
@@ -145,6 +154,7 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
             &close_project,
             &separator1,
             &import,
+            &update_manuscript,
             &export,
             &separator2,
             &settings,
@@ -440,10 +450,10 @@ mod tests {
     /// (para detectar si se anade un item sin actualizar ALL_MENU_IDS)
     #[test]
     fn menu_ids_count_matches_expected() {
-        // 6 archivo + 12 ver + 1 analisis + 6 ayuda = 25
+        // 7 archivo + 12 ver + 1 analisis + 6 ayuda = 26
         assert_eq!(
             ALL_MENU_IDS.len(),
-            25,
+            26,
             "Se cambio el numero de items de menu. Actualizar ALL_MENU_IDS y este test."
         );
     }
@@ -459,6 +469,7 @@ mod tests {
             "open_project",
             "close_project",
             "import",
+            "update_manuscript",
             "export",
             "settings",
             "view_chapters",
@@ -498,6 +509,7 @@ mod tests {
         assert_eq!(file_menu::OPEN_PROJECT, "open_project");
         assert_eq!(file_menu::CLOSE_PROJECT, "close_project");
         assert_eq!(file_menu::IMPORT, "import");
+        assert_eq!(file_menu::UPDATE_MANUSCRIPT, "update_manuscript");
         assert_eq!(file_menu::EXPORT, "export");
         assert_eq!(file_menu::SETTINGS, "settings");
     }

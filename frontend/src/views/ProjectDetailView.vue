@@ -38,13 +38,6 @@
             @change="onReplaceDocumentSelected"
           >
           <Button
-            label="Reemplazar manuscrito"
-            icon="pi pi-upload"
-            outlined
-            size="small"
-            @click="openReplaceDocumentDialog"
-          />
-          <Button
             v-tooltip.bottom="'Exportar Guía de Estilo'"
             icon="pi pi-book"
             outlined
@@ -84,7 +77,7 @@
       <CorrectionConfigModal
         ref="correctionConfigModalRef"
         :project-id="project.id"
-        @saved="loadAlerts(project.id)"
+        @saved="loadAlerts(project.id, true)"
       />
 
       <!-- Analyze/Reanalyze Confirmation Dialog -->
@@ -92,7 +85,7 @@
         :visible="showReanalyzeDialog"
         :header="hasBeenAnalyzed ? 'Re-analizar documento' : 'Analizar documento'"
         :modal="true"
-        :style="{ width: '450px' }"
+        :style="{ width: 'var(--ds-size-dialog-md)' }"
         @update:visible="showReanalyzeDialog = $event"
       >
         <p class="reanalyze-info">
@@ -365,10 +358,10 @@
             />
 
             <div class="inspector-container">
-              <div class="inspector-header">
-                <span class="inspector-title">{{ inspectorTitle }}</span>
+              <div v-if="showInspectorHeader" class="inspector-header">
+                <span v-if="inspectorHeaderTitle" class="inspector-title">{{ inspectorHeaderTitle }}</span>
                 <Button
-                  v-if="selectionStore.hasSelection"
+                  v-if="(selectionStore.hasSelection || selectionStore.textSelection) && isContextualInspector && !selectedEntity"
                   v-tooltip="'Cerrar'"
                   icon="pi pi-times"
                   text
@@ -378,67 +371,156 @@
                 />
               </div>
 
-              <div class="inspector-content">
-                <!-- Entidad seleccionada (prioridad más alta) -->
-                <EntityInspector
-                  v-if="selectedEntity"
-                  :entity="selectedEntity"
-                  :project-id="project.id"
-                  :alerts="alerts"
-                  :chapter-count="chapters.length"
-                  @view-details="onEntityEdit(selectedEntity)"
-                  @go-to-mentions="handleGoToMentions(selectedEntity)"
-                  @close="selectionStore.clearAll()"
-                />
+              <div
+                v-if="workspaceStore.activeTab === 'text'"
+                class="inspector-tabs"
+                :class="{ 'with-contextual': hasContextualContent }"
+              >
+                <Button
+                  size="small"
+                  :text="rightInspectorTab !== 'summary'"
+                  :outlined="rightInspectorTab === 'summary'"
+                  @click="rightInspectorTab = 'summary'"
+                >
+                  Resumen
+                </Button>
+                <Button
+                  size="small"
+                  :text="rightInspectorTab !== 'chapters'"
+                  :outlined="rightInspectorTab === 'chapters'"
+                  @click="rightInspectorTab = 'chapters'"
+                >
+                  Capítulos
+                </Button>
+                <Button
+                  size="small"
+                  :text="rightInspectorTab !== 'dialogue'"
+                  :outlined="rightInspectorTab === 'dialogue'"
+                  @click="rightInspectorTab = 'dialogue'"
+                >
+                  Atribución
+                </Button>
+                <Button
+                  v-if="hasContextualContent"
+                  size="small"
+                  :text="rightInspectorTab !== 'contextual'"
+                  :outlined="rightInspectorTab === 'contextual'"
+                  @click="rightInspectorTab = 'contextual'"
+                >
+                  {{ contextualTabLabel }}
+                </Button>
+              </div>
 
-                <!-- Alerta seleccionada -->
-                <AlertInspector
-                  v-else-if="selectedAlert"
-                  :alert="selectedAlert"
-                  :chapters="chapters"
-                  @navigate="selectedAlert && onAlertNavigate(selectedAlert, $event)"
-                  @navigate-to-position="(s, e, t) => selectedAlert && onAlertNavigateToPosition(selectedAlert, s, e, t)"
-                  @resolve="selectedAlert && onAlertResolve(selectedAlert)"
-                  @dismiss="selectedAlert && onAlertDismiss(selectedAlert)"
-                  @resolve-ambiguous-attribute="(entityId) => selectedAlert && onResolveAmbiguousAttribute(selectedAlert, entityId)"
-                  @close="selectionStore.clearAll()"
-                />
+              <div
+                class="inspector-content"
+                :class="{
+                  'inspector-content--dialogue': workspaceStore.activeTab === 'text' && rightInspectorTab === 'dialogue'
+                }"
+              >
+                <template v-if="workspaceStore.activeTab === 'text' && rightInspectorTab === 'summary'">
+                  <ProjectSummary
+                    :word-count="project.wordCount"
+                    :chapter-count="project.chapterCount"
+                    :entity-count="entitiesCount"
+                    :alert-count="alertsCount"
+                    :alerts="alerts"
+                    @stat-click="handleStatClick"
+                  />
+                </template>
 
-                <!-- Texto seleccionado -->
-                <TextSelectionInspector
-                  v-else-if="selectionStore.textSelection"
-                  :selection="selectionStore.textSelection"
-                  :entities="entities"
-                  @close="selectionStore.setTextSelection(null)"
-                  @select-entity="onEntityClick"
-                  @search-similar="onSearchSimilarText"
-                  @ask-ai="onAskAiAboutSelection"
-                />
+                <template v-else-if="workspaceStore.activeTab === 'text' && rightInspectorTab === 'chapters'">
+                  <ChapterInspector
+                    v-if="currentChapter"
+                    :chapter="currentChapter"
+                    :project-id="project.id"
+                    :entities="entities"
+                    :alerts="alerts"
+                    @back-to-document="onBackToDocumentSummary"
+                    @go-to-start="onGoToChapterStart"
+                    @view-alerts="onViewChapterAlerts"
+                    @select-entity="onEntityClick"
+                    @navigate-to-event="onNavigateToEvent"
+                    @navigate-to-chapter="onNavigateToChapter"
+                  />
+                  <ProjectSummary
+                    v-else
+                    :word-count="project.wordCount"
+                    :chapter-count="project.chapterCount"
+                    :entity-count="entitiesCount"
+                    :alert-count="alertsCount"
+                    :alerts="alerts"
+                    @stat-click="handleStatClick"
+                  />
+                </template>
 
-                <!-- Capítulo visible en tab texto (contextual) -->
-                <ChapterInspector
-                  v-else-if="showChapterInspector && currentChapter"
-                  :chapter="currentChapter"
-                  :project-id="project.id"
-                  :entities="entities"
-                  :alerts="alerts"
-                  @back-to-document="onBackToDocumentSummary"
-                  @go-to-start="onGoToChapterStart"
-                  @view-alerts="onViewChapterAlerts"
-                  @select-entity="onEntityClick"
-                  @navigate-to-event="onNavigateToEvent"
-                  @navigate-to-chapter="onNavigateToChapter"
-                />
+                <template v-else-if="workspaceStore.activeTab === 'text' && rightInspectorTab === 'dialogue'">
+                  <DialogueAttributionPanel
+                    :project-id="project.id"
+                    :chapters="dialogueChapters"
+                    :entities="entities"
+                    :initial-chapter="currentChapter?.chapterNumber"
+                    @select-dialogue="onInspectorDialogueSelected"
+                  />
+                </template>
 
-                <!-- Sin selección ni capítulo visible: resumen del proyecto -->
-                <ProjectSummary
-                  v-else
-                  :word-count="project.wordCount"
-                  :chapter-count="project.chapterCount"
-                  :entity-count="entitiesCount"
-                  :alert-count="alertsCount"
-                  @stat-click="handleStatClick"
-                />
+                <template v-else>
+                  <EntityInspector
+                    v-if="selectedEntity"
+                    :entity="selectedEntity"
+                    :project-id="project.id"
+                    :alerts="alerts"
+                    :chapter-count="chapters.length"
+                    @view-details="onEntityEdit(selectedEntity)"
+                    @go-to-mentions="handleGoToMentions(selectedEntity)"
+                    @close="selectionStore.clearAll()"
+                  />
+
+                  <AlertInspector
+                    v-else-if="selectedAlert"
+                    :alert="selectedAlert"
+                    :chapters="chapters"
+                    @navigate="selectedAlert && onAlertNavigate(selectedAlert, $event)"
+                    @navigate-to-position="(s, e, t) => selectedAlert && onAlertNavigateToPosition(selectedAlert, s, e, t)"
+                    @resolve="selectedAlert && onAlertResolve(selectedAlert)"
+                    @dismiss="selectedAlert && onAlertDismiss(selectedAlert)"
+                    @resolve-ambiguous-attribute="(entityId) => selectedAlert && onResolveAmbiguousAttribute(selectedAlert, entityId)"
+                    @close="selectionStore.clearAll()"
+                  />
+
+                  <TextSelectionInspector
+                    v-else-if="selectionStore.textSelection"
+                    :selection="selectionStore.textSelection"
+                    :entities="entities"
+                    @close="selectionStore.setTextSelection(null)"
+                    @select-entity="onEntityClick"
+                    @search-similar="onSearchSimilarText"
+                    @ask-ai="onAskAiAboutSelection"
+                  />
+
+                  <ChapterInspector
+                    v-else-if="showChapterInspector && currentChapter"
+                    :chapter="currentChapter"
+                    :project-id="project.id"
+                    :entities="entities"
+                    :alerts="alerts"
+                    @back-to-document="onBackToDocumentSummary"
+                    @go-to-start="onGoToChapterStart"
+                    @view-alerts="onViewChapterAlerts"
+                    @select-entity="onEntityClick"
+                    @navigate-to-event="onNavigateToEvent"
+                    @navigate-to-chapter="onNavigateToChapter"
+                  />
+
+                  <ProjectSummary
+                    v-else
+                    :word-count="project.wordCount"
+                    :chapter-count="project.chapterCount"
+                    :entity-count="entitiesCount"
+                    :alert-count="alertsCount"
+                    :alerts="alerts"
+                    @stat-click="handleStatClick"
+                  />
+                </template>
               </div>
             </div>
           </div>
@@ -480,13 +562,14 @@ import StatusBar from '@/components/layout/StatusBar.vue'
 import { WorkspaceTabs, TextTab, AlertsDashboard, EntitiesTab, RelationsTab, StyleTab, GlossaryTab, ResumenTab, PanelResizer } from '@/components/workspace'
 import { AnalysisRequired } from '@/components/analysis'
 import { TimelineView } from '@/components/timeline'
+import DialogueAttributionPanel from '@/components/DialogueAttributionPanel.vue'
 import { ChaptersPanel, AlertsPanel, CharactersPanel, AssistantPanel, HistoryPanel, SemanticSearchPanel } from '@/components/sidebar'
 import { ProjectSummary, EntityInspector, AlertInspector, ChapterInspector, TextSelectionInspector } from '@/components/inspector'
 import ComparisonBanner from '@/components/alerts/ComparisonBanner.vue'
 import DocumentTypeChip from '@/components/DocumentTypeChip.vue'
 import CorrectionConfigModal from '@/components/workspace/CorrectionConfigModal.vue'
 import type { SidebarTab } from '@/stores/workspace'
-import type { Entity, Alert, AlertSource, ChatReference } from '@/types'
+import type { Entity, Alert, AlertSource, ChatReference, DialogueAttribution } from '@/types'
 import { resetGlobalHighlight } from '@/composables/useHighlight'
 import { api } from '@/services/apiClient'
 import { useNotifications } from '@/composables/useNotifications'
@@ -565,6 +648,9 @@ function onDashboardFilterChange(filtered: Alert[]) {
   dashboardFilteredAlerts.value = filtered
 }
 
+type RightInspectorTab = 'summary' | 'chapters' | 'dialogue' | 'contextual'
+const rightInspectorTab = ref<RightInspectorTab>('summary')
+
 // Estado para sincronización
 const activeChapterId = ref<number | null>(null)
 const highlightedEntityId = ref<number | null>(null)
@@ -609,6 +695,23 @@ watch(() => workspaceStore.selectedEntityForMentions, async (entityId) => {
     workspaceStore.selectedEntityForMentions = null
   }
 })
+
+watch(
+  [
+    () => selectionStore.primary?.type ?? null,
+    () => selectionStore.textSelection,
+    () => workspaceStore.activeTab,
+  ],
+  ([primaryType, textSelection, activeTab]) => {
+    if (activeTab !== 'text') return
+    const hasContextual = Boolean(primaryType || textSelection)
+    if (hasContextual) {
+      rightInspectorTab.value = 'contextual'
+    } else if (rightInspectorTab.value === 'contextual') {
+      rightInspectorTab.value = 'summary'
+    }
+  }
+)
 
 // ── Computed (inspector + layout) ──────────────────────────
 
@@ -661,6 +764,58 @@ const inspectorTitle = computed(() => {
   return 'Resumen'
 })
 
+const entityTypeLabels: Record<Entity['type'], string> = {
+  character: 'Personaje',
+  location: 'Lugar',
+  object: 'Objeto',
+  organization: 'Organización',
+  event: 'Evento',
+  concept: 'Concepto',
+  other: 'Entidad',
+}
+
+const dialogueChapters = computed(() =>
+  chapters.value.map(ch => ({
+    id: ch.id,
+    number: ch.chapterNumber,
+    title: ch.title,
+  }))
+)
+
+const hasContextualContent = computed(() => {
+  if (workspaceStore.activeTab !== 'text') return false
+  return selectionStore.hasSelection || Boolean(selectionStore.textSelection)
+})
+
+const isContextualInspector = computed(() => {
+  if (workspaceStore.activeTab !== 'text') return true
+  return rightInspectorTab.value === 'contextual'
+})
+
+const contextualTabLabel = computed(() => {
+  if (selectedEntity.value) {
+    return entityTypeLabels[selectedEntity.value.type] || 'Entidad'
+  }
+  if (selectedAlert.value) return 'Alerta'
+  if (selectionStore.textSelection) return 'Selección'
+  return 'Contextual'
+})
+
+const inspectorHeaderTitle = computed(() => {
+  if (workspaceStore.activeTab !== 'text') {
+    return inspectorTitle.value
+  }
+  if (rightInspectorTab.value === 'contextual') {
+    return ''
+  }
+  return ''
+})
+
+const showInspectorHeader = computed(() => {
+  if (workspaceStore.activeTab !== 'text') return true
+  return isContextualInspector.value && hasContextualContent.value
+})
+
 const rightPanelWidth = computed(() => {
   const preferredWidth = workspaceStore.currentLayoutConfig.rightPanelWidth
   return preferredWidth ?? workspaceStore.rightPanel.width
@@ -677,6 +832,7 @@ const handleMenuTabEvent = (event: Event) => {
 }
 
 const handleMenuExport = () => { showExportDialog.value = true }
+const handleMenuUpdateManuscript = () => { openUpdateDocumentDialog() }
 const handleMenuRunAnalysis = () => { showReanalyzeDialog.value = true }
 const handleMenuToggleInspector = () => { workspaceStore.toggleRightPanel() }
 const handleMenuToggleSidebar = () => { workspaceStore.toggleLeftPanel() }
@@ -756,6 +912,7 @@ onMounted(async () => {
   // Listen for menu events (native Tauri menu + web MenuBar)
   window.addEventListener('menubar:view-tab', handleMenuTabEvent)
   window.addEventListener('menubar:export', handleMenuExport)
+  window.addEventListener('menubar:update-manuscript', handleMenuUpdateManuscript)
   window.addEventListener('menubar:run-analysis', handleMenuRunAnalysis)
   window.addEventListener('menubar:toggle-inspector', handleMenuToggleInspector)
   window.addEventListener('menubar:toggle-sidebar', handleMenuToggleSidebar)
@@ -824,6 +981,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('menubar:view-tab', handleMenuTabEvent)
   window.removeEventListener('menubar:export', handleMenuExport)
+  window.removeEventListener('menubar:update-manuscript', handleMenuUpdateManuscript)
   window.removeEventListener('menubar:run-analysis', handleMenuRunAnalysis)
   window.removeEventListener('menubar:toggle-inspector', handleMenuToggleInspector)
   window.removeEventListener('menubar:toggle-sidebar', handleMenuToggleSidebar)
@@ -1147,6 +1305,12 @@ const onNavigateToEvent = (startChar: number, endChar: number) => {
   workspaceStore.navigateToTextPosition(startChar, undefined, chapterId)
 }
 
+const onInspectorDialogueSelected = (attribution: DialogueAttribution) => {
+  workspaceStore.setActiveTab('text')
+  rightInspectorTab.value = 'dialogue'
+  textTabRef.value?.scrollToDialogue(attribution)
+}
+
 // TextSelectionInspector handlers
 const onSearchSimilarText = (text: string) => {
   // Establecer query y abrir panel de búsqueda
@@ -1287,6 +1451,10 @@ const onAnalysisCompleted = async () => {
 watch(() => workspaceStore.activeTab, async (newTab) => {
   if (!project.value) return
 
+  if (newTab !== 'text') {
+    rightInspectorTab.value = 'summary'
+  }
+
   // Si navegamos a 'text' y hay un scroll pendiente, asegurar que los capítulos estén cargados
   if (newTab === 'text' && workspaceStore.scrollToPosition !== null) {
     console.log('[ProjectDetailView] Navigating to text with pending scroll, ensuring chapters loaded...')
@@ -1377,7 +1545,7 @@ const startReanalysis = async () => {
   }
 }
 
-const openReplaceDocumentDialog = () => {
+const openUpdateDocumentDialog = () => {
   replaceDocumentInputRef.value?.click()
 }
 
@@ -1398,7 +1566,7 @@ const onReplaceDocumentSelected = async (event: Event) => {
 
     toast.add({
       severity: 'success',
-      summary: 'Documento reemplazado',
+      summary: 'Manuscrito actualizado',
       detail: `Clasificación: ${result.classification}. Ejecuta un nuevo análisis.`,
       life: 4000,
     })
@@ -1409,10 +1577,10 @@ const onReplaceDocumentSelected = async (event: Event) => {
   } catch (err) {
     const detail = err instanceof Error
       ? err.message
-      : 'No se pudo reemplazar el documento. Crea un proyecto nuevo para este archivo.'
+      : 'No se pudo actualizar el manuscrito. Crea un proyecto nuevo para este archivo.'
     toast.add({
       severity: 'error',
-      summary: 'Reemplazo bloqueado',
+      summary: 'Actualización bloqueada',
       detail,
       life: 5000,
     })
@@ -1439,7 +1607,7 @@ const onReplaceDocumentSelected = async (event: Event) => {
   align-items: center;
   justify-content: center;
   height: 100%;
-  gap: 1rem;
+  gap: var(--ds-space-4);
 }
 
 /* Layout */
@@ -1461,25 +1629,25 @@ const onReplaceDocumentSelected = async (event: Event) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 1rem;
+  padding: var(--ds-space-3) var(--ds-space-4);
   background: var(--surface-card);
-  border-bottom: 1px solid var(--surface-border);
+  border-bottom: var(--ds-border-1) solid var(--surface-border);
   flex-shrink: 0;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--ds-space-3);
 }
 
 .header-left > :deep(.document-type-chip) {
   align-self: flex-end;
-  margin-left: 0.5rem;
+  margin-left: var(--ds-space-2);
 }
 
 .header-info h1 {
-  font-size: 1.125rem;
+  font-size: var(--ds-font-lg);
   font-weight: 600;
   margin: 0;
   color: var(--text-color);
@@ -1488,18 +1656,18 @@ const onReplaceDocumentSelected = async (event: Event) => {
 .header-meta {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-top: 0.25rem;
+  gap: var(--ds-space-3);
+  margin-top: var(--ds-space-1);
 }
 
 .doc-name {
-  font-size: 0.8125rem;
+  font-size: var(--ds-font-xs);
   color: var(--text-color-secondary);
 }
 
 .header-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--ds-space-2);
 }
 
 .style-guide-btn {
@@ -1523,9 +1691,9 @@ const onReplaceDocumentSelected = async (event: Event) => {
 
 .sidebar-tabs {
   display: flex;
-  gap: 0.25rem;
-  padding: 0.5rem;
-  border-bottom: 1px solid var(--surface-border);
+  gap: var(--ds-space-1);
+  padding: var(--ds-space-2);
+  border-bottom: var(--ds-border-1) solid var(--surface-border);
   flex-shrink: 0;
 }
 
@@ -1534,14 +1702,14 @@ const onReplaceDocumentSelected = async (event: Event) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: var(--ds-space-10);
+  height: var(--ds-space-10);
   border: none;
   background: transparent;
   border-radius: var(--app-radius);
   cursor: pointer;
   color: var(--text-color-secondary);
-  transition: all 0.15s;
+  transition: var(--ds-transition-fast);
 }
 
 .sidebar-tab-btn:hover {
@@ -1556,11 +1724,11 @@ const onReplaceDocumentSelected = async (event: Event) => {
 
 .sidebar-badge {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  min-width: 16px;
-  height: 16px;
-  font-size: 0.625rem;
+  top: var(--ds-space-0-5);
+  right: var(--ds-space-0-5);
+  min-width: var(--ds-space-4);
+  height: var(--ds-space-4);
+  font-size: calc(var(--ds-font-xs) * 0.833);
   font-weight: 600;
   background: var(--ds-color-danger, #ef4444);
   color: white;
@@ -1568,7 +1736,7 @@ const onReplaceDocumentSelected = async (event: Event) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 4px;
+  padding: 0 var(--ds-space-1);
 }
 
 .sidebar-badge--warning {
@@ -1593,33 +1761,33 @@ const onReplaceDocumentSelected = async (event: Event) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 1rem;
+  padding: var(--ds-space-3) var(--ds-space-4);
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: var(--ds-font-sm);
   color: var(--text-color);
-  border-bottom: 1px solid var(--surface-border);
+  border-bottom: var(--ds-border-1) solid var(--surface-border);
 }
 
 .mini-count {
   background: var(--surface-200);
-  padding: 0.125rem 0.5rem;
+  padding: var(--ds-space-0-5) var(--ds-space-2);
   border-radius: var(--app-radius-lg);
-  font-size: 0.75rem;
+  font-size: var(--ds-font-xs);
   color: var(--text-color-secondary);
 }
 
 .severity-list {
-  padding: 0.5rem;
+  padding: var(--ds-space-2);
 }
 
 .severity-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2) var(--ds-space-3);
   border-radius: var(--app-radius);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--ds-duration-fast) var(--ds-ease-in-out);
 }
 
 .severity-row:hover {
@@ -1627,8 +1795,8 @@ const onReplaceDocumentSelected = async (event: Event) => {
 }
 
 .severity-dot {
-  width: 8px;
-  height: 8px;
+  width: var(--ds-space-2);
+  height: var(--ds-space-2);
   border-radius: 50%;
 }
 
@@ -1640,26 +1808,26 @@ const onReplaceDocumentSelected = async (event: Event) => {
 
 .severity-label {
   flex: 1;
-  font-size: 0.8125rem;
+  font-size: var(--ds-font-xs);
 }
 
 .severity-count {
   font-weight: 600;
-  font-size: 0.8125rem;
+  font-size: var(--ds-font-xs);
 }
 
 .characters-list {
-  padding: 0.5rem;
+  padding: var(--ds-space-2);
 }
 
 .character-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2) var(--ds-space-3);
   border-radius: var(--app-radius);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--ds-duration-fast) var(--ds-ease-in-out);
 }
 
 .character-item:hover {
@@ -1676,14 +1844,14 @@ const onReplaceDocumentSelected = async (event: Event) => {
 
 .char-name {
   flex: 1;
-  font-size: 0.875rem;
+  font-size: var(--ds-font-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .char-mentions {
-  font-size: 0.75rem;
+  font-size: var(--ds-font-xs);
   color: var(--text-color-secondary);
 }
 
@@ -1699,7 +1867,7 @@ const onReplaceDocumentSelected = async (event: Event) => {
   display: flex;
   flex-shrink: 0;
   background: var(--surface-card);
-  border-right: 1px solid var(--surface-border);
+  border-right: var(--ds-border-1) solid var(--surface-border);
   position: relative;
   box-sizing: border-box;
   overflow: hidden;
@@ -1718,7 +1886,7 @@ const onReplaceDocumentSelected = async (event: Event) => {
   display: flex;
   flex-shrink: 0;
   background: var(--surface-card);
-  border-left: 1px solid var(--surface-border);
+  border-left: var(--ds-border-1) solid var(--surface-border);
   position: relative;
   overflow: hidden;
   min-width: 0;
@@ -1727,18 +1895,18 @@ const onReplaceDocumentSelected = async (event: Event) => {
 /* Animación de paneles */
 .panel-slide-enter-active,
 .panel-slide-leave-active {
-  transition: all 0.25s ease;
+  transition: all var(--ds-duration-normal) var(--ds-ease-in-out);
 }
 
 .panel-slide-enter-from,
 .panel-slide-leave-to {
   opacity: 0;
-  transform: translateX(-20px);
+  transform: translateX(calc(-1 * var(--ds-space-5)));
 }
 
 .right-panel.panel-slide-enter-from,
 .right-panel.panel-slide-leave-to {
-  transform: translateX(20px);
+  transform: translateX(var(--ds-space-5));
 }
 
 /* Inspector */
@@ -1752,10 +1920,35 @@ const onReplaceDocumentSelected = async (event: Event) => {
 }
 
 .inspector-header {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--surface-border);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-bottom: var(--ds-border-1) solid var(--surface-border);
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: var(--ds-font-sm);
+}
+
+.inspector-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ds-space-1-5);
+  padding: var(--ds-space-2);
+  border-bottom: var(--ds-border-1) solid var(--surface-border);
+}
+
+.inspector-tabs.with-contextual {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.inspector-tabs :deep(.p-button) {
+  width: 100%;
+  white-space: nowrap;
+  font-size: var(--ds-font-xs);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.inspector-tabs :deep(.p-button-label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .inspector-content {
@@ -1763,37 +1956,43 @@ const onReplaceDocumentSelected = async (event: Event) => {
   min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 1rem;
+  padding: var(--ds-space-4);
+  scrollbar-gutter: stable;
+}
+
+.inspector-content.inspector-content--dialogue {
+  padding: 0;
+  overflow: hidden;
 }
 
 .inspector-summary {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ds-space-4);
 }
 
 .summary-stat {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-3);
   background: var(--surface-50);
   border-radius: var(--app-radius);
 }
 
 .summary-stat i {
-  font-size: 1.25rem;
+  font-size: var(--ds-font-xl);
   color: var(--primary-color);
 }
 
 .summary-stat .stat-value {
-  font-size: 1.25rem;
+  font-size: var(--ds-font-xl);
   font-weight: 700;
   color: var(--text-color);
 }
 
 .summary-stat .stat-label {
-  font-size: 0.75rem;
+  font-size: var(--ds-font-xs);
   color: var(--text-color-secondary);
   display: block;
 }
@@ -1802,33 +2001,33 @@ const onReplaceDocumentSelected = async (event: Event) => {
 .inspector-alert {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--ds-space-3);
 }
 
 .entity-header {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--ds-space-3);
 }
 
 .entity-header i {
-  font-size: 1.5rem;
+  font-size: var(--ds-font-2xl);
   color: var(--primary-color);
 }
 
 .entity-header h3 {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: var(--ds-font-lg);
 }
 
 .entity-type-label {
-  font-size: 0.8125rem;
+  font-size: var(--ds-font-xs);
   color: var(--text-color-secondary);
   text-transform: uppercase;
 }
 
 .entity-aliases {
-  font-size: 0.875rem;
+  font-size: var(--ds-font-sm);
   color: var(--text-color-secondary);
 }
 
@@ -1839,16 +2038,16 @@ const onReplaceDocumentSelected = async (event: Event) => {
 .entity-mentions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
+  gap: var(--ds-space-2);
+  font-size: var(--ds-font-sm);
   color: var(--text-color-secondary);
 }
 
 .alert-severity {
   display: inline-block;
-  padding: 0.25rem 0.75rem;
+  padding: var(--ds-space-1) var(--ds-space-3);
   border-radius: var(--app-radius);
-  font-size: 0.75rem;
+  font-size: var(--ds-font-xs);
   font-weight: 600;
   width: fit-content;
 }
@@ -1861,46 +2060,46 @@ const onReplaceDocumentSelected = async (event: Event) => {
 
 .inspector-alert h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--ds-font-base);
 }
 
 .inspector-alert p {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--ds-font-sm);
   color: var(--text-color-secondary);
-  line-height: 1.5;
+  line-height: var(--ds-leading-normal);
 }
 
 .alert-location {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8125rem;
+  gap: var(--ds-space-2);
+  font-size: var(--ds-font-xs);
   color: var(--text-color-secondary);
 }
 
 .alert-actions {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  gap: var(--ds-space-2);
+  margin-top: var(--ds-space-2);
 }
 
 /* Reanalyze dialog */
 .reanalyze-info {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-4);
   background: var(--blue-50);
   border-radius: var(--app-radius);
-  border-left: 4px solid var(--blue-500);
+  border-left: var(--ds-border-4) solid var(--blue-500);
   color: var(--blue-900);
-  font-size: 0.9rem;
+  font-size: var(--ds-font-sm);
   margin: 0;
 }
 
 .reanalyze-info i {
-  font-size: 1.25rem;
+  font-size: var(--ds-font-xl);
 }
 
 /* Dark mode */

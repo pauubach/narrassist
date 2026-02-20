@@ -36,7 +36,7 @@ logger = logging.getLogger("narrative_assistant.api")
 # Constants
 # ============================================================================
 
-BACKEND_VERSION = "0.11.4"
+BACKEND_VERSION = "0.11.5"
 IS_EMBEDDED_RUNTIME = (
     os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
 )

@@ -25,8 +25,10 @@ logger = logging.getLogger(__name__)
 # Pydantic request model
 # ============================================================================
 
+
 class PartialAnalysisRequest(BaseModel):
     """JSON body for POST /api/projects/{id}/analyze/partial."""
+
     phases: list[str] = Field(..., min_length=1, description="Frontend phase names")
     force: bool = Field(False, description="Re-run even if phase already completed")
 
@@ -37,51 +39,60 @@ class PartialAnalysisRequest(BaseModel):
 
 FRONTEND_TO_BACKEND: dict[str, list[str]] = {
     # Tier 1 is atomic — requesting any Tier 1 phase triggers all three
-    "parsing":        ["parsing", "classification", "structure"],
-    "structure":      ["parsing", "classification", "structure"],
+    "parsing": ["parsing", "classification", "structure"],
+    "structure": ["parsing", "classification", "structure"],
     # Tier 2: heavy NLP phases
-    "entities":       ["ner"],
-    "coreference":    ["fusion"],
-    "attributes":     ["attributes"],
-    "coherence":      ["consistency"],
-    "grammar":        ["grammar"],
-    "spelling":       ["grammar"],          # same backend phase
+    "entities": ["ner"],
+    "coreference": ["fusion"],
+    "attributes": ["attributes"],
+    "coherence": ["consistency"],
+    "grammar": ["grammar"],
+    "spelling": ["grammar"],  # same backend phase
     # Tier 3: enrichment (CPU-only, read from DB)
-    "relationships":  ["relationships"],
+    "relationships": ["relationships"],
     "voice_profiles": ["voice"],
-    "register":       ["prose"],
-    "pacing":         ["prose"],            # same backend phase
-    "temporal":       ["consistency"],      # sub-phase of consistency
-    "emotional":      ["health"],           # sub-phase of health
-    "sentiment":      ["health"],           # sub-phase of health
+    "register": ["prose"],
+    "pacing": ["prose"],  # same backend phase
+    "temporal": ["consistency"],  # sub-phase of consistency
+    "emotional": ["health"],  # sub-phase of health
+    "sentiment": ["health"],  # sub-phase of health
     # No direct backend equivalent
-    "focalization":   [],
-    "interactions":   [],
+    "focalization": [],
+    "interactions": [],
 }
 
 # Canonical execution order for all backend phases
 BACKEND_PHASE_ORDER = [
-    "parsing", "classification", "structure",
-    "ner", "fusion", "attributes",
-    "consistency", "grammar", "alerts",
-    "relationships", "voice", "prose", "health",
+    "parsing",
+    "classification",
+    "structure",
+    "ner",
+    "fusion",
+    "attributes",
+    "consistency",
+    "grammar",
+    "alerts",
+    "relationships",
+    "voice",
+    "prose",
+    "health",
 ]
 
 # Backend phase dependencies (what must complete before this phase can run)
 BACKEND_PHASE_DEPS: dict[str, list[str]] = {
-    "parsing":        [],
+    "parsing": [],
     "classification": ["parsing"],
-    "structure":      ["parsing"],
-    "ner":            ["parsing", "classification", "structure"],
-    "fusion":         ["ner"],
-    "attributes":     ["fusion"],
-    "consistency":    ["attributes"],
-    "grammar":        ["parsing", "structure"],
-    "alerts":         ["consistency", "grammar"],
-    "relationships":  ["fusion"],
-    "voice":          ["fusion"],
-    "prose":          ["structure"],
-    "health":         ["fusion", "structure"],
+    "structure": ["parsing"],
+    "ner": ["parsing", "classification", "structure"],
+    "fusion": ["ner"],
+    "attributes": ["fusion"],
+    "consistency": ["attributes"],
+    "grammar": ["parsing", "structure"],
+    "alerts": ["consistency", "grammar"],
+    "relationships": ["fusion"],
+    "voice": ["fusion"],
+    "prose": ["structure"],
+    "health": ["fusion", "structure"],
 }
 
 TIER1_PHASES = {"parsing", "classification", "structure"}
@@ -126,6 +137,7 @@ PHASE_WEIGHTS: dict[str, float] = {
 # ============================================================================
 # Phase completion detection (infer from DB)
 # ============================================================================
+
 
 def get_completed_phases(db_session: Any, project_id: int) -> set[str]:
     """Infer which backend phases have already been completed from DB state."""
@@ -194,6 +206,7 @@ def get_completed_phases(db_session: Any, project_id: int) -> set[str]:
 # Phase resolution: frontend names → ordered backend phases to execute
 # ============================================================================
 
+
 def resolve_backend_phases(
     requested_frontend: list[str],
     completed_phases: set[str],
@@ -245,6 +258,7 @@ def resolve_backend_phases(
 # Context loaders: populate ctx from DB for skipped prerequisite phases
 # ============================================================================
 
+
 def load_tier1_context(ctx: dict) -> None:
     """Load Tier 1 outputs (parsing + structure) from DB into ctx."""
     from narrative_assistant.persistence.chapter import get_chapter_repository
@@ -256,34 +270,32 @@ def load_tier1_context(ctx: dict) -> None:
     chapters_with_ids = chapter_repo.get_by_project(project_id)
 
     if not chapters_with_ids:
-        raise RuntimeError(
-            "No chapters found in DB — Tier 1 (parsing) must run first."
-        )
+        raise RuntimeError("No chapters found in DB — Tier 1 (parsing) must run first.")
 
     full_text = "\n\n".join(ch.content for ch in chapters_with_ids if ch.content)
     word_count = sum(len((ch.content or "").split()) for ch in chapters_with_ids)
 
     chapters_data = []
     for ch in chapters_with_ids:
-        chapters_data.append({
-            "chapter_number": ch.chapter_number,
-            "title": ch.title or f"Capítulo {ch.chapter_number}",
-            "content": ch.content or "",
-            "start_char": ch.start_char,
-            "end_char": ch.end_char,
-            "word_count": len((ch.content or "").split()),
-            "structure_type": getattr(ch, "structure_type", "flat"),
-            "sections": [],
-        })
+        chapters_data.append(
+            {
+                "chapter_number": ch.chapter_number,
+                "title": ch.title or f"Capítulo {ch.chapter_number}",
+                "content": ch.content or "",
+                "start_char": ch.start_char,
+                "end_char": ch.end_char,
+                "word_count": len((ch.content or "").split()),
+                "structure_type": getattr(ch, "structure_type", "flat"),
+                "sections": [],
+            }
+        )
 
     def find_chapter_id_for_position(start_char: int) -> int | None:
         for ch in chapters_with_ids:
             if ch.start_char <= start_char < ch.end_char:
                 return ch.id
         if chapters_with_ids:
-            closest = min(
-                chapters_with_ids, key=lambda c: abs(c.start_char - start_char)
-            )
+            closest = min(chapters_with_ids, key=lambda c: abs(c.start_char - start_char))
             return closest.id
         return None
 
@@ -296,10 +308,7 @@ def load_tier1_context(ctx: dict) -> None:
     ctx.setdefault("document_type", "unknown")
     ctx.setdefault("classification", None)
 
-    logger.info(
-        f"Loaded Tier 1 context from DB: {len(chapters_data)} chapters, "
-        f"{word_count} words"
-    )
+    logger.info(f"Loaded Tier 1 context from DB: {len(chapters_data)} chapters, {word_count} words")
 
 
 def load_entity_context(ctx: dict) -> None:
@@ -339,15 +348,17 @@ def load_attribute_context(ctx: dict) -> None:
             ).fetchall()
 
             for r in rows:
-                attributes.append(ExtractedAttribute(  # type: ignore[call-arg]
-                    entity_name=r["canonical_name"],
-                    attribute=r["attribute_key"],
-                    value=r["attribute_value"],
-                    confidence=r["confidence"] or 0.5,
-                    source="database",
-                    chapter_number=0,
-                    evidence="",
-                ))
+                attributes.append(
+                    ExtractedAttribute(  # type: ignore[call-arg]
+                        entity_name=r["canonical_name"],
+                        attribute=r["attribute_key"],
+                        value=r["attribute_value"],
+                        confidence=r["confidence"] or 0.5,
+                        source="database",
+                        chapter_number=0,
+                        evidence="",
+                    )
+                )
     except Exception as e:
         logger.warning(f"Error loading attributes from DB: {e}")
 
@@ -357,33 +368,33 @@ def load_attribute_context(ctx: dict) -> None:
 
 # What ctx keys each phase needs before it can run
 _PHASE_CTX_NEEDS: dict[str, list[str]] = {
-    "parsing":        [],
+    "parsing": [],
     "classification": ["full_text"],
-    "structure":      ["full_text"],
-    "ner":            ["full_text", "find_chapter_id_for_position"],
-    "fusion":         ["full_text", "chapters_data", "entities", "find_chapter_id_for_position"],
-    "attributes":     ["full_text", "chapters_data", "entities"],
-    "consistency":    ["full_text", "chapters_data", "entities", "attributes"],
-    "grammar":        ["full_text"],
-    "alerts":         [],  # uses ctx.get() with defaults
-    "relationships":  [],  # loads from DB internally
-    "voice":          [],  # loads from DB internally
-    "prose":          [],  # loads from DB internally
-    "health":         [],  # loads from DB internally
+    "structure": ["full_text"],
+    "ner": ["full_text", "find_chapter_id_for_position"],
+    "fusion": ["full_text", "chapters_data", "entities", "find_chapter_id_for_position"],
+    "attributes": ["full_text", "chapters_data", "entities"],
+    "consistency": ["full_text", "chapters_data", "entities", "attributes"],
+    "grammar": ["full_text"],
+    "alerts": [],  # uses ctx.get() with defaults
+    "relationships": [],  # loads from DB internally
+    "voice": [],  # loads from DB internally
+    "prose": [],  # loads from DB internally
+    "health": [],  # loads from DB internally
 }
 
 # Which loader provides which ctx keys
 _CTX_LOADERS: dict[str, callable] = {  # type: ignore[valid-type]
-    "full_text":                    load_tier1_context,
-    "chapters_data":                load_tier1_context,
-    "chapters_count":               load_tier1_context,
-    "chapters_with_ids":            load_tier1_context,
+    "full_text": load_tier1_context,
+    "chapters_data": load_tier1_context,
+    "chapters_count": load_tier1_context,
+    "chapters_with_ids": load_tier1_context,
     "find_chapter_id_for_position": load_tier1_context,
-    "word_count":                   load_tier1_context,
-    "entities":                     load_entity_context,
-    "entity_repo":                  load_entity_context,
-    "coref_result":                 load_entity_context,
-    "attributes":                   load_attribute_context,
+    "word_count": load_tier1_context,
+    "entities": load_entity_context,
+    "entity_repo": load_entity_context,
+    "coref_result": load_entity_context,
+    "attributes": load_attribute_context,
 }
 
 
@@ -398,23 +409,20 @@ def ensure_context(ctx: dict, phase: str) -> None:
                 loader(ctx)
                 loaders_called.add(id(loader))
             if key not in ctx:
-                raise RuntimeError(
-                    f"Context key '{key}' could not be loaded for phase '{phase}'"
-                )
+                raise RuntimeError(f"Context key '{key}' could not be loaded for phase '{phase}'")
 
 
 # ============================================================================
 # Phase-specific cleanup (for force=True re-runs)
 # ============================================================================
 
+
 def cleanup_phase_data(db_session: Any, project_id: int, phase: str) -> None:
     """Delete only the data produced by a specific phase (targeted cleanup)."""
     try:
         with db_session.connection() as conn:
             if phase in ("parsing", "classification", "structure"):
-                conn.execute(
-                    "DELETE FROM chapters WHERE project_id = ?", (project_id,)
-                )
+                conn.execute("DELETE FROM chapters WHERE project_id = ?", (project_id,))
             elif phase == "ner":
                 conn.execute(
                     "DELETE FROM entity_mentions WHERE entity_id IN "
@@ -432,9 +440,7 @@ def cleanup_phase_data(db_session: Any, project_id: int, phase: str) -> None:
                     "(SELECT id FROM entities WHERE project_id = ?)",
                     (project_id,),
                 )
-                conn.execute(
-                    "DELETE FROM entities WHERE project_id = ?", (project_id,)
-                )
+                conn.execute("DELETE FROM entities WHERE project_id = ?", (project_id,))
             elif phase == "attributes":
                 conn.execute(
                     "DELETE FROM attribute_evidences WHERE attribute_id IN "
@@ -468,13 +474,14 @@ def cleanup_phase_data(db_session: Any, project_id: int, phase: str) -> None:
                     (project_id,),
                 )
             elif phase == "alerts":
-                conn.execute(
-                    "DELETE FROM alerts WHERE project_id = ?", (project_id,)
-                )
+                conn.execute("DELETE FROM alerts WHERE project_id = ?", (project_id,))
             elif phase in ("relationships", "voice", "prose", "health"):
                 # Enrichment cache entries
                 phase_num = {
-                    "relationships": 10, "voice": 11, "prose": 12, "health": 13,
+                    "relationships": 10,
+                    "voice": 11,
+                    "prose": 12,
+                    "health": 13,
                 }.get(phase, 0)
                 conn.execute(
                     "DELETE FROM enrichment_cache WHERE project_id = ? AND phase = ?",
@@ -488,6 +495,7 @@ def cleanup_phase_data(db_session: Any, project_id: int, phase: str) -> None:
 # ============================================================================
 # Progress helpers
 # ============================================================================
+
 
 def build_partial_progress(
     phases_to_run: list[str],
@@ -511,6 +519,7 @@ def build_partial_progress(
 # Partial analysis orchestrator
 # ============================================================================
 
+
 def run_partial_analysis_thread(
     ctx: dict,
     phases_to_run: list[str],
@@ -522,6 +531,7 @@ def run_partial_analysis_thread(
     Similar to run_real_analysis in analysis.py but only executes
     the requested phases and loads context from DB for skipped prerequisites.
     """
+    from narrative_assistant.persistence.version_diff import VersionDiffRepository
     from routers import deps
     from routers._analysis_phases import (
         ProgressTracker,
@@ -560,9 +570,7 @@ def run_partial_analysis_thread(
     has_tier3 = bool(phases_set & TIER3_PHASES)
 
     # Build progress tracker for partial phases only
-    progress_phases, partial_weights, partial_order = build_partial_progress(
-        phases_to_run
-    )
+    progress_phases, partial_weights, partial_order = build_partial_progress(phases_to_run)
     db_session = deps.get_database()
     ctx["db_session"] = db_session
 
@@ -598,14 +606,12 @@ def run_partial_analysis_thread(
             if not got_slot:
                 ctx["queued_for_heavy"] = True
                 from narrative_assistant.persistence.project import ProjectManager
+
                 project = ctx["project"]
                 project.analysis_status = "queued"
                 proj_manager = ProjectManager(db_session)
                 proj_manager.update(project)
-                logger.info(
-                    f"Partial analysis project {project_id}: "
-                    f"queued for heavy slot"
-                )
+                logger.info(f"Partial analysis project {project_id}: queued for heavy slot")
                 return  # Will be resumed when slot frees
 
             run_ollama_healthcheck(ctx, tracker)
@@ -649,8 +655,34 @@ def run_partial_analysis_thread(
 
             invalidate_enrichment_if_mutated(db_session, project_id, entity_fp)
 
+        ctx["phase_durations_json"] = {
+            key: round(value, 3) for key, value in tracker.phase_durations.items()
+        }
+        ctx["duration_total_sec"] = round(time.time() - ctx["start_time"], 3)
+        ctx["run_mode"] = "incremental"
+
+        version_diff_repo = VersionDiffRepository(db_session)
+        chapter_diff = version_diff_repo.compute_chapter_diff(
+            snapshot_id=ctx.get("pre_analysis_snapshot_id"),
+            chapters_data=ctx.get("chapters_data", []),
+        )
+        entity_diff = version_diff_repo.compute_and_store_entity_links(
+            project_id=project_id,
+            snapshot_id=ctx.get("pre_analysis_snapshot_id"),
+        )
+        ctx["version_chapter_diff"] = chapter_diff.to_dict()
+        ctx["version_entity_diff"] = entity_diff.to_dict()
+
         # S15: Write version metrics after enrichment
-        write_version_metrics(ctx)
+        version_num = write_version_metrics(ctx)
+        if version_num is not None:
+            version_diff_repo.upsert_version_diff(
+                project_id=project_id,
+                version_num=version_num,
+                snapshot_id=ctx.get("pre_analysis_snapshot_id"),
+                chapter_metrics=chapter_diff,
+                entity_metrics=entity_diff,
+            )
 
         # --- Completion ---
         run_reconciliation(ctx, tracker)
@@ -667,6 +699,7 @@ def run_partial_analysis_thread(
 
         # Update project status
         from narrative_assistant.persistence.project import ProjectManager
+
         project = ctx["project"]
         project.analysis_status = "completed"
         total_duration = round(time.time() - ctx["start_time"], 1)

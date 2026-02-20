@@ -41,9 +41,7 @@ class TestVersionMetricsSchema:
 
         db = Database(db_path=tmp_path / "test.db")
         with db.connection() as conn:
-            tables = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
             table_names = {t[0] for t in tables}
             assert "version_metrics" in table_names
 
@@ -57,9 +55,18 @@ class TestVersionMetricsSchema:
             col_names = {c[1] for c in cols}
 
         expected = {
-            "id", "project_id", "version_num", "snapshot_id",
-            "alert_count", "word_count", "entity_count", "chapter_count",
-            "health_score", "formality_avg", "dialogue_ratio", "created_at",
+            "id",
+            "project_id",
+            "version_num",
+            "snapshot_id",
+            "alert_count",
+            "word_count",
+            "entity_count",
+            "chapter_count",
+            "health_score",
+            "formality_avg",
+            "dialogue_ratio",
+            "created_at",
         }
         assert expected.issubset(col_names)
 
@@ -318,6 +325,7 @@ class TestVersionTypes:
         assert "ApiVersionMetrics" in content
         assert "ApiVersionTrend" in content
         assert "ApiVersionDelta" in content
+        assert "top_entity_renames" in content
 
     def test_domain_types_defined(self):
         """VersionMetrics y VersionTrend domain types definidos."""
@@ -328,6 +336,7 @@ class TestVersionTypes:
         assert "VersionMetrics" in content
         assert "VersionTrend" in content
         assert "VersionDelta" in content
+        assert "topEntityRenames" in content
 
     def test_transformer_functions_defined(self):
         """transformVersionMetrics y transformVersionTrend definidos."""

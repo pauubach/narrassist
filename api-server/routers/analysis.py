@@ -649,10 +649,11 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 )
                 ctx["incremental_plan"] = incremental_plan
                 logger.info(
-                    "[INCREMENTAL_PLAN] project=%s mode=%s reason=%s chapter_diff=%s",
+                    "[INCREMENTAL_PLAN] project=%s mode=%s reason=%s impacted=%s chapter_diff=%s",
                     project_id,
                     incremental_plan.get("mode"),
                     incremental_plan.get("reason"),
+                    incremental_plan.get("impacted_nodes"),
                     incremental_plan.get("chapter_diff"),
                 )
 

@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 // import DsBadge from '@/components/ds/DsBadge.vue'  // Reserved
 import VersionSparkline from '@/components/project/VersionSparkline.vue'
 import VersionHistory from '@/components/project/VersionHistory.vue'
+import EventDensityStrip from '@/components/events/EventDensityStrip.vue'
 import type { Project, Entity, Alert, Chapter } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
+import { api } from '@/services/apiClient'
 
 /**
  * ResumenTab - Pestaña de resumen y estadísticas
@@ -33,6 +35,18 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   chapters: () => []
 })
+
+interface ChapterEventDensity {
+  chapter: number
+  tier1: number
+  tier2: number
+  tier3: number
+  total: number
+}
+
+interface EventStatsResponse {
+  density_by_chapter: ChapterEventDensity[]
+}
 
 const emit = defineEmits<{
   'export': []
@@ -107,6 +121,45 @@ const chapterNameMap = computed(() => {
   }
   return map
 })
+
+const eventDensityLoading = ref(false)
+const eventDensityError = ref<string | null>(null)
+const eventDensityData = ref<ChapterEventDensity[]>([])
+
+async function loadEventDensity() {
+  if (!props.project?.id) return
+
+  eventDensityLoading.value = true
+  eventDensityError.value = null
+
+  try {
+    const response = await api.getRaw<{ success: boolean; data?: EventStatsResponse; error?: string }>(
+      `/api/projects/${props.project.id}/events/stats`
+    )
+
+    if (response.success && response.data?.density_by_chapter) {
+      eventDensityData.value = [...response.data.density_by_chapter]
+        .sort((a, b) => a.chapter - b.chapter)
+    } else {
+      eventDensityData.value = []
+      eventDensityError.value = response.error || 'No se pudo cargar la densidad de eventos.'
+    }
+  } catch (error) {
+    console.error('Error loading event density for resumen tab:', error)
+    eventDensityData.value = []
+    eventDensityError.value = 'No se pudo cargar la densidad de eventos.'
+  } finally {
+    eventDensityLoading.value = false
+  }
+}
+
+watch(
+  () => props.project.id,
+  () => {
+    loadEventDensity()
+  },
+  { immediate: true }
+)
 
 // Densidad de alertas por capítulo
 const chapterDensity = computed(() => {
@@ -487,7 +540,30 @@ const originalDocumentName = computed(() => {
         </template>
       </Card>
 
-      <!-- Row 3b: Version History -->
+      <!-- Row 3b: Event density by chapter -->
+      <Card class="chart-card event-density-summary-card">
+        <template #content>
+          <div v-if="eventDensityLoading" class="event-density-state">
+            <i class="pi pi-spin pi-spinner"></i>
+            <span>Cargando densidad de eventos...</span>
+          </div>
+          <div v-else-if="eventDensityError" class="event-density-state event-density-error">
+            <i class="pi pi-exclamation-circle"></i>
+            <span>{{ eventDensityError }}</span>
+          </div>
+          <div v-else-if="eventDensityData.length === 0" class="event-density-state">
+            <i class="pi pi-info-circle"></i>
+            <span>No hay datos de densidad de eventos todavía.</span>
+          </div>
+          <EventDensityStrip
+            v-else
+            :density-data="eventDensityData"
+            :height="72"
+          />
+        </template>
+      </Card>
+
+      <!-- Row 3c: Version History -->
       <Card v-if="project" class="chart-card version-history-card">
         <template #title><i class="pi pi-history"></i> Historial de Versiones</template>
         <template #content>
@@ -1019,6 +1095,25 @@ const originalDocumentName = computed(() => {
 .legend-medium { background: var(--yellow-500); }
 .legend-low { background: var(--blue-500); }
 .legend-info { background: var(--gray-400); }
+
+/* ── Event density summary ── */
+.event-density-summary-card :deep(.p-card-content) {
+  padding: 0.75rem;
+}
+
+.event-density-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 88px;
+  font-size: 0.875rem;
+  color: var(--text-color-secondary);
+}
+
+.event-density-error {
+  color: var(--ds-color-danger, #ef4444);
+}
 
 /* ── Bottom row: 3 columns ── */
 .bottom-row {

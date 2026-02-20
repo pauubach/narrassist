@@ -11,7 +11,6 @@ import type { Chapter, Entity, Alert } from '@/types'
 import { api } from '@/services/apiClient'
 import { getChapterEvents, type ChapterEventsResponse } from '@/services/events'
 import EventsExportDialog from '@/components/events/EventsExportDialog.vue'
-import EventDensityStrip from '@/components/events/EventDensityStrip.vue'
 import EventStatsCard from '@/components/events/EventStatsCard.vue'
 
 /**
@@ -104,16 +103,6 @@ const eventsCache = ref<Map<number, ChapterEventsResponse>>(new Map())
 const showExportDialog = ref(false)
 const showStats = ref(false)
 
-// Density data for visualization
-interface ChapterDensity {
-  chapter: number
-  tier1: number
-  tier2: number
-  tier3: number
-  total: number
-}
-const densityData = ref<ChapterDensity[]>([])
-
 // Load chapter summary when chapter changes
 async function loadChapterSummary() {
   if (!props.chapter) return
@@ -182,7 +171,6 @@ watch(
     if (props.chapter) {
       loadChapterSummary()
       loadChapterEvents()
-      loadEventDensity()
     }
   },
   { immediate: true }
@@ -333,26 +321,6 @@ function clearEventFilters() {
   selectedEventTypes.value = new Set()
 }
 
-/** Cargar datos de densidad de eventos */
-async function loadEventDensity() {
-  try {
-    const response = await fetch(`/api/projects/${props.projectId}/events/stats`)
-    const data = await response.json()
-
-    if (data.success) {
-      densityData.value = data.data.density_by_chapter.map((ch: any) => ({
-        chapter: ch.chapter,
-        tier1: ch.tier1,
-        tier2: ch.tier2,
-        tier3: ch.tier3,
-        total: ch.total
-      }))
-    }
-  } catch (error) {
-    console.error('Error loading event density:', error)
-  }
-}
-
 /** Navegar a un capítulo específico por número */
 function navigateToChapter(chapterNumber: number) {
   emit('navigate-to-chapter', chapterNumber)
@@ -413,7 +381,7 @@ function navigateToChapter(chapterNumber: number) {
 
       <!-- Loading state -->
       <div v-if="summaryLoading" class="loading-section">
-        <ProgressSpinner style="width: 24px; height: 24px" />
+        <ProgressSpinner class="summary-spinner" />
         <span>Cargando resumen...</span>
       </div>
 
@@ -612,16 +580,6 @@ function navigateToChapter(chapterNumber: number) {
       />
     </div>
 
-    <!-- Event density visualization -->
-    <EventDensityStrip
-      v-if="densityData.length > 0"
-      :density-data="densityData"
-      :current-chapter="chapter.chapterNumber"
-      :width="400"
-      :height="60"
-      @navigate-to-chapter="navigateToChapter"
-    />
-
     <!-- Export dialog -->
     <EventsExportDialog v-model:visible="showExportDialog" :project-id="projectId" />
 
@@ -650,7 +608,7 @@ function navigateToChapter(chapterNumber: number) {
   align-items: center;
   gap: var(--ds-space-2);
   padding: var(--ds-space-3) var(--ds-space-4);
-  border-bottom: 1px solid var(--surface-border);
+  border-bottom: var(--ds-border-1) solid var(--surface-border);
 }
 
 .back-button {
@@ -665,13 +623,13 @@ function navigateToChapter(chapterNumber: number) {
   background: var(--primary-100);
   color: var(--primary-700);
   border-radius: var(--border-radius-xl);
-  font-size: 0.875rem;
+  font-size: var(--ds-font-sm);
   font-weight: 500;
   flex: 1;
 }
 
 .chapter-badge i {
-  font-size: 0.875rem;
+  font-size: var(--ds-font-sm);
 }
 
 .header-actions {
@@ -699,11 +657,16 @@ function navigateToChapter(chapterNumber: number) {
 
 .chapter-title {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: var(--ds-font-lg);
   font-weight: 600;
   color: var(--text-color);
   line-height: 1.4;
   flex: 1;
+}
+
+.summary-spinner {
+  width: var(--ds-space-6);
+  height: var(--ds-space-6);
 }
 
 .tone-tag {
@@ -716,19 +679,19 @@ function navigateToChapter(chapterNumber: number) {
   gap: var(--ds-space-2);
   padding: var(--ds-space-3);
   color: var(--text-color-secondary);
-  font-size: 0.9rem;
+  font-size: var(--ds-font-sm);
 }
 
 .summary-section {
   background: var(--surface-50);
   padding: var(--ds-space-3);
   border-radius: var(--border-radius);
-  border-left: 3px solid var(--primary-color);
+  border-left: calc(var(--ds-border-2) + var(--ds-border-1)) solid var(--primary-color);
 }
 
 .summary-text {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--ds-font-sm);
   line-height: 1.6;
   color: var(--text-color);
 }
@@ -746,12 +709,12 @@ function navigateToChapter(chapterNumber: number) {
   padding: var(--ds-space-1) var(--ds-space-2);
   background: var(--surface-100);
   border-radius: var(--border-radius);
-  font-size: 0.85rem;
+  font-size: var(--ds-font-sm);
   color: var(--text-color-secondary);
 }
 
 .stat-chip i {
-  font-size: 0.8rem;
+  font-size: var(--ds-font-xs);
 }
 
 .chapter-accordion {
@@ -759,7 +722,7 @@ function navigateToChapter(chapterNumber: number) {
 }
 
 .chapter-accordion :deep(.p-accordionpanel) {
-  border: 1px solid var(--surface-border);
+  border: var(--ds-border-1) solid var(--surface-border);
   border-radius: var(--border-radius);
   margin-bottom: var(--ds-space-2);
 }
@@ -776,7 +739,7 @@ function navigateToChapter(chapterNumber: number) {
   display: flex;
   align-items: center;
   gap: var(--ds-space-2);
-  font-size: 0.9rem;
+  font-size: var(--ds-font-sm);
   font-weight: 500;
 }
 
@@ -798,7 +761,7 @@ function navigateToChapter(chapterNumber: number) {
   background: var(--surface-50);
   border-radius: var(--border-radius);
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color var(--ds-duration-normal) var(--ds-ease-in-out);
 }
 
 .character-item:hover {
@@ -806,16 +769,16 @@ function navigateToChapter(chapterNumber: number) {
 }
 
 .character-item.is-new {
-  border-left: 3px solid var(--green-500);
+  border-left: calc(var(--ds-border-2) + var(--ds-border-1)) solid var(--green-500);
 }
 
 .character-item.is-return {
-  border-left: 3px solid var(--blue-500);
+  border-left: calc(var(--ds-border-2) + var(--ds-border-1)) solid var(--blue-500);
 }
 
 .char-name {
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: var(--ds-font-sm);
 }
 
 .char-badges {
@@ -828,7 +791,7 @@ function navigateToChapter(chapterNumber: number) {
   background: var(--surface-200);
   padding: 0 var(--ds-space-2);
   border-radius: var(--border-radius-xl);
-  font-size: 0.8rem;
+  font-size: var(--ds-font-xs);
   color: var(--text-color-secondary);
 }
 
@@ -848,7 +811,7 @@ function navigateToChapter(chapterNumber: number) {
 }
 
 .filter-label {
-  font-size: 0.8rem;
+  font-size: var(--ds-font-xs);
   font-weight: 500;
   color: var(--text-color-secondary);
 }
@@ -857,14 +820,14 @@ function navigateToChapter(chapterNumber: number) {
   display: flex;
   align-items: center;
   gap: var(--ds-space-1);
-  padding: 0.25rem 0.5rem;
+  padding: var(--ds-space-1) var(--ds-space-2);
   background: transparent;
-  border: 1px solid var(--surface-border);
+  border: var(--ds-border-1) solid var(--surface-border);
   border-radius: var(--border-radius);
-  font-size: 0.75rem;
+  font-size: var(--ds-font-xs);
   color: var(--text-color-secondary);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: var(--ds-transition-base);
 }
 
 .clear-filter-btn:hover {
@@ -874,7 +837,7 @@ function navigateToChapter(chapterNumber: number) {
 }
 
 .clear-filter-btn i {
-  font-size: 0.7rem;
+  font-size: calc(var(--ds-font-xs) * 0.933);
 }
 
 .event-type-chips {
@@ -887,14 +850,14 @@ function navigateToChapter(chapterNumber: number) {
   display: flex;
   align-items: center;
   gap: var(--ds-space-1);
-  padding: 0.375rem 0.75rem;
+  padding: var(--ds-space-1-5) var(--ds-space-3);
   background: var(--surface-0, white);
-  border: 1px solid var(--surface-border);
+  border: var(--ds-border-1) solid var(--surface-border);
   border-radius: var(--border-radius-xl);
-  font-size: 0.8rem;
+  font-size: var(--ds-font-xs);
   color: var(--text-color);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: var(--ds-transition-base);
 }
 
 .event-type-chip:hover {
@@ -909,7 +872,7 @@ function navigateToChapter(chapterNumber: number) {
 }
 
 .event-type-chip i {
-  font-size: 0.75rem;
+  font-size: var(--ds-font-xs);
 }
 
 .dark .event-type-chip {
@@ -934,11 +897,11 @@ function navigateToChapter(chapterNumber: number) {
   display: flex;
   align-items: flex-start;
   gap: var(--ds-space-2);
-  font-size: 0.9rem;
+  font-size: var(--ds-font-sm);
   padding: var(--ds-space-2);
   border-radius: var(--border-radius);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--ds-duration-fast) var(--ds-ease-in-out);
 }
 
 .event-item:hover {
@@ -947,7 +910,7 @@ function navigateToChapter(chapterNumber: number) {
 
 .event-item i {
   color: var(--text-color-secondary);
-  margin-top: 2px;
+  margin-top: var(--ds-space-0-5);
   flex-shrink: 0;
 }
 
@@ -957,13 +920,13 @@ function navigateToChapter(chapterNumber: number) {
   gap: var(--ds-space-2);
   padding: var(--ds-space-3);
   color: var(--text-color-secondary);
-  font-size: 0.85rem;
+  font-size: var(--ds-font-sm);
   text-align: center;
   justify-content: center;
 }
 
 .no-events-filtered i {
-  font-size: 1rem;
+  font-size: var(--ds-font-base);
   opacity: 0.5;
 }
 
@@ -980,7 +943,7 @@ function navigateToChapter(chapterNumber: number) {
   gap: var(--ds-space-1);
   padding: var(--ds-space-1) var(--ds-space-2);
   border-radius: var(--border-radius);
-  font-size: 0.85rem;
+  font-size: var(--ds-font-sm);
 }
 
 .alert-count .count {
@@ -988,7 +951,7 @@ function navigateToChapter(chapterNumber: number) {
 }
 
 .alert-count .label {
-  font-size: 0.8rem;
+  font-size: var(--ds-font-xs);
 }
 
 .alert-critical {
@@ -1023,11 +986,11 @@ function navigateToChapter(chapterNumber: number) {
   background: var(--green-100);
   border-radius: var(--border-radius);
   color: var(--green-700);
-  font-size: 0.9rem;
+  font-size: var(--ds-font-sm);
 }
 
 .no-alerts-badge i {
-  font-size: 1rem;
+  font-size: var(--ds-font-base);
 }
 
 .locations-section {
@@ -1038,7 +1001,7 @@ function navigateToChapter(chapterNumber: number) {
   display: flex;
   align-items: center;
   gap: var(--ds-space-2);
-  font-size: 0.8rem;
+  font-size: var(--ds-font-xs);
   font-weight: 500;
   color: var(--text-color-secondary);
   text-transform: uppercase;
@@ -1057,7 +1020,7 @@ function navigateToChapter(chapterNumber: number) {
   flex-direction: column;
   gap: var(--ds-space-2);
   padding: var(--ds-space-3) var(--ds-space-4);
-  border-top: 1px solid var(--surface-border);
+  border-top: var(--ds-border-1) solid var(--surface-border);
 }
 
 /* Dark mode */

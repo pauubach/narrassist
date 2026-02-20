@@ -152,6 +152,14 @@ useNativeMenu({
     console.log('[Menu] Export requested')
     window.dispatchEvent(new CustomEvent('menubar:export'))
   },
+  onUpdateManuscript: () => {
+    if (route.name !== 'project') {
+      console.warn('[Menu] Update manuscript ignored: no project view active')
+      return
+    }
+    console.log('[Menu] Update manuscript requested')
+    window.dispatchEvent(new CustomEvent('menubar:update-manuscript'))
+  },
   onViewChange: (view: string) => {
     const tabMap: Record<string, string> = {
       chapters: 'text',

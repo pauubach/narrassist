@@ -613,8 +613,20 @@ defineExpose({ focusSearch })
 /* ── Meta-categorías ── */
 .meta-categories {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--ds-space-3);
+}
+
+@media (max-width: 1200px) {
+  .meta-categories {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .meta-categories {
+    grid-template-columns: 1fr;
+  }
 }
 
 .meta-card {

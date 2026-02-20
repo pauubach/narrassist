@@ -45,9 +45,26 @@ LOSS_VERBS = ["perder", "robar", "desaparecer", "extraviar", "despojado"]
 INJURY_VERBS = ["herir", "lastimar", "fracturar", "sangrar", "atravesar", "golpear"]
 HEALING_VERBS = ["curar", "sanar", "recuperarse", "cicatrizar", "mejorar"]
 BODY_PARTS = [
-    "brazo", "pierna", "hombro", "cabeza", "pecho", "mano", "pie",
-    "espalda", "rostro", "cara", "ojo", "oído", "nariz", "boca",
-    "cuello", "vientre", "costilla", "muñeca", "tobillo", "rodilla"
+    "brazo",
+    "pierna",
+    "hombro",
+    "cabeza",
+    "pecho",
+    "mano",
+    "pie",
+    "espalda",
+    "rostro",
+    "cara",
+    "ojo",
+    "oído",
+    "nariz",
+    "boca",
+    "cuello",
+    "vientre",
+    "costilla",
+    "muñeca",
+    "tobillo",
+    "rodilla",
 ]
 
 # Grupo 2: Detección Heurística
@@ -113,6 +130,7 @@ DECISION_INDICATORS = ["decidir", "elegir", "optar", "resolver", "determinar"]
 # Dataclasses para eventos detectados
 # ============================================================================
 
+
 @dataclass
 class DetectedEvent:
     """
@@ -140,6 +158,7 @@ class DetectedEvent:
 # ============================================================================
 # Detectores Tier 1 - Grupo 1: NLP Básico
 # ============================================================================
+
 
 class PromiseDetector:
     """Detecta promesas usando verbos clave y patrones."""
@@ -173,31 +192,35 @@ class PromiseDetector:
 
                 description = f"{subject or 'Alguien'} prometió {complement or 'algo'}"
 
-                events.append(DetectedEvent(
-                    event_type=EventType.PROMISE,
-                    description=description,
-                    confidence=0.8,
-                    start_char=start_char,
-                    end_char=end_char,
-                    metadata={
-                        "promise_text": complement,
-                        "subject": subject,
-                    }
-                ))
+                events.append(
+                    DetectedEvent(
+                        event_type=EventType.PROMISE,
+                        description=description,
+                        confidence=0.8,
+                        start_char=start_char,
+                        end_char=end_char,
+                        metadata={
+                            "promise_text": complement,
+                            "subject": subject,
+                        },
+                    )
+                )
 
         # Buscar patrones explícitos
         for pattern in PROMISE_PATTERNS:
             for match in re.finditer(pattern, text, re.IGNORECASE):
                 # Evitar duplicados con detección de verbos
                 if not any(e.start_char <= match.start() <= e.end_char for e in events):
-                    events.append(DetectedEvent(
-                        event_type=EventType.PROMISE,
-                        description=f"Promesa: {match.group()}",
-                        confidence=0.7,
-                        start_char=match.start(),
-                        end_char=match.end(),
-                        metadata={"pattern": pattern}
-                    ))
+                    events.append(
+                        DetectedEvent(
+                            event_type=EventType.PROMISE,
+                            description=f"Promesa: {match.group()}",
+                            confidence=0.7,
+                            start_char=match.start(),
+                            end_char=match.end(),
+                            metadata={"pattern": pattern},
+                        )
+                    )
 
         return events
 
@@ -214,7 +237,7 @@ class PromiseDetector:
         for child in token.children:
             if child.dep_ in ("dobj", "xcomp", "ccomp"):
                 # Tomar hasta el final de la frase
-                return sent.text[child.idx - sent.start_char:]
+                return sent.text[child.idx - sent.start_char :]
         return None
 
 
@@ -244,18 +267,20 @@ class InjuryDetector:
                 # Inferir severidad del verbo
                 severity = "grave" if token.lemma_ in ["atravesar", "fracturar"] else "leve"
 
-                events.append(DetectedEvent(
-                    event_type=EventType.INJURY,
-                    description=description,
-                    confidence=0.75,
-                    start_char=start_char,
-                    end_char=end_char,
-                    metadata={
-                        "body_part": body_part,
-                        "severity": severity,
-                        "injured": injured,
-                    }
-                ))
+                events.append(
+                    DetectedEvent(
+                        event_type=EventType.INJURY,
+                        description=description,
+                        confidence=0.75,
+                        start_char=start_char,
+                        end_char=end_char,
+                        metadata={
+                            "body_part": body_part,
+                            "severity": severity,
+                            "injured": injured,
+                        },
+                    )
+                )
 
         return events
 
@@ -315,17 +340,19 @@ class AcquisitionLossDetector:
             action = "obtuvo" if event_type == EventType.ACQUISITION else "perdió"
             description = f"{subject or 'Alguien'} {action} {obj or 'algo'}"
 
-            events.append(DetectedEvent(
-                event_type=event_type,
-                description=description,
-                confidence=0.7,
-                start_char=start_char,
-                end_char=end_char,
-                metadata={
-                    "object": obj,
-                    "subject": subject,
-                }
-            ))
+            events.append(
+                DetectedEvent(
+                    event_type=event_type,
+                    description=description,
+                    confidence=0.7,
+                    start_char=start_char,
+                    end_char=end_char,
+                    metadata={
+                        "object": obj,
+                        "subject": subject,
+                    },
+                )
+            )
 
         return events
 
@@ -342,14 +369,18 @@ class AcquisitionLossDetector:
             if child.dep_ in ("dobj", "obj"):
                 # Tomar toda la frase nominal si es compuesta
                 obj_tokens = [child]
-                obj_tokens.extend([t for t in child.subtree if t.dep_ in ("amod", "det", "compound")])
-                return " ".join(sorted(obj_tokens, key=lambda t: t.i))
+                obj_tokens.extend(
+                    [t for t in child.subtree if t.dep_ in ("amod", "det", "compound")]
+                )
+                ordered = sorted(obj_tokens, key=lambda t: t.i)
+                return " ".join(tok.text for tok in ordered if getattr(tok, "text", ""))
         return None
 
 
 # ============================================================================
 # Detectores Tier 1 - Grupo 2: Heurísticos
 # ============================================================================
+
 
 class FlashbackDetector:
     """Detecta inicio/fin de flashbacks (analepsis)."""
@@ -361,26 +392,30 @@ class FlashbackDetector:
         # Detectar inicio de flashback
         for pattern in FLASHBACK_START_PATTERNS:
             for match in re.finditer(pattern, text, re.IGNORECASE):
-                events.append(DetectedEvent(
-                    event_type=EventType.FLASHBACK_START,
-                    description=f"Inicio de flashback: {match.group()}",
-                    confidence=0.65,
-                    start_char=match.start(),
-                    end_char=match.end(),
-                    metadata={"pattern": pattern}
-                ))
+                events.append(
+                    DetectedEvent(
+                        event_type=EventType.FLASHBACK_START,
+                        description=f"Inicio de flashback: {match.group()}",
+                        confidence=0.65,
+                        start_char=match.start(),
+                        end_char=match.end(),
+                        metadata={"pattern": pattern},
+                    )
+                )
 
         # Detectar fin de flashback
         for pattern in FLASHBACK_END_PATTERNS:
             for match in re.finditer(pattern, text, re.IGNORECASE):
-                events.append(DetectedEvent(
-                    event_type=EventType.FLASHBACK_END,
-                    description=f"Fin de flashback: {match.group()}",
-                    confidence=0.65,
-                    start_char=match.start(),
-                    end_char=match.end(),
-                    metadata={"pattern": pattern}
-                ))
+                events.append(
+                    DetectedEvent(
+                        event_type=EventType.FLASHBACK_END,
+                        description=f"Fin de flashback: {match.group()}",
+                        confidence=0.65,
+                        start_char=match.start(),
+                        end_char=match.end(),
+                        metadata={"pattern": pattern},
+                    )
+                )
 
         return events
 
@@ -397,14 +432,16 @@ class TimeSkipDetector:
                 # Extraer duración si está en el patrón
                 duration = match.group(0) if match.groups() else None
 
-                events.append(DetectedEvent(
-                    event_type=EventType.TIME_SKIP,
-                    description=f"Salto temporal: {match.group()}",
-                    confidence=0.8,
-                    start_char=match.start(),
-                    end_char=match.end(),
-                    metadata={"duration": duration}
-                ))
+                events.append(
+                    DetectedEvent(
+                        event_type=EventType.TIME_SKIP,
+                        description=f"Salto temporal: {match.group()}",
+                        confidence=0.8,
+                        start_char=match.start(),
+                        end_char=match.end(),
+                        metadata={"duration": duration},
+                    )
+                )
 
         return events
 
@@ -441,17 +478,19 @@ class ConfessionLieDetector:
             action = "confesó" if event_type == EventType.CONFESSION else "mintió sobre"
             description = f"{subject or 'Alguien'} {action} {complement or 'algo'}"
 
-            events.append(DetectedEvent(
-                event_type=event_type,
-                description=description,
-                confidence=0.7,
-                start_char=start_char,
-                end_char=end_char,
-                metadata={
-                    "subject": subject,
-                    "content": complement,
-                }
-            ))
+            events.append(
+                DetectedEvent(
+                    event_type=event_type,
+                    description=description,
+                    confidence=0.7,
+                    start_char=start_char,
+                    end_char=end_char,
+                    metadata={
+                        "subject": subject,
+                        "content": complement,
+                    },
+                )
+            )
 
         return events
 
@@ -466,7 +505,7 @@ class ConfessionLieDetector:
         """Extrae el complemento del verbo."""
         for child in token.children:
             if child.dep_ in ("dobj", "xcomp", "ccomp"):
-                return sent.text[child.idx - sent.start_char:]
+                return sent.text[child.idx - sent.start_char :]
         return None
 
 
@@ -493,17 +532,19 @@ class HealingDetector:
                 if body_part:
                     description += f" de herida en {body_part}"
 
-                events.append(DetectedEvent(
-                    event_type=EventType.HEALING,
-                    description=description,
-                    confidence=0.7,
-                    start_char=start_char,
-                    end_char=end_char,
-                    metadata={
-                        "body_part": body_part,
-                        "healed": healed,
-                    }
-                ))
+                events.append(
+                    DetectedEvent(
+                        event_type=EventType.HEALING,
+                        description=description,
+                        confidence=0.7,
+                        start_char=start_char,
+                        end_char=end_char,
+                        metadata={
+                            "body_part": body_part,
+                            "healed": healed,
+                        },
+                    )
+                )
 
         return events
 
@@ -539,14 +580,16 @@ class DreamSequenceDetector:
 
         for pattern in DREAM_PATTERNS:
             for match in re.finditer(pattern, text, re.IGNORECASE):
-                events.append(DetectedEvent(
-                    event_type=EventType.DREAM_SEQUENCE,
-                    description=f"Secuencia onírica: {match.group()}",
-                    confidence=0.6,
-                    start_char=match.start(),
-                    end_char=match.end(),
-                    metadata={"pattern": pattern}
-                ))
+                events.append(
+                    DetectedEvent(
+                        event_type=EventType.DREAM_SEQUENCE,
+                        description=f"Secuencia onírica: {match.group()}",
+                        confidence=0.6,
+                        start_char=match.start(),
+                        end_char=match.end(),
+                        metadata={"pattern": pattern},
+                    )
+                )
 
         return events
 
@@ -576,17 +619,19 @@ class POVChangeDetector:
         current_pov = self._detect_pov(text)
 
         if prev_pov != current_pov and current_pov != "unknown":
-            events.append(DetectedEvent(
-                event_type=EventType.POV_CHANGE,
-                description=f"Cambio de POV: {prev_pov} → {current_pov}",
-                confidence=0.65,
-                start_char=0,
-                end_char=min(200, len(text)),  # Primeros 200 chars
-                metadata={
-                    "previous_pov": prev_pov,
-                    "current_pov": current_pov,
-                }
-            ))
+            events.append(
+                DetectedEvent(
+                    event_type=EventType.POV_CHANGE,
+                    description=f"Cambio de POV: {prev_pov} → {current_pov}",
+                    confidence=0.65,
+                    start_char=0,
+                    end_char=min(200, len(text)),  # Primeros 200 chars
+                    metadata={
+                        "previous_pov": prev_pov,
+                        "current_pov": current_pov,
+                    },
+                )
+            )
 
         return events
 
@@ -615,14 +660,16 @@ class NarrativeIntrusionDetector:
 
         for pattern in NARRATIVE_INTRUSION_PATTERNS:
             for match in re.finditer(pattern, text, re.IGNORECASE):
-                events.append(DetectedEvent(
-                    event_type=EventType.NARRATIVE_INTRUSION,
-                    description=f"Intrusión narrativa: {match.group()}",
-                    confidence=0.7,
-                    start_char=match.start(),
-                    end_char=match.end(),
-                    metadata={"pattern": pattern}
-                ))
+                events.append(
+                    DetectedEvent(
+                        event_type=EventType.NARRATIVE_INTRUSION,
+                        description=f"Intrusión narrativa: {match.group()}",
+                        confidence=0.7,
+                        start_char=match.start(),
+                        end_char=match.end(),
+                        metadata={"pattern": pattern},
+                    )
+                )
 
         return events
 
@@ -630,6 +677,7 @@ class NarrativeIntrusionDetector:
 # ============================================================================
 # Detector Principal (Orquestador)
 # ============================================================================
+
 
 class EventDetector:
     """
@@ -667,10 +715,7 @@ class EventDetector:
         self.intrusion_detector = NarrativeIntrusionDetector()
 
     def detect_events(
-        self,
-        text: str,
-        chapter_number: int = 1,
-        prev_chapter_text: str | None = None
+        self, text: str, chapter_number: int = 1, prev_chapter_text: str | None = None
     ) -> list[DetectedEvent]:
         """
         Detecta todos los eventos en un texto.
@@ -753,7 +798,7 @@ def detect_events_in_chapter(
     chapter_number: int,
     nlp=None,
     enable_llm: bool = False,
-    prev_chapter_text: str | None = None
+    prev_chapter_text: str | None = None,
 ) -> list[DetectedEvent]:
     """
     Función helper para detectar eventos en un capítulo.
