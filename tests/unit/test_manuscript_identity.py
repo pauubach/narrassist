@@ -36,12 +36,10 @@ def test_identity_service_near_revision_not_classified_as_different():
 def test_identity_service_detects_different_document():
     service = ManuscriptIdentityService()
     novel_a = (
-        "Capítulo 1\nEl detective llega a Madrid.\n\n"
-        "Capítulo 2\nEncuentra pistas en el puerto."
+        "Capítulo 1\nEl detective llega a Madrid.\n\nCapítulo 2\nEncuentra pistas en el puerto."
     )
     novel_b = (
-        "Manual de jardinería\n\n"
-        "Cómo podar rosales en invierno y preparar el suelo para primavera."
+        "Manual de jardinería\n\nCómo podar rosales en invierno y preparar el suelo para primavera."
     )
 
     decision = service.classify(novel_a, novel_b)

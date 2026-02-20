@@ -82,7 +82,9 @@ def _resolve_document_path(
                 total += len(chunk)
                 if total > max_upload_bytes:
                     permanent_path.unlink(missing_ok=True)
-                    raise HTTPException(status_code=400, detail="El archivo supera el límite de 50 MB")
+                    raise HTTPException(
+                        status_code=400, detail="El archivo supera el límite de 50 MB"
+                    )
                 output.write(chunk)
         return permanent_path, True
 
@@ -101,12 +103,17 @@ def _parse_document(path: Path) -> tuple[str, str]:
     parser = get_parser(path)
     parse_result = parser.parse(path)
     if parse_result.is_failure:
-        raise HTTPException(status_code=400, detail=f"Error leyendo documento: {parse_result.error}")
+        raise HTTPException(
+            status_code=400, detail=f"Error leyendo documento: {parse_result.error}"
+        )
     raw_doc = parse_result.value
     text = raw_doc.full_text if raw_doc else ""
     if not text or not text.strip():
-        raise HTTPException(status_code=400, detail="El documento está vacío o no se pudo leer el contenido")
+        raise HTTPException(
+            status_code=400, detail="El documento está vacío o no se pudo leer el contenido"
+        )
     return text, format_str
+
 
 @router.get("/api/projects", response_model=ApiResponse)
 def list_projects():
@@ -136,19 +143,28 @@ def list_projects():
             db_path = str(db.db_path)
             # Verify essential tables exist (auto-repair if needed)
             tables = db.fetchall("SELECT name FROM sqlite_master WHERE type='table'")
-            table_names = [t['name'] for t in tables]
+            table_names = [t["name"] for t in tables]
             logger.debug(f"list_projects: db_path={db_path}, tables={table_names}")
-            if 'projects' not in table_names:
-                logger.warning(f"list_projects: 'projects' table missing! db_path={db_path}, tables_found={table_names}")
-                deps._write_debug(f"list_projects: 'projects' MISSING! db_path={db_path}, tables={table_names}")
+            if "projects" not in table_names:
+                logger.warning(
+                    f"list_projects: 'projects' table missing! db_path={db_path}, tables_found={table_names}"
+                )
+                deps._write_debug(
+                    f"list_projects: 'projects' MISSING! db_path={db_path}, tables={table_names}"
+                )
 
                 # Log file info for diagnostics
                 try:
                     from pathlib import Path as _P  # noqa: N814
+
                     _db_file = _P(db_path)
                     if _db_file.exists():
-                        deps._write_debug(f"list_projects: DB file exists, size={_db_file.stat().st_size} bytes")
-                        logger.warning(f"list_projects: DB file exists at {db_path}, size={_db_file.stat().st_size} bytes")
+                        deps._write_debug(
+                            f"list_projects: DB file exists, size={_db_file.stat().st_size} bytes"
+                        )
+                        logger.warning(
+                            f"list_projects: DB file exists at {db_path}, size={_db_file.stat().st_size} bytes"
+                        )
                     else:
                         deps._write_debug(f"list_projects: DB file DOES NOT EXIST at {db_path}")
                         logger.error(f"list_projects: DB file DOES NOT EXIST at {db_path}")
@@ -158,12 +174,17 @@ def list_projects():
                 # Also check via direct sqlite3 connection (bypass any caching)
                 try:
                     import sqlite3 as _sq
+
                     _direct = _sq.connect(db_path)
                     _direct.execute("PRAGMA wal_checkpoint(FULL)")
-                    _direct_tables = _direct.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+                    _direct_tables = _direct.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'"
+                    ).fetchall()
                     _direct_names = [t[0] for t in _direct_tables]
                     deps._write_debug(f"list_projects: direct sqlite3 tables={_direct_names}")
-                    logger.warning(f"list_projects: direct sqlite3 connection tables={_direct_names}")
+                    logger.warning(
+                        f"list_projects: direct sqlite3 connection tables={_direct_names}"
+                    )
                     _direct.close()
                 except Exception as _dex:
                     deps._write_debug(f"list_projects: direct sqlite3 check failed: {_dex}")
@@ -171,22 +192,33 @@ def list_projects():
                 logger.warning("list_projects: attempting schema repair...")
                 try:
                     from narrative_assistant.persistence.database import SCHEMA_SQL
+
                     with db.connection() as conn:
                         conn.executescript(SCHEMA_SQL)
                         conn.commit()
                     # Verify repair worked
                     post_tables = db.fetchall("SELECT name FROM sqlite_master WHERE type='table'")
-                    post_names = [t['name'] for t in post_tables]
+                    post_names = [t["name"] for t in post_tables]
                     deps._write_debug(f"list_projects: post-repair tables={post_names}")
                     logger.info(f"list_projects: Schema repaired, tables now: {post_names}")
-                    if 'projects' not in post_names:
-                        logger.error("list_projects: Schema repair FAILED, still no 'projects' table")
+                    if "projects" not in post_names:
+                        logger.error(
+                            "list_projects: Schema repair FAILED, still no 'projects' table"
+                        )
                         deps._write_debug("list_projects: repair FAILED, still no 'projects'")
-                        return ApiResponse(success=False, error="Database not initialized properly - 'projects' table missing")
+                        return ApiResponse(
+                            success=False,
+                            error="Database not initialized properly - 'projects' table missing",
+                        )
                 except Exception as repair_err:
-                    logger.error(f"list_projects: Schema repair failed: {repair_err}", exc_info=True)
+                    logger.error(
+                        f"list_projects: Schema repair failed: {repair_err}", exc_info=True
+                    )
                     deps._write_debug(f"list_projects: Schema repair exception: {repair_err}")
-                    return ApiResponse(success=False, error="Database not initialized properly - 'projects' table missing")
+                    return ApiResponse(
+                        success=False,
+                        error="Database not initialized properly - 'projects' table missing",
+                    )
         except Exception as db_err:
             logger.error(f"list_projects: Error checking database: {db_err}", exc_info=True)
             deps._write_debug(f"list_projects: DB check exception: {db_err}")
@@ -209,26 +241,30 @@ def list_projects():
                         severity_priority = {"critical": 3, "warning": 2, "info": 1}
                         highest_severity = max(
                             (a.severity.value for a in open_alerts),
-                            key=lambda s: severity_priority.get(s, 0)
+                            key=lambda s: severity_priority.get(s, 0),
                         )
 
-            projects_data.append({
-                "id": p.id,
-                "name": p.name,
-                "description": p.description,
-                "document_path": p.document_path,
-                "document_format": p.document_format,
-                "created_at": p.created_at.isoformat() if p.created_at else None,
-                "last_modified": p.updated_at.isoformat() if p.updated_at else None,
-                "last_opened": p.last_opened_at.isoformat() if p.last_opened_at else None,
-                "analysis_status": p.analysis_status,
-                "analysis_progress": int(p.analysis_progress * 100) if p.analysis_progress else 0,
-                "word_count": stats["word_count"] or p.word_count,
-                "chapter_count": stats["chapter_count"],
-                "entity_count": stats["entity_count"],
-                "open_alerts_count": stats["open_alerts_count"],
-                "highest_alert_severity": highest_severity,
-            })
+            projects_data.append(
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "description": p.description,
+                    "document_path": p.document_path,
+                    "document_format": p.document_format,
+                    "created_at": p.created_at.isoformat() if p.created_at else None,
+                    "last_modified": p.updated_at.isoformat() if p.updated_at else None,
+                    "last_opened": p.last_opened_at.isoformat() if p.last_opened_at else None,
+                    "analysis_status": p.analysis_status,
+                    "analysis_progress": int(p.analysis_progress * 100)
+                    if p.analysis_progress
+                    else 0,
+                    "word_count": stats["word_count"] or p.word_count,
+                    "chapter_count": stats["chapter_count"],
+                    "entity_count": stats["entity_count"],
+                    "open_alerts_count": stats["open_alerts_count"],
+                    "highest_alert_severity": highest_severity,
+                }
+            )
 
         return ApiResponse(success=True, data=projects_data)
     except Exception as e:
@@ -265,13 +301,15 @@ def get_project(project_id: int):
         # - El análisis está en cola pero el proceso murió
         # NOTA: 'pending' NO se incluye aquí porque es el estado inicial legítimo
         # de un proyecto recién creado que aún no ha sido analizado.
-        if project.analysis_status in ['analyzing', 'in_progress', 'queued', 'cancelled']:
+        if project.analysis_status in ["analyzing", "in_progress", "queued", "cancelled"]:
             # Si no hay análisis activo en memoria, el estado está atascado
             with deps._progress_lock:
                 has_active = project_id in deps.analysis_progress_storage
             if not has_active:
-                logger.warning(f"Project {project_id} has stuck analysis_status='{project.analysis_status}', resetting to 'pending'")
-                project.analysis_status = 'pending'
+                logger.warning(
+                    f"Project {project_id} has stuck analysis_status='{project.analysis_status}', resetting to 'pending'"
+                )
+                project.analysis_status = "pending"
                 project.analysis_progress = 0.0
                 try:
                     deps.project_manager.update(project)
@@ -292,7 +330,7 @@ def get_project(project_id: int):
                     severity_priority = {"critical": 3, "warning": 2, "info": 1}
                     highest_severity = max(
                         (a.severity.value for a in open_alerts),
-                        key=lambda s: severity_priority.get(s, 0)
+                        key=lambda s: severity_priority.get(s, 0),
                     )
 
         # Extraer document_type (preferir columna DB sobre settings JSON)
@@ -310,6 +348,7 @@ def get_project(project_id: int):
                         _TYPE_CODE_TO_LONG,
                         normalize_document_type,
                     )
+
                     code = normalize_document_type(dt_row[0])
                     document_type = _TYPE_CODE_TO_LONG.get(code, document_type)
         except Exception:
@@ -328,7 +367,9 @@ def get_project(project_id: int):
             "last_modified": project.updated_at.isoformat() if project.updated_at else None,
             "last_opened": project.last_opened_at.isoformat() if project.last_opened_at else None,
             "analysis_status": project.analysis_status,
-            "analysis_progress": int(project.analysis_progress * 100) if project.analysis_progress else 0,
+            "analysis_progress": int(project.analysis_progress * 100)
+            if project.analysis_progress
+            else 0,
             "word_count": stats["word_count"] or project.word_count,
             "chapter_count": stats["chapter_count"],
             "entity_count": stats["entity_count"],
@@ -391,8 +432,7 @@ def get_analysis_status(project_id: int):
             # Intentar primero la tabla 'relationships' (schema principal)
             try:
                 cursor = conn.execute(
-                    "SELECT COUNT(*) FROM relationships WHERE project_id = ?",
-                    (project_id,)
+                    "SELECT COUNT(*) FROM relationships WHERE project_id = ?", (project_id,)
                 )
                 relationship_count = cursor.fetchone()[0]
             except Exception:
@@ -400,7 +440,7 @@ def get_analysis_status(project_id: int):
                 try:
                     cursor = conn.execute(
                         "SELECT COUNT(*) FROM entity_relationships WHERE project_id = ?",
-                        (project_id,)
+                        (project_id,),
                     )
                     relationship_count = cursor.fetchone()[0]
                 except Exception:
@@ -412,7 +452,7 @@ def get_analysis_status(project_id: int):
                 cursor = conn.execute(
                     """SELECT COUNT(*) FROM alerts
                        WHERE project_id = ? AND category = 'temporal'""",
-                    (project_id,)
+                    (project_id,),
                 )
                 has_temporal = cursor.fetchone()[0] > 0
             except Exception:
@@ -422,8 +462,7 @@ def get_analysis_status(project_id: int):
             has_timeline = False
             try:
                 cursor = conn.execute(
-                    "SELECT COUNT(*) FROM timeline_events WHERE project_id = ?",
-                    (project_id,)
+                    "SELECT COUNT(*) FROM timeline_events WHERE project_id = ?", (project_id,)
                 )
                 has_timeline = cursor.fetchone()[0] > 0
             except Exception:
@@ -468,7 +507,7 @@ def get_analysis_status(project_id: int):
             data={
                 "executed": executed,
                 "analysis_status": project.analysis_status,
-            }
+            },
         )
     except HTTPException:
         raise
@@ -505,7 +544,7 @@ def create_project(
         import uuid
         from pathlib import Path
 
-        allowed_extensions = ['.docx', '.doc', '.txt', '.md', '.pdf', '.epub']
+        allowed_extensions = [".docx", ".doc", ".txt", ".md", ".pdf", ".epub"]
 
         # Determinar la ruta del documento
         document_path: Optional[Path] = None
@@ -516,16 +555,14 @@ def create_project(
             # Validar contra path traversal y extensiones permitidas
             try:
                 from narrative_assistant.parsers.sanitization import validate_file_path
+
                 document_path = validate_file_path(
                     Path(file_path),
                     must_exist=True,
                     allowed_extensions=set(allowed_extensions),
                 )
             except FileNotFoundError:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"El archivo no existe: {file_path}"
-                )
+                raise HTTPException(status_code=400, detail=f"El archivo no existe: {file_path}")
             except (ValueError, PermissionError) as e:
                 raise HTTPException(status_code=400, detail=str(e))
             file_ext = document_path.suffix.lower()  # type: ignore[union-attr]
@@ -552,7 +589,9 @@ def create_project(
                     size += len(chunk)
                     if size > MAX_UPLOAD_BYTES:
                         permanent_path.unlink(missing_ok=True)
-                        raise HTTPException(status_code=400, detail="El archivo supera el límite de 50 MB")
+                        raise HTTPException(
+                            status_code=400, detail="El archivo supera el límite de 50 MB"
+                        )
                     f.write(chunk)
 
             document_path = permanent_path
@@ -560,10 +599,7 @@ def create_project(
             logger.info(f"Document saved permanently at: {permanent_path}")
 
         else:
-            raise HTTPException(
-                status_code=400,
-                detail="Se requiere file_path o file"
-            )
+            raise HTTPException(status_code=400, detail="Se requiere file_path o file")
 
         if file_ext not in allowed_extensions:
             # Limpiar archivo guardado si la extensión no es válida
@@ -571,7 +607,7 @@ def create_project(
                 Path(stored_path).unlink()
             raise HTTPException(
                 status_code=400,
-                detail=f"Formato de archivo no soportado: {file_ext}. Formatos permitidos: {', '.join(allowed_extensions)}"
+                detail=f"Formato de archivo no soportado: {file_ext}. Formatos permitidos: {', '.join(allowed_extensions)}",
             )
 
         try:
@@ -580,7 +616,11 @@ def create_project(
 
             # Detectar formato del documento
             doc_format = detect_format(document_path)  # type: ignore[arg-type]
-            format_str = doc_format.value if hasattr(doc_format, 'value') else str(doc_format).split('.')[-1].upper()
+            format_str = (
+                doc_format.value
+                if hasattr(doc_format, "value")
+                else str(doc_format).split(".")[-1].upper()
+            )
 
             # Leer contenido del documento para create_from_document
             logger.info(f"Reading document content from: {document_path}")
@@ -588,15 +628,21 @@ def create_project(
             parse_result = parser.parse(document_path)  # type: ignore[arg-type]
 
             if parse_result.is_failure:
-                raise HTTPException(status_code=400, detail=f"Error leyendo documento: {parse_result.error}")
+                raise HTTPException(
+                    status_code=400, detail=f"Error leyendo documento: {parse_result.error}"
+                )
 
             raw_doc = parse_result.value
             document_text = raw_doc.full_text  # type: ignore[union-attr]
 
             if not document_text or not document_text.strip():
-                raise HTTPException(status_code=400, detail="El documento está vacío o no se pudo leer el contenido")
+                raise HTTPException(
+                    status_code=400, detail="El documento está vacío o no se pudo leer el contenido"
+                )
 
-            logger.info(f"Document parsed: {len(document_text)} chars, {len(document_text.split())} words")
+            logger.info(
+                f"Document parsed: {len(document_text)} chars, {len(document_text.split())} words"
+            )
 
             # Crear proyecto usando create_from_document (el único método disponible)
             logger.info(f"Creating project '{name}' from: {document_path}")
@@ -618,7 +664,7 @@ def create_project(
                 if error and "already exists" in str(error.message).lower():
                     raise HTTPException(
                         status_code=409,
-                        detail=f"Este documento ya existe en el proyecto '{getattr(error, 'existing_project_name', 'existente')}'"
+                        detail=f"Este documento ya existe en el proyecto '{getattr(error, 'existing_project_name', 'existente')}'",
                     )
                 raise HTTPException(status_code=500, detail=f"Error creando proyecto: {error}")
 
@@ -652,7 +698,7 @@ def create_project(
             return ApiResponse(
                 success=True,
                 data=project_data,
-                message="Proyecto creado. Use /analyze para iniciar el análisis."
+                message="Proyecto creado. Use /analyze para iniciar el análisis.",
             )
 
         except Exception:
@@ -762,7 +808,10 @@ def replace_project_document(
             decision = identity_service.classify(previous_text, candidate_text)
         else:
             # Fallback conservador si no existe texto previo parseable.
-            if project.document_fingerprint and project.document_fingerprint == candidate_fingerprint:
+            if (
+                project.document_fingerprint
+                and project.document_fingerprint == candidate_fingerprint
+            ):
                 decision = identity_service.classify(candidate_text, candidate_text)
             else:
                 decision = identity_service.classify("", candidate_text)
@@ -909,42 +958,44 @@ def list_versions(project_id: int, limit: int = Query(50, ge=1, le=200)):
 
         versions = []
         for r in rows:
-            versions.append({
-                "id": r[0],
-                "project_id": r[1],
-                "version_num": r[2],
-                "snapshot_id": r[3],
-                "alert_count": r[4],
-                "word_count": r[5],
-                "entity_count": r[6],
-                "chapter_count": r[7],
-                "health_score": r[8],
-                "formality_avg": r[9],
-                "dialogue_ratio": r[10],
-                "created_at": r[11],
-                "alerts_new_count": r[12] or 0,
-                "alerts_resolved_count": r[13] or 0,
-                "alerts_unchanged_count": r[14] or 0,
-                "critical_count": r[15] or 0,
-                "warning_count": r[16] or 0,
-                "info_count": r[17] or 0,
-                "entities_new_count": r[18] or 0,
-                "entities_removed_count": r[19] or 0,
-                "entities_renamed_count": r[20] or 0,
-                "chapter_added_count": r[21] or 0,
-                "chapter_removed_count": r[22] or 0,
-                "chapter_reordered_count": r[23] or 0,
-                "run_mode": r[24] or "full",
-                "duration_total_sec": float(r[25] or 0.0),
-                "phase_durations_json": r[26] or "{}",
-                "modified_chapters": r[27] or 0,
-                "added_chapters": r[28] or 0,
-                "removed_chapters": r[29] or 0,
-                "chapter_change_ratio": float(r[30] or 0.0),
-                "renamed_entities": r[31] or 0,
-                "new_entities": r[32] or 0,
-                "removed_entities": r[33] or 0,
-            })
+            versions.append(
+                {
+                    "id": r[0],
+                    "project_id": r[1],
+                    "version_num": r[2],
+                    "snapshot_id": r[3],
+                    "alert_count": r[4],
+                    "word_count": r[5],
+                    "entity_count": r[6],
+                    "chapter_count": r[7],
+                    "health_score": r[8],
+                    "formality_avg": r[9],
+                    "dialogue_ratio": r[10],
+                    "created_at": r[11],
+                    "alerts_new_count": r[12] or 0,
+                    "alerts_resolved_count": r[13] or 0,
+                    "alerts_unchanged_count": r[14] or 0,
+                    "critical_count": r[15] or 0,
+                    "warning_count": r[16] or 0,
+                    "info_count": r[17] or 0,
+                    "entities_new_count": r[18] or 0,
+                    "entities_removed_count": r[19] or 0,
+                    "entities_renamed_count": r[20] or 0,
+                    "chapter_added_count": r[21] or 0,
+                    "chapter_removed_count": r[22] or 0,
+                    "chapter_reordered_count": r[23] or 0,
+                    "run_mode": r[24] or "full",
+                    "duration_total_sec": float(r[25] or 0.0),
+                    "phase_durations_json": r[26] or "{}",
+                    "modified_chapters": r[27] or 0,
+                    "added_chapters": r[28] or 0,
+                    "removed_chapters": r[29] or 0,
+                    "chapter_change_ratio": float(r[30] or 0.0),
+                    "renamed_entities": r[31] or 0,
+                    "new_entities": r[32] or 0,
+                    "removed_entities": r[33] or 0,
+                }
+            )
 
         return ApiResponse(success=True, data=versions)
     except Exception as e:
@@ -976,17 +1027,19 @@ def get_version_trend(project_id: int, limit: int = Query(10, ge=2, le=50)):
         # Revert to chronological order (ASC) for sparkline rendering
         trend = []
         for r in reversed(rows):
-            trend.append({
-                "version_num": r[0],
-                "alert_count": r[1],
-                "health_score": r[2],
-                "word_count": r[3],
-                "created_at": r[4],
-                "alerts_new_count": r[5] or 0,
-                "alerts_resolved_count": r[6] or 0,
-                "run_mode": r[7] or "full",
-                "duration_total_sec": float(r[8] or 0.0),
-            })
+            trend.append(
+                {
+                    "version_num": r[0],
+                    "alert_count": r[1],
+                    "health_score": r[2],
+                    "word_count": r[3],
+                    "created_at": r[4],
+                    "alerts_new_count": r[5] or 0,
+                    "alerts_resolved_count": r[6] or 0,
+                    "run_mode": r[7] or "full",
+                    "duration_total_sec": float(r[8] or 0.0),
+                }
+            )
 
         # Calculate deltas if at least 2 versions
         delta = None
@@ -1062,7 +1115,9 @@ def get_version_summary(project_id: int):
             "health_score": 0.0,
         }
         if previous:
-            delta["alert_count"] = int(latest["alert_count"] or 0) - int(previous["alert_count"] or 0)
+            delta["alert_count"] = int(latest["alert_count"] or 0) - int(
+                previous["alert_count"] or 0
+            )
             if latest["health_score"] is not None and previous["health_score"] is not None:
                 delta["health_score"] = round(
                     float(latest["health_score"]) - float(previous["health_score"]),
@@ -1101,7 +1156,9 @@ def get_version_summary(project_id: int):
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/projects/{project_id}/versions/{version_num}/entity-links", response_model=ApiResponse)
+@router.get(
+    "/api/projects/{project_id}/versions/{version_num}/entity-links", response_model=ApiResponse
+)
 def get_version_entity_links(project_id: int, version_num: int):
     """Detalle de continuidad de entidades para una versión."""
     try:
@@ -1154,7 +1211,9 @@ def get_version_entity_links(project_id: int, version_num: int):
 
 
 @router.get("/api/projects/{project_id}/versions/compare", response_model=ApiResponse)
-def compare_versions(project_id: int, from_version: int = Query(..., ge=1), to_version: int = Query(..., ge=1)):
+def compare_versions(
+    project_id: int, from_version: int = Query(..., ge=1), to_version: int = Query(..., ge=1)
+):
     """Comparativa detallada entre dos versiones."""
     try:
         db = deps.get_database()
@@ -1171,7 +1230,9 @@ def compare_versions(project_id: int, from_version: int = Query(..., ge=1), to_v
                 (project_id, from_version, to_version),
             ).fetchall()
             if len(rows) != 2:
-                return ApiResponse(success=False, error="No se encontraron ambas versiones para comparar.")
+                return ApiResponse(
+                    success=False, error="No se encontraron ambas versiones para comparar."
+                )
 
         ordered = sorted(rows, key=lambda x: int(x["version_num"]))
         older = ordered[0]
@@ -1216,6 +1277,7 @@ def compare_versions(project_id: int, from_version: int = Query(..., ge=1), to_v
 # Dialogue Style Preferences
 # ============================================================================
 
+
 @router.get("/api/projects/{project_id}/dialogue-style-summary", response_model=ApiResponse)
 def get_dialogue_style_summary(project_id: int):
     """
@@ -1253,7 +1315,9 @@ def get_dialogue_style_summary(project_id: int):
         )
 
     except Exception as e:
-        logger.error(f"Error getting dialogue style summary for project {project_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error getting dialogue style summary for project {project_id}: {e}", exc_info=True
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
@@ -1336,5 +1400,7 @@ def validate_dialogue_style(
         )
 
     except Exception as e:
-        logger.error(f"Error validating dialogue style for project {project_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error validating dialogue style for project {project_id}: {e}", exc_info=True
+        )
         return ApiResponse(success=False, error="Error interno del servidor")

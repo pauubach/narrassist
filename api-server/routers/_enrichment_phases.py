@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 # Cache helper
 # ============================================================================
 
+
 def _cache_result(
     db_session: Any,
     project_id: int,
@@ -78,8 +79,7 @@ def _cache_result(
                     computed_at, updated_at)
                    VALUES (?, ?, ?, 'completed', ?, ?, ?, 0,
                            datetime('now'), datetime('now'))""",
-                (project_id, enrichment_type, entity_scope,
-                 output_hash, result_json, phase),
+                (project_id, enrichment_type, entity_scope, output_hash, result_json, phase),
             )
             conn.commit()
             return True
@@ -308,9 +308,11 @@ def _run_enrichment(
 # Data loaders (shared across phases)
 # ============================================================================
 
+
 def _load_entities(db_session, project_id):
     """Load entities from DB."""
     from narrative_assistant.entities.repository import get_entity_repository
+
     repo = get_entity_repository(db_session)
     return repo.get_entities_by_project(project_id)
 
@@ -318,6 +320,7 @@ def _load_entities(db_session, project_id):
 def _load_chapters(db_session, project_id):
     """Load chapters from DB."""
     from narrative_assistant.persistence.chapter import get_chapter_repository
+
     repo = get_chapter_repository(db_session)
     return repo.get_by_project(project_id)
 
@@ -333,13 +336,15 @@ def _chapters_to_dicts(chapters):
     offset = 0
     for ch in chapters:
         content = ch.content or ""
-        result.append({
-            "number": ch.chapter_number,
-            "title": ch.title or f"Capítulo {ch.chapter_number}",
-            "content": content,
-            "start_char": offset,
-            "end_char": offset + len(content),
-        })
+        result.append(
+            {
+                "number": ch.chapter_number,
+                "title": ch.title or f"Capítulo {ch.chapter_number}",
+                "content": content,
+                "start_char": offset,
+                "end_char": offset + len(content),
+            }
+        )
         offset += len(content) + 2  # +2 for \n\n separator
     return result
 
@@ -349,19 +354,22 @@ def _entities_to_dicts(entities):
     result = []
     for e in entities:
         etype = e.entity_type.value if hasattr(e.entity_type, "value") else str(e.entity_type)
-        result.append({
-            "id": e.id,
-            "name": e.canonical_name,
-            "entity_type": etype,
-            "aliases": getattr(e, "aliases", []) or [],
-            "importance": getattr(e, "importance", None),
-        })
+        result.append(
+            {
+                "id": e.id,
+                "name": e.canonical_name,
+                "entity_type": etype,
+                "aliases": getattr(e, "aliases", []) or [],
+                "importance": getattr(e, "importance", None),
+            }
+        )
     return result
 
 
 def _detect_all_dialogues(chapters):
     """Detect dialogues in all chapters. Returns list of (speaker_hint, text, start, end, chapter_num)."""
     from narrative_assistant.nlp.dialogue import detect_dialogues
+
     all_dialogues = []
     for ch in chapters:
         try:
@@ -371,13 +379,15 @@ def _detect_all_dialogues(chapters):
                 text = d[1] if len(d) > 1 else ""
                 start = d[2] if len(d) > 2 else 0
                 end = d[3] if len(d) > 3 else len(text)
-                all_dialogues.append({
-                    "speaker_hint": speaker_hint,
-                    "text": text,
-                    "start_char": start,
-                    "end_char": end,
-                    "chapter": ch.chapter_number,
-                })
+                all_dialogues.append(
+                    {
+                        "speaker_hint": speaker_hint,
+                        "text": text,
+                        "start_char": start,
+                        "end_char": end,
+                        "chapter": ch.chapter_number,
+                    }
+                )
         except Exception as e:
             logger.warning(f"Dialogue detection failed for chapter {ch.chapter_number}: {e}")
     return all_dialogues
@@ -386,6 +396,7 @@ def _detect_all_dialogues(chapters):
 # ============================================================================
 # Phase 10: Relationships enrichment
 # ============================================================================
+
 
 def run_relationships_enrichment(ctx: dict, tracker) -> None:
     """Phase 10: Pre-compute relationship-related analysis."""
@@ -403,9 +414,12 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
         chapters_dicts = _chapters_to_dicts(chapters)
         # entities_dicts and full_text computed on demand by individual phases
 
-        character_entities = [e for e in entities
-                              if (e.entity_type.value if hasattr(e.entity_type, "value")
-                                  else str(e.entity_type)) in ("character", "animal", "creature")]
+        character_entities = [
+            e
+            for e in entities
+            if (e.entity_type.value if hasattr(e.entity_type, "value") else str(e.entity_type))
+            in ("character", "animal", "creature")
+        ]
 
         total_steps = 6
         step = 0
@@ -413,44 +427,78 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
         # --- 10a: Character Network ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Calculando red de personajes...")
-        _run_enrichment(db, project_id, "character_network", 10, lambda: _compute_character_network(
-            db, project_id, entities, chapters
-        ), "character_network")
+        _run_enrichment(
+            db,
+            project_id,
+            "character_network",
+            10,
+            lambda: _compute_character_network(db, project_id, entities, chapters),
+            "character_network",
+        )
 
         # --- 10b: Character Timeline ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Generando línea temporal...")
-        _run_enrichment(db, project_id, "character_timeline", 10, lambda: _compute_character_timeline(
-            db, project_id, entities, chapters
-        ), "character_timeline")
+        _run_enrichment(
+            db,
+            project_id,
+            "character_timeline",
+            10,
+            lambda: _compute_character_timeline(db, project_id, entities, chapters),
+            "character_timeline",
+        )
 
         # --- 10c: Character Profiles (6 indicators) ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Perfilando personajes...")
-        _run_enrichment(db, project_id, "character_profiles", 10, lambda: _compute_character_profiles(
-            db, project_id, entities, chapters
-        ), "character_profiles")
+        _run_enrichment(
+            db,
+            project_id,
+            "character_profiles",
+            10,
+            lambda: _compute_character_profiles(db, project_id, entities, chapters),
+            "character_profiles",
+        )
 
         # --- 10d: Emotional Analysis ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Analizando coherencia emocional...")
-        _run_enrichment(db, project_id, "emotional_analysis", 10, lambda: _compute_emotional_analysis(
-            chapters, character_entities
-        ), "emotional_analysis")
+        _run_enrichment(
+            db,
+            project_id,
+            "emotional_analysis",
+            10,
+            lambda: _compute_emotional_analysis(chapters, character_entities),
+            "emotional_analysis",
+        )
 
         # --- 10e: Character Archetypes ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Detectando arquetipos...")
-        _run_enrichment(db, project_id, "character_archetypes", 10, lambda: _compute_character_archetypes(
-            db, project_id, entities, chapters, chapters_dicts
-        ), "character_archetypes")
+        _run_enrichment(
+            db,
+            project_id,
+            "character_archetypes",
+            10,
+            lambda: _compute_character_archetypes(
+                db, project_id, entities, chapters, chapters_dicts
+            ),
+            "character_archetypes",
+        )
 
         # --- 10f: Character Knowledge ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Analizando conocimiento entre personajes...")
-        _run_enrichment(db, project_id, "character_knowledge", 10, lambda: _compute_character_knowledge(
-            project_id, entities, chapters
-        ), "character_knowledge")
+        tracker.update_progress(
+            phase_key, step / total_steps, "Analizando conocimiento entre personajes..."
+        )
+        _run_enrichment(
+            db,
+            project_id,
+            "character_knowledge",
+            10,
+            lambda: _compute_character_knowledge(project_id, entities, chapters),
+            "character_knowledge",
+        )
 
     except Exception as e:
         logger.error(f"[Phase 10] Relationships enrichment failed: {e}", exc_info=True)
@@ -469,7 +517,11 @@ def _compute_character_network(db, project_id, entities, chapters):
     PROXIMITY_WINDOW = 500
 
     for entity in entities:
-        etype = entity.entity_type.value if hasattr(entity.entity_type, "value") else str(entity.entity_type)
+        etype = (
+            entity.entity_type.value
+            if hasattr(entity.entity_type, "value")
+            else str(entity.entity_type)
+        )
         if etype not in ("character", "animal", "creature"):
             continue
         entity_names[entity.id] = entity.canonical_name
@@ -493,12 +545,14 @@ def _compute_character_network(db, project_id, entities, chapters):
                 if pos2 - pos1 > PROXIMITY_WINDOW:
                     break
                 if eid1 != eid2:
-                    cooccurrences.append({
-                        "entity1_id": eid1,
-                        "entity2_id": eid2,
-                        "chapter": ch.chapter_number,
-                        "distance_chars": pos2 - pos1,
-                    })
+                    cooccurrences.append(
+                        {
+                            "entity1_id": eid1,
+                            "entity2_id": eid2,
+                            "chapter": ch.chapter_number,
+                            "distance_chars": pos2 - pos1,
+                        }
+                    )
 
     analyzer = CharacterNetworkAnalyzer()
     report = analyzer.analyze(cooccurrences, entity_names, len(chapters))
@@ -515,7 +569,11 @@ def _compute_character_timeline(db, project_id, entities, chapters):
 
     characters = []
     for entity in entities:
-        etype = entity.entity_type.value if hasattr(entity.entity_type, "value") else str(entity.entity_type)
+        etype = (
+            entity.entity_type.value
+            if hasattr(entity.entity_type, "value")
+            else str(entity.entity_type)
+        )
         if etype not in ("character", "animal", "creature"):
             continue
 
@@ -529,20 +587,23 @@ def _compute_character_timeline(db, project_id, entities, chapters):
         if not ch_counts:
             continue
 
-        appearances = [{"chapter": ch_num, "mentions": count}
-                       for ch_num, count in sorted(ch_counts.items())]
+        appearances = [
+            {"chapter": ch_num, "mentions": count} for ch_num, count in sorted(ch_counts.items())
+        ]
 
-        characters.append({
-            "entity_id": entity.id,
-            "name": entity.canonical_name,
-            "entity_type": etype,
-            "importance": getattr(entity, "importance", None),
-            "total_mentions": sum(ch_counts.values()),
-            "chapters_present": len(ch_counts),
-            "first_chapter": min(ch_counts.keys()),
-            "last_chapter": max(ch_counts.keys()),
-            "appearances": appearances,
-        })
+        characters.append(
+            {
+                "entity_id": entity.id,
+                "name": entity.canonical_name,
+                "entity_type": etype,
+                "importance": getattr(entity, "importance", None),
+                "total_mentions": sum(ch_counts.values()),
+                "chapters_present": len(ch_counts),
+                "first_chapter": min(ch_counts.keys()),
+                "last_chapter": max(ch_counts.keys()),
+                "appearances": appearances,
+            }
+        )
 
     characters.sort(key=lambda c: c["total_mentions"], reverse=True)
 
@@ -563,7 +624,11 @@ def _compute_character_profiles(db, project_id, entities, chapters):
     # Build mentions list and chapter_texts
     mentions_list = []
     for entity in entities:
-        etype = entity.entity_type.value if hasattr(entity.entity_type, "value") else str(entity.entity_type)
+        etype = (
+            entity.entity_type.value
+            if hasattr(entity.entity_type, "value")
+            else str(entity.entity_type)
+        )
         if etype not in ("character", "animal", "creature"):
             continue
         ch_number_map = {ch.id: ch.chapter_number for ch in chapters if hasattr(ch, "id")}
@@ -571,11 +636,13 @@ def _compute_character_profiles(db, project_id, entities, chapters):
         for m in ems:
             ch_id = getattr(m, "chapter_id", None)
             ch_num = ch_number_map.get(ch_id, 0) if ch_id else 0
-            mentions_list.append({
-                "entity_id": entity.id,
-                "entity_name": entity.canonical_name,
-                "chapter": ch_num,
-            })
+            mentions_list.append(
+                {
+                    "entity_id": entity.id,
+                    "entity_name": entity.canonical_name,
+                    "chapter": ch_num,
+                }
+            )
 
     chapter_texts = {ch.chapter_number: (ch.content or "") for ch in chapters}
 
@@ -605,9 +672,7 @@ def _compute_emotional_analysis(chapters, character_entities):
             continue
         try:
             dialogues = detect_dialogues(content)
-            result = checker.analyze_chapter(
-                content, ch.chapter_number, character_names, dialogues
-            )
+            result = checker.analyze_chapter(content, ch.chapter_number, character_names, dialogues)
             if hasattr(result, "incoherences"):
                 for inc in result.incoherences:
                     d = inc.to_dict() if hasattr(inc, "to_dict") else inc
@@ -642,7 +707,9 @@ def _compute_character_archetypes(db, project_id, entities, chapters, chapters_d
         return {"characters": [], "archetype_distribution": {}}
 
     progress_data = progress_result.value if hasattr(progress_result, "value") else progress_result
-    character_arcs = progress_data.get("character_arcs", []) if isinstance(progress_data, dict) else []
+    character_arcs = (
+        progress_data.get("character_arcs", []) if isinstance(progress_data, dict) else []
+    )
 
     # Get relationships
     rel_repo = get_relationship_repository(db)
@@ -654,18 +721,24 @@ def _compute_character_archetypes(db, project_id, entities, chapters, chapters_d
     ch_number_map = {ch.id: ch.chapter_number for ch in chapters if hasattr(ch, "id")}
     mentions_list = []
     for entity in entities:
-        etype = entity.entity_type.value if hasattr(entity.entity_type, "value") else str(entity.entity_type)
+        etype = (
+            entity.entity_type.value
+            if hasattr(entity.entity_type, "value")
+            else str(entity.entity_type)
+        )
         if etype not in ("character", "animal", "creature"):
             continue
         ems = entity_repo.get_mentions_by_entity(entity.id)
         for m in ems:
             ch_id = getattr(m, "chapter_id", None)
             ch_num = ch_number_map.get(ch_id, 0) if ch_id else 0
-            mentions_list.append({
-                "entity_id": entity.id,
-                "entity_name": entity.canonical_name,
-                "chapter": ch_num,
-            })
+            mentions_list.append(
+                {
+                    "entity_id": entity.id,
+                    "entity_name": entity.canonical_name,
+                    "chapter": ch_num,
+                }
+            )
 
     chapter_texts = {ch.chapter_number: (ch.content or "") for ch in chapters}
     profiler = CharacterProfiler()
@@ -693,9 +766,12 @@ def _compute_character_knowledge(project_id, entities, chapters):
     )
 
     analyzer = CharacterKnowledgeAnalyzer()
-    character_entities = [e for e in entities
-                          if (e.entity_type.value if hasattr(e.entity_type, "value")
-                              else str(e.entity_type)) in ("character", "animal", "creature")]
+    character_entities = [
+        e
+        for e in entities
+        if (e.entity_type.value if hasattr(e.entity_type, "value") else str(e.entity_type))
+        in ("character", "animal", "creature")
+    ]
 
     for ch in chapters:
         try:
@@ -725,6 +801,7 @@ def _compute_character_knowledge(project_id, entities, chapters):
 # Phase 11: Voice enrichment
 # ============================================================================
 
+
 def run_voice_enrichment(ctx: dict, tracker) -> None:
     """Phase 11: Pre-compute voice-related analysis."""
     phase_key = "voice"
@@ -740,13 +817,17 @@ def run_voice_enrichment(ctx: dict, tracker) -> None:
         chapters = _load_chapters(db, project_id)
         dialogues = _detect_all_dialogues(chapters)
 
-        character_entities = [e for e in entities
-                              if (e.entity_type.value if hasattr(e.entity_type, "value")
-                                  else str(e.entity_type)) in ("character", "animal", "creature")]
+        character_entities = [
+            e
+            for e in entities
+            if (e.entity_type.value if hasattr(e.entity_type, "value") else str(e.entity_type))
+            in ("character", "animal", "creature")
+        ]
 
-        entity_data = [{"id": e.id, "name": e.canonical_name,
-                        "aliases": getattr(e, "aliases", []) or []}
-                       for e in character_entities]
+        entity_data = [
+            {"id": e.id, "name": e.canonical_name, "aliases": getattr(e, "aliases", []) or []}
+            for e in character_entities
+        ]
 
         total_steps = 4
         step = 0
@@ -759,34 +840,52 @@ def run_voice_enrichment(ctx: dict, tracker) -> None:
         def compute_voice_profiles():
             nonlocal profiles_result
             from narrative_assistant.voice.profiles import VoiceProfileBuilder
+
             builder = VoiceProfileBuilder()
             profiles = builder.build_profiles(dialogues, entity_data)
             profiles_result = profiles
             return [p.to_dict() if hasattr(p, "to_dict") else p for p in profiles]
 
-        _run_enrichment(db, project_id, "voice_profiles", 11, compute_voice_profiles, "voice_profiles")
+        _run_enrichment(
+            db, project_id, "voice_profiles", 11, compute_voice_profiles, "voice_profiles"
+        )
 
         # --- 11b: Voice Deviations ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Detectando desviaciones de voz...")
         if profiles_result:
-            _run_enrichment(db, project_id, "voice_deviations", 11, lambda: _compute_voice_deviations(
-                profiles_result, dialogues
-            ), "voice_deviations")
+            _run_enrichment(
+                db,
+                project_id,
+                "voice_deviations",
+                11,
+                lambda: _compute_voice_deviations(profiles_result, dialogues),
+                "voice_deviations",
+            )
 
         # --- 11c: Register Analysis ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Analizando registro lingüístico...")
-        _run_enrichment(db, project_id, "register_analysis", 11, lambda: _compute_register_analysis(
-            chapters, dialogues
-        ), "register_analysis")
+        _run_enrichment(
+            db,
+            project_id,
+            "register_analysis",
+            11,
+            lambda: _compute_register_analysis(chapters, dialogues),
+            "register_analysis",
+        )
 
         # --- 11d: Focalization Violations ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Verificando focalización...")
-        _run_enrichment(db, project_id, "focalization_violations", 11, lambda: _compute_focalization_violations(
-            db, project_id, chapters, character_entities
-        ), "focalization_violations")
+        _run_enrichment(
+            db,
+            project_id,
+            "focalization_violations",
+            11,
+            lambda: _compute_focalization_violations(db, project_id, chapters, character_entities),
+            "focalization_violations",
+        )
 
     except Exception as e:
         logger.error(f"[Phase 11] Voice enrichment failed: {e}", exc_info=True)
@@ -797,6 +896,7 @@ def run_voice_enrichment(ctx: dict, tracker) -> None:
 def _compute_voice_deviations(profiles, dialogues):
     """Compute voice deviations from baseline profiles."""
     from narrative_assistant.voice.deviations import VoiceDeviationDetector
+
     detector = VoiceDeviationDetector()
     deviations = detector.detect_deviations(profiles, dialogues)
     return [d.to_dict() if hasattr(d, "to_dict") else d for d in deviations]
@@ -832,7 +932,9 @@ def _compute_register_analysis(chapters, dialogues):
 
     return {
         "changes": [c.to_dict() if hasattr(c, "to_dict") else c for c in changes],
-        "summary": summary if isinstance(summary, dict) else (summary.to_dict() if hasattr(summary, "to_dict") else {}),
+        "summary": summary
+        if isinstance(summary, dict)
+        else (summary.to_dict() if hasattr(summary, "to_dict") else {}),
         "total_segments": len(segments),
     }
 
@@ -853,9 +955,7 @@ def _compute_focalization_violations(db, project_id, chapters, character_entitie
     all_violations = []
     for ch in chapters:
         try:
-            violations = detector.detect_violations(
-                project_id, ch.content or "", ch.chapter_number
-            )
+            violations = detector.detect_violations(project_id, ch.content or "", ch.chapter_number)
             for v in violations:
                 all_violations.append(v.to_dict() if hasattr(v, "to_dict") else v)
         except Exception as e:
@@ -871,6 +971,7 @@ def _compute_focalization_violations(db, project_id, chapters, character_entitie
 # ============================================================================
 # Phase 12: Prose enrichment
 # ============================================================================
+
 
 def run_prose_enrichment(ctx: dict, tracker) -> None:
     """Phase 12: Pre-compute prose/style analysis."""
@@ -893,72 +994,117 @@ def run_prose_enrichment(ctx: dict, tracker) -> None:
         # --- 12a: Sticky Sentences ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Detectando frases pegajosas...")
-        _run_enrichment(db, project_id, "sticky_sentences", 12, lambda: _compute_sticky_sentences(
-            chapters
-        ), "sticky_sentences")
+        _run_enrichment(
+            db,
+            project_id,
+            "sticky_sentences",
+            12,
+            lambda: _compute_sticky_sentences(chapters),
+            "sticky_sentences",
+        )
 
         # --- 12b: Sentence Energy ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Midiendo energía narrativa...")
-        _run_enrichment(db, project_id, "sentence_energy", 12, lambda: _compute_sentence_energy(
-            chapters
-        ), "sentence_energy")
+        _run_enrichment(
+            db,
+            project_id,
+            "sentence_energy",
+            12,
+            lambda: _compute_sentence_energy(chapters),
+            "sentence_energy",
+        )
 
         # --- 12c: Echo Report (lexical only — skip semantic to avoid embeddings) ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Buscando repeticiones...")
-        _run_enrichment(db, project_id, "echo_report", 12, lambda: _compute_echo_report(
-            chapters
-        ), "echo_report")
+        _run_enrichment(
+            db, project_id, "echo_report", 12, lambda: _compute_echo_report(chapters), "echo_report"
+        )
 
         # --- 12d: Pacing Analysis ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Analizando ritmo narrativo...")
-        _run_enrichment(db, project_id, "pacing_analysis", 12, lambda: _compute_pacing_analysis(
-            chapters_dicts
-        ), "pacing_analysis")
+        _run_enrichment(
+            db,
+            project_id,
+            "pacing_analysis",
+            12,
+            lambda: _compute_pacing_analysis(chapters_dicts),
+            "pacing_analysis",
+        )
 
         # --- 12e: Tension Curve ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Trazando curva de tensión...")
-        _run_enrichment(db, project_id, "tension_curve", 12, lambda: _compute_tension_curve(
-            chapters_dicts, full_text
-        ), "tension_curve")
+        _run_enrichment(
+            db,
+            project_id,
+            "tension_curve",
+            12,
+            lambda: _compute_tension_curve(chapters_dicts, full_text),
+            "tension_curve",
+        )
 
         # --- 12f: Sensory Report ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Evaluando detalles sensoriales...")
-        _run_enrichment(db, project_id, "sensory_report", 12, lambda: _compute_sensory_report(
-            full_text, chapters_dicts
-        ), "sensory_report")
+        _run_enrichment(
+            db,
+            project_id,
+            "sensory_report",
+            12,
+            lambda: _compute_sensory_report(full_text, chapters_dicts),
+            "sensory_report",
+        )
 
         # --- 12g: Age Readability ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Calculando legibilidad...")
-        _run_enrichment(db, project_id, "age_readability", 12, lambda: _compute_readability(
-            full_text
-        ), "age_readability")
+        _run_enrichment(
+            db,
+            project_id,
+            "age_readability",
+            12,
+            lambda: _compute_readability(full_text),
+            "age_readability",
+        )
 
         # --- 12h: Sentence Variation ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Analizando variación sintáctica...")
-        _run_enrichment(db, project_id, "sentence_variation", 12, lambda: _compute_sentence_variation(
-            chapters
-        ), "sentence_variation")
+        _run_enrichment(
+            db,
+            project_id,
+            "sentence_variation",
+            12,
+            lambda: _compute_sentence_variation(chapters),
+            "sentence_variation",
+        )
 
         # --- 12i: Dialogue Validation ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Validando diálogos...")
-        _run_enrichment(db, project_id, "dialogue_validation", 12, lambda: _compute_dialogue_validation(
-            chapters
-        ), "dialogue_validation")
+        _run_enrichment(
+            db,
+            project_id,
+            "dialogue_validation",
+            12,
+            lambda: _compute_dialogue_validation(chapters),
+            "dialogue_validation",
+        )
 
         # --- 12j: Narrative Structure ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Detectando estructura narrativa...")
-        _run_enrichment(db, project_id, "narrative_structure", 12, lambda: _compute_narrative_structure(
-            full_text, chapters_dicts
-        ), "narrative_structure")
+        _run_enrichment(
+            db,
+            project_id,
+            "narrative_structure",
+            12,
+            lambda: _compute_narrative_structure(full_text, chapters_dicts),
+            "narrative_structure",
+        )
 
     except Exception as e:
         logger.error(f"[Phase 12] Prose enrichment failed: {e}", exc_info=True)
@@ -969,6 +1115,7 @@ def run_prose_enrichment(ctx: dict, tracker) -> None:
 def _compute_sticky_sentences(chapters):
     """Compute sticky (high glue word %) sentences."""
     from narrative_assistant.nlp.style.sticky_sentences import get_sticky_sentence_detector
+
     detector = get_sticky_sentence_detector()
     all_sticky = []
     stats = {"total_sentences": 0, "total_sticky": 0}
@@ -988,6 +1135,7 @@ def _compute_sticky_sentences(chapters):
 def _compute_sentence_energy(chapters):
     """Compute sentence energy (passive voice, weak verbs)."""
     from narrative_assistant.nlp.style.sentence_energy import get_sentence_energy_detector
+
     detector = get_sentence_energy_detector()
     all_low = []
     stats = {"avg_energy": 0, "chapters": 0}
@@ -1009,6 +1157,7 @@ def _compute_sentence_energy(chapters):
 def _compute_echo_report(chapters):
     """Compute lexical repetitions (no semantic to avoid embedding cost)."""
     from narrative_assistant.nlp.style.repetition_detector import get_repetition_detector
+
     detector = get_repetition_detector()
     all_repetitions = []
     for ch in chapters:
@@ -1025,14 +1174,16 @@ def _compute_echo_report(chapters):
 def _compute_pacing_analysis(chapters_dicts):
     """Compute pacing metrics per chapter."""
     from narrative_assistant.analysis.pacing import get_pacing_analyzer
+
     analyzer = get_pacing_analyzer()
     result = analyzer.analyze(chapters_dicts)
     if hasattr(result, "to_dict"):
         return result.to_dict()
     if hasattr(result, "chapter_metrics"):
         return {
-            "chapter_metrics": [m.to_dict() if hasattr(m, "to_dict") else m
-                                for m in result.chapter_metrics],
+            "chapter_metrics": [
+                m.to_dict() if hasattr(m, "to_dict") else m for m in result.chapter_metrics
+            ],
         }
     return result
 
@@ -1040,6 +1191,7 @@ def _compute_pacing_analysis(chapters_dicts):
 def _compute_tension_curve(chapters_dicts, full_text):
     """Compute tension curve across chapters."""
     from narrative_assistant.analysis.pacing import compute_tension_curve
+
     result = compute_tension_curve(chapters_dicts, full_text)
     return result.to_dict() if hasattr(result, "to_dict") else result
 
@@ -1047,6 +1199,7 @@ def _compute_tension_curve(chapters_dicts, full_text):
 def _compute_sensory_report(full_text, chapters_dicts):
     """Compute sensory details analysis (5 senses)."""
     from narrative_assistant.nlp.style.sensory_report import get_sensory_analyzer
+
     analyzer = get_sensory_analyzer()
     report = analyzer.analyze(full_text, chapters=chapters_dicts)
     return report.to_dict() if hasattr(report, "to_dict") else report
@@ -1055,6 +1208,7 @@ def _compute_sensory_report(full_text, chapters_dicts):
 def _compute_readability(full_text):
     """Compute age-readability analysis."""
     from narrative_assistant.nlp.style.readability import get_readability_analyzer
+
     analyzer = get_readability_analyzer()
     report = analyzer.analyze_for_age(full_text)
     return report.to_dict() if hasattr(report, "to_dict") else report
@@ -1073,22 +1227,26 @@ def _compute_sentence_variation(chapters):
             continue
         avg = sum(lengths) / len(lengths)
         variance = sum((l - avg) ** 2 for l in lengths) / len(lengths)
-        std = variance ** 0.5
+        std = variance**0.5
         cv = std / avg if avg > 0 else 0
-        chapter_results.append({
-            "chapter": ch.chapter_number,
-            "avg_length": round(avg, 1),
-            "std_dev": round(std, 1),
-            "variation_coefficient": round(cv, 3),
-            "min_length": min(lengths),
-            "max_length": max(lengths),
-            "sentence_count": len(lengths),
-        })
+        chapter_results.append(
+            {
+                "chapter": ch.chapter_number,
+                "avg_length": round(avg, 1),
+                "std_dev": round(std, 1),
+                "variation_coefficient": round(cv, 3),
+                "min_length": min(lengths),
+                "max_length": max(lengths),
+                "sentence_count": len(lengths),
+            }
+        )
         all_lengths.extend(lengths)
 
     global_avg = sum(all_lengths) / len(all_lengths) if all_lengths else 0
-    global_var = sum((l - global_avg) ** 2 for l in all_lengths) / len(all_lengths) if all_lengths else 0
-    global_std = global_var ** 0.5
+    global_var = (
+        sum((l - global_avg) ** 2 for l in all_lengths) / len(all_lengths) if all_lengths else 0
+    )
+    global_std = global_var**0.5
     global_cv = global_std / global_avg if global_avg > 0 else 0
 
     return {
@@ -1107,9 +1265,12 @@ def _compute_sentence_variation(chapters):
 def _compute_dialogue_validation(chapters):
     """Validate dialogue attribution."""
     from narrative_assistant.nlp.dialogue_validator import DialogueContextValidator
+
     validator = DialogueContextValidator()
-    chapters_info = [{"number": ch.chapter_number, "start_char": 0, "content": ch.content or ""}
-                     for ch in chapters]
+    chapters_info = [
+        {"number": ch.chapter_number, "start_char": 0, "content": ch.content or ""}
+        for ch in chapters
+    ]
     report = validator.validate_all(chapters_info)
     return report.to_dict() if hasattr(report, "to_dict") else report
 
@@ -1117,6 +1278,7 @@ def _compute_dialogue_validation(chapters):
 def _compute_narrative_structure(full_text, chapters_dicts):
     """Detect prolepsis/analepsis in narrative."""
     from narrative_assistant.analysis.narrative_structure import get_narrative_structure_detector
+
     detector = get_narrative_structure_detector()
     report = detector.detect_all(full_text, chapters_dicts, min_confidence=0.5)
     return report.to_dict() if hasattr(report, "to_dict") else report
@@ -1125,6 +1287,7 @@ def _compute_narrative_structure(full_text, chapters_dicts):
 # ============================================================================
 # Phase 13: Health enrichment
 # ============================================================================
+
 
 def run_health_enrichment(ctx: dict, tracker) -> None:
     """Phase 13: Pre-compute narrative health analysis."""
@@ -1147,12 +1310,15 @@ def run_health_enrichment(ctx: dict, tracker) -> None:
 
         # --- 13a: Chapter Progress (basic mode — no LLM) ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Analizando progreso por capítulo...")
+        tracker.update_progress(
+            phase_key, step / total_steps, "Analizando progreso por capítulo..."
+        )
         progress_data = None
 
         def compute_chapter_progress():
             nonlocal progress_data
             from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
+
             result = analyze_chapter_progress(project_id, mode="basic")
             if hasattr(result, "is_failure") and result.is_failure:
                 raise RuntimeError(f"Chapter progress failed: {result.error}")
@@ -1160,23 +1326,39 @@ def run_health_enrichment(ctx: dict, tracker) -> None:
             progress_data = data
             return data.to_dict() if hasattr(data, "to_dict") else data
 
-        _run_enrichment(db, project_id, "chapter_progress", 13, compute_chapter_progress, "chapter_progress")
+        _run_enrichment(
+            db, project_id, "chapter_progress", 13, compute_chapter_progress, "chapter_progress"
+        )
 
         # --- 13b: Narrative Templates ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Comparando con plantillas narrativas...")
+        tracker.update_progress(
+            phase_key, step / total_steps, "Comparando con plantillas narrativas..."
+        )
         if progress_data is not None:
-            _run_enrichment(db, project_id, "narrative_templates", 13, lambda: _compute_narrative_templates(
-                progress_data, chapters_dicts, len(chapters)
-            ), "narrative_templates")
+            _run_enrichment(
+                db,
+                project_id,
+                "narrative_templates",
+                13,
+                lambda: _compute_narrative_templates(progress_data, chapters_dicts, len(chapters)),
+                "narrative_templates",
+            )
 
         # --- 13c: Narrative Health (12 dimensions) ---
         step += 1
         tracker.update_progress(phase_key, step / total_steps, "Calculando puntuación de salud...")
         if progress_data is not None:
-            _run_enrichment(db, project_id, "narrative_health", 13, lambda: _compute_narrative_health(
-                progress_data, chapters_dicts, entities_dicts, len(chapters)
-            ), "narrative_health")
+            _run_enrichment(
+                db,
+                project_id,
+                "narrative_health",
+                13,
+                lambda: _compute_narrative_health(
+                    progress_data, chapters_dicts, entities_dicts, len(chapters)
+                ),
+                "narrative_health",
+            )
 
     except Exception as e:
         logger.error(f"[Phase 13] Health enrichment failed: {e}", exc_info=True)
@@ -1187,11 +1369,14 @@ def run_health_enrichment(ctx: dict, tracker) -> None:
 def _compute_narrative_templates(progress_data, chapters_dicts, total_chapters):
     """Match narrative against known templates (3 Acts, Hero's Journey, etc.)."""
     from narrative_assistant.analysis.narrative_templates import NarrativeTemplateAnalyzer
+
     analyzer = NarrativeTemplateAnalyzer()
 
     # Extract chapters_data from progress_data
-    pd = progress_data if isinstance(progress_data, dict) else (
-        progress_data.to_dict() if hasattr(progress_data, "to_dict") else {}
+    pd = (
+        progress_data
+        if isinstance(progress_data, dict)
+        else (progress_data.to_dict() if hasattr(progress_data, "to_dict") else {})
     )
     ch_data = pd.get("chapters", chapters_dicts)
 
@@ -1202,10 +1387,13 @@ def _compute_narrative_templates(progress_data, chapters_dicts, total_chapters):
 def _compute_narrative_health(progress_data, chapters_dicts, entities_dicts, total_chapters):
     """Compute 12-dimension narrative health check."""
     from narrative_assistant.analysis.narrative_health import NarrativeHealthChecker
+
     checker = NarrativeHealthChecker()
 
-    pd = progress_data if isinstance(progress_data, dict) else (
-        progress_data.to_dict() if hasattr(progress_data, "to_dict") else {}
+    pd = (
+        progress_data
+        if isinstance(progress_data, dict)
+        else (progress_data.to_dict() if hasattr(progress_data, "to_dict") else {})
     )
     character_arcs = pd.get("character_arcs", [])
     chekhov_elements = pd.get("chekhov_elements", [])
@@ -1226,6 +1414,7 @@ def _compute_narrative_health(progress_data, chapters_dicts, entities_dicts, tot
 # ============================================================================
 # S15: Version metrics (post-Phase 13 hook)
 # ============================================================================
+
 
 def write_version_metrics(ctx: dict) -> int | None:
     """S15-03: Persist aggregated metrics for this analysis as a version.
@@ -1298,7 +1487,9 @@ def write_version_metrics(ctx: dict) -> int | None:
             if health_row and health_row[0]:
                 try:
                     health_data = json.loads(health_row[0])
-                    health_score = health_data.get("overall_score") or health_data.get("health_score")
+                    health_score = health_data.get("overall_score") or health_data.get(
+                        "health_score"
+                    )
                 except (json.JSONDecodeError, TypeError):
                     pass
 
@@ -1371,17 +1562,33 @@ def write_version_metrics(ctx: dict) -> int | None:
                     chapter_added_count, chapter_removed_count, chapter_reordered_count,
                     run_mode, duration_total_sec, phase_durations_json)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (project_id, next_version, snapshot_id, alert_count, word_count,
-                 entity_count, chapter_count, health_score, formality_avg, dialogue_ratio,
-                 alerts_new_count, alerts_resolved_count, alerts_unchanged_count,
-                 critical_count, warning_count, info_count,
-                 int(entity_diff.get("new_entities", 0)),
-                 int(entity_diff.get("removed_entities", 0)),
-                 int(entity_diff.get("renamed", entity_diff.get("renamed_entities", 0))),
-                 int(chapter_diff.get("added", 0)),
-                 int(chapter_diff.get("removed", 0)),
-                 0,  # chapter_reordered_count (pendiente de algoritmo dedicado)
-                 run_mode, duration_total_sec, phase_durations_json),
+                (
+                    project_id,
+                    next_version,
+                    snapshot_id,
+                    alert_count,
+                    word_count,
+                    entity_count,
+                    chapter_count,
+                    health_score,
+                    formality_avg,
+                    dialogue_ratio,
+                    alerts_new_count,
+                    alerts_resolved_count,
+                    alerts_unchanged_count,
+                    critical_count,
+                    warning_count,
+                    info_count,
+                    int(entity_diff.get("new_entities", 0)),
+                    int(entity_diff.get("removed_entities", 0)),
+                    int(entity_diff.get("renamed", entity_diff.get("renamed_entities", 0))),
+                    int(chapter_diff.get("added", 0)),
+                    int(chapter_diff.get("removed", 0)),
+                    0,  # chapter_reordered_count (pendiente de algoritmo dedicado)
+                    run_mode,
+                    duration_total_sec,
+                    phase_durations_json,
+                ),
             )
             conn.commit()
 
@@ -1394,6 +1601,8 @@ def write_version_metrics(ctx: dict) -> int | None:
     except Exception as e:
         logger.warning(f"[S15] Failed to write version metrics for project {project_id}: {e}")
     return None
+
+
 def _hash_payload(payload: Any) -> str:
     """Hash estable para detectar si los inputs de una fase cambiaron."""
     try:

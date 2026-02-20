@@ -98,7 +98,9 @@ class VersionDiffRepository:
             return min(1.0, 0.83 + (mention_ratio * 0.10) + importance_bonus), "new_in_old_aliases"
         jacc = self._token_jaccard(old_name, new_name)
         if jacc >= 0.8:
-            return min(1.0, 0.78 + ((jacc - 0.8) * 0.35) + (mention_ratio * 0.08) + importance_bonus), "token_overlap"
+            return min(
+                1.0, 0.78 + ((jacc - 0.8) * 0.35) + (mention_ratio * 0.08) + importance_bonus
+            ), "token_overlap"
         return (jacc * 0.6) + (mention_ratio * 0.15), "weak_overlap"
 
     def load_snapshot_chapter_texts(self, snapshot_id: int) -> dict[int, str]:
