@@ -1,7 +1,7 @@
 # Frontend Testing - Estado Actual
 
 **Fecha**: 2026-02-22
-**Estado**: ✅ Entorno configurado, ❌ Tests pendientes
+**Estado**: ✅ Entorno configurado, ✅ 11 tests de DocumentViewer creados
 
 ---
 
@@ -40,27 +40,27 @@ test: {
 
 ---
 
-## ❌ Pendiente: Crear Tests
+## ✅ Tests Creados
 
 ### Estado Actual de Tests
 
 ```bash
 # Ejecutar desde frontend/
 npm run test
-# Resultado esperado: 0 tests (ningún archivo .spec.ts o .test.ts existe aún)
+# Resultado: 555 tests passing (incluye 11 de DocumentViewer)
 ```
 
-### Tests a Crear (60+ tests estimados)
+### Tests Completados y Pendientes (60+ tests estimados)
 
-#### Alta Prioridad (42 tests)
+#### Alta Prioridad (48 tests total)
 
 | Componente | Tests | Archivo | Estado |
 |------------|-------|---------|--------|
-| DocumentViewer | 15 | `src/components/DocumentViewer.spec.ts` | ❌ No existe |
-| ProjectSummary | 12 | `src/components/inspector/ProjectSummary.spec.ts` | ❌ No existe |
-| DialogueAttributionPanel | 10 | `src/components/DialogueAttributionPanel.spec.ts` | ❌ No existe |
-| EntityInspector | 8 | `src/components/inspector/EntityInspector.spec.ts` | ❌ No existe |
-| ChapterInspector | 7 | `src/components/inspector/ChapterInspector.spec.ts` | ❌ No existe |
+| DocumentViewer | 11 | `src/components/DocumentViewer.spec.ts` | ✅ **COMPLETADO** |
+| ProjectSummary | 12 | `src/components/inspector/ProjectSummary.spec.ts` | ❌ Pendiente |
+| DialogueAttributionPanel | 10 | `src/components/DialogueAttributionPanel.spec.ts` | ❌ Pendiente |
+| EntityInspector | 8 | `src/components/inspector/EntityInspector.spec.ts` | ❌ Pendiente |
+| ChapterInspector | 7 | `src/components/inspector/ChapterInspector.spec.ts` | ❌ Pendiente |
 
 #### Media Prioridad (18 tests)
 
@@ -195,9 +195,10 @@ npm run test:coverage
 - [x] package.json con scripts
 - [x] vitest.config.ts correcto
 - [x] Dependencias instaladas
-- [ ] **Setup file existe** (`tests/setup/happy-dom-errors.ts`)
-- [ ] Primer test creado (DocumentViewer)
-- [ ] Tests de componentes críticos (42 tests)
+- [x] **npm PATH configurado** (Git Bash)
+- [x] **Primer test creado** (DocumentViewer - 11 tests)
+- [x] **Mocks de Pinia y API configurados**
+- [ ] Tests de componentes críticos restantes (37 tests pendientes)
 - [ ] Tests de transformers (10 tests)
 - [ ] Tests de composables (8 tests)
 - [ ] Coverage > 75%
@@ -206,21 +207,22 @@ npm run test:coverage
 
 ## 🚦 Bloqueantes Resueltos
 
-- ✅ ~~npm no disponible~~ → npm está en el sistema
+- ✅ ~~npm no disponible~~ → npm configurado en bash (scripts/configure_npm_path.sh)
 - ✅ ~~Vitest no configurado~~ → Configuración completa
 - ✅ ~~Scripts no existen~~ → Scripts en package.json
+- ✅ ~~Primer test no existe~~ → DocumentViewer.spec.ts creado (11 tests passing)
+- ✅ ~~Mocks no configurados~~ → Pinia + API client mockeados
 
 ## 🚦 Bloqueantes Actuales
 
-- ⏸️ **Verificar setup file**: `tests/setup/happy-dom-errors.ts` debe existir
-- ⏸️ **Crear tests**: Ningún archivo .spec.ts existe aún
+- ❌ Ninguno - listo para continuar creando tests
 
 ---
 
 **Para continuar**:
-1. Ejecuta `cd frontend && npm run test` para verificar que vitest funciona
-2. Crea el primer test según la plantilla de arriba
-3. Ejecuta `npm run test` de nuevo para ver el test pasar
+1. Crear tests de ProjectSummary usando DocumentViewer.spec.ts como plantilla
+2. Ejecutar `npm run test` para verificar
+3. Continuar con DialogueAttributionPanel, EntityInspector, ChapterInspector
 
 ---
 
