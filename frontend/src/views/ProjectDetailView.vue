@@ -997,6 +997,17 @@ onMounted(async () => {
       }
     }
 
+    // Check for scrollPos query parameter (para navegación desde RevisionView)
+    const scrollPosParam = route.query.scrollPos as string
+    if (scrollPosParam) {
+      const pos = parseInt(scrollPosParam)
+      if (!isNaN(pos)) {
+        const chapterNum = route.query.scrollChapter ? parseInt(route.query.scrollChapter as string) : undefined
+        const chapter = chapterNum ? chapters.value.find(c => c.chapterNumber === chapterNum) : undefined
+        workspaceStore.navigateToTextPosition(pos, undefined, chapter?.id ?? null)
+      }
+    }
+
     const hasActiveAnalysis = await analysisStore.checkAnalysisStatus(projectId)
     if (hasActiveAnalysis) {
       startAnalysisPolling()

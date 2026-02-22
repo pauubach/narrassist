@@ -15,6 +15,12 @@ const projectId = computed(() => Number(route.params.id))
 function goBack() {
   router.push({ name: 'project', params: { id: route.params.id }, query: { tab: 'alerts' } })
 }
+
+function onNavigateToAlert(position: number, chapter?: number) {
+  const query: Record<string, string> = { tab: 'text', scrollPos: String(position) }
+  if (chapter != null) query.scrollChapter = String(chapter)
+  router.push({ name: 'project', params: { id: route.params.id }, query })
+}
 </script>
 
 <template>
@@ -30,6 +36,7 @@ function goBack() {
     <RevisionDashboard
       :project-id="projectId"
       @close="goBack"
+      @navigate-to-alert="onNavigateToAlert"
     />
   </div>
 </template>

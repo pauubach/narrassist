@@ -18,6 +18,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
+  (e: 'navigate', position: number, chapter?: number): void
 }>()
 
 function reasonLabel(reason: string | undefined): string {
@@ -48,6 +49,14 @@ const confidenceLabel = computed(() => {
   if (pct >= 70) return 'Media'
   return 'Baja'
 })
+
+const canNavigate = computed(() => props.alert.spanStart != null)
+
+function navigateToDocument() {
+  if (props.alert.spanStart != null) {
+    emit('navigate', props.alert.spanStart, props.alert.chapter)
+  }
+}
 </script>
 
 <template>
@@ -110,7 +119,17 @@ const confidenceLabel = computed(() => {
     </div>
 
     <template #footer>
-      <Button label="Cerrar" text @click="emit('close')" />
+      <div class="dialog-footer">
+        <Button
+          v-if="canNavigate"
+          icon="pi pi-external-link"
+          label="Ver en documento"
+          severity="info"
+          text
+          @click="navigateToDocument"
+        />
+        <Button label="Cerrar" text @click="emit('close')" />
+      </div>
     </template>
   </Dialog>
 </template>
@@ -195,4 +214,10 @@ const confidenceLabel = computed(() => {
 .bar-fill.high { background: var(--green-500); }
 .bar-fill.medium { background: var(--yellow-500); }
 .bar-fill.low { background: var(--orange-500); }
+
+.dialog-footer {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
 </style>

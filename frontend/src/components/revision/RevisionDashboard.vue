@@ -25,6 +25,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
+  (e: 'navigate-to-alert', position: number, chapter?: number): void
 }>()
 
 const detail = ref<ComparisonDetail | null>(null)
@@ -77,6 +78,10 @@ function reasonLabel(reason: string | undefined): string {
     case 'manual': return 'Resolución manual'
     default: return reason || 'Desconocido'
   }
+}
+
+function onAlertNavigate(position: number, chapter?: number) {
+  emit('navigate-to-alert', position, chapter)
 }
 
 onMounted(loadDetail)
@@ -192,6 +197,7 @@ watch(() => props.projectId, loadDetail)
                 v-for="(alert, idx) in detail?.alertsNew"
                 :key="idx"
                 class="alert-diff-item new-alert"
+                @click="selectedAlert = alert"
               >
                 <div class="diff-item-header">
                   <span class="diff-title">{{ alert.title }}</span>
@@ -218,6 +224,7 @@ watch(() => props.projectId, loadDetail)
         :alert="selectedAlert"
         :project-id="projectId"
         @close="selectedAlert = null"
+        @navigate="onAlertNavigate"
       />
     </template>
   </div>
