@@ -176,15 +176,21 @@ const roleStats = computed<RoleStats>(() => {
     const reasoning = (m.validationReasoning?.toLowerCase() || '') as string
     const conf = m.confidence || 0
 
-    // Categorizar por rol sintáctico
-    if (reasoning.includes('sujeto')) {
+    // Categorizar por rol sintáctico (keywords en español del backend)
+    if (reasoning.includes('sujeto') || reasoning.includes('vocativo') || reasoning.includes('aposición') || reasoning.includes('gerundio') || reasoning.includes('agente')) {
       stats.asSubject++
     } else if (reasoning.includes('objeto')) {
       stats.asObject++
-    } else if (reasoning.includes('comunicativo') || reasoning.includes('verbo')) {
+    } else if (reasoning.includes('comunicativo') || reasoning.includes('verbo comunicativo') || reasoning.includes('diálogo') || reasoning.includes('dialogu')) {
       stats.inDialogue++
-    } else if (conf < 0.75 || reasoning.includes('posesivo')) {
+    } else if (reasoning.includes('posesivo') || reasoning.includes('oblicuo') || reasoning.includes('caso')) {
       stats.passive++
+    } else if (conf < 0.5) {
+      // Solo considerar passive si confianza muy baja (< 0.5 en vez de < 0.75)
+      stats.passive++
+    } else {
+      // Menciones contextuales con confianza razonable se consideran activas (como objeto)
+      stats.asObject++
     }
   })
 

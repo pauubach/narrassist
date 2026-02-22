@@ -118,7 +118,9 @@ function getCategoryLabel(category: string): string {
     temporal: 'Temporal',
     style: 'Estilo',
     repetition: 'Repetición',
-    filler: 'Muletillas'
+    filler: 'Muletillas',
+    grammar: 'Gramática',
+    spelling: 'Ortografía'
   }
   return labels[category] || category
 }

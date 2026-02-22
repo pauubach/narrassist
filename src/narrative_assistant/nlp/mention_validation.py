@@ -197,7 +197,7 @@ class RegexValidator:
             is_valid=True,  # Default: aceptar si no hay evidencia contraria
             confidence=0.60,
             method=ValidationMethod.REGEX,
-            reasoning="No match con patrones regex claros",
+            reasoning="Mención contextual (sin rol sintáctico claro)",
             metadata={},
         )
 
@@ -434,6 +434,23 @@ class SpacyValidator:
         "vocative",  # Vocativo: "¡María, ven aquí!"
     }
 
+    # Mapeo de dep labels a descripciones en español para el frontend
+    # IMPORTANTE: El frontend (EntityInspector.vue) busca keywords:
+    #   'sujeto' → asSubject, 'objeto' → asObject,
+    #   'comunicativo'/'verbo' → inDialogue, 'posesivo' → passive
+    DEP_LABEL_DESCRIPTIONS: dict[str, str] = {
+        "nsubj": "Sujeto de la oración",
+        "nsubj:pass": "Sujeto pasivo de la oración",
+        "csubj": "Sujeto oracional",
+        "obj": "Objeto directo del verbo",
+        "dobj": "Objeto directo del verbo",
+        "iobj": "Objeto indirecto del verbo",
+        "ROOT": "Sujeto o verbo principal",
+        "conj": "Coordinación (sujeto u objeto compuesto)",
+        "appos": "Aposición (referencia directa)",
+        "vocative": "Vocativo (llamada directa al sujeto)",
+    }
+
     # Verbos de comunicación (excepción para obl)
     COMMUNICATION_VERBS = {
         "hablar",
@@ -564,11 +581,12 @@ class SpacyValidator:
 
             # Caso 4: Roles válidos (sujeto, objeto) → MANTENER
             if dep in self.KEEP_DEP_LABELS:
+                desc = self.DEP_LABEL_DESCRIPTIONS.get(dep, dep)
                 return ValidationResult(
                     is_valid=True,
                     confidence=0.95,
                     method=ValidationMethod.SPACY,
-                    reasoning=f"Rol sintáctico principal: {dep}",
+                    reasoning=desc,
                     metadata={"dep": dep},
                 )
 
@@ -577,11 +595,19 @@ class SpacyValidator:
                 return self.next.validate(mention, context, entities)
 
             # Sin LLM, aceptar con confianza moderada
+            # Intentar describir el rol en español para el frontend
+            dep_desc = self.DEP_LABEL_DESCRIPTIONS.get(dep, "")
+            if dep_desc:
+                reasoning = dep_desc
+            elif dep in ("flat", "flat:name"):
+                reasoning = "Nombre propio (sujeto u objeto)"
+            else:
+                reasoning = f"Mención contextual ({dep})"
             return ValidationResult(
                 is_valid=True,
                 confidence=0.70,
                 method=ValidationMethod.SPACY,
-                reasoning=f"Rol sintáctico ambiguo: {dep}",
+                reasoning=reasoning,
                 metadata={"dep": dep},
             )
 
