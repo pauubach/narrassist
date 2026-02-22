@@ -1649,6 +1649,9 @@ class Database:
         ]
         for table, column, col_def in migrations:
             try:
+                # SEGURIDAD: table, column, col_def provienen de constantes de código (migrations list),
+                # NO de user input. SQLite no permite placeholders en PRAGMA ni ALTER TABLE.
+                # Este uso de f-strings es seguro porque los valores están hardcoded arriba.
                 cols = conn.execute(f"PRAGMA table_info({table})").fetchall()
                 col_names = {c[1] for c in cols}
                 if column not in col_names:

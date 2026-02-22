@@ -60,7 +60,10 @@
         v-for="(attr, idx) in attributions"
         :key="idx"
         class="attribution-item"
-        :class="getConfidenceClass(attr.confidence)"
+        :class="[
+          getConfidenceClass(attr.confidence),
+          { editing: correctingIndex === idx }
+        ]"
         @click="$emit('select-dialogue', { ...attr, chapterNumber: selectedChapter ?? attr.chapterNumber })"
       >
         <div class="dialogue-header">
@@ -616,6 +619,18 @@ watch(selectedChapter, () => {
 
 .attribution-item.confidence-unknown {
   border-color: var(--gray-400);
+}
+
+/* Estado de edición - indicador visual claro */
+.attribution-item.editing {
+  background: var(--primary-50);
+  border-left-width: var(--ds-border-6);
+  box-shadow: 0 0 0 2px var(--primary-200);
+  cursor: default;
+}
+
+.attribution-item.editing:hover {
+  transform: none; /* No mover cuando está en edición */
 }
 
 .dialogue-header {

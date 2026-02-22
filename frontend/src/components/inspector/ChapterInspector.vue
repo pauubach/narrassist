@@ -248,14 +248,39 @@ const keyEvents = computed(() => {
   ]
 
   // Mapear a formato esperado por el template + incluir posiciones para navegación
-  return allEvents.map(e => ({
-    event_type: e.event_type,
-    description: e.description,
-    characters_involved: [], // TODO: Extraer de entity_ids si es necesario
-    start_char: e.start_char,
-    end_char: e.end_char,
-    confidence: e.confidence,
-  }))
+  return allEvents.map(e => {
+    // Extraer entity_ids (puede ser JSON string o array)
+    let entityIds: number[] = []
+    if (e.entity_ids) {
+      try {
+        entityIds = typeof e.entity_ids === 'string'
+          ? JSON.parse(e.entity_ids)
+          : Array.isArray(e.entity_ids)
+            ? e.entity_ids
+            : []
+      } catch {
+        entityIds = []
+      }
+    }
+
+    // Mapear entity_ids a nombres de personajes presentes en el capítulo
+    const charactersInvolved = entityIds
+      .map(id => {
+        const char = topCharacters.value.find(c => c.entity_id === id)
+        return char ? char.name : null
+      })
+      .filter((name): name is string => name !== null)
+
+    return {
+      event_type: e.event_type,
+      description: e.description,
+      characters_involved: charactersInvolved,
+      start_char: e.start_char,
+      end_char: e.end_char,
+      confidence: e.confidence,
+      entity_ids: entityIds, // Guardar IDs para navegación
+    }
+  })
 })
 
 function getToneSeverity(tone: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
@@ -521,8 +546,14 @@ function navigateToChapter(chapterNumber: number) {
                 class="event-item"
                 @click="navigateToEvent(event)"
               >
-                <i :class="`pi ${getEventIcon(event.event_type)}`"></i>
-                <span>{{ event.description }}</span>
+                <div class="event-main">
+                  <i :class="`pi ${getEventIcon(event.event_type)}`"></i>
+                  <span class="event-description">{{ event.description }}</span>
+                </div>
+                <div v-if="event.characters_involved && event.characters_involved.length > 0" class="event-characters">
+                  <i class="pi pi-users event-char-icon"></i>
+                  <span class="event-char-list">{{ event.characters_involved.join(', ') }}</span>
+                </div>
               </div>
             </div>
 
@@ -922,8 +953,8 @@ function navigateToChapter(chapterNumber: number) {
 
 .event-item {
   display: flex;
-  align-items: flex-start;
-  gap: var(--ds-space-2);
+  flex-direction: column;
+  gap: var(--ds-space-1);
   font-size: var(--ds-font-sm);
   padding: var(--ds-space-2);
   border-radius: var(--border-radius);
@@ -935,10 +966,38 @@ function navigateToChapter(chapterNumber: number) {
   background: var(--surface-50);
 }
 
-.event-item i {
+.event-main {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ds-space-2);
+}
+
+.event-main i {
   color: var(--text-color-secondary);
   margin-top: var(--ds-space-0-5);
   flex-shrink: 0;
+}
+
+.event-description {
+  flex: 1;
+}
+
+.event-characters {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-1-5);
+  padding-left: var(--ds-space-6); /* Alinear con descripción */
+  font-size: var(--ds-font-xs);
+  color: var(--text-color-secondary);
+}
+
+.event-char-icon {
+  font-size: var(--ds-font-xs);
+  opacity: 0.7;
+}
+
+.event-char-list {
+  font-style: italic;
 }
 
 .no-events-filtered {

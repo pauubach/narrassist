@@ -498,7 +498,13 @@ function onChapterClick(chapterNumber: number) {
         <span class="nav-hint">← → para navegar</span>
       </div>
 
-      <div class="nav-controls">
+      <!-- Loading state mientras se cargan menciones -->
+      <div v-if="mentionNav.isLoading.value" class="mention-nav-loading">
+        <i class="pi pi-spin pi-spinner"></i>
+        <span>Cargando menciones...</span>
+      </div>
+
+      <div v-else class="nav-controls">
         <Button
           v-tooltip.bottom="'Anterior (←)'"
           icon="pi pi-chevron-left"
@@ -760,6 +766,16 @@ function onChapterClick(chapterNumber: number) {
   background: var(--ds-surface-ground);
   border-top: var(--ds-border-1) solid var(--ds-surface-border);
   padding: var(--ds-space-2);
+}
+
+.mention-nav-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-3);
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-sm);
 }
 
 .nav-header {
