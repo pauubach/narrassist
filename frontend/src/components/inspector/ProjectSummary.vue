@@ -285,6 +285,14 @@ const categoryOverview = computed(() => {
 .stat-card:hover {
   background: var(--ds-surface-hover);
   border-color: var(--ds-color-primary-light);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease-in-out;
+}
+
+.stat-card:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 .stat-card--alert {

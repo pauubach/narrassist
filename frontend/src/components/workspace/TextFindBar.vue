@@ -50,15 +50,17 @@ watch(() => props.visible, async (visible) => {
   }
 })
 
-watch(
-  () => props.chapters,
-  () => {
-    if (props.visible && query.value.length >= 2) {
-      performSearch(query.value)
-    }
-  },
-  { deep: true }
-)
+// Optimización UX4: Usar hash de chapters en lugar de deep watch
+const chaptersHash = computed(() => {
+  if (!props.chapters) return ''
+  return props.chapters.map(ch => `${ch.id}:${ch.content.length}`).join('|')
+})
+
+watch(chaptersHash, () => {
+  if (props.visible && query.value.length >= 2) {
+    performSearch(query.value)
+  }
+})
 
 // Search when query changes (debounced)
 let searchTimeout: ReturnType<typeof setTimeout> | null = null

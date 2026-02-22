@@ -655,6 +655,7 @@ onBeforeUnmount(() => {
   left: 50%;
   transform: translateX(-50%);
   width: 380px;
+  max-width: calc(100vw - 2rem); /* UX5: Responsive en pantallas pequeñas */
   background-color: var(--p-surface-ground, var(--surface-ground, #ffffff));
   border: 1px solid var(--p-surface-border, var(--surface-border, #e2e8f0));
   border-radius: var(--app-radius);
@@ -663,6 +664,17 @@ onBeforeUnmount(() => {
   margin-bottom: 0.5rem;
   z-index: var(--ds-z-popover); /* Mayor que tabs/panels para evitar superposición */
   color: var(--p-text-color, var(--text-color, #1e293b));
+}
+
+/* UX5: Responsive - móvil */
+@media (max-width: 640px) {
+  .details-panel {
+    width: calc(100vw - 1rem);
+    left: 0.5rem;
+    right: 0.5rem;
+    transform: none;
+    padding: 0.75rem;
+  }
 }
 
 .details-header {
