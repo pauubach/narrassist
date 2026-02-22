@@ -164,4 +164,5 @@ export interface ApiChapter {
   created_at?: string
   updated_at?: string
   sections?: ApiSection[]
+  entities_count?: number
 }

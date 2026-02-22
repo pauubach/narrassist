@@ -52,6 +52,25 @@ def list_chapters(project_id: int):
                 "subsections": [section_to_dict(s) for s in section.subsections],
             }
 
+        # Contar entidades distintas por capítulo (Bug #4: sync con EntitiesPanel)
+        entities_count_by_chapter: dict[int, int] = {}
+        if deps.entity_repository:
+            try:
+                from narrative_assistant.persistence.database import get_database
+                db = get_database()
+                rows = db.fetchall(
+                    """SELECT em.chapter_id, COUNT(DISTINCT em.entity_id) as cnt
+                       FROM entity_mentions em
+                       JOIN entities e ON e.id = em.entity_id
+                       WHERE e.project_id = ? AND e.is_active = 1
+                       GROUP BY em.chapter_id""",
+                    (project_id,),
+                )
+                for row in rows:
+                    entities_count_by_chapter[row["chapter_id"]] = row["cnt"]
+            except Exception as e:
+                logger.debug(f"Could not count entities per chapter: {e}")
+
         # Convertir a formato de respuesta con secciones
         chapters_data = []
         for ch in chapters:
@@ -74,6 +93,7 @@ def list_chapters(project_id: int):
                     "created_at": ch.created_at,
                     "updated_at": ch.updated_at,
                     "sections": [section_to_dict(s) for s in sections],
+                    "entities_count": entities_count_by_chapter.get(ch.id, 0),
                 }
             )
 

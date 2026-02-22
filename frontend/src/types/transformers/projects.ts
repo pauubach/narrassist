@@ -115,6 +115,7 @@ export function transformChapter(api: ApiChapter): Chapter {
     createdAt: safeDate(api.created_at),
     updatedAt: safeDate(api.updated_at),
     sections: api.sections?.map(transformSection) || [],
+    entitiesCount: api.entities_count,
   }
 }
 

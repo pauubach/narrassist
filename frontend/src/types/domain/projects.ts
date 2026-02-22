@@ -182,4 +182,5 @@ export interface Chapter {
   createdAt?: Date
   updatedAt?: Date
   sections?: Section[]
+  entitiesCount?: number
 }
