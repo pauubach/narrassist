@@ -425,7 +425,7 @@ defineExpose({ focusSearch })
 
       <!-- Analytics (2 columnas) -->
       <div v-if="stats.active > 0" class="analytics-grid">
-        <AlertsAnalytics :alerts="alerts" :chapter-count="props.chapters?.length || 0" />
+        <AlertsAnalytics :alerts="alerts" :chapter-count="props.chapters?.length || 0" :chapters="props.chapters" />
       </div>
 
       <!-- Empty state cuando no hay alertas -->

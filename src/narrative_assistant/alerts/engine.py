@@ -804,6 +804,10 @@ class AlertEngine:
             # Hay sugerencia, el contexto está implícito en excerpt
             explanation_text = None
 
+        # Usar contexto ampliado como excerpt si está disponible,
+        # ya que el 'text' puede ser muy corto (ej: "la formalidad")
+        excerpt = context if context and len(context) > len(text) else text
+
         return self.create_alert(
             project_id=project_id,
             category=alert_category,
@@ -816,7 +820,7 @@ class AlertEngine:
             chapter=chapter,
             start_char=start_char,
             end_char=end_char,
-            excerpt=text,
+            excerpt=excerpt,
             confidence=confidence,
             source_module="corrections_detector",
             extra_data=extra_data

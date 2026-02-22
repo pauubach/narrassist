@@ -11,16 +11,32 @@ import type { Alert } from '@/types'
  * - Estadísticas resumidas
  */
 
+interface ChapterInfo {
+  id: number
+  chapterNumber: number
+  title: string
+}
+
 interface Props {
   /** Alertas a analizar */
   alerts: Alert[]
   /** Número total de capítulos */
   chapterCount?: number
+  /** Capítulos con título (para mostrar nombres completos) */
+  chapters?: ChapterInfo[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  chapterCount: 0
+  chapterCount: 0,
+  chapters: () => [],
 })
+
+/** Formato de capítulo: "1. Título" si hay título, "Cap. N" si no */
+function formatChapter(chapterNum: number): string {
+  const ch = props.chapters?.find(c => c.chapterNumber === chapterNum)
+  if (ch?.title) return `${chapterNum}. ${ch.title}`
+  return `Cap. ${chapterNum}`
+}
 
 // ============================================================================
 // Distribución por capítulo
@@ -139,7 +155,7 @@ function getCategoryLabel(category: string): string {
       <div class="section-header">
         <span class="section-title">Distribución por capítulo</span>
         <span v-if="topChapter" class="section-hint">
-          Cap. {{ topChapter.chapter }} tiene más alertas ({{ topChapter.count }})
+          {{ formatChapter(topChapter.chapter) }} tiene más alertas ({{ topChapter.count }})
         </span>
       </div>
 
@@ -149,7 +165,7 @@ function getCategoryLabel(category: string): string {
           :key="stat.chapter"
           class="chart-bar-wrapper"
         >
-          <span class="bar-label">Cap. {{ stat.chapter }}</span>
+          <span class="bar-label" :title="formatChapter(stat.chapter)">{{ formatChapter(stat.chapter) }}</span>
           <div class="bar-container">
             <div
               class="bar-fill"
@@ -270,6 +286,10 @@ function getCategoryLabel(category: string): string {
   font-size: 0.8rem;
   color: var(--text-color-secondary);
   text-align: right;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bar-container {

@@ -1011,6 +1011,46 @@ JSON:"""
 
         return result
 
+    def _reclassify_known_entities(self, entities: list[ExtractedEntity]) -> list[ExtractedEntity]:
+        """
+        Reclasifica entidades con tipo incorrecto usando gazetteers.
+
+        Corrige errores comunes de spaCy donde objetos/dispositivos se
+        clasifican como ORG o LOC en lugar de MISC.
+        """
+        # Entidades que spaCy clasifica como ORG pero son MISC (vehículos, objetos)
+        ORG_TO_MISC = {
+            "ford t", "ford modelo t", "citroën 2cv", "citroën ds",
+            "seat 600", "renault 4", "volkswagen escarabajo", "fiat 500",
+            "rolls royce", "rolls-royce",
+        }
+
+        # Entidades que spaCy clasifica como LOC pero son MISC (dispositivos, objetos)
+        LOC_TO_MISC = {
+            "gps", "radar", "sonar", "rfid", "wifi", "wi-fi",
+            "bluetooth", "usb", "dvd", "cd", "vhs",
+        }
+
+        reclassified = 0
+        for entity in entities:
+            text_lower = entity.text.lower().strip()
+
+            if entity.label == EntityLabel.ORG and text_lower in ORG_TO_MISC:
+                entity.label = EntityLabel.MISC
+                entity.source = f"{entity.source}+reclassified_misc"
+                logger.debug(f"ORG reclasificado a MISC: '{entity.text}'")
+                reclassified += 1
+            elif entity.label == EntityLabel.LOC and text_lower in LOC_TO_MISC:
+                entity.label = EntityLabel.MISC
+                entity.source = f"{entity.source}+reclassified_misc"
+                logger.debug(f"LOC reclasificado a MISC: '{entity.text}'")
+                reclassified += 1
+
+        if reclassified > 0:
+            logger.info(f"Reclasificación por gazetteer: {reclassified} entidades corregidas")
+
+        return entities
+
     # _is_valid_spacy_entity, _is_valid_heuristic_candidate, _is_high_quality_entity
     # and constants (STOP_TITLES, HEURISTIC_FALSE_POSITIVES, COMMON_PHRASES_NOT_ENTITIES,
     # PHYSICAL_DESCRIPTION_PATTERNS, SPACY_FALSE_POSITIVE_WORDS) are inherited from
@@ -1282,6 +1322,9 @@ JSON:"""
 
             # 5. Post-procesamiento: limpiar MISC espurios y reclasificar conocidos
             result.entities = self._postprocess_misc_entities(result.entities)
+
+            # 6. Reclasificar entidades con tipo incorrecto (gazetteers)
+            result.entities = self._reclassify_known_entities(result.entities)
 
             # Ordenar por posición
             result.entities.sort(key=lambda e: e.start_char)
