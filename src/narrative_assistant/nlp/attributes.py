@@ -53,25 +53,42 @@ _POST_PROFESSION_BLOCKERS = re.compile(
 )
 
 
-def _is_valid_profession_context(text: str, match: re.Match, value: str) -> bool:
+def _is_valid_profession_context(
+    text: str, match: re.Match, value: str, doc: Any = None,
+) -> bool:
     """
     Verifica que un candidato a profesión sea realmente un sustantivo predicativo.
 
-    Criterios lingüísticos:
-    1. Los adverbios en -mente no son profesiones (exactamente, claramente...).
-    2. Si tras la palabra candidata viene un artículo/pronombre/subordinante
-       (lo, la, que, todo, como), la palabra funciona como adverbio/adjetivo,
-       no como sustantivo predicativo. Ej: "Era exactamente lo que buscaba".
-    3. Una profesión real termina la cláusula o es seguida por adjetivo/prep:
-       "Era médico de profesión", "Era carpintero nato", "Era ingeniero."
+    Pipeline de validación en 3 capas:
+    1. POS-Tag Gating (si hay doc spaCy): rechaza ADV, ADJ, VERB, DET, PRON.
+    2. Filtro -mente: adverbios terminados en -mente no son profesiones.
+    3. Contexto post-match: si le sigue artículo/pronombre/subordinante,
+       la palabra funciona como adverbio, no como predicado nominal.
     """
     val = value.lower()
 
-    # Regla 1: Adverbios en -mente
+    # Capa 1: POS-Tag Gating — la más fiable (spaCy doc disponible)
+    if doc is not None:
+        # Buscar el token spaCy que corresponde al valor capturado
+        # El valor está dentro del match; calcular su posición en el texto
+        match_text = match.group(0)
+        val_start_in_match = match_text.lower().rfind(val)
+        if val_start_in_match >= 0:
+            char_start = match.start() + val_start_in_match
+            char_end = char_start + len(value)
+            span = doc.char_span(char_start, char_end, alignment_mode="expand")
+            if span and len(span) > 0:
+                token = span.root
+                # ADV, ADJ, VERB, DET, PRON → nunca es profesión
+                if token.pos_ in {"ADV", "ADJ", "VERB", "ADP", "DET", "PRON", "SCONJ", "CCONJ"}:
+                    return False
+                # NOUN o PROPN → probablemente profesión (pasar a capas siguientes)
+
+    # Capa 2: Adverbios en -mente
     if val.endswith("mente") and len(val) > 5:
         return False
 
-    # Regla 2: Contexto post-match — qué sigue después de la palabra
+    # Capa 3: Contexto post-match — qué sigue después de la palabra
     after_start = match.end()
     after_text = text[after_start:after_start + 20]
     if _POST_PROFESSION_BLOCKERS.match(after_text):
@@ -2210,7 +2227,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                 if key == AttributeKey.PROFESSION:
                     groups_tmp = match.groups()
                     value_tmp = groups_tmp[0] if groups_tmp else ""
-                    if not _is_valid_profession_context(text, match, value_tmp):
+                    spacy_doc = getattr(self, "_spacy_doc", None)
+                    if not _is_valid_profession_context(text, match, value_tmp, spacy_doc):
                         logger.debug(
                             f"Profesión descartada por contexto: {match.group(0)[:50]}..."
                         )
