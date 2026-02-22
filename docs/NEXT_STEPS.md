@@ -1,8 +1,8 @@
 # Próximos Pasos - Sesión 2026-02-22
 
 **Fecha**: 2026-02-22
-**Trabajo completado**: M3 + UX improvements
-**Pendiente**: npm PATH + Frontend tests + Sprints A-D
+**Trabajo completado**: M3 + UX improvements + Frontend tests
+**Pendiente**: Más tests frontend + Sprints A-D
 
 ---
 
@@ -20,126 +20,45 @@
 - Responsive modal en StatusBar (media queries)
 - **Commit**: `b4c7f2f`
 
-### 3. Documentación Frontend Testing ✅
-- 5 documentos creados (setup, status, install, etc.)
-- Vitest ya configurado (detectado)
-- Scripts de instalación preparados
+### 3. Frontend Testing Setup ✅
+- npm PATH configurado en Git Bash
+- Script `configure_npm_path.sh` creado
+- 11 tests de DocumentViewer creados (100% passing)
+- Documentación completa (5 documentos)
+- **Commit**: `694162b`
 
 ---
 
-## 🚀 Siguiente Paso: Configurar npm PATH
+## 🚀 Siguiente Paso: Continuar con Más Tests Frontend
 
-### Opción A: Script Automático (Recomendado)
+### ✅ npm PATH Configurado
 
-```bash
-# Desde el directorio raíz del proyecto
-bash scripts/configure_npm_path.sh
-```
+El script `scripts/configure_npm_path.sh` ha sido ejecutado exitosamente:
+- Node.js v24.13.1 detectado en `/c/Program Files/nodejs`
+- PATH añadido a `~/.bashrc`
+- npm 11.3.0 disponible en bash
 
-El script:
-- ✅ Detecta automáticamente la ubicación de Node.js
-- ✅ Añade al PATH en ~/.bashrc
-- ✅ Verifica la configuración
+### ✅ Primer Test Creado
 
-**Después del script**:
-```bash
-# Recargar bashrc
-source ~/.bashrc
+Creado `frontend/src/components/DocumentViewer.spec.ts` con 11 tests:
+- Rendering básico (4 tests)
+- Highlights de alertas (2 tests)
+- Navegación (1 test)
+- Edge cases (3 tests)
+- Performance - Lazy loading (1 test)
 
-# Verificar
-npm --version
-```
+**Estado**: Todos los 11 tests passing ✅
 
-### Opción B: Manual
-
-1. **Encuentra Node.js**:
-   ```powershell
-   # En PowerShell
-   where node
-   # Ejemplo de salida: C:\Program Files\nodejs\node.exe
-   ```
-
-2. **Añade al PATH**:
-   ```bash
-   # En Git Bash, edita ~/.bashrc
-   echo 'export PATH="/c/Program Files/nodejs:$PATH"' >> ~/.bashrc
-   source ~/.bashrc
-   ```
-
-3. **Verifica**:
-   ```bash
-   npm --version
-   node --version
-   ```
-
----
-
-## 📋 Después de Configurar npm
-
-### Paso 1: Instalar Dependencias Frontend
-
-```bash
-cd frontend
-npm install
-```
-
-### Paso 2: Verificar Vitest
-
-```bash
-npm run test
-# Debería mostrar: "No test files found" (0 tests aún)
-```
-
-### Paso 3: Crear Primer Test
-
-Crear `frontend/src/components/DocumentViewer.spec.ts`:
-
-```typescript
-import { describe, it, expect } from 'vitest'
-import { mount } from '@vue/test-utils'
-import DocumentViewer from './DocumentViewer.vue'
-
-describe('DocumentViewer', () => {
-  it('renders empty state when no chapters', () => {
-    const wrapper = mount(DocumentViewer, {
-      props: {
-        chapters: [],
-        projectId: 1
-      }
-    })
-    expect(wrapper.exists()).toBe(true)
-  })
-
-  it('displays chapter content', () => {
-    const wrapper = mount(DocumentViewer, {
-      props: {
-        chapters: [
-          { id: 1, number: 1, content: 'Test content', title: 'Chapter 1' }
-        ],
-        projectId: 1
-      }
-    })
-    expect(wrapper.text()).toContain('Test content')
-  })
-})
-```
-
-### Paso 4: Ejecutar Test
-
-```bash
-npm run test
-# Debería mostrar: "2 passed"
-```
-
-### Paso 5: Continuar con Más Tests
+### Siguientes Componentes a Testear
 
 Ver prioridades en `docs/FRONTEND_TESTING_SETUP.md`:
-- DocumentViewer: 15 tests (alta prioridad)
-- ProjectSummary: 12 tests
-- DialogueAttributionPanel: 10 tests
-- EntityInspector: 8 tests
-- ChapterInspector: 7 tests
+- ✅ DocumentViewer: 11 tests (COMPLETADO)
+- ⏸️ ProjectSummary: 12 tests (siguiente)
+- ⏸️ DialogueAttributionPanel: 10 tests
+- ⏸️ EntityInspector: 8 tests
+- ⏸️ ChapterInspector: 7 tests
 - **Total objetivo**: 60+ tests, >75% coverage
+- **Actual**: 11/60 tests (18.3%)
 
 ---
 
@@ -220,32 +139,40 @@ npm run test:coverage
 ## 📊 Estado del Proyecto
 
 ### Commits Recientes
-- `f6d288d` - feat(M3): Clustering optimization
+- `694162b` - feat(frontend): Add DocumentViewer tests and npm PATH configuration
 - `b4c7f2f` - feat(UX): Mejoras feedback y responsive
+- `f6d288d` - feat(M3): Clustering optimization
 
 ### Tests
 - Backend: 1252 tests (100% passing)
-- Frontend: 0 tests (pendiente crear)
+- Frontend: 555 tests (100% passing, +11 DocumentViewer tests)
 
 ### Versión
 - Actual: v0.11.5
-- Propuesta próxima: v0.12.0 (con M3 + frontend tests)
+- Propuesta próxima: v0.12.0 (con M3 + UX + frontend tests)
 
 ---
 
 ## 💡 Recomendación
 
 **Siguiente paso inmediato**:
-1. Ejecuta `bash scripts/configure_npm_path.sh`
-2. Recarga terminal: `source ~/.bashrc`
-3. Verifica: `npm --version`
-4. Instala deps: `cd frontend && npm install`
-5. Crea primer test de DocumentViewer
-6. Ejecuta: `npm run test`
+1. Crear tests de ProjectSummary (12 tests estimados)
+2. Crear tests de DialogueAttributionPanel (10 tests)
+3. Crear tests de EntityInspector (8 tests)
+4. Crear tests de ChapterInspector (7 tests)
 
-Una vez tengas 2-3 tests funcionando, el resto será más rápido (copy-paste + adapt pattern).
+**Plantilla base** (ver DocumentViewer.spec.ts):
+```typescript
+import { describe, it, expect, vi } from 'vitest'
+import { mount } from '@vue/test-utils'
+import PrimeVue from 'primevue/config'
+import ToastService from 'primevue/toastservice'
+// Mock stores y API
+// mountWithPlugins helper
+// Tests con async/await para componentes con loading
+```
 
-**Estimación**: Con npm funcionando, puedes completar los 60 tests en 3-4 días de trabajo enfocado.
+**Estimación**: Con el patrón establecido, puedes completar los 49 tests restantes en 2-3 días de trabajo enfocado.
 
 ---
 
