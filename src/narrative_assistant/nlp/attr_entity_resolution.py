@@ -737,4 +737,16 @@ class AttributeEntityResolutionMixin:
         if value_lower in PERSONALITY_TRAITS:
             return AttributeKey.PERSONALITY
 
+        # Profesión: sustantivo en posición de predicado nominal (Capa 2)
+        # "Era médico", "Es carpintero" — NOUN tras verbo copulativo
+        if token and token.pos_ in ("NOUN", "PROPN"):
+            # Verificar que es predicado de verbo copulativo
+            is_copulative_predicate = any(
+                child.dep_ == "cop" for child in token.children
+            ) or (token.head and token.head.lemma_ in {
+                "ser", "estar", "parecer",
+            } and token.dep_ in ("attr", "ROOT"))
+            if is_copulative_predicate:
+                return AttributeKey.PROFESSION
+
         return AttributeKey.OTHER

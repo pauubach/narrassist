@@ -3350,7 +3350,14 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                                     entity_type=entity_type,
                                 )
 
+                                # Validar el valor contra el tipo de atributo
+                                if not self._validate_value(key, attribute_value):
+                                    continue
+
                                 confidence = 0.55
+                                # Profesiones detectadas por dep-parse → confianza alta
+                                if key == AttributeKey.PROFESSION:
+                                    confidence = 0.75
                                 if confidence >= self.min_confidence:
                                     # Calcular sentence_idx para CESP
                                     sent_list = list(doc.sents)
