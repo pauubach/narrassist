@@ -42,7 +42,7 @@ def get_chapter_progress(
     # Check enrichment cache first (S8a-13) — only for basic mode (what pipeline caches)
     if mode == "basic":
         from routers._enrichment_cache import get_cached_enrichment
-        cached = get_cached_enrichment(deps.get_database(), project_id, "chapter_progress", allow_stale=True)
+        cached = get_cached_enrichment(deps.get_database(), project_id, "chapter_progress")
         if cached:
             return ApiResponse(success=True, data=cached)
 
@@ -2078,5 +2078,4 @@ def get_semantic_redundancy(
         logger.error(f"Error analyzing semantic redundancy: {e}", exc_info=True)
         user_msg = e.user_message if hasattr(e, 'user_message') and e.user_message else str(e)
         return ApiResponse(success=False, error=user_msg)
-
 

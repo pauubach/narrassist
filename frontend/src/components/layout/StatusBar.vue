@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { useAnalysisStore } from '@/stores/analysis'
 import { useSystemStore } from '@/stores/system'
 import ProgressBar from 'primevue/progressbar'
@@ -75,6 +75,8 @@ const showReviewProgress = computed(() =>
 
 // Estado local para expandir/colapsar detalles
 const showDetails = ref(false)
+const analysisTriggerRef = ref<HTMLElement | null>(null)
+const detailsPanelRef = ref<HTMLElement | null>(null)
 
 // Definición de todas las fases del análisis con sus rangos de progreso
 interface PhaseDefinition {
@@ -267,6 +269,28 @@ function formatNumber(num: number): string {
 function toggleDetails() {
   showDetails.value = !showDetails.value
 }
+
+function handleOutsideClick(event: MouseEvent) {
+  if (!showDetails.value) return
+
+  const target = event.target as Node | null
+  if (!target) return
+
+  const clickedInsideTrigger = analysisTriggerRef.value?.contains(target) ?? false
+  const clickedInsideDetails = detailsPanelRef.value?.contains(target) ?? false
+
+  if (!clickedInsideTrigger && !clickedInsideDetails) {
+    showDetails.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('mousedown', handleOutsideClick)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', handleOutsideClick)
+})
 </script>
 
 <template>
@@ -300,7 +324,7 @@ function toggleDetails() {
 
     <!-- Sección central: Estado/Progreso de análisis -->
     <!-- Estado cuando NO está analizando -->
-    <div v-if="!isAnalyzing && analysisStatus" class="status-section status-analysis-state" :class="analysisStatus.class" @click="toggleDetails">
+    <div v-if="!isAnalyzing && analysisStatus" ref="analysisTriggerRef" class="status-section status-analysis-state" :class="analysisStatus.class" @click="toggleDetails">
       <i :class="['pi', analysisStatus.icon]"></i>
       <span>{{ analysisStatus.text }}</span>
       <Button
@@ -316,7 +340,7 @@ function toggleDetails() {
     </div>
 
     <!-- Estado: en cola (estructura lista, esperando análisis pesado) -->
-    <div v-if="isQueuedForHeavy" class="status-section status-analysis-state status-queued-heavy" @click="toggleDetails">
+    <div v-if="isQueuedForHeavy" ref="analysisTriggerRef" class="status-section status-analysis-state status-queued-heavy" @click="toggleDetails">
       <i class="pi pi-check-circle queued-heavy-check"></i>
       <span>Estructura lista — en cola para análisis profundo</span>
       <Button
@@ -334,7 +358,7 @@ function toggleDetails() {
     </div>
 
     <!-- Progreso cuando SÍ está analizando -->
-    <div v-if="isAnalyzing && !isQueued" class="status-section status-progress" @click="toggleDetails">
+    <div v-if="isAnalyzing && !isQueued" ref="analysisTriggerRef" class="status-section status-progress" @click="toggleDetails">
       <span class="progress-step">{{ currentStepLabel }}</span>
       <ProgressBar
         :value="progress"
@@ -360,7 +384,7 @@ function toggleDetails() {
 
     <!-- Panel de detalles expandido -->
     <Transition name="slide-up">
-      <div v-if="showDetails && (isAnalyzing || hasCompletedAnalysis)" class="details-panel">
+      <div v-if="showDetails && (isAnalyzing || hasCompletedAnalysis)" ref="detailsPanelRef" class="details-panel">
         <div class="details-header">
           <h4>{{ isAnalyzing ? 'Progreso del Análisis' : 'Resumen del Análisis' }}</h4>
           <Button

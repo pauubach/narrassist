@@ -162,6 +162,24 @@ class TestStaleMarking:
         assert status_map["character_profiles"] == "stale"
         assert status_map["echo_report"] == "completed"  # unaffected
 
+    def test_merge_marks_chapter_progress_stale(self):
+        import os
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
+        from routers._invalidation import emit_invalidation_event
+
+        conn = _create_test_db()
+        db = _mock_db_session(conn)
+
+        _seed_cache(conn, 1, "chapter_progress")
+        emit_invalidation_event(db, 1, "merge", [1, 2])
+
+        row = conn.execute(
+            "SELECT status FROM enrichment_cache WHERE project_id = 1 AND enrichment_type = 'chapter_progress'"
+        ).fetchone()
+        assert row is not None
+        assert row["status"] == "stale"
+
     def test_attribute_edit_marks_attribute_dependent_types(self):
         import os
         import sys

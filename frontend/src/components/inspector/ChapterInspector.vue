@@ -104,14 +104,16 @@ const showExportDialog = ref(false)
 const showStats = ref(false)
 
 // Load chapter summary when chapter changes
-async function loadChapterSummary() {
+async function loadChapterSummary(force = false) {
   if (!props.chapter) return
 
   // Check cache first
-  const cached = summaryCache.value.get(props.chapter.chapterNumber)
-  if (cached) {
-    chapterSummary.value = cached
-    return
+  if (!force) {
+    const cached = summaryCache.value.get(props.chapter.chapterNumber)
+    if (cached) {
+      chapterSummary.value = cached
+      return
+    }
   }
 
   summaryLoading.value = true
@@ -174,6 +176,31 @@ watch(
     }
   },
   { immediate: true }
+)
+
+// Refresh chapter summaries when the entity list changes (merge/reject/rename).
+watch(
+  () => props.entities,
+  () => {
+    summaryCache.value.clear()
+    if (props.chapter) {
+      loadChapterSummary(true)
+    }
+  }
+)
+
+watch(
+  () => props.projectId,
+  () => {
+    summaryCache.value.clear()
+    eventsCache.value.clear()
+    chapterSummary.value = null
+    chapterEvents.value = null
+    if (props.chapter) {
+      loadChapterSummary(true)
+      loadChapterEvents()
+    }
+  }
 )
 
 /** Alertas de este capítulo */

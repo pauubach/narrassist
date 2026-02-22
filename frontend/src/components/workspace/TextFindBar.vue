@@ -12,16 +12,25 @@ import Button from 'primevue/button'
 interface Props {
   visible: boolean
   container: HTMLElement | null
+  chapters?: Array<{
+    id: number
+    content: string
+    positionStart: number
+  }>
 }
 
 const props = defineProps<Props>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{
+  close: []
+  navigate: [payload: { chapterId: number; position: number; text: string }]
+}>()
 
 const findInputRef = ref<HTMLInputElement | null>(null)
 const query = ref('')
 const currentIndex = ref(-1)
 const totalMatches = ref(0)
 const marks = ref<HTMLElement[]>([])
+const chapterMatches = ref<Array<{ chapterId: number; position: number; text: string }>>([])
 
 const matchLabel = computed(() => {
   if (!query.value) return ''
@@ -41,6 +50,16 @@ watch(() => props.visible, async (visible) => {
   }
 })
 
+watch(
+  () => props.chapters,
+  () => {
+    if (props.visible && query.value.length >= 2) {
+      performSearch(query.value)
+    }
+  },
+  { deep: true }
+)
+
 // Search when query changes (debounced)
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 watch(query, (newQuery) => {
@@ -57,20 +76,21 @@ function getSearchContainer(): HTMLElement | null {
 
 function clearHighlights() {
   const container = getSearchContainer()
-  if (!container) return
-
-  const existingMarks = container.querySelectorAll('mark.text-find-match')
-  existingMarks.forEach(mark => {
-    const parent = mark.parentNode
-    if (parent) {
-      while (mark.firstChild) {
-        parent.insertBefore(mark.firstChild, mark)
+  if (container) {
+    const existingMarks = container.querySelectorAll('mark.text-find-match')
+    existingMarks.forEach(mark => {
+      const parent = mark.parentNode
+      if (parent) {
+        while (mark.firstChild) {
+          parent.insertBefore(mark.firstChild, mark)
+        }
+        parent.removeChild(mark)
+        parent.normalize()
       }
-      parent.removeChild(mark)
-      parent.normalize()
-    }
-  })
+    })
+  }
 
+  chapterMatches.value = []
   marks.value = []
   totalMatches.value = 0
   currentIndex.value = -1
@@ -82,10 +102,53 @@ interface TextMatch {
   length: number
 }
 
+function findMatchesInAllChapters(searchQuery: string): Array<{
+  chapterId: number
+  position: number
+  text: string
+}> {
+  const matches: Array<{ chapterId: number; position: number; text: string }> = []
+  const lowerQuery = searchQuery.toLowerCase()
+
+  for (const chapter of props.chapters || []) {
+    const content = chapter.content || ''
+    if (!content) continue
+
+    const contentLower = content.toLowerCase()
+    let fromIndex = 0
+
+    while (true) {
+      const idx = contentLower.indexOf(lowerQuery, fromIndex)
+      if (idx === -1) break
+
+      matches.push({
+        chapterId: chapter.id,
+        position: (Number.isFinite(chapter.positionStart) ? chapter.positionStart : 0) + idx,
+        text: content.slice(idx, idx + searchQuery.length) || searchQuery,
+      })
+
+      fromIndex = idx + 1
+    }
+  }
+
+  return matches
+}
+
 function performSearch(searchQuery: string) {
   clearHighlights()
 
   if (!searchQuery || searchQuery.length < 2) return
+
+  if (props.chapters && props.chapters.length > 0) {
+    chapterMatches.value = findMatchesInAllChapters(searchQuery)
+    totalMatches.value = chapterMatches.value.length
+
+    if (chapterMatches.value.length > 0) {
+      currentIndex.value = 0
+      navigateToMatch(0)
+    }
+    return
+  }
 
   const container = getSearchContainer()
   if (!container) return
@@ -142,6 +205,19 @@ function performSearch(searchQuery: string) {
   }
 }
 
+function navigateToMatch(index: number) {
+  if (chapterMatches.value.length > 0 && index >= 0 && index < chapterMatches.value.length) {
+    const match = chapterMatches.value[index]
+    emit('navigate', {
+      chapterId: match.chapterId,
+      position: match.position,
+      text: query.value,
+    })
+    return
+  }
+  scrollToMatch(index)
+}
+
 function scrollToMatch(index: number) {
   marks.value.forEach(m => m.classList.remove('text-find-current'))
 
@@ -155,13 +231,13 @@ function scrollToMatch(index: number) {
 function goToNext() {
   if (totalMatches.value === 0) return
   currentIndex.value = (currentIndex.value + 1) % totalMatches.value
-  scrollToMatch(currentIndex.value)
+  navigateToMatch(currentIndex.value)
 }
 
 function goToPrevious() {
   if (totalMatches.value === 0) return
   currentIndex.value = (currentIndex.value - 1 + totalMatches.value) % totalMatches.value
-  scrollToMatch(currentIndex.value)
+  navigateToMatch(currentIndex.value)
 }
 
 function close() {

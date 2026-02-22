@@ -947,3 +947,111 @@ class TestChapterDataEnrichment:
         d = ch.to_dict()
         assert "metrics" in d
         assert d["metrics"] == {}
+
+
+class TestChapterSummaryRespectsEntityState:
+    """Tests de integración: chapter summary solo debe usar entidades activas."""
+
+    def test_get_mentions_by_chapter_excludes_inactive_entities(self, tmp_path):
+        from narrative_assistant.analysis.chapter_summary import ChapterSummaryAnalyzer
+        from narrative_assistant.persistence.database import Database, reset_database
+
+        reset_database()
+        db_path = tmp_path / "chapter_summary_active_mentions.db"
+        db = Database(db_path=db_path)
+
+        with db.connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO projects (id, name, document_fingerprint, document_format)
+                VALUES (1, 'Proyecto test', 'fp-test', 'txt')
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO chapters (id, project_id, chapter_number, title, content, start_char, end_char)
+                VALUES (1, 1, 1, 'Capítulo 1', 'Texto', 0, 100)
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO entities (id, project_id, entity_type, canonical_name, is_active)
+                VALUES (1, 1, 'character', 'Isabel Vargas', 1)
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO entities (id, project_id, entity_type, canonical_name, is_active)
+                VALUES (2, 1, 'character', 'Solo faltaba Isabel', 0)
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO entity_mentions (entity_id, chapter_id, surface_form, start_char, end_char)
+                VALUES (1, 1, 'Isabel', 10, 16)
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO entity_mentions (entity_id, chapter_id, surface_form, start_char, end_char)
+                VALUES (2, 1, 'Solo faltaba Isabel', 30, 49)
+                """
+            )
+
+        analyzer = ChapterSummaryAnalyzer(db_path=db_path)
+        mentions = analyzer._get_mentions_by_chapter(project_id=1, chapter_id=1)
+
+        assert 1 in mentions
+        assert 2 not in mentions
+
+    def test_get_locations_by_chapter_excludes_inactive_locations(self, tmp_path):
+        from narrative_assistant.analysis.chapter_summary import ChapterSummaryAnalyzer
+        from narrative_assistant.persistence.database import Database, reset_database
+
+        reset_database()
+        db_path = tmp_path / "chapter_summary_active_locations.db"
+        db = Database(db_path=db_path)
+
+        with db.connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO projects (id, name, document_fingerprint, document_format)
+                VALUES (1, 'Proyecto test', 'fp-test', 'txt')
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO chapters (id, project_id, chapter_number, title, content, start_char, end_char)
+                VALUES (1, 1, 1, 'Capítulo 1', 'Texto', 0, 100)
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO entities (id, project_id, entity_type, canonical_name, is_active)
+                VALUES (10, 1, 'location', 'Aldebarán', 1)
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO entities (id, project_id, entity_type, canonical_name, is_active)
+                VALUES (11, 1, 'location', 'pueblo', 0)
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO entity_mentions (entity_id, chapter_id, surface_form, start_char, end_char)
+                VALUES (10, 1, 'Aldebarán', 5, 14)
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO entity_mentions (entity_id, chapter_id, surface_form, start_char, end_char)
+                VALUES (11, 1, 'pueblo', 20, 26)
+                """
+            )
+
+        analyzer = ChapterSummaryAnalyzer(db_path=db_path)
+        locations = analyzer._get_locations_by_chapter(project_id=1, chapter_id=1)
+
+        assert "Aldebarán" in locations
+        assert "pueblo" not in locations

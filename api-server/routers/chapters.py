@@ -1127,9 +1127,7 @@ def get_dialogue_attributions(project_id: int, chapter_number: int):
         attributions_data = [
             {
                 "dialogue_index": i,
-                "text": dialogues[i].text[:100] + "..."
-                if len(dialogues[i].text) > 100
-                else dialogues[i].text,
+                "text": dialogues[i].text,
                 "start_char": dialogues[i].start_char,
                 "end_char": dialogues[i].end_char,
                 "speaker_id": attr.speaker_id,

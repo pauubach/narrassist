@@ -73,42 +73,30 @@ const reviewRate = computed(() => {
   return Math.round((reviewedCount.value / totalDetailedAlerts.value) * 100)
 })
 
-const topCategories = computed(() => {
+const categoryOverview = computed(() => {
   if (!props.alerts.length) return []
 
-  const counts = new Map<Alert['category'], number>()
+  const totalByCategory = new Map<Alert['category'], number>()
+  const pendingByCategory = new Map<Alert['category'], number>()
+
   for (const alert of props.alerts) {
-    counts.set(alert.category, (counts.get(alert.category) ?? 0) + 1)
+    totalByCategory.set(alert.category, (totalByCategory.get(alert.category) ?? 0) + 1)
+    if (alert.status === 'active') {
+      pendingByCategory.set(alert.category, (pendingByCategory.get(alert.category) ?? 0) + 1)
+    }
   }
 
-  return [...counts.entries()]
+  return [...totalByCategory.entries()]
     .map(([category, count]) => ({
       category,
       label: getCategoryLabel(category),
-      count,
-      percentage: Math.round((count / props.alerts.length) * 100),
+      totalCount: count,
+      pendingCount: pendingByCategory.get(category) ?? 0,
+      totalPercentage: Math.round((count / props.alerts.length) * 100),
+      pendingPercentageOfAll: Math.round(((pendingByCategory.get(category) ?? 0) / props.alerts.length) * 100),
+      pendingWithinType: count > 0 ? Math.round(((pendingByCategory.get(category) ?? 0) / count) * 100) : 0,
     }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 4)
-})
-
-const pendingCategories = computed(() => {
-  const pendingAlerts = props.alerts.filter(alert => alert.status === 'active')
-  if (!pendingAlerts.length) return []
-
-  const counts = new Map<Alert['category'], number>()
-  for (const alert of pendingAlerts) {
-    counts.set(alert.category, (counts.get(alert.category) ?? 0) + 1)
-  }
-
-  return [...counts.entries()]
-    .map(([category, count]) => ({
-      category,
-      label: getCategoryLabel(category),
-      count,
-      percentage: Math.round((count / pendingAlerts.length) * 100),
-    }))
-    .sort((a, b) => b.count - a.count)
+    .sort((a, b) => b.totalCount - a.totalCount)
     .slice(0, 5)
 })
 </script>
@@ -180,8 +168,10 @@ const pendingCategories = computed(() => {
       </div>
 
       <p class="progress-caption">
-        <strong>{{ reviewRate }}%</strong> revisadas
-        <span>({{ reviewedCount }} de {{ totalDetailedAlerts }})</span>
+        <span class="progress-main">
+          <strong>{{ reviewRate }}%</strong> revisadas
+        </span>
+        <span class="progress-detail">({{ reviewedCount }} de {{ totalDetailedAlerts }})</span>
       </p>
 
       <div class="progress-track">
@@ -207,37 +197,42 @@ const pendingCategories = computed(() => {
       </div>
     </div>
 
-    <div v-if="pendingCategories.length > 0" class="summary-section">
-      <div class="section-title">Pendientes por tipo</div>
+    <div v-if="categoryOverview.length > 0" class="summary-section">
+      <div class="section-title">Distribución y pendientes por tipo</div>
 
-      <div class="category-breakdown">
+      <div class="category-legend">
+        <span class="legend-item">
+          <i class="legend-dot legend-dot--total"></i>
+          Total
+        </span>
+        <span class="legend-item">
+          <i class="legend-dot legend-dot--pending"></i>
+          Pendiente
+        </span>
+      </div>
+
+      <div class="category-list category-list--compact">
         <div
-          v-for="item in pendingCategories"
-          :key="`pending-${item.category}`"
-          class="category-breakdown-row"
+          v-for="item in categoryOverview"
+          :key="item.category"
+          class="category-overview-row"
         >
           <div class="category-row">
             <span class="category-name">{{ item.label }}</span>
-            <span class="category-meta">{{ item.count }} · {{ item.percentage }}%</span>
+            <span class="category-meta">{{ item.totalCount }} · {{ item.totalPercentage }}%</span>
           </div>
-          <div class="category-track">
-            <div class="category-fill" :style="{ width: `${item.percentage}%` }"></div>
+          <div class="category-row category-row--pending">
+            <span class="category-pending">{{ item.pendingCount }} pendientes</span>
+            <span class="category-meta">{{ item.pendingWithinType }}%</span>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="topCategories.length > 0" class="summary-section">
-      <div class="section-title">Distribución total por tipo</div>
-
-      <div class="category-list">
-        <div
-          v-for="item in topCategories"
-          :key="item.category"
-          class="category-row"
-        >
-          <span class="category-name">{{ item.label }}</span>
-          <span class="category-meta">{{ item.count }} · {{ item.percentage }}%</span>
+          <div class="dual-track">
+            <div class="dual-track-line dual-track-line--total">
+              <div class="dual-track-fill dual-track-fill--total" :style="{ width: `${item.totalPercentage}%` }"></div>
+            </div>
+            <div class="dual-track-line dual-track-line--pending">
+              <div class="dual-track-fill dual-track-fill--pending" :style="{ width: `${item.pendingPercentageOfAll}%` }"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -258,8 +253,8 @@ const pendingCategories = computed(() => {
 .project-summary {
   display: flex;
   flex-direction: column;
-  gap: var(--ds-space-4);
-  padding: var(--ds-space-4);
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-3);
   width: 100%;
   min-width: 0;
   overflow: hidden;
@@ -331,10 +326,10 @@ const pendingCategories = computed(() => {
   display: flex;
   align-items: flex-start;
   gap: var(--ds-space-2);
-  padding: var(--ds-space-3);
+  padding: var(--ds-space-2);
   background: var(--ds-surface-section);
   border-radius: var(--ds-radius-md);
-  font-size: var(--ds-font-size-sm);
+  font-size: var(--ds-font-size-xs);
   color: var(--ds-color-text-secondary);
   line-height: 1.4;
 }
@@ -347,11 +342,12 @@ const pendingCategories = computed(() => {
 .summary-section {
   display: flex;
   flex-direction: column;
-  gap: var(--ds-space-2);
-  padding: var(--ds-space-3);
+  gap: var(--ds-space-1-5);
+  padding: var(--ds-space-2);
   background: var(--ds-surface-ground);
   border: var(--ds-border-1) solid var(--ds-surface-border);
   border-radius: var(--ds-radius-lg);
+  min-width: 0;
 }
 
 .section-header {
@@ -359,12 +355,17 @@ const pendingCategories = computed(() => {
   align-items: center;
   justify-content: space-between;
   gap: var(--ds-space-2);
+  min-width: 0;
 }
 
 .section-title {
   font-size: var(--ds-font-size-sm);
   font-weight: var(--ds-font-weight-semibold);
   color: var(--ds-color-text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .section-link {
@@ -374,6 +375,8 @@ const pendingCategories = computed(() => {
   font-size: var(--ds-font-size-xs);
   cursor: pointer;
   padding: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .section-link:hover {
@@ -382,13 +385,23 @@ const pendingCategories = computed(() => {
 
 .progress-caption {
   margin: 0;
-  font-size: var(--ds-font-size-sm);
+  font-size: var(--ds-font-size-xs);
   color: var(--ds-color-text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-1);
+  align-items: baseline;
+  min-width: 0;
 }
 
 .progress-caption strong {
   color: var(--ds-color-text);
   margin-right: var(--ds-space-1);
+}
+
+.progress-main,
+.progress-detail {
+  min-width: 0;
 }
 
 .progress-track {
@@ -401,29 +414,37 @@ const pendingCategories = computed(() => {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--ds-color-primary) 0%, var(--ds-color-primary-light) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--ds-color-success, var(--green-500)) 0%,
+    var(--ds-color-primary, var(--primary-500)) 100%
+  );
   transition: width var(--ds-transition-fast);
 }
 
 .status-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--ds-space-10) * 2.2), 1fr));
   gap: var(--ds-space-2);
+  min-width: 0;
 }
 
 .status-chip {
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-0-5);
-  padding: var(--ds-space-2);
+  padding: var(--ds-space-1-5);
   border-radius: var(--ds-radius-md);
   border: var(--ds-border-1) solid var(--ds-surface-border);
   background: var(--ds-surface-section);
+  min-width: 0;
 }
 
 .status-chip span {
   font-size: var(--ds-font-size-xs);
   color: var(--ds-color-text-secondary);
+  overflow-wrap: anywhere;
+  line-height: var(--ds-leading-tight);
 }
 
 .status-chip strong {
@@ -439,35 +460,80 @@ const pendingCategories = computed(() => {
 
 .status-chip--active {
   border-color: var(--ds-alert-high, var(--orange-500));
+  background: color-mix(in srgb, var(--ds-alert-high, var(--orange-500)) 8%, var(--ds-surface-ground));
 }
 
 .status-chip--resolved {
   border-color: var(--ds-color-success);
+  background: color-mix(in srgb, var(--ds-color-success) 8%, var(--ds-surface-ground));
 }
 
 .status-chip--dismissed {
-  border-color: var(--ds-surface-border-strong, var(--ds-surface-border));
+  border-color: var(--ds-color-text-muted, var(--ds-surface-border-strong, var(--ds-surface-border)));
 }
 
 .category-list {
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-2);
+  min-width: 0;
 }
 
-.category-breakdown {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ds-space-2);
-}
-
-.category-breakdown-row {
-  display: flex;
-  flex-direction: column;
+.category-list--compact {
   gap: var(--ds-space-1-5);
 }
 
-.category-track {
+.category-overview-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+  min-width: 0;
+}
+
+.category-legend {
+  display: flex;
+  gap: var(--ds-space-3);
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-text-secondary);
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+}
+
+.legend-dot {
+  width: var(--ds-space-1-5);
+  height: var(--ds-space-1-5);
+  border-radius: var(--ds-radius-full);
+  display: inline-block;
+}
+
+.legend-dot--total {
+  background: var(--ds-color-primary, var(--primary-500));
+}
+
+.legend-dot--pending {
+  background: var(--ds-alert-high, var(--orange-500));
+}
+
+.category-row--pending {
+  font-size: var(--ds-font-size-xs);
+}
+
+.category-pending {
+  color: var(--ds-alert-high, var(--orange-500));
+}
+
+.dual-track {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-0-5);
+}
+
+.dual-track-line {
   width: 100%;
   height: var(--ds-space-1);
   border-radius: var(--ds-radius-full);
@@ -475,10 +541,29 @@ const pendingCategories = computed(() => {
   overflow: hidden;
 }
 
-.category-fill {
+.dual-track-line--pending {
+  height: var(--ds-space-0-5);
+}
+
+.dual-track-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--ds-color-primary) 0%, var(--ds-color-primary-light) 100%);
+}
+
+.dual-track-fill--total {
+  background: linear-gradient(
+    90deg,
+    var(--ds-color-primary, var(--primary-500)) 0%,
+    var(--ds-color-primary-light, var(--primary-300)) 100%
+  );
+}
+
+.dual-track-fill--pending {
+  background: linear-gradient(
+    90deg,
+    var(--ds-alert-high, var(--orange-500)) 0%,
+    color-mix(in srgb, var(--ds-alert-high, var(--orange-500)) 65%, white) 100%
+  );
 }
 
 .category-row {
@@ -486,15 +571,22 @@ const pendingCategories = computed(() => {
   align-items: center;
   justify-content: space-between;
   gap: var(--ds-space-2);
-  font-size: var(--ds-font-size-sm);
+  font-size: var(--ds-font-size-xs);
+  min-width: 0;
 }
 
 .category-name {
   color: var(--ds-color-text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .category-meta {
   color: var(--ds-color-text-secondary);
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 </style>

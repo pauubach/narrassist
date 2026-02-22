@@ -580,6 +580,7 @@ class ChapterSummaryAnalyzer:
                 FROM entity_mentions em
                 JOIN entities e ON em.entity_id = e.id
                 WHERE em.chapter_id = ? AND e.project_id = ?
+                  AND e.is_active = 1
                 ORDER BY em.start_char
                 """,
                 (chapter_id, project_id),
@@ -622,6 +623,8 @@ class ChapterSummaryAnalyzer:
                 JOIN entities e ON em.entity_id = e.id
                 WHERE em.chapter_id = ? AND e.project_id = ?
                   AND e.entity_type IN ('location', 'building', 'region')
+                  AND e.is_active = 1
+                ORDER BY LOWER(e.canonical_name)
                 """,
                 (chapter_id, project_id),
             )
@@ -846,6 +849,15 @@ class ChapterSummaryAnalyzer:
             # Sanitizar texto del manuscrito antes de enviarlo al LLM (A-10)
             max_chars = 6000
             text_to_analyze = sanitize_for_prompt(chapter_text[:max_chars], max_length=max_chars)
+
+            # Validar que el texto sanitizado no quedó vacío
+            if not text_to_analyze or not text_to_analyze.strip():
+                logger.warning(
+                    f"Capítulo {summary.chapter_number}: texto vacío tras sanitización, "
+                    "saltando análisis LLM"
+                )
+                return
+
             if len(chapter_text) > max_chars:
                 text_to_analyze += "\n[... texto truncado ...]"
 
@@ -1196,7 +1208,10 @@ def analyze_chapter_progress(
     Returns:
         ChapterProgressReport con el análisis completo
     """
-    cache_key = f"{project_id}:{mode}:{llm_model}"
+    analysis_mode = AnalysisMode(mode)
+    analyzer = ChapterSummaryAnalyzer(db_path, mode=analysis_mode, llm_model=llm_model)
+    revision = _get_project_revision(analyzer.db, project_id)
+    cache_key = f"{project_id}:{mode}:{llm_model}:rev{revision}"
     now = time.monotonic()
 
     with _cache_lock:
@@ -1208,8 +1223,6 @@ def analyze_chapter_progress(
             else:
                 del _cache[cache_key]
 
-    analysis_mode = AnalysisMode(mode)
-    analyzer = ChapterSummaryAnalyzer(db_path, mode=analysis_mode, llm_model=llm_model)
     report = analyzer.analyze_project(project_id)
 
     with _cache_lock:
@@ -1220,6 +1233,29 @@ def analyze_chapter_progress(
             del _cache[k]
 
     return report
+
+
+def _get_project_revision(db_session, project_id: int) -> int:
+    """Obtiene la revisión de invalidación para invalidar cachés en memoria."""
+    try:
+        with db_session.connection() as conn:
+            row = conn.execute(
+                """
+                SELECT COALESCE(MAX(revision), 0) AS revision
+                FROM invalidation_events
+                WHERE project_id = ?
+                """,
+                (project_id,),
+            ).fetchone()
+            if row is None:
+                return 0
+            try:
+                return int(row["revision"])
+            except Exception:
+                return int(row[0])
+    except Exception:
+        # Compatibilidad con DBs antiguas sin tabla invalidation_events.
+        return 0
 
 
 def invalidate_chapter_progress_cache(project_id: int | None = None) -> None:

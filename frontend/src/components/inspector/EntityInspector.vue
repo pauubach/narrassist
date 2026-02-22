@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import InputSwitch from 'primevue/inputswitch'
@@ -57,6 +57,7 @@ const emit = defineEmits<{
 
 // Navegación de menciones
 const mentionNav = useMentionNavigation(() => props.projectId)
+const mentionNavContainerRef = ref<HTMLElement | null>(null)
 
 const { getEntityIcon, getEntityLabel, getEntityColor } = useEntityUtils()
 
@@ -86,6 +87,16 @@ watch(
     }
   },
   { immediate: true }
+)
+
+watch(
+  () => mentionNav.isActive.value,
+  async (isActive, wasActive) => {
+    if (isActive && !wasActive) {
+      await nextTick()
+      focusMentionNavContainer()
+    }
+  }
 )
 
 /** Cargar información de correferencia (solo confianza) */
@@ -239,7 +250,32 @@ function onMentionNavKeydown(event: KeyboardEvent) {
   } else if (event.key === 'End') {
     event.preventDefault()
     mentionNav.goToMention(mentionNav.totalMentions.value - 1)
+  } else if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    mentionNav.navigateToCurrentMention()
   }
+}
+
+function focusMentionNavContainer() {
+  mentionNavContainerRef.value?.focus({ preventScroll: true })
+}
+
+async function onMentionNavPreviousClick() {
+  mentionNav.goToPrevious()
+  await nextTick()
+  focusMentionNavContainer()
+}
+
+async function onMentionNavNextClick() {
+  mentionNav.goToNext()
+  await nextTick()
+  focusMentionNavContainer()
+}
+
+async function onMentionNavHighlightClick() {
+  mentionNav.navigateToCurrentMention()
+  await nextTick()
+  focusMentionNavContainer()
 }
 
 /**
@@ -450,6 +486,7 @@ function onChapterClick(chapterNumber: number) {
     <!-- Barra de navegación de apariciones (siempre visible si hay menciones) -->
     <div
       v-if="mentionNav.isActive.value"
+      ref="mentionNavContainerRef"
       class="mention-navigation"
       tabindex="0"
       role="group"
@@ -469,7 +506,16 @@ function onChapterClick(chapterNumber: number) {
           rounded
           size="small"
           :disabled="!mentionNav.canGoPrevious.value"
-          @click="mentionNav.goToPrevious()"
+          @click="onMentionNavPreviousClick"
+        />
+        <Button
+          v-tooltip.bottom="'Resaltar aparición actual (Enter)'"
+          icon="pi pi-search"
+          text
+          rounded
+          size="small"
+          :disabled="!mentionNav.currentMention.value"
+          @click="onMentionNavHighlightClick"
         />
         <span class="nav-counter">{{ mentionNav.navigationLabel.value }}</span>
         <Button
@@ -479,7 +525,7 @@ function onChapterClick(chapterNumber: number) {
           rounded
           size="small"
           :disabled="!mentionNav.canGoNext.value"
-          @click="mentionNav.goToNext()"
+          @click="onMentionNavNextClick"
         />
       </div>
       <div v-if="mentionNav.currentMention.value" class="nav-context">

@@ -29,6 +29,7 @@ function scrollToDialogue(attribution: DialogueAttribution) {
   documentViewerRef.value?.scrollToMention({
     chapterId: chapter.id,
     position: attribution.startChar,
+    endPosition: attribution.endChar,
     text: attribution.text,
   })
 }
@@ -47,7 +48,9 @@ defineExpose({ openFindBar, scrollToDialogue })
 interface ScrollTarget {
   chapterId: number
   position?: number  // Posición de caracteres dentro del capítulo (para desambiguar)
+  endPosition?: number
   text?: string      // Texto a resaltar
+  preserveMultiHighlights?: boolean
 }
 
 interface AlertHighlightRange {

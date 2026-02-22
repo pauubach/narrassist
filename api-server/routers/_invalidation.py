@@ -46,6 +46,7 @@ ENTITY_LIST_DEPENDENT_TYPES = {
     "emotional_arcs",
     "character_archetypes",
     "character_profiles",
+    "chapter_progress",
 }
 
 # Mapeo evento → tipos de enrichment a invalidar
@@ -69,6 +70,9 @@ def emit_invalidation_event(
     """
     Registra un evento de invalidación y marca cachés afectadas como stale.
 
+    IMPORTANTE: Esta operación es transaccional. Si falla el marcado de cachés,
+    se hace rollback del evento de invalidación para mantener coherencia.
+
     Args:
         db_session: Sesión de base de datos
         project_id: ID del proyecto
@@ -77,7 +81,7 @@ def emit_invalidation_event(
         detail: Detalles adicionales del evento
 
     Returns:
-        revision: Número de revisión asignado al evento
+        revision: Número de revisión asignado al evento (0 si falla)
     """
     try:
         with db_session.connection() as conn:
@@ -104,10 +108,19 @@ def emit_invalidation_event(
             )
 
             # Marcar cachés afectadas como stale
+            # CRÍTICO: _mark_stale() debe completar o se hace rollback del INSERT
             affected_types = EVENT_INVALIDATION_MAP.get(event_type, set())
             if affected_types:
-                _mark_stale(conn, project_id, affected_types, entity_ids)
+                try:
+                    _mark_stale(conn, project_id, affected_types, entity_ids)
+                except Exception as mark_error:
+                    # Rollback implícito al salir del with sin commit
+                    logger.error(
+                        f"Failed to mark stale caches, rolling back event: {mark_error}"
+                    )
+                    raise
 
+            # Solo commitear si INSERT + _mark_stale() completan exitosamente
             conn.commit()
 
             logger.info(

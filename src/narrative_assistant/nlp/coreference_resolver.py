@@ -39,9 +39,11 @@ import threading
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Protocol
+from typing import Callable, Protocol
 
 logger = logging.getLogger(__name__)
+
+CorefProgressCallback = Callable[[float, str, int | None, int | None], None]
 
 
 # =============================================================================
@@ -1484,6 +1486,7 @@ class CoreferenceVotingResolver(
         self,
         text: str,
         chapters: list[dict] | None = None,
+        progress_callback: CorefProgressCallback | None = None,
     ) -> CorefResult:
         """
         Resuelve correferencias en un documento completo.
@@ -1501,14 +1504,32 @@ class CoreferenceVotingResolver(
 
         result = CorefResult()
 
+        def emit_progress(
+            progress: float,
+            message: str,
+            step: int | None = None,
+            total_steps: int | None = None,
+        ) -> None:
+            if progress_callback is None:
+                return
+            bounded = max(0.0, min(1.0, progress))
+            try:
+                progress_callback(bounded, message, step, total_steps)
+            except Exception:
+                logger.debug("Coref progress callback failed", exc_info=True)
+
         # Extraer menciones
+        emit_progress(0.02, "Extrayendo menciones...")
         mentions = self._extract_mentions(text, chapters)
         logger.info(f"Extraídas {len(mentions)} menciones del documento")
+        emit_progress(0.12, f"Menciones extraídas: {len(mentions)}")
 
         if not mentions:
+            emit_progress(1.0, "Sin menciones para resolver")
             return result
 
         # Detectar narrador en primera persona
+        emit_progress(0.16, "Detectando narrador y contexto...")
         narrator_info = self._detect_narrator(text, mentions)
 
         # Separar anáforas y posibles antecedentes
@@ -1516,6 +1537,12 @@ class CoreferenceVotingResolver(
         potential_antecedents = [
             m for m in mentions if self._is_potential_antecedent(m)
         ]
+        emit_progress(
+            0.22,
+            f"Preparadas {len(anaphors)} anáforas",
+            0 if anaphors else None,
+            len(anaphors) if anaphors else None,
+        )
 
         # Si hay narrador, añadirlo como antecedente potencial
         if narrator_info:
@@ -1561,8 +1588,10 @@ class CoreferenceVotingResolver(
 
         # Resolver cada anáfora (excluyendo las de primera persona ya resueltas)
         resolved_pairs: list[tuple[Mention, Mention, float]] = []
+        total_anaphors = len(anaphors)
+        progress_update_every = max(1, total_anaphors // 40) if total_anaphors else 1
 
-        for anaphor in anaphors:
+        for index, anaphor in enumerate(anaphors, start=1):
             # Ceder turno al chat interactivo si hay uno esperando
             try:
                 from narrative_assistant.llm.client import get_llm_scheduler
@@ -1599,6 +1628,15 @@ class CoreferenceVotingResolver(
                 except Exception as e:
                     logger.debug(f"Error en método {method.value}: {e}")
 
+            # Validar que hay votos disponibles
+            if not all_votes:
+                logger.warning(
+                    f"No votes received for anaphor '{anaphor.text}' "
+                    f"at position {anaphor.start_char}, marking as unresolved"
+                )
+                result.unresolved.append(anaphor)
+                continue
+
             # Votación ponderada
             best_candidate, final_score, method_detail = self._weighted_vote(all_votes)
 
@@ -1624,6 +1662,15 @@ class CoreferenceVotingResolver(
                 )
             else:
                 result.unresolved.append(anaphor)
+
+            if index % progress_update_every == 0 or index == total_anaphors:
+                loop_progress = index / total_anaphors if total_anaphors else 1.0
+                emit_progress(
+                    0.22 + (loop_progress * 0.68),
+                    f"Resolviendo anáforas ({index}/{total_anaphors})",
+                    index,
+                    total_anaphors,
+                )
 
         # Añadir resoluciones de primera persona al narrador
         if narrator_info and first_person_already_resolved:
@@ -1657,7 +1704,9 @@ class CoreferenceVotingResolver(
                 )
 
         # Construir cadenas de correferencia
+        emit_progress(0.94, "Construyendo cadenas de correferencia...")
         result.chains = self._build_chains(resolved_pairs, potential_antecedents)
+        emit_progress(0.98, f"Cadenas construidas: {result.total_chains}")
 
         result.processing_time_ms = (time.time() - start_time) * 1000
 
@@ -1666,6 +1715,7 @@ class CoreferenceVotingResolver(
             f"{len(result.unresolved)} sin resolver, "
             f"{result.processing_time_ms:.1f}ms"
         )
+        emit_progress(1.0, "Correferencias completadas")
 
         return result
 
@@ -1717,6 +1767,7 @@ def resolve_coreferences_voting(
     text: str,
     chapters: list[dict] | None = None,
     config: CorefConfig | None = None,
+    progress_callback: CorefProgressCallback | None = None,
 ) -> CorefResult:
     """
     Función de conveniencia para resolver correferencias.
@@ -1730,7 +1781,7 @@ def resolve_coreferences_voting(
         CorefResult con las cadenas de correferencia
     """
     resolver = get_coref_resolver(config)
-    return resolver.resolve_document(text, chapters)
+    return resolver.resolve_document(text, chapters, progress_callback=progress_callback)
 
 
 def build_pronoun_resolution_map(

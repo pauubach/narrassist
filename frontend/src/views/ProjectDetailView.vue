@@ -380,7 +380,7 @@
                   size="small"
                   :text="rightInspectorTab !== 'summary'"
                   :outlined="rightInspectorTab === 'summary'"
-                  @click="rightInspectorTab = 'summary'"
+                  @click="switchRightInspectorTab('summary')"
                 >
                   Resumen
                 </Button>
@@ -388,24 +388,24 @@
                   size="small"
                   :text="rightInspectorTab !== 'chapters'"
                   :outlined="rightInspectorTab === 'chapters'"
-                  @click="rightInspectorTab = 'chapters'"
+                  @click="switchRightInspectorTab('chapters')"
                 >
-                  Capítulos
+                  Capítulo
                 </Button>
                 <Button
                   size="small"
                   :text="rightInspectorTab !== 'dialogue'"
                   :outlined="rightInspectorTab === 'dialogue'"
-                  @click="rightInspectorTab = 'dialogue'"
+                  @click="switchRightInspectorTab('dialogue')"
                 >
-                  Atribución
+                  Diálogos
                 </Button>
                 <Button
                   v-if="hasContextualContent"
                   size="small"
                   :text="rightInspectorTab !== 'contextual'"
                   :outlined="rightInspectorTab === 'contextual'"
-                  @click="rightInspectorTab = 'contextual'"
+                  @click="switchRightInspectorTab('contextual')"
                 >
                   {{ contextualTabLabel }}
                 </Button>
@@ -735,6 +735,28 @@ const chaptersById = computed(() =>
   new Map(chapters.value.map(c => [c.id, c]))
 )
 
+const ensureInspectorChapterSelection = () => {
+  if (chapters.value.length === 0) return
+
+  const hasValidActiveChapter =
+    activeChapterId.value !== null && chaptersById.value.has(activeChapterId.value)
+
+  if (hasValidActiveChapter) return
+
+  const firstChapter = chapters.value[0]
+  if (!firstChapter) return
+
+  activeChapterId.value = firstChapter.id
+  workspaceStore.setCurrentChapter(firstChapter.id)
+}
+
+const switchRightInspectorTab = (tab: RightInspectorTab) => {
+  rightInspectorTab.value = tab
+  if (tab === 'chapters' && workspaceStore.activeTab === 'text') {
+    ensureInspectorChapterSelection()
+  }
+}
+
 const selectedEntity = computed(() => {
   if (selectionStore.primary?.type !== 'entity') return null
   return entitiesById.value.get(selectionStore.primary.id) || null
@@ -749,6 +771,15 @@ const currentChapter = computed(() => {
   if (!activeChapterId.value) return null
   return chaptersById.value.get(activeChapterId.value) || null
 })
+
+watch(
+  [() => rightInspectorTab.value, () => workspaceStore.activeTab, () => chapters.value.length],
+  ([inspectorTab, activeTab]) => {
+    if (activeTab !== 'text' || inspectorTab !== 'chapters') return
+    ensureInspectorChapterSelection()
+  },
+  { immediate: true }
+)
 
 const showChapterInspector = computed(() => {
   return workspaceStore.activeTab === 'text' &&

@@ -195,7 +195,9 @@ interface EntityMention {
 interface ScrollTarget {
   chapterId: number
   position?: number  // Posición de caracteres dentro del capítulo (para desambiguar)
+  endPosition?: number
   text?: string      // Texto a resaltar
+  preserveMultiHighlights?: boolean
 }
 
 interface AlertHighlightRange {
@@ -318,6 +320,7 @@ interface HighlightedContentCache {
     entitiesCount: number
     annotationsCount: number
     dialoguesCount: number
+    dialoguesKey: string
   }
 }
 const highlightedContentCache = ref<Map<number, HighlightedContentCache>>(new Map())
@@ -606,6 +609,49 @@ const removeLeadingTitle = (content: string, title: string): string => {
   return content
 }
 
+const findClosestTextOccurrence = (
+  haystack: string,
+  needle: string,
+  expectedIndex?: number
+): number => {
+  if (!needle) return -1
+
+  const firstIndex = haystack.indexOf(needle)
+  if (firstIndex === -1) return -1
+  if (expectedIndex === undefined || expectedIndex < 0) return firstIndex
+
+  let bestIndex = firstIndex
+  let bestDistance = Math.abs(firstIndex - expectedIndex)
+  let currentIndex = firstIndex
+
+  while (currentIndex !== -1) {
+    const distance = Math.abs(currentIndex - expectedIndex)
+    if (distance < bestDistance) {
+      bestDistance = distance
+      bestIndex = currentIndex
+    }
+    currentIndex = haystack.indexOf(needle, currentIndex + 1)
+  }
+
+  return bestIndex
+}
+
+const replaceOutsideHtmlTags = (
+  input: string,
+  pattern: RegExp,
+  replacer: (match: string) => string
+): string => {
+  const segments = input.split(/(<[^>]+>)/g)
+  return segments
+    .map(segment => {
+      if (!segment) return segment
+      if (segment.startsWith('<') && segment.endsWith('>')) return segment
+      const safePattern = new RegExp(pattern.source, pattern.flags)
+      return segment.replace(safePattern, replacer)
+    })
+    .join('')
+}
+
 // Resaltar entidades en el contenido (memoized, performance optimization #1)
 const getHighlightedContent = (chapter: Chapter): string => {
   if (!chapter.content) return ''
@@ -623,7 +669,10 @@ const getHighlightedContent = (chapter: Chapter): string => {
     highlightDialogue: showDialogueHighlights.value,
     entitiesCount: entities.value.length,
     annotationsCount: annotations.length,
-    dialoguesCount: dialogues.length
+    dialoguesCount: dialogues.length,
+    dialoguesKey: dialogues
+      .map(d => `${d.startChar}:${d.endChar}:${d.confidence}:${d.method}:${d.text?.length ?? 0}`)
+      .join('|')
   }
 
   // Si el cache es válido, retornar inmediatamente
@@ -699,11 +748,37 @@ const getHighlightedContent = (chapter: Chapter): string => {
     sortedDialogues.forEach(dialogue => {
       // Ajustar posición por el título removido
       const adjustedStart = dialogue.startChar - titleOffset
+      const adjustedEnd = dialogue.endChar - titleOffset
       if (adjustedStart < 0) return
+      if (adjustedEnd <= adjustedStart) return
 
-      // Buscar el texto del diálogo en el contenido
-      const dialogueText = escapeHtml(dialogue.text)
-      const dialogueIndex = content.indexOf(dialogueText)
+      // Priorizar el texto detectado completo; solo usar slice por offsets como fallback.
+      // Hay casos donde endChar viene corto y el slice recorta el highlight a 1-2 palabras.
+      const dialogueTextFromDetection = escapeHtml(dialogue.text)
+      let dialogueIndex = findClosestTextOccurrence(content, dialogueTextFromDetection, adjustedStart)
+      let dialogueText = dialogueTextFromDetection
+
+      if (dialogueIndex === -1) {
+        const lowerRaw = contentWithoutTitle.toLowerCase()
+        const lowerDialogue = dialogue.text.toLowerCase()
+        const nearbyStart = Math.max(0, adjustedStart - 8)
+        const nearbyMatch = lowerRaw.indexOf(lowerDialogue, nearbyStart)
+
+        let estimatedEnd = adjustedEnd
+        if (nearbyMatch !== -1 && nearbyMatch <= adjustedStart + 12) {
+          estimatedEnd = Math.max(estimatedEnd, nearbyMatch + dialogue.text.length)
+        } else {
+          // Fallback genérico: si el detector devuelve un end corto, extender por longitud textual.
+          estimatedEnd = Math.max(estimatedEnd, adjustedStart + dialogue.text.length)
+        }
+        estimatedEnd = Math.min(contentWithoutTitle.length, estimatedEnd)
+
+        const rawSlice = contentWithoutTitle.slice(adjustedStart, estimatedEnd)
+        if (rawSlice) {
+          dialogueText = escapeHtml(rawSlice)
+          dialogueIndex = findClosestTextOccurrence(content, dialogueText, adjustedStart)
+        }
+      }
 
       if (dialogueIndex !== -1) {
         const confidenceClass = `dialogue-confidence-${dialogue.confidence}`
@@ -717,6 +792,8 @@ const getHighlightedContent = (chapter: Chapter): string => {
         content = before +
           `<span class="dialogue-highlight ${confidenceClass}" ` +
           `data-speaker-id="${dialogue.speakerId || ''}" ` +
+          `data-dialogue-start="${dialogue.startChar}" ` +
+          `data-dialogue-end="${dialogue.endChar}" ` +
           `data-speaker-name="${escapeHtml(speakerName)}" ` +
           `title="${escapeHtml(tooltip)}">` +
           dialogueText +
@@ -753,8 +830,8 @@ const getHighlightedContent = (chapter: Chapter): string => {
       const combinedPattern = `\\b(${escapedNames.join('|')})\\b`
       const combinedRegex = new RegExp(combinedPattern, 'gi')
 
-      // Un solo pase de reemplazo
-      content = content.replace(combinedRegex, (match) => {
+      // Un solo pase de reemplazo sobre texto (sin tocar etiquetas/atributos HTML)
+      content = replaceOutsideHtmlTags(content, combinedRegex, (match) => {
         const entity = entityByName.get(match.toLowerCase())
         if (!entity) return match
 
@@ -923,12 +1000,164 @@ const scrollToChapter = async (chapterId: number) => {
 
 // Variable para almacenar el highlight temporal
 const temporaryHighlightClass = 'mention-highlight-active'
+const temporarySelectedClass = 'mention-highlight-selected'
+const highlightDurationMs = 3000
+
+const unwrapHighlightElement = (element: Element) => {
+  const parent = element.parentNode
+  if (!parent) return
+  while (element.firstChild) {
+    parent.insertBefore(element.firstChild, element)
+  }
+  parent.removeChild(element)
+  parent.normalize()
+}
+
+const clearTemporaryMentionHighlights = () => {
+  const highlightSpans = viewerContainer.value?.querySelectorAll(`span.${temporaryHighlightClass}`)
+  highlightSpans?.forEach(el => unwrapHighlightElement(el))
+
+  const highlightedElements = viewerContainer.value?.querySelectorAll(`.${temporaryHighlightClass}`)
+  highlightedElements?.forEach(el => {
+    if (el.tagName.toLowerCase() !== 'span') {
+      el.classList.remove(temporaryHighlightClass, 'highlight-entering', 'highlight-leaving')
+    }
+  })
+
+  const selectedElements = viewerContainer.value?.querySelectorAll(`.${temporarySelectedClass}`)
+  selectedElements?.forEach(el => {
+    el.classList.remove(temporarySelectedClass)
+  })
+}
+
+const applyTemporaryHighlightSpan = (highlightSpan: HTMLSpanElement) => {
+  highlightSpan.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  highlightSpan.classList.add('highlight-entering')
+  setTimeout(() => {
+    highlightSpan.classList.remove('highlight-entering')
+  }, 500)
+
+  setTimeout(() => {
+    highlightSpan.classList.add('highlight-leaving')
+    setTimeout(() => {
+      unwrapHighlightElement(highlightSpan)
+    }, 400)
+  }, highlightDurationMs)
+}
+
+const applyTemporaryHighlightElement = (element: Element) => {
+  element.classList.add(temporarySelectedClass)
+  element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  setTimeout(() => {
+    element.classList.remove(temporarySelectedClass)
+  }, highlightDurationMs)
+}
+
+const findDialogueHighlightElement = (
+  chapterElement: Element,
+  start?: number,
+  end?: number
+): Element | null => {
+  if (start === undefined || end === undefined) return null
+
+  const exact = chapterElement.querySelector(
+    `.dialogue-highlight[data-dialogue-start="${start}"][data-dialogue-end="${end}"]`
+  )
+  if (exact) return exact
+
+  const chapter = chapters.value.find(ch => ch.id === Number((chapterElement as HTMLElement).dataset.chapterId))
+  if (!chapter || chapter.positionStart === undefined) return null
+
+  const localStart = start - chapter.positionStart
+  const localEnd = end - chapter.positionStart
+  if (localEnd <= localStart) return null
+
+  return chapterElement.querySelector(
+    `.dialogue-highlight[data-dialogue-start="${localStart}"][data-dialogue-end="${localEnd}"]`
+  )
+}
+
+const createRangeFromCharacterOffsets = (
+  contentElement: Element,
+  start: number,
+  end: number
+): Range | null => {
+  const totalLength = contentElement.textContent?.length || 0
+  if (totalLength === 0) return null
+
+  const normalizedStart = Math.max(0, Math.min(start, totalLength - 1))
+  const normalizedEnd = Math.max(normalizedStart + 1, Math.min(end, totalLength))
+
+  const walker = document.createTreeWalker(contentElement, NodeFilter.SHOW_TEXT, null)
+  let node: Text | null
+  let charCount = 0
+  let startNode: Text | null = null
+  let endNode: Text | null = null
+  let startOffset = 0
+  let endOffset = 0
+
+  while ((node = walker.nextNode() as Text | null)) {
+    const nodeText = node.textContent || ''
+    const nodeLength = nodeText.length
+    const nodeStart = charCount
+    const nodeEnd = nodeStart + nodeLength
+
+    if (!startNode && normalizedStart <= nodeEnd) {
+      startNode = node
+      startOffset = Math.max(0, normalizedStart - nodeStart)
+    }
+
+    if (!endNode && normalizedEnd <= nodeEnd) {
+      endNode = node
+      endOffset = Math.max(0, normalizedEnd - nodeStart)
+      break
+    }
+
+    charCount = nodeEnd
+  }
+
+  if (!startNode || !endNode) return null
+
+  const range = document.createRange()
+  range.setStart(startNode, startOffset)
+  range.setEnd(endNode, endOffset)
+  return range
+}
+
+const highlightRangeInChapter = (chapterElement: Element, start: number, end: number): boolean => {
+  const contentElement = chapterElement.querySelector('.chapter-text')
+  if (!contentElement) return false
+
+  const range = createRangeFromCharacterOffsets(contentElement, start, end)
+  if (!range || range.collapsed) return false
+
+  const highlightSpan = document.createElement('span')
+  highlightSpan.className = temporaryHighlightClass
+
+  try {
+    highlightSpan.appendChild(range.extractContents())
+    range.insertNode(highlightSpan)
+  } catch (e) {
+    console.warn('Error creating range highlight span:', e)
+    return false
+  }
+
+  applyTemporaryHighlightSpan(highlightSpan)
+  return true
+}
 
 // Scroll a una mención específica dentro del documento
 const scrollToMention = async (target: ScrollTarget) => {
+  clearTemporaryMentionHighlights()
+  if (!target.preserveMultiHighlights) {
+    clearAllAlertHighlights()
+  }
+  const isDialogueTarget = target.endPosition !== undefined && !!target.text
+
   console.log('scrollToMention called:', {
     chapterId: target.chapterId,
     position: target.position,
+    endPosition: target.endPosition,
     text: target.text?.substring(0, 50) + (target.text && target.text.length > 50 ? '...' : '')
   })
 
@@ -954,6 +1183,14 @@ const scrollToMention = async (target: ScrollTarget) => {
     }
   }
 
+  if (isDialogueTarget) {
+    const chapterForDialogues = chapters.value[targetIndex]
+    if (chapterForDialogues) {
+      await loadChapterDialogues(chapterForDialogues.chapterNumber)
+      highlightedContentCache.value.delete(chapterForDialogues.id)
+    }
+  }
+
   // Esperar a que Vue actualice el DOM con todos los capítulos cargados
   await nextTick()
 
@@ -970,28 +1207,93 @@ const scrollToMention = async (target: ScrollTarget) => {
     return
   }
 
+  const dialogueElement = findDialogueHighlightElement(
+    chapterElement,
+    target.position,
+    target.endPosition
+  )
+  if (dialogueElement) {
+    if (!isDialogueTarget) {
+      applyTemporaryHighlightElement(dialogueElement)
+      return
+    }
+  }
+
+  const chapter = chapters.value.find(ch => ch.id === target.chapterId)
+  let adjustedPosition: number | undefined = target.position
+  let adjustedEndPosition: number | undefined = target.endPosition
+  if (chapter) {
+    const chapterLength = chapter.content?.length ?? 0
+    if (
+      adjustedPosition !== undefined &&
+      chapter.positionStart !== undefined &&
+      chapterLength > 0 &&
+      adjustedPosition > chapterLength
+    ) {
+      adjustedPosition -= chapter.positionStart
+    }
+    if (
+      adjustedEndPosition !== undefined &&
+      chapter.positionStart !== undefined &&
+      chapterLength > 0 &&
+      adjustedEndPosition > chapterLength
+    ) {
+      adjustedEndPosition -= chapter.positionStart
+    }
+
+    const titleOffset = getTitleOffset(chapter.content, chapter.title)
+    if (adjustedPosition !== undefined) adjustedPosition -= titleOffset
+    if (adjustedEndPosition !== undefined) adjustedEndPosition -= titleOffset
+  }
+
+  // Para diálogos priorizamos búsqueda textual para evitar desalineaciones por offset
+  // cuando hay saltos/parágrafos renderizados.
+  if (isDialogueTarget && target.text) {
+    const highlightedByText = await highlightTextInChapter(chapterElement, target.text, adjustedPosition)
+    if (highlightedByText) return
+
+    if (adjustedPosition !== undefined) {
+      const textLength = Math.max(1, cleanExcerptForSearch(target.text).length)
+      const fallbackEnd = adjustedEndPosition && adjustedEndPosition > adjustedPosition
+        ? adjustedEndPosition
+        : adjustedPosition + textLength
+      const maxEnd = adjustedPosition + Math.max(textLength, 24)
+      const clampedEnd = Math.min(maxEnd, fallbackEnd)
+      const highlightedByRange = highlightRangeInChapter(
+        chapterElement,
+        adjustedPosition,
+        Math.max(adjustedPosition + 1, clampedEnd)
+      )
+      if (highlightedByRange) return
+    }
+
+    if (adjustedPosition !== undefined) {
+      highlightPositionInChapter(chapterElement, adjustedPosition)
+    } else {
+      chapterElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    return
+  }
+
+  // Si tenemos rango completo, priorizarlo: es más preciso que la búsqueda textual.
+  if (
+    adjustedPosition !== undefined &&
+    adjustedEndPosition !== undefined &&
+    adjustedEndPosition > adjustedPosition
+  ) {
+    const highlighted = highlightRangeInChapter(chapterElement, adjustedPosition, adjustedEndPosition)
+    if (highlighted) return
+  }
+
   // Si hay texto específico a buscar, ir directamente a él (evitar doble scroll)
   if (target.text) {
-    // Calcular la posición ajustada dentro del capítulo
-    const chapter = chapters.value.find(ch => ch.id === target.chapterId)
-    let adjustedPosition: number | undefined = undefined
-
-    if (chapter && target.position !== undefined) {
-      const titleOffset = getTitleOffset(chapter.content, chapter.title)
-      adjustedPosition = target.position - titleOffset
+    const highlighted = await highlightTextInChapter(chapterElement, target.text, adjustedPosition)
+    if (!highlighted && adjustedPosition !== undefined) {
+      highlightPositionInChapter(chapterElement, adjustedPosition)
     }
-
-    // Resaltar directamente el texto (incluye scroll)
-    await highlightTextInChapter(chapterElement, target.text!, adjustedPosition)
   } else if (target.position !== undefined) {
     // Si solo hay posición, calcular el elemento aproximado
-    const chapter = chapters.value.find(ch => ch.id === target.chapterId)
-    let adjustedPosition = target.position
-    if (chapter) {
-      const titleOffset = getTitleOffset(chapter.content, chapter.title)
-      adjustedPosition = adjustedPosition - titleOffset
-    }
-    highlightPositionInChapter(chapterElement, adjustedPosition)
+    highlightPositionInChapter(chapterElement, adjustedPosition ?? target.position)
   } else {
     // Si no hay texto ni posición, scroll al capítulo
     chapterElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -1015,14 +1317,14 @@ const cleanExcerptForSearch = (text: string): string => {
 // Resalta un texto específico dentro del capítulo
 // position: posición de caracteres donde debería estar el texto (para desambiguar)
 // retryCount: número de reintentos realizados (para esperar a que v-html renderice)
-const highlightTextInChapter = async (chapterElement: Element, text: string, position?: number, retryCount: number = 0): Promise<void> => {
+const highlightTextInChapter = async (chapterElement: Element, text: string, position?: number, retryCount: number = 0): Promise<boolean> => {
   const MAX_RETRIES = 3
   const RETRY_DELAY = 150
 
   const contentElement = chapterElement.querySelector('.chapter-text')
   if (!contentElement) {
     console.warn('No .chapter-text element found in chapter')
-    return
+    return false
   }
 
   // Verificar si el contenido tiene texto (v-html puede no haber renderizado aún)
@@ -1038,80 +1340,38 @@ const highlightTextInChapter = async (chapterElement: Element, text: string, pos
   const cleanText = cleanExcerptForSearch(text)
   if (!cleanText) {
     console.warn('Empty search text after cleaning')
-    return
+    return false
   }
 
-  // Buscar TODAS las ocurrencias del texto (case-insensitive)
-  const walker = document.createTreeWalker(contentElement, NodeFilter.SHOW_TEXT, null)
+  const chapterText = contentElement.textContent || ''
+  const lowerChapterText = chapterText.toLowerCase()
 
-  interface TextMatch {
-    node: Text
-    index: number
-    length: number
-    charPosition: number  // Posición en caracteres desde el inicio del contenido
-  }
-  const matches: TextMatch[] = []
-  let node: Text | null
-  let charCount = 0
-
-  // Primero intentar búsqueda exacta
-  while ((node = walker.nextNode() as Text | null)) {
-    const nodeText = node.textContent || ''
-    let searchIndex = 0
-
-    // Buscar ocurrencias exactas (case-insensitive)
-    while (true) {
-      const index = nodeText.toLowerCase().indexOf(cleanText.toLowerCase(), searchIndex)
-      if (index === -1) break
-
-      matches.push({
-        node,
-        index,
-        length: cleanText.length,
-        charPosition: charCount + index
-      })
-      searchIndex = index + 1
+  const findAllOccurrences = (needle: string): number[] => {
+    if (!needle) return []
+    const indices: number[] = []
+    let cursor = lowerChapterText.indexOf(needle)
+    while (cursor !== -1) {
+      indices.push(cursor)
+      cursor = lowerChapterText.indexOf(needle, cursor + 1)
     }
-
-    charCount += nodeText.length
+    return indices
   }
 
-  // Si no hay matches, intentar con fragmentos más cortos del texto
-  if (matches.length === 0 && cleanText.length > 20) {
-    // Intentar con las primeras palabras (más probable que coincidan)
-    const words = cleanText.split(' ')
-    const shortText = words.slice(0, Math.min(5, words.length)).join(' ')
+  let searchedNeedle = cleanText.toLowerCase()
+  let matchIndexes = findAllOccurrences(searchedNeedle)
 
+  // Si no hay matches, intentar con fragmentos más cortos del texto.
+  if (matchIndexes.length === 0 && cleanText.length > 20) {
+    const words = cleanText.split(' ')
+    const shortText = words.slice(0, Math.min(5, words.length)).join(' ').trim()
     if (shortText.length >= 10) {
       console.log(`Trying shorter search: "${shortText}"`)
-
-      // Reset walker
-      const walker2 = document.createTreeWalker(contentElement, NodeFilter.SHOW_TEXT, null)
-      charCount = 0
-
-      while ((node = walker2.nextNode() as Text | null)) {
-        const nodeText = node.textContent || ''
-        let searchIndex = 0
-
-        while (true) {
-          const index = nodeText.toLowerCase().indexOf(shortText.toLowerCase(), searchIndex)
-          if (index === -1) break
-
-          matches.push({
-            node,
-            index,
-            length: shortText.length,
-            charPosition: charCount + index
-          })
-          searchIndex = index + 1
-        }
-
-        charCount += nodeText.length
-      }
+      searchedNeedle = shortText.toLowerCase()
+      matchIndexes = findAllOccurrences(searchedNeedle)
     }
   }
 
-  if (matches.length === 0) {
+  if (matchIndexes.length === 0) {
     // Si no encontramos el texto pero hay contenido, intentar un retry más
     // (a veces v-html necesita más tiempo para procesar)
     if (retryCount < MAX_RETRIES) {
@@ -1121,36 +1381,36 @@ const highlightTextInChapter = async (chapterElement: Element, text: string, pos
       return highlightTextInChapter(chapterElement, text, position, retryCount + 1)
     }
 
-    console.warn(`Text "${cleanText}" not found in chapter after ${MAX_RETRIES} retries. Using position fallback.`)
-    // Fallback: usar highlightPositionInChapter si tenemos posición
-    if (position !== undefined) {
-      highlightPositionInChapter(chapterElement, position)
-    }
-    return
+    console.warn(`Text "${cleanText}" not found in chapter after ${MAX_RETRIES} retries.`)
+    return false
   }
 
-  console.log(`Found ${matches.length} matches for "${cleanText.substring(0, 30)}..."`, { position })
+  console.log(`Found ${matchIndexes.length} matches for "${cleanText.substring(0, 30)}..."`, { position })
 
   // Seleccionar la ocurrencia correcta:
   // Si tenemos posición, usar la más cercana a esa posición
   // Si no, usar la primera
-  let match = matches[0]
+  let bestStart = matchIndexes[0]
 
-  if (position !== undefined && position >= 0 && matches.length > 1) {
-    let minDistance = Math.abs(matches[0].charPosition - position)
-    for (const m of matches) {
-      const distance = Math.abs(m.charPosition - position)
+  if (position !== undefined && position >= 0 && matchIndexes.length > 1) {
+    let minDistance = Math.abs(matchIndexes[0] - position)
+    for (const idx of matchIndexes) {
+      const distance = Math.abs(idx - position)
       if (distance < minDistance) {
         minDistance = distance
-        match = m
+        bestStart = idx
       }
     }
   }
 
-  // Crear el rango para el highlight
-  const range = document.createRange()
-  range.setStart(match.node, match.index)
-  range.setEnd(match.node, match.index + match.length)
+  const range = createRangeFromCharacterOffsets(
+    contentElement,
+    bestStart,
+    bestStart + searchedNeedle.length
+  )
+  if (!range || range.collapsed) {
+    return false
+  }
 
   // Crear span de highlight
   const highlightSpan = document.createElement('span')
@@ -1162,34 +1422,10 @@ const highlightTextInChapter = async (chapterElement: Element, text: string, pos
     range.insertNode(highlightSpan)
   } catch (e) {
     console.warn('Error creating highlight span:', e)
-    return
+    return false
   }
-
-  // Scroll al elemento resaltado (único scroll, no hay doble)
-  highlightSpan.scrollIntoView({ behavior: 'smooth', block: 'center' })
-
-  // Animación de entrada
-  highlightSpan.classList.add('highlight-entering')
-  setTimeout(() => {
-    highlightSpan.classList.remove('highlight-entering')
-  }, 500)
-
-  // Quitar highlight después de 3 segundos
-  setTimeout(() => {
-    highlightSpan.classList.add('highlight-leaving')
-
-    setTimeout(() => {
-      const parent = highlightSpan.parentNode
-      if (parent) {
-        // Restaurar: mover los hijos del span de vuelta al padre
-        while (highlightSpan.firstChild) {
-          parent.insertBefore(highlightSpan.firstChild, highlightSpan)
-        }
-        parent.removeChild(highlightSpan)
-        parent.normalize()
-      }
-    }, 400)
-  }, 3000)
+  applyTemporaryHighlightSpan(highlightSpan)
+  return true
 }
 
 // Resalta una posición aproximada en el capítulo (basado en porcentaje)
@@ -1216,14 +1452,7 @@ const highlightPositionInChapter = (chapterElement: Element, position: number) =
   const targetParagraph = paragraphs[Math.min(targetIndex, paragraphs.length - 1)]
 
   if (targetParagraph) {
-    // Añadir clase de highlight temporal
-    targetParagraph.classList.add(temporaryHighlightClass)
-    targetParagraph.scrollIntoView({ behavior: 'smooth', block: 'center' })
-
-    // Quitar highlight después de 3 segundos
-    setTimeout(() => {
-      targetParagraph.classList.remove(temporaryHighlightClass)
-    }, 3000)
+    applyTemporaryHighlightElement(targetParagraph)
   }
 }
 
@@ -1516,7 +1745,9 @@ watch(() => props.alertHighlightRanges, async (ranges) => {
       const target: ScrollTarget = {
         chapterId: firstRange.chapterId,
         position: firstRange.startChar,
-        text: firstRange.text
+        endPosition: firstRange.endChar,
+        text: firstRange.text,
+        preserveMultiHighlights: true,
       }
       await scrollToMention(target)
     }
@@ -1953,6 +2184,13 @@ defineExpose({
   transition: all 0.4s ease-out;
 }
 
+.chapter-text :deep(.mention-highlight-selected) {
+  background: rgba(251, 191, 36, 0.5);
+  border-radius: var(--app-radius-sm);
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.35);
+  transition: all var(--ds-duration-fast) var(--ds-ease-in-out);
+}
+
 /* Animación de entrada */
 .chapter-text :deep(.mention-highlight-active.highlight-entering) {
   animation: highlight-enter 0.5s ease-out forwards;
@@ -2223,8 +2461,13 @@ defineExpose({
   border-radius: var(--app-radius-sm);
   box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.4);
   animation: mention-highlight-pulse 1.5s ease-in-out infinite;
-  padding: 2px 4px;
-  margin: -2px -4px;
+  box-decoration-break: clone;
+}
+
+.mention-highlight-selected {
+  background: rgba(251, 191, 36, 0.5) !important;
+  border-radius: var(--app-radius-sm);
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.35);
 }
 
 .mention-highlight-active.highlight-entering {
