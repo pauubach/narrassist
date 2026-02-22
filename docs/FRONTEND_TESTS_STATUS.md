@@ -1,7 +1,7 @@
 # Frontend Testing - Estado Actual
 
 **Fecha**: 2026-02-22
-**Estado**: ✅ Entorno configurado, ✅ 11 tests de DocumentViewer creados
+**Estado**: ✅ Entorno configurado, ✅ 65 tests de componentes críticos completados
 
 ---
 
@@ -52,15 +52,15 @@ npm run test
 
 ### Tests Completados y Pendientes (60+ tests estimados)
 
-#### Alta Prioridad (48 tests total)
+#### Alta Prioridad (65 tests completados)
 
 | Componente | Tests | Archivo | Estado |
 |------------|-------|---------|--------|
 | DocumentViewer | 11 | `src/components/DocumentViewer.spec.ts` | ✅ **COMPLETADO** |
-| ProjectSummary | 12 | `src/components/inspector/ProjectSummary.spec.ts` | ❌ Pendiente |
-| DialogueAttributionPanel | 10 | `src/components/DialogueAttributionPanel.spec.ts` | ❌ Pendiente |
-| EntityInspector | 8 | `src/components/inspector/EntityInspector.spec.ts` | ❌ Pendiente |
-| ChapterInspector | 7 | `src/components/inspector/ChapterInspector.spec.ts` | ❌ Pendiente |
+| ProjectSummary | 19 | `src/components/inspector/ProjectSummary.spec.ts` | ✅ **COMPLETADO** |
+| DialogueAttributionPanel | 13 | `src/components/DialogueAttributionPanel.spec.ts` | ✅ **COMPLETADO** |
+| EntityInspector | 12 | `src/components/inspector/EntityInspector.spec.ts` | ✅ **COMPLETADO** |
+| ChapterInspector | 10 | `src/components/inspector/ChapterInspector.spec.ts` | ✅ **COMPLETADO** |
 
 #### Media Prioridad (18 tests)
 
