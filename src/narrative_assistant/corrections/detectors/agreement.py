@@ -151,6 +151,9 @@ class AgreementDetector(BaseDetector):
                     if confidence < self.config.min_confidence:
                         continue
 
+                    suggestion = self._suggest_gender_fix(
+                        token, child, noun_gender, child_gender
+                    )
                     issues.append(
                         CorrectionIssue(
                             category=self.category.value,
@@ -166,7 +169,7 @@ class AgreementDetector(BaseDetector):
                                 f"'{child.text}' ({self._gender_name(child_gender)}) "
                                 f"con '{token.text}' ({self._gender_name(noun_gender)})"
                             ),
-                            suggestion=None,  # Corrector decide
+                            suggestion=suggestion,
                             confidence=confidence,
                             context=self._extract_context(
                                 text, child.idx, token.idx + len(token.text)
@@ -214,6 +217,9 @@ class AgreementDetector(BaseDetector):
                     if confidence < self.config.min_confidence:
                         continue
 
+                    suggestion = self._suggest_number_fix(
+                        token, child, noun_number, child_number
+                    )
                     issues.append(
                         CorrectionIssue(
                             category=self.category.value,
@@ -229,7 +235,7 @@ class AgreementDetector(BaseDetector):
                                 f"'{child.text}' ({self._number_name(child_number)}) "
                                 f"con '{token.text}' ({self._number_name(noun_number)})"
                             ),
-                            suggestion=None,
+                            suggestion=suggestion,
                             confidence=confidence,
                             context=self._extract_context(
                                 text, child.idx, token.idx + len(token.text)
@@ -357,6 +363,25 @@ class AgreementDetector(BaseDetector):
             return 0.7
         else:
             return 0.6
+
+    def _suggest_gender_fix(self, noun, modifier, noun_gender: str, mod_gender: str) -> str:
+        """Genera sugerencia para corregir discordancia de género."""
+        # El sustantivo manda: sugerir cambiar el modificador
+        target_gender = "femenino" if noun_gender == "Fem" else "masculino"
+        return (
+            f"Revise la concordancia de género: "
+            f"'{modifier.text}' debería concordar en {target_gender} "
+            f"con '{noun.text}'."
+        )
+
+    def _suggest_number_fix(self, noun, modifier, noun_number: str, mod_number: str) -> str:
+        """Genera sugerencia para corregir discordancia de número."""
+        target_number = "plural" if noun_number == "Plur" else "singular"
+        return (
+            f"Revise la concordancia de número: "
+            f"'{modifier.text}' debería concordar en {target_number} "
+            f"con '{noun.text}'."
+        )
 
     def _gender_name(self, gender: str) -> str:
         """Nombre legible del género."""

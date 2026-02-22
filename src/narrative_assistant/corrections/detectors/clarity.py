@@ -159,7 +159,7 @@ class ClarityDetector(BaseDetector):
                             f"más cortas para mejorar la legibilidad. "
                             f"Divida la oración en oraciones más cortas usando punto seguido."
                         ),
-                        suggestion=None,  # No hay corrección automática, solo recomendación
+                        suggestion="Divida esta oración en dos o más oraciones más cortas usando punto seguido.",
                         confidence=confidence,
                         context=self._extract_context(text, start, end),
                         chapter_index=chapter_index,
@@ -187,7 +187,7 @@ class ClarityDetector(BaseDetector):
                             f"Oración larga: {word_count} palabras. "
                             f"Considere si podría simplificarse."
                         ),
-                        suggestion=None,  # Solo advertencia
+                        suggestion="Considere simplificar esta oración o dividirla en partes más breves.",
                         confidence=0.7,
                         context=self._extract_context(text, start, end),
                         chapter_index=chapter_index,
@@ -227,7 +227,7 @@ class ClarityDetector(BaseDetector):
                             f"Esto puede dificultar la lectura. "
                             f"Divida la oración en oraciones independientes más simples."
                         ),
-                        suggestion=None,  # No hay corrección automática, solo recomendación
+                        suggestion="Divida esta oración en oraciones independientes más simples, eliminando subordinadas encadenadas.",
                         confidence=min(0.9, 0.7 + (count - self.config.max_subordinates) * 0.1),
                         context=self._extract_context(text, start, end),
                         chapter_index=chapter_index,
@@ -285,7 +285,7 @@ class ClarityDetector(BaseDetector):
                             f"en {word_count} palabras. Puede resultar denso de leer. "
                             f"Considere añadir pausas (comas) o dividir en oraciones más cortas."
                         ),
-                        suggestion=None,  # No hay corrección automática, solo recomendación
+                        suggestion="Añada comas o punto y coma para crear pausas naturales, o divida en oraciones más cortas.",
                         confidence=0.75,
                         context=self._extract_context(text, start, min(end, start + 200)),
                         chapter_index=chapter_index,
@@ -375,7 +375,7 @@ class ClarityDetector(BaseDetector):
                             f"oraciones pueden dificultar la lectura. "
                             f"Divida este párrafo en bloques temáticos más pequeños."
                         ),
-                        suggestion=None,  # No hay corrección automática, solo recomendación
+                        suggestion="Divida este párrafo en bloques temáticos más pequeños.",
                         confidence=min(
                             0.92,
                             0.78 + (sentence_count - self.config.max_paragraph_sentences) * 0.03,
