@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from . import morpho_utils
+from .gender_names import FEMININE_NAMES, MASCULINE_NAMES, infer_gender_from_name
 
 logger = logging.getLogger(__name__)
 
@@ -837,13 +838,130 @@ class ScopeResolver:
             if etype == "PER" and prev_start <= start < prev_end:
                 prev_entities.add(name)
 
-        if len(prev_entities) >= 2:
-            logger.debug(
-                f"Ambiguity detected: zero anaphora with {prev_entities} in previous sentence"
-            )
-            return True
+        if len(prev_entities) < 2:
+            return False
 
-        return False
+        # --- T3: Filtrar candidatos por concordancia de número del verbo ---
+        verb_number = morpho_utils.get_number(first_token)
+        if verb_number == "Sing":
+            # Detectar coordinaciones (plural) y eliminarlas
+            singular_entities = self._filter_by_number_agreement(
+                prev_entities, prev_start, prev_end, entity_mentions
+            )
+            if len(singular_entities) == 1:
+                logger.debug(
+                    f"Zero anaphora resolved by number agreement (singular verb): "
+                    f"'{next(iter(singular_entities))}'"
+                )
+                return False  # No es ambiguo, número lo desambigua
+
+        # --- T4: Filtrar candidatos por género del predicado ---
+        pred_gender = self._get_predicate_gender(first_token)
+        if pred_gender is not None:
+            gender_filtered = self._filter_by_predicate_gender(
+                prev_entities, pred_gender
+            )
+            if len(gender_filtered) == 1:
+                logger.debug(
+                    f"Zero anaphora resolved by predicate gender ({pred_gender}): "
+                    f"'{next(iter(gender_filtered))}'"
+                )
+                return False  # No es ambiguo, género lo desambigua
+
+        logger.debug(
+            f"Ambiguity detected: zero anaphora with {prev_entities} in previous sentence"
+        )
+        return True
+
+    def _filter_by_number_agreement(
+        self,
+        candidate_names: set[str],
+        sent_start: int,
+        sent_end: int,
+        entity_mentions: list[tuple[str, int, int, str]],
+    ) -> set[str]:
+        """
+        T3: Filtra candidatos eliminando los que forman grupo coordinado (plural)
+        cuando el verbo es singular.
+
+        Detecta "Rosa y Blanca" como grupo plural y los elimina si el verbo
+        es singular ("Tenía"), dejando solo candidatos singulares.
+        """
+        sent_text = self.text[sent_start:sent_end]
+
+        # Buscar coordinaciones: "X y Y", "X e Y"
+        coordinated = set()
+        mention_list = [
+            (name, start, end)
+            for name, start, end, _etype in entity_mentions
+            if sent_start <= start < sent_end and name in candidate_names
+        ]
+        mention_list.sort(key=lambda x: x[1])
+
+        for i, (name1, _s1, end1) in enumerate(mention_list):
+            for name2, start2, _e2 in mention_list[i + 1:]:
+                between = sent_text[end1 - sent_start:start2 - sent_start].strip().lower()
+                if between in ("y", "e", "y con", "junto a", "junto con", ","):
+                    coordinated.add(name1)
+                    coordinated.add(name2)
+
+        # Candidatos singulares = los que NO están en coordinación
+        singular = candidate_names - coordinated
+        return singular if singular else candidate_names
+
+    def _get_predicate_gender(self, verb_token) -> str | None:
+        """
+        T4: Extrae el género del adjetivo predicativo de un verbo copulativo.
+
+        "Era alta" → "Fem"
+        "Estaba cansado" → "Masc"
+        "Era inteligente" → None (sin género marcado)
+        """
+        # Buscar adjetivo predicativo entre los hijos del verbo
+        for child in verb_token.children:
+            if child.dep_ in ("attr", "acomp", "xcomp") and child.pos_ == "ADJ":
+                gender = morpho_utils.get_gender(child)
+                if gender:
+                    return gender
+
+        # Buscar adjetivo predicativo entre hermanos (si el verbo es cop)
+        if verb_token.dep_ == "cop":
+            head = verb_token.head
+            if head.pos_ == "ADJ":
+                gender = morpho_utils.get_gender(head)
+                if gender:
+                    return gender
+
+        # Buscar en hijos del ROOT si el verbo es ROOT
+        if verb_token.dep_ == "ROOT":
+            for child in verb_token.children:
+                if child.pos_ == "ADJ" and child.dep_ not in ("amod", "advmod"):
+                    gender = morpho_utils.get_gender(child)
+                    if gender:
+                        return gender
+
+        return None
+
+    def _filter_by_predicate_gender(
+        self, candidate_names: set[str], pred_gender: str
+    ) -> set[str]:
+        """
+        T4: Filtra candidatos por concordancia de género del predicado.
+
+        Cascada multi-tier:
+          1. spaCy morph del token en self.doc (más fiable)
+          2. Gazetteer de nombres conocidos
+          3. Heurística por sufijo (-a/-o)
+        """
+        matching = set()
+        for name in candidate_names:
+            inferred = infer_gender_from_name(name, doc=self.doc)
+            if pred_gender == "Fem" and inferred == "Fem":
+                matching.add(name)
+            elif pred_gender == "Masc" and inferred == "Masc":
+                matching.add(name)
+
+        return matching if matching else candidate_names
 
     def _is_coordination_ambiguity(
         self,

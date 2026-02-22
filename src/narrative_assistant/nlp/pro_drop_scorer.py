@@ -15,6 +15,10 @@ import logging
 from dataclasses import dataclass, field
 
 from .coreference_resolver import Gender, Mention, MentionType, Number
+from .sentence_utils import (
+    detect_continuity_signal as _detect_continuity_signal,
+    normalize_sentence_breaks as _normalize_sentence_breaks,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -139,8 +143,8 @@ class ProDropAmbiguityScorer:
             factors: dict[str, float] = {}
             reasons: list[str] = []
 
-            # Recencia
-            recency = self._score_recency(zero, candidate, text_length)
+            # Recencia (con señales de continuidad cross-sentence)
+            recency = self._score_recency(zero, candidate, text_length, text)
             factors["recency"] = recency
             if recency > 0.7:
                 reasons.append("muy cercano")
@@ -209,15 +213,40 @@ class ProDropAmbiguityScorer:
         return max(0.0, min(1.0, 1.0 - margin))
 
     def _score_recency(
-        self, zero: Mention, candidate: Mention, text_length: int
+        self,
+        zero: Mention,
+        candidate: Mention,
+        text_length: int,
+        text: str = "",
     ) -> float:
-        """Score por cercanía posicional. Mayor = más cerca."""
+        """Score por cercanía posicional con señales de continuidad.
+
+        Usa T1 (normalización de breaks) y T2 (señales lingüísticas)
+        para ajustar la recencia cuando hay continuidad cross-sentence.
+        """
         distance = zero.start_char - candidate.end_char
         if distance <= 0:
             return 0.1  # Candidato después del verbo: poco probable
 
-        # Normalizar: 0 chars → 1.0, 500+ → ~0
-        return max(0.0, 1.0 - (distance / 500.0))
+        # Base: decay lineal 0 chars → 1.0, 500+ → ~0
+        base_recency = max(0.0, 1.0 - (distance / 500.0))
+
+        # T1+T2: Si hay texto y distancia significativa, detectar continuidad
+        if text and distance > 20:
+            end = min(candidate.end_char, len(text))
+            start = min(zero.start_char, len(text))
+            text_between = text[end:start]
+            breaks = _normalize_sentence_breaks(text_between)
+            if breaks > 0:
+                signal = _detect_continuity_signal(
+                    text, candidate.end_char, zero.start_char
+                )
+                if signal > 0:
+                    # Boost recencia: señal de continuidad reduce el penalty
+                    boost = signal * 0.3  # Hasta 30% bonus
+                    base_recency = min(1.0, base_recency + boost)
+
+        return base_recency
 
     def _score_saliency(self, candidate: Mention, tracker: SaliencyTracker) -> float:
         """Score por saliencia en el discurso."""

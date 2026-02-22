@@ -14,6 +14,13 @@ import logging
 import re
 from typing import TYPE_CHECKING
 
+from .gender_names import FEMININE_NAMES, MASCULINE_NAMES, infer_gender_from_name
+from .sentence_utils import (
+    CROSS_SENTENCE_BASE_PENALTY,
+    detect_continuity_signal as _detect_continuity_signal,
+    normalize_sentence_breaks as _normalize_sentence_breaks,
+)
+
 if TYPE_CHECKING:
     pass
 
@@ -221,10 +228,17 @@ class AttributeEntityResolutionMixin:
             # Detectar si la entidad está dentro de una cláusula relativa
             in_relative_clause = self._is_inside_relative_clause(text, start, end, position)  # type: ignore[attr-defined]
 
-            # Penalizar si hay límites de oración entre entidad y posición (Bug #2)
+            # Penalizar cruces de oración con normalización y señales (T1+T2)
             text_between = text[end:position]
-            sentence_breaks = sum(1 for c in text_between if c in '.!?')
-            sentence_penalty = sentence_breaks * 500  # Fuerte penalización por cruce de oración
+            sentence_breaks = _normalize_sentence_breaks(text_between)
+            if sentence_breaks > 0:
+                doc = getattr(self, "_spacy_doc", None)
+                continuity = _detect_continuity_signal(text, end, position, doc)
+                sentence_penalty = int(
+                    sentence_breaks * CROSS_SENTENCE_BASE_PENALTY * (1.0 - continuity)
+                )
+            else:
+                sentence_penalty = 0
 
             # Aplicar penalización por cláusula relativa
             relative_clause_penalty = 300 if in_relative_clause else 0
@@ -304,6 +318,41 @@ class AttributeEntityResolutionMixin:
             re.IGNORECASE,
         )
 
+        # T5: Detección de primera persona — "Tengo", "Soy", "Llevo"
+        has_1st_person_verb = bool(
+            re.search(
+                r"\b(tengo|soy|estoy|llevo|parezco|muestro|luzco|visto|"
+                r"miro|camino|sonrío|hablo|porto|exhibo|"
+                r"presento|aparento|revelo|transmito|"
+                r"fui|tuve|estuve|llevé|"
+                r"mis|mi)\b",
+                combined_context,
+                re.IGNORECASE,
+            )
+        )
+        # También detectar por spaCy si hay doc
+        if not has_1st_person_verb:
+            spacy_doc = getattr(self, "_spacy_doc", None)
+            if spacy_doc is not None:
+                try:
+                    from . import morpho_utils as _mu
+                    for token in spacy_doc:
+                        if token.idx >= position - 30 and token.idx < position + 20:
+                            if _mu.is_verb(token) and _mu.get_person(token) == "1":
+                                has_1st_person_verb = True
+                                break
+                except Exception:
+                    pass
+
+        if has_1st_person_verb and person_candidates:
+            narrator_entity = self._find_narrator_entity(person_candidates, text)
+            if narrator_entity is not None:
+                logger.debug(
+                    f"Primera persona detectada, atribuyendo a narrador: "
+                    f"'{narrator_entity}'"
+                )
+                return narrator_entity
+
         # Caso -1: Pronombre de sujeto explícito o indicador de género
         if (subject_pronoun_match or gender_noun_match) and person_candidates:
             result = self._resolve_by_gender(
@@ -364,33 +413,12 @@ class AttributeEntityResolutionMixin:
             noun = gender_noun_match.group(1).lower()
             is_feminine = noun in ("mujer", "chica", "señora", "niña")
 
-        # Nombres femeninos comunes en español
-        feminine_names = {
-            "maría", "ana", "elena", "laura", "carmen", "isabel", "rosa",
-            "lucía", "marta", "paula", "sara", "andrea", "claudia", "sofía",
-            "julia", "clara", "alba", "irene", "nuria", "eva", "raquel",
-            "silvia", "cristina", "patricia", "mónica", "beatriz", "alicia",
-        }
-        # Nombres masculinos comunes en español
-        masculine_names = {
-            "juan", "pedro", "carlos", "antonio", "josé", "luis", "miguel",
-            "francisco", "javier", "david", "daniel", "pablo", "alejandro",
-            "sergio", "fernando", "alberto", "manuel", "rafael", "jorge",
-            "mario", "andrés", "roberto", "enrique", "ricardo", "diego",
-        }
-
         # Buscar candidatos con género coincidente
         gendered_candidates = []
         for name, start, end, distance in person_candidates:
-            name_lower = name.lower()
-            first_name = name_lower.split()[0] if name_lower else ""
-
-            name_is_feminine = first_name in feminine_names or (
-                first_name.endswith("a") and first_name not in masculine_names
-            )
-            name_is_masculine = first_name in masculine_names or (
-                first_name.endswith("o") and first_name not in feminine_names
-            )
+            inferred = infer_gender_from_name(name)
+            name_is_feminine = inferred == "Fem"
+            name_is_masculine = inferred == "Masc"
 
             # Calcular ajuste de distancia por género
             gender_adjustment = 0
@@ -514,6 +542,46 @@ class AttributeEntityResolutionMixin:
                 f"(dist={best[3]}, ajustada={best[4]}, es_objeto={best[5]})"
             )
             return best[0]  # type: ignore[no-any-return]
+
+        return None
+
+    # Regex para detectar patrones "me llamo X", "soy X", "mi nombre es X"
+    _NARRATOR_INTRO_RE = re.compile(
+        r"(?:me\s+llamo|soy|mi\s+nombre\s+es)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+        re.IGNORECASE,
+    )
+
+    def _find_narrator_entity(
+        self, person_candidates: list[tuple], text: str
+    ) -> str | None:
+        """
+        T5: Identifica al narrador en primera persona.
+
+        Busca patrones como "Me llamo Paco", "Soy Paco", "Mi nombre es Paco"
+        en el texto para identificar al narrador. Luego verifica que el
+        narrador esté entre los candidatos.
+        """
+        # Buscar intro del narrador en las primeras 500 chars del texto
+        intro_match = self._NARRATOR_INTRO_RE.search(text[:500])
+        if intro_match:
+            narrator_name = intro_match.group(1)
+            # Verificar que el narrador está entre los candidatos
+            for name, _start, _end, _dist in person_candidates:
+                if name.lower().startswith(narrator_name.lower()):
+                    return name
+                if narrator_name.lower() in name.lower():
+                    return name
+
+        # Fallback: si hay una entidad que aparece con "yo" o "me" cerca
+        # buscar en los primeros 1000 chars
+        for name, _start, _end, _dist in person_candidates:
+            # Buscar "yo, NAME" o "NAME, yo" o "yo NAME"
+            pattern = re.compile(
+                rf"(?:yo[,\s]+{re.escape(name)}|{re.escape(name)}[,\s]+yo)\b",
+                re.IGNORECASE,
+            )
+            if pattern.search(text[:1000]):
+                return name
 
         return None
 

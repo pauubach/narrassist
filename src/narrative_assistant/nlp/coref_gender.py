@@ -15,6 +15,7 @@ from .coreference_resolver import (
     MentionType,
     Number,
 )
+from .gender_names import FEMININE_NAMES as _SHARED_FEM, MASCULINE_NAMES as _SHARED_MASC
 
 logger = logging.getLogger(__name__)
 
@@ -63,86 +64,9 @@ class CorefGenderMixin:
 
         return Gender.UNKNOWN
 
-    # Nombres españoles comunes por género (para inferencia cuando spaCy no detecta)
-    FEMININE_NAMES = {
-        "maría",
-        "maria",
-        "ana",
-        "carmen",
-        "laura",
-        "marta",
-        "elena",
-        "sara",
-        "paula",
-        "lucía",
-        "lucia",
-        "sofía",
-        "sofia",
-        "isabel",
-        "rosa",
-        "pilar",
-        "teresa",
-        "julia",
-        "clara",
-        "alicia",
-        "beatriz",
-        "andrea",
-        "cristina",
-        "diana",
-        "eva",
-        "irene",
-        "lorena",
-        "nuria",
-        "olga",
-        "patricia",
-        "raquel",
-        "silvia",
-        "susana",
-        "verónica",
-        "veronica",
-        "virginia",
-        "inés",
-        "ines",
-    }
-
-    MASCULINE_NAMES = {
-        "juan",
-        "pedro",
-        "carlos",
-        "miguel",
-        "josé",
-        "jose",
-        "antonio",
-        "manuel",
-        "francisco",
-        "david",
-        "jorge",
-        "pablo",
-        "andrés",
-        "andres",
-        "luis",
-        "javier",
-        "sergio",
-        "fernando",
-        "alejandro",
-        "alberto",
-        "daniel",
-        "diego",
-        "enrique",
-        "felipe",
-        "gabriel",
-        "héctor",
-        "hector",
-        "ignacio",
-        "jaime",
-        "mario",
-        "rafael",
-        "ramón",
-        "ramon",
-        "roberto",
-        "víctor",
-        "victor",
-    }
+    # Listas consolidadas desde gender_names.py (DRY)
+    FEMININE_NAMES = _SHARED_FEM
+    MASCULINE_NAMES = _SHARED_MASC
 
     def _infer_gender_number(self, text: str, token) -> tuple[Gender, Number]:
         """Infiere género y número de un token."""

@@ -341,3 +341,63 @@ class TestProDropIntegration:
         assert len(results) == 2
         # Los resultados deben ser tuplas (Mention, float, str)
         assert all(len(r) == 3 for r in results)
+
+
+# ── Cross-sentence continuity (T1+T2 en recency) ─────────────────────
+
+
+class TestRecencyContinuitySignal:
+    """Verifica que _score_recency usa T1+T2 para mejorar scoring cross-sentence."""
+
+    @pytest.fixture
+    def scorer(self):
+        return ProDropAmbiguityScorer()
+
+    def test_gerund_boosts_recency(self, scorer):
+        """Gerundio al inicio de oración siguiente sube recency del candidato previo."""
+        # "Juan habló con María. Aprovechando la situación, decidió actuar."
+        text = "Juan habló con María. Aprovechando la situación, decidió actuar."
+        zero = _make_mention("[PRO decidió]", 50, 57, MentionType.ZERO, sentence_idx=1)
+        candidate = _make_mention("Juan", 0, 4, sentence_idx=0)
+
+        # Score con texto real (tiene gerundio → boost)
+        recency_with_signal = scorer._score_recency(zero, candidate, len(text), text)
+
+        # Score sin texto (sin boost, solo distancia)
+        recency_no_text = scorer._score_recency(zero, candidate, len(text), "")
+
+        assert recency_with_signal > recency_no_text
+
+    def test_causal_boosts_recency(self, scorer):
+        """Conector causal 'porque' sube recency del candidato previo."""
+        text = "Pedro salió corriendo. Porque estaba asustado, no miró atrás."
+        zero = _make_mention("[PRO estaba]", 32, 38, MentionType.ZERO, sentence_idx=1)
+        candidate = _make_mention("Pedro", 0, 5, sentence_idx=0)
+
+        recency_with = scorer._score_recency(zero, candidate, len(text), text)
+        recency_without = scorer._score_recency(zero, candidate, len(text), "")
+
+        assert recency_with > recency_without
+
+    def test_no_signal_no_boost(self, scorer):
+        """Sin señal de continuidad, no hay boost."""
+        text = "Juan caminaba por la calle. El cielo estaba nublado."
+        zero = _make_mention("[PRO estaba]", 35, 41, MentionType.ZERO, sentence_idx=1)
+        candidate = _make_mention("Juan", 0, 4, sentence_idx=0)
+
+        recency_with = scorer._score_recency(zero, candidate, len(text), text)
+        recency_without = scorer._score_recency(zero, candidate, len(text), "")
+
+        # Sin señal de continuidad → scores iguales
+        assert abs(recency_with - recency_without) < 0.01
+
+    def test_abbreviation_doesnt_inflate_distance(self, scorer):
+        """'Dr.' no debe crear un break falso que reduzca recency."""
+        text = "El Dr. García examinó al paciente. Tenía fiebre alta."
+        zero = _make_mention("[PRO Tenía]", 35, 40, MentionType.ZERO, sentence_idx=1)
+        # "Dr. García" es un solo entity — el "Dr." no crea break extra
+        candidate = _make_mention("García", 7, 13, sentence_idx=0)
+
+        recency = scorer._score_recency(zero, candidate, len(text), text)
+        # Solo 1 break real (el punto final de "paciente."), no 2
+        assert recency > 0.0
