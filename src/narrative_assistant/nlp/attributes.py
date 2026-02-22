@@ -40,6 +40,46 @@ from ..core.result import Result
 
 logger = logging.getLogger(__name__)
 
+
+# ── Profession Context Validator ────────────────────────────────────
+# Validates that a word matched by the "era [WORD]" profession regex is
+# actually a predicate nominal (profession), not an adverb or adjective
+# modifying a subordinate clause.
+
+# Tokens that CANNOT follow a real profession (indicate adverb/adjective usage)
+_POST_PROFESSION_BLOCKERS = re.compile(
+    r"\s+(?:lo|la|las|los|todo|toda|que|como|de\s+lo|de\s+la)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_valid_profession_context(text: str, match: re.Match, value: str) -> bool:
+    """
+    Verifica que un candidato a profesión sea realmente un sustantivo predicativo.
+
+    Criterios lingüísticos:
+    1. Los adverbios en -mente no son profesiones (exactamente, claramente...).
+    2. Si tras la palabra candidata viene un artículo/pronombre/subordinante
+       (lo, la, que, todo, como), la palabra funciona como adverbio/adjetivo,
+       no como sustantivo predicativo. Ej: "Era exactamente lo que buscaba".
+    3. Una profesión real termina la cláusula o es seguida por adjetivo/prep:
+       "Era médico de profesión", "Era carpintero nato", "Era ingeniero."
+    """
+    val = value.lower()
+
+    # Regla 1: Adverbios en -mente
+    if val.endswith("mente") and len(val) > 5:
+        return False
+
+    # Regla 2: Contexto post-match — qué sigue después de la palabra
+    after_start = match.end()
+    after_text = text[after_start:after_start + 20]
+    if _POST_PROFESSION_BLOCKERS.match(after_text):
+        return False
+
+    return True
+
+
 # Pesos de votación por método (defaults heurísticos)
 # Se reemplazan automáticamente por pesos aprendidos si existe default_weights.json
 DEFAULT_METHOD_WEIGHTS = {
@@ -1157,9 +1197,9 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         True,
     ),
     # "era carpintero", "es médico" - profesiones con sufijos comunes (un grupo, requiere contexto)
-    # Excluir adverbios en -mente (exactamente, claramente, etc.) con negative lookahead
+    # Post-match validation filters adverbs (-mente) and non-nominal predicates
     (
-        r"[Ee]ra\s+(?:un\s+)?(\w+(?:ero|era|ista|(?<!me)nte|or|ora|ico|ica|dor|dora|tor|tora|ogo|oga|ino|ina|ario|aria|ador|adora))\b",
+        r"[Ee]ra\s+(?:un\s+)?(\w+(?:ero|era|ista|nte|or|ora|ico|ica|dor|dora|tor|tora|ogo|oga|ino|ina|ario|aria|ador|adora))\b",
         AttributeKey.PROFESSION,
         AttributeCategory.SOCIAL,
         0.65,
@@ -2166,6 +2206,16 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                     logger.debug(f"Ignorando atributo en diálogo: {match.group(0)[:40]}...")
                     continue
 
+                # Profesiones: validar contexto sintáctico post-match
+                if key == AttributeKey.PROFESSION:
+                    groups_tmp = match.groups()
+                    value_tmp = groups_tmp[0] if groups_tmp else ""
+                    if not _is_valid_profession_context(text, match, value_tmp):
+                        logger.debug(
+                            f"Profesión descartada por contexto: {match.group(0)[:50]}..."
+                        )
+                        continue
+
                 # Obtener contexto para análisis
                 context_start = max(0, match.start() - 50)
                 context_end = min(len(text), match.end() + 50)
@@ -3027,29 +3077,19 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
             ]
 
             for pattern in profession_patterns:
-                match = regex_module.search(pattern, sentence_lower, regex_module.IGNORECASE)
-                if match:
-                    profession = match.group(1).lower()
+                m = regex_module.search(pattern, sentence_lower, regex_module.IGNORECASE)
+                if m:
+                    profession = m.group(1).lower()
+                    # Validar contexto sintáctico
+                    if not _is_valid_profession_context(sentence_lower, m, profession):
+                        continue
                     # Excluir palabras muy genéricas que no son profesiones
                     excluded = {
-                        "hombre",
-                        "mujer",
-                        "persona",
-                        "tipo",
-                        "chico",
-                        "chica",
-                        "joven",
-                        "viejo",
-                        "niño",
-                        "niña",
-                        "señor",
-                        "señora",
-                        "alto",
-                        "bajo",
-                        "grande",
-                        "pequeño",
-                        "bueno",
-                        "malo",
+                        "hombre", "mujer", "persona", "tipo",
+                        "chico", "chica", "joven", "viejo",
+                        "niño", "niña", "señor", "señora",
+                        "alto", "bajo", "grande", "pequeño",
+                        "bueno", "malo",
                     }
                     if profession not in excluded and len(profession) > 3:
                         return profession
