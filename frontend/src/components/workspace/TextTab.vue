@@ -34,6 +34,24 @@ function scrollToDialogue(attribution: DialogueAttribution) {
   })
 }
 
+/** Chapters data for TextFindBar — searches across all chapters */
+const findBarChapters = computed(() =>
+  props.chapters.map(ch => ({
+    id: ch.id,
+    content: ch.content || '',
+    positionStart: ch.positionStart,
+  }))
+)
+
+/** Navigate to a search result from TextFindBar */
+function onFindNavigate(payload: { chapterId: number; position: number; text: string }) {
+  documentViewerRef.value?.scrollToMention({
+    chapterId: payload.chapterId,
+    position: payload.position - (props.chapters.find(c => c.id === payload.chapterId)?.positionStart || 0),
+    text: payload.text,
+  })
+}
+
 defineExpose({ openFindBar, scrollToDialogue })
 
 /**
@@ -356,7 +374,9 @@ onMounted(async () => {
       ref="findBarRef"
       :visible="showFindBar"
       :container="textTabContainer"
+      :chapters="findBarChapters"
       @close="showFindBar = false"
+      @navigate="onFindNavigate"
     />
 
     <!-- Document Viewer -->

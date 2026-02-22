@@ -197,6 +197,77 @@ def get_chapter_annotations(project_id: int, chapter_number: int):
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
+@router.get("/api/projects/{project_id}/search", response_model=ApiResponse)
+def search_in_project(
+    project_id: int,
+    q: str = Query(..., min_length=2, max_length=200, description="Texto a buscar"),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """
+    Busca texto en todos los capítulos de un proyecto.
+
+    Busca en el contenido almacenado en la base de datos, no requiere
+    que los capítulos estén cargados en el frontend.
+
+    Returns:
+        Lista de resultados con chapterId, chapterNumber, position y excerpt.
+    """
+    try:
+        if not deps.chapter_repository:
+            return ApiResponse(success=False, error="Chapter repository not initialized")
+
+        chapters = deps.chapter_repository.get_by_project(project_id)
+        results = []
+        search_lower = q.lower()
+
+        for ch in chapters:
+            content = ch.content or ""
+            content_lower = content.lower()
+            start = 0
+
+            while len(results) < limit:
+                idx = content_lower.find(search_lower, start)
+                if idx == -1:
+                    break
+
+                # Extraer excerpt con contexto
+                ctx_start = max(0, idx - 40)
+                ctx_end = min(len(content), idx + len(q) + 40)
+                excerpt = content[ctx_start:ctx_end].strip()
+                if ctx_start > 0:
+                    excerpt = "..." + excerpt
+                if ctx_end < len(content):
+                    excerpt = excerpt + "..."
+
+                # Posición absoluta en el documento
+                abs_position = (ch.start_char or 0) + idx
+
+                results.append({
+                    "chapter_id": ch.id,
+                    "chapter_number": ch.chapter_number,
+                    "chapter_title": ch.title or f"Capítulo {ch.chapter_number}",
+                    "position": abs_position,
+                    "local_position": idx,
+                    "excerpt": excerpt,
+                    "match_length": len(q),
+                })
+
+                start = idx + 1
+
+            if len(results) >= limit:
+                break
+
+        return ApiResponse(success=True, data={
+            "query": q,
+            "total": len(results),
+            "results": results,
+        })
+
+    except Exception as e:
+        logger.error(f"Error searching in project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
 @router.get("/api/projects/{project_id}/style-guide", response_model=ApiResponse)
 def get_style_guide(project_id: int, format: str = "json", preview: bool = False):
     """
