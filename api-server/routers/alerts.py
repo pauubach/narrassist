@@ -168,6 +168,36 @@ def list_alerts(
             except Exception:
                 pass  # Si falla, las posiciones quedarán como None
 
+        # Construir mapa de posición→capítulo para inferir chapter faltantes
+        position_to_chapter = None
+        if hasattr(deps, 'chapter_repository') and deps.chapter_repository:
+            try:
+                if chapters_cache is None:
+                    chapters = deps.chapter_repository.get_by_project(project_id)
+                    position_to_chapter = sorted(
+                        [(c.start_char, c.end_char, c.chapter_number) for c in chapters],
+                        key=lambda x: x[0],
+                    )
+                else:
+                    position_to_chapter = sorted(
+                        [(v['start_char'], v['start_char'] + len(v.get('content', '')), k)
+                         for k, v in chapters_cache.items()],
+                        key=lambda x: x[0],
+                    )
+            except Exception:
+                pass
+
+        def _infer_chapter(alert_chapter, start_char):
+            """Infiere capítulo desde posición si no está asignado."""
+            if alert_chapter is not None:
+                return alert_chapter
+            if start_char is None or not position_to_chapter:
+                return None
+            for ch_start, ch_end, ch_num in position_to_chapter:
+                if ch_start <= start_char < ch_end:
+                    return ch_num
+            return None
+
         alerts_data = []
         for a in alerts:
             resolved_start, resolved_end = _resolve_alert_positions(a, chapters_cache)
@@ -179,6 +209,12 @@ def list_alerts(
             if prev_snap_id:
                 prev_summary = f"Linked to snapshot alert #{prev_snap_id}"
 
+            # Inferir chapter desde posición si no está asignado
+            effective_chapter = _infer_chapter(
+                a.chapter,
+                resolved_start or getattr(a, 'start_char', None),
+            )
+
             alerts_data.append(AlertResponse(
                 id=a.id,
                 project_id=a.project_id,
@@ -189,7 +225,7 @@ def list_alerts(
                 description=a.description,
                 explanation=a.explanation,
                 suggestion=a.suggestion,
-                chapter=a.chapter,
+                chapter=effective_chapter,
                 start_char=resolved_start,
                 end_char=resolved_end,
                 excerpt=getattr(a, 'excerpt', None) or '',
