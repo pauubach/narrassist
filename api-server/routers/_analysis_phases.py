@@ -17,6 +17,7 @@ from typing import Any
 
 import deps
 from deps import generate_person_aliases, logger
+from narrative_assistant.entities.clustering import compute_reduced_pairs_from_clusters
 
 
 class AnalysisCancelledError(Exception):
@@ -1920,7 +1921,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             subphase_progress=0.0,
         )
 
-        # 1. Fusión semántica por tipo
+        # 1. Fusión semántica por tipo CON CLUSTERING (M3 optimization)
         entities_by_type: dict[EntityType, list] = {}
         for ent in entities:
             if ent.entity_type not in entities_by_type:
@@ -1928,14 +1929,11 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             entities_by_type[ent.entity_type].append(ent)
 
         fusion_pairs: list[tuple] = []
-        total_pairs = sum(
-            (len(type_entities) * (len(type_entities) - 1)) // 2
-            for type_entities in entities_by_type.values()
-            if len(type_entities) >= 2
-        )
-        checked_pairs = 0
-        compare_update_every = max(1, total_pairs // 25) if total_pairs else 1
 
+        # OPTIMIZACIÓN M3: Usar clustering para reducir O(N²) → O(N log N)
+        # En lugar de comparar TODOS los pares (N²), solo comparamos pares dentro de clusters
+        # Reducción esperada: 1000 entidades = ~500K pares → ~5K pares (100x menos)
+        all_candidate_pairs: list[tuple] = []
         for entity_type, type_entities in entities_by_type.items():
             if len(type_entities) < 2:
                 continue
@@ -1943,53 +1941,68 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             entity_names = [e.canonical_name for e in type_entities]
             logger.info(f"Fusion check: {entity_type.value} entities = {entity_names}")
 
-            for i, ent1 in enumerate(type_entities):
-                for j, ent2 in enumerate(type_entities):
-                    if i >= j:
-                        continue
+            # Clustering previo: reduce pares a comparar
+            candidate_pairs = compute_reduced_pairs_from_clusters(
+                type_entities,
+                similarity_threshold=0.45  # Umbral clustering (más bajo que fusion)
+            )
+            all_candidate_pairs.extend(candidate_pairs)
 
-                    checked_pairs += 1
-                    if checked_pairs % 50 == 0:
-                        tracker.check_cancelled()
+            logger.info(
+                f"  Tipo {entity_type.value}: {len(type_entities)} entidades → "
+                f"{len(candidate_pairs)} pares candidatos (clustering aplicado)"
+            )
 
-                    name1 = ent1.canonical_name
-                    name2 = ent2.canonical_name
-                    force_merge = _is_name_subset(name1, name2) or _is_name_subset(name2, name1)
+        total_pairs = len(all_candidate_pairs)
+        checked_pairs = 0
+        compare_update_every = max(1, total_pairs // 25) if total_pairs else 1
 
-                    if force_merge:
-                        logger.info(f"Fusión forzada por nombre contenido: '{name1}' ↔ '{name2}'")
+        # Comparar solo pares candidatos (pre-filtrados por clustering)
+        for ent1, ent2 in all_candidate_pairs:
+            checked_pairs += 1
+            if checked_pairs % 50 == 0:
+                tracker.check_cancelled()
 
-                    result = fusion_service.should_merge(ent1, ent2)
+            name1 = ent1.canonical_name
+            name2 = ent2.canonical_name
+            force_merge = _is_name_subset(name1, name2) or _is_name_subset(name2, name1)
 
-                    if result.should_merge or force_merge:
-                        merge_reason = (
-                            f"nombre contenido ({name1} ⊂ {name2} o viceversa)"
-                            if force_merge and not result.should_merge
-                            else result.reason
-                        )
-                        logger.info(
-                            f"Fusión sugerida: '{ent1.canonical_name}' + '{ent2.canonical_name}' "
-                            f"(similaridad: {result.similarity:.2f}, razón: {merge_reason})"
-                        )
+            if force_merge:
+                logger.info(f"Fusión forzada por nombre contenido: '{name1}' ↔ '{name2}'")
 
-                        score1 = _name_score(ent1)
-                        score2 = _name_score(ent2)
-                        if score1 >= score2:
-                            fusion_pairs.append((ent1, ent2))
-                        else:
-                            fusion_pairs.append((ent2, ent1))
+            # IMPORTANTE: should_merge() usa embeddings (costoso)
+            # Por eso SOLO lo llamamos en pares pre-filtrados por clustering
+            result = fusion_service.should_merge(ent1, ent2)
 
-                    if checked_pairs % compare_update_every == 0 or checked_pairs == total_pairs:
-                        compare_fraction = checked_pairs / total_pairs if total_pairs else 1.0
-                        _update_fusion_progress(
-                            0.08 + compare_fraction * 0.32,
-                            f"Comparando nombres similares ({checked_pairs}/{total_pairs})",
-                            subphase_id="compare",
-                            subphase_label="Comparando entidades candidatas",
-                            subphase_progress=compare_fraction,
-                            subphase_step=checked_pairs,
-                            subphase_total_steps=total_pairs,
-                        )
+            if result.should_merge or force_merge:
+                merge_reason = (
+                    f"nombre contenido ({name1} ⊂ {name2} o viceversa)"
+                    if force_merge and not result.should_merge
+                    else result.reason
+                )
+                logger.info(
+                    f"Fusión sugerida: '{ent1.canonical_name}' + '{ent2.canonical_name}' "
+                    f"(similaridad: {result.similarity:.2f}, razón: {merge_reason})"
+                )
+
+                score1 = _name_score(ent1)
+                score2 = _name_score(ent2)
+                if score1 >= score2:
+                    fusion_pairs.append((ent1, ent2))
+                else:
+                    fusion_pairs.append((ent2, ent1))
+
+            if checked_pairs % compare_update_every == 0 or checked_pairs == total_pairs:
+                compare_fraction = checked_pairs / total_pairs if total_pairs else 1.0
+                _update_fusion_progress(
+                    0.08 + compare_fraction * 0.32,
+                    f"Comparando nombres similares ({checked_pairs}/{total_pairs} pares)",
+                    subphase_id="compare",
+                    subphase_label="Comparando entidades candidatas (clustering aplicado)",
+                    subphase_progress=compare_fraction,
+                    subphase_step=checked_pairs,
+                    subphase_total_steps=total_pairs,
+                )
 
         if total_pairs == 0:
             _update_fusion_progress(
