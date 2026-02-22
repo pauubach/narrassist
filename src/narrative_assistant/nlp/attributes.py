@@ -1157,8 +1157,9 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         True,
     ),
     # "era carpintero", "es médico" - profesiones con sufijos comunes (un grupo, requiere contexto)
+    # Excluir adverbios en -mente (exactamente, claramente, etc.) con negative lookahead
     (
-        r"[Ee]ra\s+(?:un\s+)?(\w+(?:ero|era|ista|or|ora|ico|ica|nte|dor|dora|tor|tora|ogo|oga|ino|ina|ario|aria|ador|adora))\b",
+        r"[Ee]ra\s+(?:un\s+)?(\w+(?:ero|era|ista|(?<!me)nte|or|ora|ico|ica|dor|dora|tor|tora|ogo|oga|ino|ina|ario|aria|ador|adora))\b",
         AttributeKey.PROFESSION,
         AttributeCategory.SOCIAL,
         0.65,

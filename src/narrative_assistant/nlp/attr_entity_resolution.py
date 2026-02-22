@@ -102,32 +102,32 @@ class AttributeEntityResolutionMixin:
             return value_lower in age_descriptors
 
         if key == AttributeKey.PROFESSION:
+            # Filtrar adverbios terminados en -mente (Bug #3)
+            if value_lower.endswith("mente") and len(value_lower) > 5:
+                return False
+
             # Excluir palabras genéricas que no son profesiones
             excluded = {
-                "hombre",
-                "mujer",
-                "persona",
-                "tipo",
-                "chico",
-                "chica",
-                "joven",
-                "viejo",
-                "niño",
-                "niña",
-                "señor",
-                "señora",
-                "alto",
-                "bajo",
-                "grande",
-                "pequeño",
-                "bueno",
-                "malo",
-                "mejor",
-                "peor",
-                "primero",
-                "primera",
-                "último",
-                "última",
+                # Personas genéricas
+                "hombre", "mujer", "persona", "tipo", "chico", "chica",
+                "joven", "viejo", "niño", "niña", "señor", "señora",
+                "individuo", "sujeto", "gente", "vecino", "vecina",
+                # Adjetivos comunes
+                "alto", "bajo", "grande", "pequeño", "bueno", "malo",
+                "mejor", "peor", "primero", "primera", "último", "última",
+                "fuerte", "débil", "bonito", "bonita", "feo", "fea",
+                "importante", "interesante", "diferente", "siguiente",
+                "anterior", "posterior", "inferior", "superior",
+                "exterior", "interior",
+                # Adverbios y palabras funcionales
+                "exactamente", "solamente", "simplemente", "realmente",
+                "claramente", "obviamente", "seguramente", "naturalmente",
+                "prácticamente", "básicamente", "efectivamente",
+                "ciertamente", "definitivamente", "absolutamente",
+                "completamente", "perfectamente", "totalmente",
+                "especialmente", "particularmente", "generalmente",
+                # Determinantes/pronombres
+                "otro", "otra", "mismo", "misma", "propio", "propia",
             }
             return value_lower not in excluded and len(value) > 3
 
@@ -221,9 +221,14 @@ class AttributeEntityResolutionMixin:
             # Detectar si la entidad está dentro de una cláusula relativa
             in_relative_clause = self._is_inside_relative_clause(text, start, end, position)  # type: ignore[attr-defined]
 
+            # Penalizar si hay límites de oración entre entidad y posición (Bug #2)
+            text_between = text[end:position]
+            sentence_breaks = sum(1 for c in text_between if c in '.!?')
+            sentence_penalty = sentence_breaks * 500  # Fuerte penalización por cruce de oración
+
             # Aplicar penalización por cláusula relativa
             relative_clause_penalty = 300 if in_relative_clause else 0
-            adjusted_distance = distance + relative_clause_penalty
+            adjusted_distance = distance + relative_clause_penalty + sentence_penalty
 
             # Si tenemos entity_type del NER, usarlo directamente
             if entity_type is not None:
