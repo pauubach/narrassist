@@ -11,9 +11,10 @@ La detección distingue entre texto narrativo y diálogos:
 """
 
 import logging
-import unicodedata
 from collections import defaultdict
 from dataclasses import dataclass, field
+
+from narrative_assistant.core.text_utils import strip_accents as _strip_accents
 
 logger = logging.getLogger(__name__)
 
@@ -31,14 +32,6 @@ class NameVariantIssue:
     variant_mentions: list[dict] = field(default_factory=list)
     all_in_dialogue: bool = False
     confidence: float = 0.85
-
-
-def _strip_accents(text: str) -> str:
-    """Elimina acentos preservando ñ/Ñ."""
-    text = text.replace("ñ", "\x00").replace("Ñ", "\x01")
-    nfkd = unicodedata.normalize("NFKD", text)
-    result = "".join(c for c in nfkd if not unicodedata.combining(c))
-    return result.replace("\x00", "ñ").replace("\x01", "Ñ")
 
 
 def _normalize(text: str) -> str:

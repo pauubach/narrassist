@@ -13,16 +13,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .unified_analysis import AnalysisContext
 
-import unicodedata
-
 from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
-
-
-def _normalize_key(text: str) -> str:
-    """Normaliza un nombre eliminando diacriticos."""
-    nfkd = unicodedata.normalize("NFKD", text.strip().lower())
-    return "".join(c for c in nfkd if not unicodedata.combining(c))
+from ..core.text_utils import normalize_name as _normalize_key
 
 
 logger = logging.getLogger(__name__)

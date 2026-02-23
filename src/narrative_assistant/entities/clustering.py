@@ -100,11 +100,17 @@ def _fast_name_similarity(name1: str, name2: str) -> float:
     if n1 == n2:
         return 1.0
 
-    # Contención (un nombre dentro de otro)
-    if n1 in n2 or n2 in n1:
+    # Contención a nivel de PALABRAS (no subcadena arbitraria)
+    # "garcia" in "maria garcia" → OK (palabra completa)
+    # "a" in "maria garcia" → RECHAZADO (subcadena, no palabra)
+    words1 = set(n1.split())
+    words2 = set(n2.split())
+    if words1 and words2 and (words1 <= words2 or words2 <= words1):
         shorter = min(len(n1), len(n2))
         longer = max(len(n1), len(n2))
-        return 0.75 + (shorter / longer) * 0.2  # 0.75-0.95
+        # Requiere que la parte más corta tenga al menos 3 caracteres
+        if shorter >= 3:
+            return 0.75 + (shorter / longer) * 0.2  # 0.75-0.95
 
     # SequenceMatcher rápido
     return SequenceMatcher(None, n1, n2).ratio()

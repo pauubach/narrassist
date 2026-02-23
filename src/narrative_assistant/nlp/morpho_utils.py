@@ -233,40 +233,14 @@ def is_infinitive(token) -> bool:
 
 # =========================================================================
 # Normalización de nombres (acento-safe)
+# Delegado a core.text_utils (DRY) — este módulo re-exporta para
+# compatibilidad con el resto del codebase que ya importa de aquí.
 # =========================================================================
 
-# Patrón para eliminar marcas combinantes (acentos) de Unicode
-_COMBINING_MARK_RE = re.compile(r"[\u0300-\u036f]")
-
-
-def normalize_name(text: str) -> str:
-    """
-    Normaliza un nombre eliminando acentos y convirtiendo a minúsculas.
-
-    Esto permite que "María" y "Maria" se fusionen como la misma entidad.
-    También "García" y "Garcia", "José" y "Jose", etc.
-
-    Args:
-        text: Nombre a normalizar
-
-    Returns:
-        Nombre normalizado sin acentos, en minúsculas
-    """
-    # NFKD descompone caracteres acentuados en base + combining mark
-    normalized = unicodedata.normalize("NFKD", text)
-    # Eliminar combining marks (acentos)
-    stripped = _COMBINING_MARK_RE.sub("", normalized)
-    return stripped.lower().strip()
-
-
-def names_match(name1: str, name2: str) -> bool:
-    """
-    Compara dos nombres ignorando acentos y capitalización.
-
-    "María García" == "Maria Garcia" → True
-    "José" == "jose" → True
-    """
-    return normalize_name(name1) == normalize_name(name2)
+from narrative_assistant.core.text_utils import (  # noqa: E402
+    names_match,
+    normalize_name,
+)
 
 
 # =========================================================================

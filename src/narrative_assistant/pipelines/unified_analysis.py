@@ -41,7 +41,7 @@ FASE 6 - CONSISTENCIA Y ALERTAS:
 
 import logging
 import threading
-import unicodedata
+
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -60,18 +60,9 @@ from .ua_ner import PipelineNERMixin
 from .ua_quality import PipelineQualityMixin
 from .ua_resolution import PipelineResolutionMixin
 
+from ..core.text_utils import normalize_name as _normalize_key
+
 logger = logging.getLogger(__name__)
-
-
-def _normalize_key(text: str) -> str:
-    """Normaliza un nombre para usarlo como clave de agrupación.
-
-    Elimina diacríticos (acentos, tildes) y convierte a minúsculas
-    para evitar duplicados por variantes de acentuación.
-    Ej: 'María García' → 'maria garcia'
-    """
-    nfkd = unicodedata.normalize("NFKD", text.strip().lower())
-    return "".join(c for c in nfkd if not unicodedata.combining(c))
 
 
 class AnalysisPhase(Enum):

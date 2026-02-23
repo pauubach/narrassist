@@ -1133,6 +1133,17 @@ class MorphoCorefMethod:
     def __init__(self):
         self._nlp = None
         self._lock = threading.Lock()
+        self._hypocoristic_match = None  # Lazy import
+
+    def _check_hypocoristic(self, name1: str, name2: str) -> bool:
+        """Comprueba si dos nombres son variantes hipocorísticas."""
+        if self._hypocoristic_match is None:
+            try:
+                from ..entities.semantic_fusion import are_hypocoristic_match
+                self._hypocoristic_match = are_hypocoristic_match
+            except ImportError:
+                self._hypocoristic_match = lambda a, b: False
+        return self._hypocoristic_match(name1, name2)
 
     @property
     def nlp(self):
@@ -1166,18 +1177,18 @@ class MorphoCorefMethod:
             reasons = []
 
             # Concordancia de género
+            # NEUTRAL (ej: "su", "le") no aporta información → 0 (sin bonus ni penalty)
             if anaphor.gender != Gender.UNKNOWN and candidate.gender != Gender.UNKNOWN:
-                if anaphor.gender == candidate.gender:
-                    score += 0.4
-                    reasons.append("género coincide")
-                elif (
+                if (
                     anaphor.gender == Gender.NEUTRAL
                     or candidate.gender == Gender.NEUTRAL
                 ):
-                    score += 0.2
-                    reasons.append("género compatible")
+                    pass  # Sin información de género → sin efecto
+                elif anaphor.gender == candidate.gender:
+                    score += 0.35
+                    reasons.append("género coincide")
                 else:
-                    score -= 0.3
+                    score -= 0.35
                     reasons.append("género no coincide")
 
             # Concordancia de número
@@ -1194,6 +1205,17 @@ class MorphoCorefMethod:
                 score += 0.2
                 reasons.append("nombre propio")
 
+            # Hipocorísticos: si ambos son nombres propios y son variantes
+            # (Mari↔María, Paco↔Francisco), bonus fuerte
+            if (
+                anaphor.mention_type == MentionType.PROPER_NOUN
+                and candidate.mention_type == MentionType.PROPER_NOUN
+                and anaphor.text.lower() != candidate.text.lower()
+                and self._check_hypocoristic(anaphor.text, candidate.text)
+            ):
+                score += 0.6
+                reasons.append("hipocorístico")
+
             # Penalización por distancia
             sentence_distance = abs(anaphor.sentence_idx - candidate.sentence_idx)
             if sentence_distance == 0:
@@ -1203,8 +1225,8 @@ class MorphoCorefMethod:
             elif sentence_distance > 5:
                 score -= 0.1
 
-            # Normalizar
-            score = min(1.0, max(0.0, (score + 0.5) / 1.5))
+            # Normalizar — consistente con HeuristicsCorefMethod (sin inflación)
+            score = min(1.0, max(0.0, score))
 
             reasoning = "; ".join(reasons) if reasons else "análisis morfológico"
             results.append((candidate, score, reasoning))
@@ -1230,6 +1252,17 @@ class HeuristicsCorefMethod:
         self._mention_freq: dict[str, int] = {}
         self._saliency_tracker = None
         self._pro_drop_scorer = None
+        self._hypocoristic_match = None  # Lazy import
+
+    def _check_hypocoristic(self, name1: str, name2: str) -> bool:
+        """Comprueba si dos nombres son variantes hipocorísticas."""
+        if self._hypocoristic_match is None:
+            try:
+                from ..entities.semantic_fusion import are_hypocoristic_match
+                self._hypocoristic_match = are_hypocoristic_match
+            except ImportError:
+                self._hypocoristic_match = lambda a, b: False
+        return self._hypocoristic_match(name1, name2)
 
     def set_mention_frequencies(self, mentions: list["Mention"]) -> None:
         """Calcula frecuencia de nombres propios para saliencia."""
@@ -1361,6 +1394,17 @@ class HeuristicsCorefMethod:
                         # Dos oraciones atrás: probabilidad moderada
                         score += 0.10
                         reasons.append("2 oraciones atrás")
+
+            # Hipocorísticos: si ambos son nombres propios y son variantes
+            # (Mari↔María, Paco↔Francisco), bonus fuerte
+            if (
+                anaphor.mention_type == MentionType.PROPER_NOUN
+                and candidate.mention_type == MentionType.PROPER_NOUN
+                and anaphor.text.lower() != candidate.text.lower()
+                and self._check_hypocoristic(anaphor.text, candidate.text)
+            ):
+                score += 0.6
+                reasons.append("hipocorístico")
 
             # Mismo capítulo bonus
             if (

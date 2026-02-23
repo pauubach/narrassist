@@ -9,9 +9,14 @@ Este servicio encapsula el matching "same/renamed/new/removed" para:
 from __future__ import annotations
 
 import re
-import unicodedata
 from dataclasses import dataclass
 from typing import Any
+
+from narrative_assistant.core.text_utils import (
+    normalize_name as _shared_normalize,
+    strip_accents as _shared_strip_accents,
+    token_jaccard as _shared_token_jaccard,
+)
 
 
 @dataclass(frozen=True)
@@ -30,13 +35,11 @@ class EntityContinuityService:
 
     @staticmethod
     def _strip_accents(value: str) -> str:
-        normalized = unicodedata.normalize("NFD", value or "")
-        return "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+        return _shared_strip_accents(value or "", preserve_ñ=False)
 
     @classmethod
     def _normalize_name(cls, value: str) -> str:
-        normalized = cls._strip_accents((value or "").lower().strip())
-        normalized = re.sub(r"\s+", " ", normalized)
+        normalized = _shared_normalize((value or "").strip())
         normalized = re.sub(r"[^\w\s]", "", normalized)
         return normalized.strip()
 
@@ -62,14 +65,7 @@ class EntityContinuityService:
 
     @classmethod
     def _token_jaccard(cls, left: str, right: str) -> float:
-        left_tokens = set(cls._normalize_name(left).split())
-        right_tokens = set(cls._normalize_name(right).split())
-        if not left_tokens or not right_tokens:
-            return 0.0
-        union = left_tokens | right_tokens
-        if not union:
-            return 0.0
-        return len(left_tokens & right_tokens) / len(union)
+        return _shared_token_jaccard(left, right)
 
     def _name_score(self, old_sig: dict[str, Any], new_sig: dict[str, Any]) -> tuple[float, str]:
         old_norm = str(old_sig.get("normalized_name") or "")

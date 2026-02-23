@@ -7,8 +7,14 @@ Compartida por:
 """
 
 import logging
-import unicodedata
 from dataclasses import dataclass
+
+from narrative_assistant.core.text_utils import (
+    char_ngrams as _char_ngrams,
+    jaccard_similarity,
+    names_match as exact_match,
+    normalize_name as _normalize_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,38 +29,6 @@ class EntityMatchResult:
     target_type: str
     similarity: float
     match_type: str  # 'exact', 'fuzzy'
-
-
-def _normalize_name(name: str) -> str:
-    """Normaliza un nombre para comparación: lowercase, sin acentos, sin espacios extra."""
-    # NFD decomposition + strip accents
-    nfkd = unicodedata.normalize("NFKD", name)
-    ascii_name = "".join(c for c in nfkd if not unicodedata.combining(c))
-    return " ".join(ascii_name.lower().split())
-
-
-def _char_ngrams(text: str, n: int = 3) -> set[str]:
-    """Genera n-gramas de caracteres para similitud Jaccard."""
-    normalized = _normalize_name(text)
-    if len(normalized) < n:
-        return {normalized}
-    return {normalized[i : i + n] for i in range(len(normalized) - n + 1)}
-
-
-def jaccard_similarity(set_a: set, set_b: set) -> float:
-    """Calcula similitud Jaccard entre dos conjuntos."""
-    if not set_a and not set_b:
-        return 1.0
-    if not set_a or not set_b:
-        return 0.0
-    intersection = len(set_a & set_b)
-    union = len(set_a | set_b)
-    return intersection / union if union > 0 else 0.0
-
-
-def exact_match(name1: str, name2: str) -> bool:
-    """Match exacto (case-insensitive, accent-normalized)."""
-    return _normalize_name(name1) == _normalize_name(name2)
 
 
 def fuzzy_match(

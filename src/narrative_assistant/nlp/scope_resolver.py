@@ -435,10 +435,11 @@ class ScopeResolver:
 
     def _names_match_flexible(self, name1: str, name2: str) -> bool:
         """
-        Compara nombres de forma flexible, manejando artículos y acentos.
+        Compara nombres de forma flexible, manejando artículos, acentos e hipocorísticos.
 
         "hombre" ↔ "El hombre" → True
         "María" ↔ "Maria" → True
+        "Paco" ↔ "Francisco" → True (hipocorístico)
         "mujer" ↔ "La mujer de ojos verdes" → False (demasiado diferente)
         """
         n1 = morpho_utils.normalize_name(name1)
@@ -455,7 +456,18 @@ class ScopeResolver:
 
         if n1_stripped == n2_stripped:
             return True
-        return bool(n1_stripped == n2 or n1 == n2_stripped)
+        if n1_stripped == n2 or n1 == n2_stripped:
+            return True
+
+        # Hipocorísticos: Mari↔María, Paco↔Francisco
+        try:
+            from ..entities.semantic_fusion import are_hypocoristic_match
+            if are_hypocoristic_match(name1, name2):
+                return True
+        except ImportError:
+            pass
+
+        return False
 
     # =========================================================================
     # Filtrado de entidades en cláusulas relativas

@@ -33,7 +33,8 @@ def _get_fusion_threshold() -> float:
     try:
         config = get_config()
         return config.nlp.semantic_fusion_threshold
-    except Exception:
+    except Exception as e:
+        logger.debug("Config no disponible para fusion_threshold, usando default: %s", e)
         return SEMANTIC_SIMILARITY_THRESHOLD
 
 
