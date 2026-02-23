@@ -168,6 +168,14 @@ def _force_clear_analysis(project_id: int):
         ]
         deps._analysis_queue[:] = [q for q in deps._analysis_queue if q["project_id"] != project_id]
 
+        # Liberar heavy slot si lo tiene este proyecto (el thread viejo ya no
+        # va a hacer nada útil — su cancel se detectará, pero el slot debe
+        # estar libre para que el nuevo análisis pueda reclamarlo)
+        if deps._heavy_analysis_project_id == project_id:
+            deps._heavy_analysis_project_id = None
+            deps._heavy_analysis_claimed_at = None
+            logger.info(f"[AUTO-RECOVERY] Released heavy slot held by project {project_id}")
+
     # Actualizar DB — marcar como "error" (no "completed") para que
     # el fast-path no reutilice datos potencialmente incompletos
     try:
@@ -1249,6 +1257,14 @@ def cancel_analysis(project_id: int):
             deps.analysis_progress_storage[project_id]["status"] = "cancelled"
             deps.analysis_progress_storage[project_id]["current_phase"] = "Cancelando análisis..."
 
+            # Liberar heavy slot inmediatamente para que un re-análisis no
+            # se quede encolado esperando a que el thread viejo detecte la
+            # cancelación (podría tardar minutos si está en una llamada LLM)
+            if deps._heavy_analysis_project_id == project_id:
+                deps._heavy_analysis_project_id = None
+                deps._heavy_analysis_claimed_at = None
+                logger.info(f"[CANCEL] Released heavy slot for project {project_id}")
+
         logger.info(f"Analysis cancellation requested for project {project_id}")
 
         return ApiResponse(
@@ -1309,7 +1325,13 @@ def force_clear_stuck_analysis(project_id: int):
                 q for q in deps._analysis_queue if q["project_id"] != project_id
             ]
 
-        # 4. Actualizar DB: status → error (no "completed") para que fast-path
+            # 4. Liberar heavy slot si lo tiene este proyecto
+            if deps._heavy_analysis_project_id == project_id:
+                deps._heavy_analysis_project_id = None
+                deps._heavy_analysis_claimed_at = None
+                logger.info(f"[FORCE-CLEAR] Released heavy slot for project {project_id}")
+
+        # 5. Actualizar DB: status → error (no "completed") para que fast-path
         #    no reutilice datos potencialmente incompletos
         project_manager = ProjectManager()
         result = project_manager.get(project_id)

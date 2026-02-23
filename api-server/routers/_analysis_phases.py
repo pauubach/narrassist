@@ -1375,7 +1375,15 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
                     stale_storage["status"] = "error"
                     stale_storage["error"] = "Análisis excedió el tiempo máximo"
 
-        if deps._heavy_analysis_project_id is not None:
+        if deps._heavy_analysis_project_id == project_id:
+            # Same project re-claiming slot (e.g. cancel → re-analyze while
+            # old thread hasn't fully exited yet).  Reset the timer.
+            logger.info(f"Project {project_id}: re-claiming heavy slot (already held by self)")
+            claim_ts = time.time()
+            deps._heavy_analysis_claimed_at = claim_ts
+            ctx["_heavy_slot_claim_ts"] = claim_ts
+            return True
+        elif deps._heavy_analysis_project_id is not None:
             # Heavy slot busy — queue lightweight metadata only (F-005)
             queue_entry: dict[str, Any] = {
                 "project_id": project_id,
@@ -1394,7 +1402,9 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
             return False
         else:
             deps._heavy_analysis_project_id = project_id
-            deps._heavy_analysis_claimed_at = time.time()
+            claim_ts = time.time()
+            deps._heavy_analysis_claimed_at = claim_ts
+            ctx["_heavy_slot_claim_ts"] = claim_ts
             return True
 
 
@@ -4800,11 +4810,20 @@ def _release_heavy_and_start_next(project_id: int, ctx: dict | None = None) -> N
     next_heavy = None
     with deps._progress_lock:
         if deps._heavy_analysis_project_id == project_id:
-            deps._heavy_analysis_project_id = None
-            deps._heavy_analysis_claimed_at = None
-            if ctx is not None:
-                ctx["heavy_slot_released"] = True
-            logger.info(f"Project {project_id}: released heavy slot")
+            # Guard: if a newer analysis for the same project has re-claimed
+            # the slot, the old (cancelled) thread must NOT release it.
+            my_claim_ts = ctx.get("_heavy_slot_claim_ts") if ctx else None
+            if my_claim_ts is not None and deps._heavy_analysis_claimed_at != my_claim_ts:
+                logger.info(
+                    f"Project {project_id}: skipping heavy slot release "
+                    f"(slot re-claimed by newer analysis)"
+                )
+            else:
+                deps._heavy_analysis_project_id = None
+                deps._heavy_analysis_claimed_at = None
+                if ctx is not None:
+                    ctx["heavy_slot_released"] = True
+                logger.info(f"Project {project_id}: released heavy slot")
         if deps._heavy_analysis_queue:
             next_heavy = deps._heavy_analysis_queue.pop(0)
 
