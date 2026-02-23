@@ -1526,6 +1526,7 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
 
             ctx["entities"] = entities
             ctx["entity_repo"] = get_entity_repository()
+            ctx["_ner_cache_hit"] = True  # Skip LLM validation (already validated)
             tracker.set_metric("entities_found", len(entities))
             tracker.end_phase("ner", 3)
 
@@ -1876,26 +1877,14 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
     ctx["entities"] = entities
     ctx["entity_repo"] = entity_repo
 
-    # ========================================================================
-    # Cache Write: Save NER results for future re-analysis
-    # ========================================================================
-    try:
-        if document_fingerprint and entities:
-            entities_json = _serialize_entities_for_cache(entities, entity_repo)
-            total_mentions = sum(e.mention_count or 0 for e in entities)
-
-            cache.set_ner_results(
-                project_id=project_id,
-                document_fingerprint=document_fingerprint,
-                config_hash=config_hash,
-                entities_json=entities_json,
-                entity_count=len(entities),
-                mention_count=total_mentions,
-                processed_chars=len(full_text),
-            )
-    except Exception as cache_err:
-        logger.warning(f"[NER] Cache write failed (continuing): {cache_err}")
-    # ========================================================================
+    # NER cache write is deferred to AFTER LLM entity validation so that
+    # cached entities are already validated (no need to re-validate on cache hit).
+    ctx["_ner_cache_pending"] = {
+        "cache": cache,
+        "document_fingerprint": document_fingerprint,
+        "config_hash": config_hash,
+        "full_text_len": len(full_text),
+    }
 
 
 # ============================================================================
@@ -1909,7 +1898,16 @@ def run_llm_entity_validation(ctx: dict, tracker: ProgressTracker):
     entities = ctx["entities"]
     entity_repo = ctx["entity_repo"]
 
-    _update_storage(project_id, current_action="Verificando personajes detectados...")
+    # Skip if entities came from NER cache (already validated on first run)
+    if ctx.get("_ner_cache_hit"):
+        logger.info("[LLM_VALIDATION] Skipped — entities from NER cache (already validated)")
+        return
+
+    _update_storage(
+        project_id,
+        current_action="Verificando personajes detectados con modelo de lenguaje...",
+        current_phase="Verificando personajes detectados...",
+    )
     try:
         from narrative_assistant.llm.client import get_llm_client
 
@@ -1988,6 +1986,28 @@ JSON:"""
 
     tracker.check_cancelled()
     ctx["entities"] = entities
+
+    # Write NER cache now (after validation, so cached entities are clean)
+    _ner_cp = ctx.pop("_ner_cache_pending", None)
+    if _ner_cp:
+        try:
+            _entities = ctx["entities"]
+            _entity_repo = ctx["entity_repo"]
+            if _ner_cp["document_fingerprint"] and _entities:
+                _ej = _serialize_entities_for_cache(_entities, _entity_repo)
+                _tm = sum(e.mention_count or 0 for e in _entities)
+                _ner_cp["cache"].set_ner_results(
+                    project_id=project_id,
+                    document_fingerprint=_ner_cp["document_fingerprint"],
+                    config_hash=_ner_cp["config_hash"],
+                    entities_json=_ej,
+                    entity_count=len(_entities),
+                    mention_count=_tm,
+                    processed_chars=_ner_cp["full_text_len"],
+                )
+                logger.info(f"[NER_CACHE] Written {len(_entities)} validated entities")
+        except Exception as _ce:
+            logger.warning(f"[NER] Cache write failed (continuing): {_ce}")
 
 
 # ============================================================================
