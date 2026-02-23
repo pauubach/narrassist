@@ -151,6 +151,9 @@ def _force_clear_analysis(project_id: int):
 
     Ejecuta las mismas acciones que el endpoint /force-clear
     pero sin retornar ApiResponse.
+
+    IMPORTANTE: No marca como "completed" para evitar que fast-path
+    reutilice datos parciales de un análisis incompleto.
     """
     from narrative_assistant.persistence.project import ProjectManager
 
@@ -165,15 +168,17 @@ def _force_clear_analysis(project_id: int):
         ]
         deps._analysis_queue[:] = [q for q in deps._analysis_queue if q["project_id"] != project_id]
 
-    # Actualizar DB
+    # Actualizar DB — marcar como "error" (no "completed") para que
+    # el fast-path no reutilice datos potencialmente incompletos
     try:
         project_manager = ProjectManager()
         result = project_manager.get(project_id)
         if result.is_success:
             project = result.value
-            project.analysis_status = "completed"
+            project.analysis_status = "error"
+            project.analysis_progress = 0.0
             project_manager.update(project)
-            logger.info(f"[AUTO-RECOVERY] Project {project_id} cleared successfully")
+            logger.info(f"[AUTO-RECOVERY] Project {project_id} cleared (status → error)")
     except Exception as e:
         logger.error(f"[AUTO-RECOVERY] Error clearing project {project_id}: {e}")
 
@@ -319,6 +324,9 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 )
                 # Auto-limpiar análisis bloqueado
                 _force_clear_analysis(project_id)
+                # Actualizar previous_analysis_status para reflejar que fue limpiado
+                # (evita que fast-path trate datos parciales como completos)
+                previous_analysis_status = "error"
                 # Continuar con el nuevo análisis
             else:
                 # Análisis realmente en curso
@@ -577,6 +585,31 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                     and previous_fp == current_fp
                     and previous_status == "completed"
                 )
+
+                # Verificar que los datos del análisis previo están completos
+                # antes de activar fast-path (protege contra datos parciales)
+                if is_same_document:
+                    with db_session.connection() as conn:
+                        _ch_count = int(
+                            conn.execute(
+                                "SELECT COUNT(*) FROM chapters WHERE project_id = ?",
+                                (project_id,),
+                            ).fetchone()[0]
+                        )
+                        _ent_count = int(
+                            conn.execute(
+                                "SELECT COUNT(*) FROM entities WHERE project_id = ?",
+                                (project_id,),
+                            ).fetchone()[0]
+                        )
+                    if _ch_count == 0 or _ent_count == 0:
+                        logger.warning(
+                            f"[FAST_PATH] Project {project_id}: fingerprint match but "
+                            f"incomplete data (chapters={_ch_count}, entities={_ent_count}). "
+                            "Running full analysis."
+                        )
+                        is_same_document = False
+
                 ctx["fast_path_same_document"] = is_same_document
 
                 if is_same_document:
@@ -1227,7 +1260,7 @@ def force_clear_stuck_analysis(project_id: int):
     Acciones:
     1. Limpia flags de cancelación en memoria
     2. Limpia storage de progreso
-    3. Actualiza DB: analysis_status → 'completed'
+    3. Actualiza DB: analysis_status → 'error' (no 'completed', para evitar fast-path)
     4. Permite re-análisis inmediato
 
     Args:
@@ -1258,7 +1291,8 @@ def force_clear_stuck_analysis(project_id: int):
                 q for q in deps._analysis_queue if q["project_id"] != project_id
             ]
 
-        # 4. Actualizar DB: status → completed
+        # 4. Actualizar DB: status → error (no "completed") para que fast-path
+        #    no reutilice datos potencialmente incompletos
         project_manager = ProjectManager()
         result = project_manager.get(project_id)
 
@@ -1268,17 +1302,18 @@ def force_clear_stuck_analysis(project_id: int):
         project = result.value
         old_status = project.analysis_status
 
-        project.analysis_status = "completed"
+        project.analysis_status = "error"
+        project.analysis_progress = 0.0
         project_manager.update(project)
 
-        logger.info(f"[FORCE-CLEAR] Project {project_id} cleared: {old_status} → completed")
+        logger.info(f"[FORCE-CLEAR] Project {project_id} cleared: {old_status} → error")
 
         return ApiResponse(
             success=True,
             data={
                 "project_id": project_id,
                 "old_status": old_status,
-                "new_status": "completed",
+                "new_status": "error",
                 "message": "Análisis bloqueado limpiado exitosamente. Puedes re-analizar ahora.",
             },
         )
