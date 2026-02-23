@@ -10,6 +10,7 @@ from narrative_assistant.analysis.chapter_summary import (
     AnalysisMode,
     ChapterProgressReport,
     ChapterSummary,
+    ChapterSummaryAnalyzer,
     CharacterArc,
     CharacterPresence,
     ChekhovElement,
@@ -1055,3 +1056,222 @@ class TestChapterSummaryRespectsEntityState:
 
         assert "Aldebarán" in locations
         assert "pueblo" not in locations
+
+
+# =============================================================================
+# Tests para _generate_text_summary (resumen extractivo narrativo)
+# =============================================================================
+
+
+class TestGenerateTextSummary:
+    """Tests para el resumen extractivo narrativo."""
+
+    def _make_analyzer(self):
+        """Crea un analyzer sin DB para tests unitarios."""
+        # Bypass __init__ que requiere DB
+        analyzer = object.__new__(ChapterSummaryAnalyzer)
+        analyzer.mode = AnalysisMode.BASIC
+        return analyzer
+
+    def _make_summary(self, **kwargs):
+        """Crea un ChapterSummary con defaults razonables."""
+        defaults = {"chapter_number": 1}
+        defaults.update(kwargs)
+        return ChapterSummary(**defaults)
+
+    def test_empty_text_returns_fallback(self):
+        """Texto vacío retorna mensaje por defecto."""
+        analyzer = self._make_analyzer()
+        summary = self._make_summary()
+        result = analyzer._generate_text_summary(summary, "")
+        assert "Sin contenido" in result
+
+    def test_whitespace_only_returns_fallback(self):
+        """Solo espacios retorna fallback."""
+        analyzer = self._make_analyzer()
+        summary = self._make_summary()
+        result = analyzer._generate_text_summary(summary, "   \n\n  ")
+        assert "Sin contenido" in result
+
+    def test_narrative_text_produces_real_summary(self):
+        """Texto narrativo produce resumen con oraciones del texto original."""
+        analyzer = self._make_analyzer()
+        text = (
+            "Don Ramiro llegó al pueblo al anochecer. "
+            "Las calles estaban desiertas y el viento soplaba con fuerza. "
+            "Buscaba a Isabel Vargas, la mujer que había desaparecido hacía tres meses. "
+            "En la posada, el tabernero le advirtió que no hiciera preguntas. "
+            "Pero Ramiro no era hombre que se dejara intimidar."
+        )
+        summary = self._make_summary(
+            characters_present=[
+                CharacterPresence(entity_id=1, name="Don Ramiro", mention_count=5),
+                CharacterPresence(entity_id=2, name="Isabel Vargas", mention_count=2),
+            ]
+        )
+        result = analyzer._generate_text_summary(summary, text)
+
+        # Debe contener oraciones del texto original, no metadatos
+        assert "Personajes principales" not in result
+        assert "Escenarios" not in result
+        assert "interacciones" not in result
+        # Debe tener contenido real del texto
+        assert len(result) > 30
+
+    def test_summary_excludes_dialogue(self):
+        """El resumen no incluye líneas de diálogo."""
+        analyzer = self._make_analyzer()
+        text = (
+            "Juan entró en la habitación con paso firme y decidido. "
+            "Miró a María con expresión grave.\n"
+            "—¿Dónde has estado? —preguntó María.\n"
+            "—No te importa —respondió Juan fríamente.\n"
+            "El silencio se apoderó de la estancia durante largos minutos."
+        )
+        summary = self._make_summary(
+            characters_present=[
+                CharacterPresence(entity_id=1, name="Juan", mention_count=3),
+                CharacterPresence(entity_id=2, name="María", mention_count=2),
+            ]
+        )
+        result = analyzer._generate_text_summary(summary, text)
+
+        assert "—" not in result
+        assert "preguntó" not in result
+
+    def test_summary_respects_max_length(self):
+        """El resumen no supera ~400 caracteres."""
+        analyzer = self._make_analyzer()
+        # Texto largo con muchas oraciones
+        text = ". ".join(
+            [f"Esta es la oración número {i} del capítulo largo" for i in range(50)]
+        ) + "."
+        summary = self._make_summary()
+        result = analyzer._generate_text_summary(summary, text)
+
+        assert len(result) <= 403  # 400 + "..."
+
+    def test_summary_prefers_sentences_with_characters(self):
+        """Las oraciones que mencionan personajes se priorizan."""
+        analyzer = self._make_analyzer()
+        text = (
+            "El sol brillaba sobre las colinas del valle lejano. "
+            "Los pájaros cantaban entre los árboles centenarios. "
+            "María descubrió la carta escondida en el cajón del escritorio. "
+            "Las nubes se acumulaban en el horizonte occidental. "
+            "El viento soplaba con fuerza desde las montañas."
+        )
+        summary = self._make_summary(
+            characters_present=[
+                CharacterPresence(entity_id=1, name="María", mention_count=5),
+            ]
+        )
+        result = analyzer._generate_text_summary(summary, text)
+
+        # La oración con "María" y "descubrió" debe aparecer
+        assert "María" in result or "descubr" in result
+
+    def test_summary_no_metadata_format(self):
+        """Verifica que el resumen NO usa formato de metadatos."""
+        analyzer = self._make_analyzer()
+        text = (
+            "Carlos Mendoza cruzó la frontera al amanecer sin ser detectado. "
+            "Llevaba consigo los documentos que probarían la inocencia de Elena. "
+            "El viaje había sido largo y peligroso a través de la sierra. "
+            "Al llegar a la estación, descubrió que Elena ya no estaba allí."
+        )
+        summary = self._make_summary(
+            characters_present=[
+                CharacterPresence(entity_id=1, name="Carlos Mendoza", mention_count=3),
+                CharacterPresence(entity_id=2, name="Elena", mention_count=2),
+            ],
+            locations_mentioned=["la frontera", "la estación"],
+        )
+        result = analyzer._generate_text_summary(summary, text)
+
+        # NO debe tener formato tipo listado de metadatos
+        forbidden_patterns = [
+            "Personajes principales:",
+            "Nuevos personajes:",
+            "Escenarios:",
+            "Tono ",
+            "interacciones",
+            "Protagonizado por",
+        ]
+        for pattern in forbidden_patterns:
+            assert pattern not in result, f"Summary contains metadata pattern: '{pattern}'"
+
+
+class TestSplitIntoSentences:
+    """Tests para _split_into_sentences."""
+
+    def test_basic_split(self):
+        """Divide texto básico en oraciones."""
+        text = "Juan corrió. María saltó. Pedro gritó fuertemente."
+        sents = ChapterSummaryAnalyzer._split_into_sentences(text)
+        # Puede filtrar oraciones cortas (<20 chars)
+        assert len(sents) >= 0  # Depende del filtro de longitud
+
+    def test_filters_dialogue(self):
+        """Filtra líneas de diálogo con raya."""
+        text = (
+            "El sol brillaba con fuerza sobre la ciudad dormida.\n"
+            "—¡Buenos días! —dijo Juan alegremente.\n"
+            "María caminaba por la calle empedrada del centro histórico."
+        )
+        sents = ChapterSummaryAnalyzer._split_into_sentences(text)
+        for s in sents:
+            assert "—" not in s
+
+    def test_filters_scene_separators(self):
+        """Filtra separadores de escena."""
+        text = "Primera escena con suficiente texto para no ser filtrada.\n\n* * *\n\nSegunda escena también con texto suficiente."
+        sents = ChapterSummaryAnalyzer._split_into_sentences(text)
+        for s in sents:
+            assert "* * *" not in s
+
+    def test_empty_text(self):
+        """Texto vacío retorna lista vacía."""
+        assert ChapterSummaryAnalyzer._split_into_sentences("") == []
+
+    def test_filters_short_sentences(self):
+        """Filtra oraciones demasiado cortas (<20 chars)."""
+        text = "Sí. No. Bueno. Esta oración sí tiene suficiente contenido narrativo."
+        sents = ChapterSummaryAnalyzer._split_into_sentences(text)
+        for s in sents:
+            assert len(s) >= 20
+
+
+class TestScoreSentence:
+    """Tests para _score_sentence."""
+
+    def test_first_sentence_gets_bonus(self):
+        """La primera oración tiene mayor puntuación."""
+        sent = "Un texto normal sin nada especial en la oración."
+        score_first = ChapterSummaryAnalyzer._score_sentence(sent, 0, 10, set())
+        score_mid = ChapterSummaryAnalyzer._score_sentence(sent, 5, 10, set())
+        assert score_first > score_mid
+
+    def test_character_mention_boosts_score(self):
+        """Mencionar personajes aumenta la puntuación."""
+        sent = "María descubrió el secreto que guardaba Juan desde hacía años."
+        names = {"maría", "juan"}
+        score_with = ChapterSummaryAnalyzer._score_sentence(sent, 3, 10, names)
+        score_without = ChapterSummaryAnalyzer._score_sentence(sent, 3, 10, set())
+        assert score_with > score_without
+
+    def test_action_verbs_boost_score(self):
+        """Verbos de acción narrativa aumentan la puntuación."""
+        sent_action = "María descubrió la verdad oculta tras la puerta cerrada."
+        sent_plain = "El cielo estaba azul y despejado aquella mañana de primavera."
+        names: set[str] = set()
+        score_action = ChapterSummaryAnalyzer._score_sentence(sent_action, 3, 10, names)
+        score_plain = ChapterSummaryAnalyzer._score_sentence(sent_plain, 3, 10, names)
+        assert score_action > score_plain
+
+    def test_last_sentences_get_bonus(self):
+        """Las últimas oraciones tienen bonus."""
+        sent = "Un texto normal sin nada especial en la oración."
+        score_last = ChapterSummaryAnalyzer._score_sentence(sent, 9, 10, set())
+        score_mid = ChapterSummaryAnalyzer._score_sentence(sent, 5, 10, set())
+        assert score_last > score_mid

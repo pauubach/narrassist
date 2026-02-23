@@ -780,7 +780,7 @@ class ChapterSummaryAnalyzer:
             summary.dominant_tone = "neutral"
             summary.tone_intensity = 0.5
 
-        summary.auto_summary = self._generate_text_summary(summary)
+        summary.auto_summary = self._generate_text_summary(summary, chapter_text)
 
         # Análisis LLM del capítulo
         if self.mode != AnalysisMode.BASIC and chapter_text:
@@ -912,52 +912,155 @@ class ChapterSummaryAnalyzer:
         except Exception as e:
             logger.warning(f"Error en análisis LLM del capítulo {summary.chapter_number}: {e}")
 
-    def _generate_text_summary(self, summary: ChapterSummary) -> str:
-        """Genera un resumen textual del capítulo."""
-        parts = []
+    def _generate_text_summary(
+        self, summary: ChapterSummary, chapter_text: str = ""
+    ) -> str:
+        """Genera un resumen narrativo extractivo del capítulo.
 
-        if summary.characters_present:
-            top_chars = summary.characters_present[:5]
-            char_names = [c.name for c in top_chars]
-            if len(char_names) == 1:
-                parts.append(f"Protagonizado por {char_names[0]}")
-            else:
-                parts.append(
-                    f"Personajes principales: {', '.join(char_names[:-1])} y {char_names[-1]}"
-                )
+        Selecciona las oraciones más representativas del texto original
+        usando scoring por: posición, mención de personajes, eventos
+        narrativos y relevancia estructural.
+        """
+        if not chapter_text or not chapter_text.strip():
+            return "Sin contenido disponible para generar resumen."
 
-        if summary.new_characters:
-            if len(summary.new_characters) == 1:
-                parts.append(f"Aparece por primera vez {summary.new_characters[0]}")
-            else:
-                parts.append(f"Nuevos personajes: {', '.join(summary.new_characters)}")
+        sentences = self._split_into_sentences(chapter_text)
+        if not sentences:
+            return "Sin contenido disponible para generar resumen."
 
-        if summary.returning_characters:
-            parts.append(f"Regresan: {', '.join(summary.returning_characters)}")
+        # Nombres de personajes presentes (para scoring)
+        char_names = {c.name.lower() for c in summary.characters_present}
+        # También incluir formas parciales (primer nombre)
+        char_first_names: set[str] = set()
+        for name in char_names:
+            parts = name.split()
+            if parts:
+                char_first_names.add(parts[0])
+                if len(parts) > 1:
+                    char_first_names.add(parts[-1])
+        all_names = char_names | char_first_names
 
-        if summary.total_interactions > 0:
-            int_desc = []
-            if summary.conflict_interactions > 0:
-                int_desc.append(f"{summary.conflict_interactions} conflictivas")
-            if summary.positive_interactions > 0:
-                int_desc.append(f"{summary.positive_interactions} positivas")
-            if int_desc:
-                parts.append(f"{summary.total_interactions} interacciones ({', '.join(int_desc)})")
+        scored: list[tuple[float, int, str]] = []
+        n_sents = len(sentences)
 
-        if summary.locations_mentioned:
-            locs = summary.locations_mentioned[:3]
-            parts.append(f"Escenarios: {', '.join(locs)}")
+        for idx, sent in enumerate(sentences):
+            score = self._score_sentence(sent, idx, n_sents, all_names)
+            scored.append((score, idx, sent))
 
-        tone_names = {
-            "tense": "Tono tenso",
-            "positive": "Tono positivo",
-            "negative": "Tono negativo",
-            "neutral": "Tono neutro",
-        }
-        if summary.dominant_tone != "neutral":
-            parts.append(tone_names.get(summary.dominant_tone, ""))
+        # Seleccionar top oraciones manteniendo orden original
+        scored.sort(key=lambda x: x[0], reverse=True)
 
-        return ". ".join(filter(None, parts)) + "." if parts else "Sin información destacada."
+        # Cuántas oraciones elegir (2-4 según longitud del texto)
+        max_sents = 2 if len(chapter_text) < 3000 else (3 if len(chapter_text) < 8000 else 4)
+        selected = sorted(scored[:max_sents], key=lambda x: x[1])  # Orden original
+
+        result = " ".join(s[2] for s in selected)
+
+        # Limitar a ~400 caracteres
+        if len(result) > 400:
+            result = result[:397].rsplit(" ", 1)[0] + "..."
+
+        return result if result.strip() else "Sin contenido disponible para generar resumen."
+
+    @staticmethod
+    def _split_into_sentences(text: str) -> list[str]:
+        """Divide texto en oraciones para resumen extractivo."""
+        # Eliminar diálogo (rayas) — el resumen debe ser narrativo
+        lines = text.split("\n")
+        narrative_lines = []
+        for line in lines:
+            stripped = line.strip()
+            # Ignorar líneas de diálogo y separadores
+            if stripped.startswith(("—", "–", "-\"", "«")) or stripped in ("", "* * *", "***"):
+                continue
+            narrative_lines.append(stripped)
+
+        narrative_text = " ".join(narrative_lines)
+        # Limpiar espacios múltiples
+        narrative_text = re.sub(r"\s+", " ", narrative_text).strip()
+
+        if not narrative_text:
+            return []
+
+        # Split por puntuación de fin de oración
+        raw_sents = re.split(r"(?<=[.!?])\s+", narrative_text)
+
+        result = []
+        for s in raw_sents:
+            s = s.strip()
+            # Filtrar oraciones demasiado cortas o sin contenido real
+            if len(s) < 20:
+                continue
+            # Filtrar fragmentos que son solo nombres propios
+            words = s.split()
+            if len(words) < 4:
+                continue
+            result.append(s)
+
+        return result
+
+    @staticmethod
+    def _score_sentence(
+        sent: str, idx: int, total: int, char_names: set[str]
+    ) -> float:
+        """Puntúa una oración para resumen extractivo.
+
+        Criterios:
+        - Posición: primeras y últimas oraciones valen más
+        - Personajes: menciona personajes presentes en el capítulo
+        - Verbos de acción narrativa: decidir, descubrir, revelar, etc.
+        - Longitud: ni demasiado corta ni demasiado larga
+        """
+        score = 0.0
+        sent_lower = sent.lower()
+
+        # --- Posición (primeras oraciones suelen introducir la escena) ---
+        if idx == 0:
+            score += 3.0
+        elif idx == 1:
+            score += 1.5
+        elif idx == 2:
+            score += 0.5
+        # Últimas oraciones suelen cerrar/concluir
+        if total > 3 and idx >= total - 2:
+            score += 1.5
+
+        # --- Mención de personajes ---
+        name_hits = sum(1 for name in char_names if name in sent_lower)
+        score += min(name_hits * 1.0, 3.0)  # Max 3 puntos por personajes
+
+        # --- Verbos de acción narrativa significativa ---
+        action_patterns = [
+            r"\b(?:descubr|revel|confes|decid|resolv|comprend)\w+\b",
+            r"\b(?:lleg|part|huy|escap|regres|abandon)\w+\b",
+            r"\b(?:enfrent|luch|atac|defend|traicion)\w+\b",
+            r"\b(?:record|olvid|prometi|jur|advirti)\w+\b",
+            r"\b(?:muri|naci|desapareci|transform)\w+\b",
+        ]
+        for pattern in action_patterns:
+            if re.search(pattern, sent_lower):
+                score += 0.8
+
+        # --- Conectores causales/temporales (indican progresión narrativa) ---
+        if re.search(
+            r"\b(?:por eso|por lo tanto|entonces|así que|de modo que|sin embargo|"
+            r"no obstante|mientras tanto|después de|antes de|cuando)\b",
+            sent_lower,
+        ):
+            score += 0.5
+
+        # --- Penalización por oraciones genéricas/descriptivas ---
+        if re.search(r"^(?:el sol|la noche|el día|hacía|era un)\b", sent_lower):
+            score -= 0.5
+
+        # --- Longitud óptima (40-150 chars) ---
+        length = len(sent)
+        if 40 <= length <= 150:
+            score += 0.5
+        elif length > 250:
+            score -= 0.3
+
+        return score
 
     def _calculate_character_arcs(
         self, chapters: list[ChapterSummary], all_characters: dict[int, str]
