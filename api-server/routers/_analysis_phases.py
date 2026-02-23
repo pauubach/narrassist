@@ -1903,6 +1903,17 @@ def run_llm_entity_validation(ctx: dict, tracker: ProgressTracker):
         logger.info("[LLM_VALIDATION] Skipped — entities from NER cache (already validated)")
         return
 
+    # Keep NER phase visually active during validation so the UI shows the
+    # spinner instead of a dead gap between NER-done and fusion-start.
+    with deps._progress_lock:
+        storage = deps.analysis_progress_storage.get(project_id, {})
+        phases_list = storage.get("phases", [])
+        for p in phases_list:
+            if p.get("id") == "ner":
+                p["current"] = True
+                p["completed"] = False
+                break
+
     _update_storage(
         project_id,
         current_action="Verificando personajes detectados con modelo de lenguaje...",
@@ -1986,6 +1997,16 @@ JSON:"""
 
     tracker.check_cancelled()
     ctx["entities"] = entities
+
+    # Re-mark NER as completed (was temporarily set to current during validation)
+    with deps._progress_lock:
+        storage = deps.analysis_progress_storage.get(project_id, {})
+        phases_list = storage.get("phases", [])
+        for p in phases_list:
+            if p.get("id") == "ner":
+                p["current"] = False
+                p["completed"] = True
+                break
 
     # Write NER cache now (after validation, so cached entities are clean)
     _ner_cp = ctx.pop("_ner_cache_pending", None)
