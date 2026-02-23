@@ -9,11 +9,11 @@ Determina quien dice que en los dialogos usando multiples estrategias:
 
 import logging
 import re
-import unicodedata
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Protocol
 
+from ..core.text_utils import normalize_for_lookup, strip_accents
 from ..persistence.chapter import _SCENE_BREAK_PATTERNS
 
 logger = logging.getLogger(__name__)
@@ -345,22 +345,8 @@ class SpeakerAttributor:
 
         logger.info(f"SpeakerAttributor initialized with {len(self.entities)} entities")
 
-    @staticmethod
-    def _strip_accents(text: str) -> str:
-        if not text:
-            return ""
-        normalized = unicodedata.normalize("NFD", text)
-        return "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
-
-    @classmethod
-    def _normalize_name_key(cls, text: str) -> str:
-        stripped = cls._strip_accents(text).lower()
-        stripped = re.sub(r"[^a-z0-9\s]", " ", stripped)
-        stripped = re.sub(r"\s+", " ", stripped).strip()
-        return stripped
-
     def _index_entity_name(self, entity_id: int, raw_name: str) -> None:
-        key = self._normalize_name_key(raw_name)
+        key = normalize_for_lookup(raw_name)
         if not key:
             return
         self.entity_names[key] = entity_id
@@ -371,7 +357,7 @@ class SpeakerAttributor:
             self.entity_token_candidates.setdefault(token, set()).add(entity_id)
 
     def _resolve_entity_id(self, candidate_name: str) -> int | None:
-        key = self._normalize_name_key(candidate_name)
+        key = normalize_for_lookup(candidate_name)
         if not key:
             return None
 
@@ -457,7 +443,7 @@ class SpeakerAttributor:
         Intenta el nombre completo y, si falla, elimina tokens finales
         para quedarse con el núcleo nominal.
         """
-        key = self._normalize_name_key(candidate_name)
+        key = normalize_for_lookup(candidate_name)
         if not key:
             return None
 
@@ -499,7 +485,7 @@ class SpeakerAttributor:
         if not dialogue_text:
             return False
 
-        text_norm = self._strip_accents(dialogue_text).lower()
+        text_norm = strip_accents(dialogue_text).lower()
         name_keys = sorted(
             self.entity_name_keys_by_id.get(entity_id, set()),
             key=len,
@@ -522,7 +508,7 @@ class SpeakerAttributor:
         if not context_before:
             return False
 
-        context_norm = self._strip_accents(context_before).lower()
+        context_norm = strip_accents(context_before).lower()
         name_keys = sorted(
             self.entity_name_keys_by_id.get(entity_id, set()),
             key=len,
@@ -997,8 +983,8 @@ class SpeakerAttributor:
             Tupla (entity_id, verbo) o None
         """
         context_after_local = self._trim_context_after(context_after)
-        context_after_norm = self._strip_accents(context_after_local).lower()
-        context_before_norm = self._strip_accents(context_before).lower()
+        context_after_norm = strip_accents(context_after_local).lower()
+        context_before_norm = strip_accents(context_before).lower()
 
         # Buscar en contexto despues del dialogo
         for pattern in [self.pattern_verb_name, self.pattern_comma_verb_name]:

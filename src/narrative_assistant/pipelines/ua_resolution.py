@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
+from ..core.text_utils import normalize_name as _normalize_name_shared_shared
 
 logger = logging.getLogger(__name__)
 
@@ -282,9 +283,6 @@ class PipelineResolutionMixin:
             except Exception as e:
                 logger.debug(f"Could not load entity mentions: {e}")
 
-            def _normalize_name(value: str) -> str:
-                return " ".join((value or "").strip().lower().split())
-
             # Índice de nombres/aliases para mapear resoluciones de coref a entidades reales.
             canonical_by_norm: dict[str, tuple[str, int | None]] = {}
             for entity in character_entities:
@@ -294,17 +292,17 @@ class PipelineResolutionMixin:
                 )
                 canonical_name = (canonical_name or "").strip()
                 if canonical_name:
-                    canonical_by_norm[_normalize_name(canonical_name)] = (
+                    canonical_by_norm[_normalize_name_shared(canonical_name)] = (
                         canonical_name,
                         entity_id,
                     )
                 for alias in getattr(entity, "aliases", []) or []:
-                    alias_norm = _normalize_name(alias)
+                    alias_norm = _normalize_name_shared(alias)
                     if alias_norm and alias_norm not in canonical_by_norm:
                         canonical_by_norm[alias_norm] = (canonical_name or alias, entity_id)
 
             def _resolve_to_character(name: str) -> tuple[str, int | None]:
-                normalized = _normalize_name(name)
+                normalized = _normalize_name_shared(name)
                 if not normalized:
                     return name, None
 
@@ -404,7 +402,7 @@ class PipelineResolutionMixin:
                 if not dialogue.get("resolved_speaker"):
                     speaker = (dialogue.get("speaker_hint") or "").strip()
                     if speaker:
-                        speaker_lower = _normalize_name(speaker)
+                        speaker_lower = _normalize_name_shared(speaker)
                         resolved_name: str | None = None
                         method = "hint_only"
 

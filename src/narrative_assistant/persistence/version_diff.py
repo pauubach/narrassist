@@ -10,11 +10,11 @@ Incluye:
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from typing import Any
 
 from narrative_assistant.analysis.entity_continuity_service import EntityContinuityService
+from narrative_assistant.core.text_utils import normalize_name, token_jaccard
 
 
 @dataclass(frozen=True)
@@ -58,21 +58,13 @@ class VersionDiffRepository:
         self.db = db
         self.continuity_service = EntityContinuityService()
 
-    def _normalize_name(self, value: str) -> str:
-        normalized = value.lower().strip()
-        normalized = re.sub(r"\s+", " ", normalized)
-        normalized = re.sub(r"[^\w\s]", "", normalized)
-        return normalized
-
     def _token_jaccard(self, left: str, right: str) -> float:
-        left_tokens = set(self._normalize_name(left).split())
-        right_tokens = set(self._normalize_name(right).split())
-        if not left_tokens or not right_tokens:
-            return 0.0
-        union = left_tokens | right_tokens
-        if not union:
-            return 0.0
-        return len(left_tokens & right_tokens) / len(union)
+        # Directly use shared implementation
+        return token_jaccard(left, right)
+
+    def _normalize_name(self, value: str) -> str:
+        # Directly use shared implementation
+        return normalize_name(value)
 
     def _name_score(
         self,

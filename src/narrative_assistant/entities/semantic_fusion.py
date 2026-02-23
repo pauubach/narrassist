@@ -12,10 +12,10 @@ Los LLMs se ejecutan via Ollama (llama3.2, mistral, qwen2.5).
 
 import logging
 import re
-import unicodedata
 from dataclasses import dataclass
 
 from ..core.config import get_config
+from ..core.text_utils import strip_accents
 from ..nlp.embeddings import get_embeddings_model
 from .models import Entity, EntityType
 
@@ -457,46 +457,6 @@ def are_hypocoristic_match(name1: str, name2: str) -> bool:
                 return True
 
     return False
-
-
-def strip_accents(text: str) -> str:
-    """
-    Quita acentos diacríticos del texto para comparación.
-
-    Mantiene la ñ (es letra, no acento) y otros caracteres base.
-
-    Args:
-        text: Texto con posibles acentos
-
-    Returns:
-        Texto sin acentos diacríticos
-
-    Examples:
-        >>> strip_accents("María")
-        'Maria'
-        >>> strip_accents("José García")
-        'Jose Garcia'
-        >>> strip_accents("niño")  # ñ se mantiene
-        'niño'
-    """
-    if not text:
-        return text
-
-    # Preservar ñ/Ñ antes de la normalización NFD
-    # Usamos placeholders que no contienen caracteres especiales
-    _PLACEHOLDER_LOWER = "\x00\x01"  # Placeholder para ñ
-    _PLACEHOLDER_UPPER = "\x00\x02"  # Placeholder para Ñ
-    text = text.replace("ñ", _PLACEHOLDER_LOWER).replace("Ñ", _PLACEHOLDER_UPPER)
-
-    # NFD descompone los caracteres acentuados en base + acento
-    normalized = unicodedata.normalize("NFD", text)
-    # Filtrar solo los "Nonspacing Mark" (acentos), manteniendo todo lo demás
-    result = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
-    # Recomponer cualquier carácter que pudiera haberse descompuesto
-    result = unicodedata.normalize("NFC", result)
-
-    # Restaurar ñ/Ñ
-    return result.replace(_PLACEHOLDER_LOWER, "ñ").replace(_PLACEHOLDER_UPPER, "Ñ")
 
 
 def strip_interior_particles(name: str) -> str:
