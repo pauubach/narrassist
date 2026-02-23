@@ -79,9 +79,36 @@ def _is_valid_profession_context(
             span = doc.char_span(char_start, char_end, alignment_mode="expand")
             if span and len(span) > 0:
                 token = span.root
-                # ADV, ADJ, VERB, DET, PRON → nunca es profesión
-                if token.pos_ in {"ADV", "ADJ", "VERB", "ADP", "DET", "PRON", "SCONJ", "CCONJ"}:
+
+                # Rechazar adverbios, determinantes, pronombres (siempre)
+                if token.pos_ in {"ADV", "DET", "PRON", "SCONJ", "CCONJ", "ADP"}:
                     return False
+
+                # Rechazar verbos (salvo participios que pueden ser profes: "es graduado")
+                if token.pos_ == "VERB" and not token.morph.get("VerbForm") == ["Part"]:
+                    return False
+
+                # ADJ: permitir solo si está en predicado nominal (después de cop)
+                # Ejemplo válido: "era médico" (médico etiquetado como ADJ por spaCy)
+                # Ejemplo inválido: "exactamente lo que..." (exactamente como ADJ)
+                if token.pos_ == "ADJ":
+                    # Buscar si hay un verbo copulativo (cop) antes del token
+                    has_copula_before = False
+                    for ancestor in token.ancestors:
+                        if ancestor.dep_ == "cop" or (ancestor.pos_ == "AUX" and ancestor.lemma_ in {"ser", "estar"}):
+                            has_copula_before = True
+                            break
+                    # También mirar hermanos (para casos donde cop es hermano, no ancestro)
+                    if not has_copula_before and token.head:
+                        for child in token.head.children:
+                            if child.dep_ == "cop":
+                                has_copula_before = True
+                                break
+
+                    # Si no hay cópula, es un ADJ genuino (no predicado nominal)
+                    if not has_copula_before:
+                        return False
+
                 # NOUN o PROPN → probablemente profesión (pasar a capas siguientes)
 
     # Capa 2: Adverbios en -mente
