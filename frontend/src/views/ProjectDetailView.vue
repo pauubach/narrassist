@@ -1557,20 +1557,22 @@ const startReanalysis = async () => {
   entities.value = []
   alerts.value = []
 
-  // Activar el estado de análisis en el store para que StatusBar lo muestre
-  analysisStore.setAnalyzing(project.value.id, true)
+  // Pausar el polling ANTES de llamar al API para evitar que capture
+  // el estado "cancelled" del análisis anterior (race condition).
+  stopAnalysisPolling()
 
   try {
     const data = await api.postRaw<{ success: boolean; error?: string }>(`/api/projects/${project.value.id}/reanalyze`)
 
     if (data.success) {
-      // El proyecto ahora está en estado "analyzing", iniciar polling
+      // Backend ya creó el nuevo storage con status "running" →
+      // ahora es seguro activar el polling
+      analysisStore.setAnalyzing(project.value.id, true)
       await projectsStore.fetchProject(project.value.id)
       // No cargar entidades/alertas aquí - se cargarán cuando termine el análisis
     } else {
       error.value = data.error || 'Error al re-analizar'
       // En caso de error, recargar los datos originales
-      analysisStore.setAnalyzing(project.value.id, false)
       await loadEntities(project.value.id)
       await loadAlerts(project.value.id)
     }
@@ -1578,7 +1580,6 @@ const startReanalysis = async () => {
     error.value = 'No se pudo re-analizar el documento. Si persiste, reinicia la aplicación.'
     // En caso de error, recargar los datos originales
     if (project.value) {
-      analysisStore.setAnalyzing(project.value.id, false)
       await loadEntities(project.value.id)
       await loadAlerts(project.value.id)
     }

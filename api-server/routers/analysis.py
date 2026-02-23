@@ -332,6 +332,25 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 )
                 # Auto-limpiar análisis bloqueado
                 _force_clear_analysis(project_id)
+
+                # Crear placeholder inmediato en storage para que cualquier
+                # poll que llegue durante la preparación vea "running" en vez
+                # de "idle" (evita que el frontend muestre estado estancado)
+                import time as _time_mod
+
+                with deps._progress_lock:
+                    deps.analysis_cancellation_flags.pop(project_id, None)
+                    deps.analysis_progress_storage[project_id] = {
+                        "project_id": project_id,
+                        "status": "running",
+                        "progress": 0,
+                        "current_phase": "Preparando re-análisis...",
+                        "current_action": "Iniciando",
+                        "last_update": _time_mod.time(),
+                        "phases": [],
+                        "metrics": {},
+                    }
+
                 # Actualizar previous_analysis_status para reflejar que fue limpiado
                 # (evita que fast-path trate datos parciales como completos)
                 previous_analysis_status = "error"

@@ -111,6 +111,13 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
       if (['completed', 'error', 'failed', 'cancelled'].includes(progressData.status)) {
         stopPolling()
 
+        // Cancelled: el usuario canceló — no mostrar error ni recargar datos.
+        // cancelAnalysis() ya gestionó la transición de estado y fetchProject.
+        if (progressData.status === 'cancelled') {
+          analysisStore.setAnalyzing(project.value!.id, false)
+          return
+        }
+
         if (progressData.status === 'completed') {
           notifyAnalysisComplete(project.value?.name)
         } else {
