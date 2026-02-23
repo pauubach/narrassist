@@ -116,20 +116,20 @@ PHASE_NAMES: dict[str, str] = {
     "health": "Salud narrativa",
 }
 
-# Phase weights for progress estimation
+# Phase weights for progress estimation (defaults — auto-calibrated per project)
 PHASE_WEIGHTS: dict[str, float] = {
     "parsing": 0.01,
     "classification": 0.01,
     "structure": 0.01,
-    "ner": 0.31,
-    "fusion": 0.15,
-    "attributes": 0.08,
+    "ner": 0.22,
+    "fusion": 0.28,
+    "attributes": 0.07,
     "consistency": 0.03,
     "grammar": 0.06,
-    "alerts": 0.04,
+    "alerts": 0.03,
     "relationships": 0.08,
-    "voice": 0.08,
-    "prose": 0.08,
+    "voice": 0.07,
+    "prose": 0.07,
     "health": 0.06,
 }
 

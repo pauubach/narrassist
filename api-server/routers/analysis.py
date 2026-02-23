@@ -8,9 +8,94 @@ import deps
 from deps import ApiResponse, logger
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from routers._partial_analysis import PartialAnalysisRequest
+from routers._partial_analysis import PHASE_WEIGHTS, PartialAnalysisRequest
 
 router = APIRouter()
+
+# Phase order used across analysis orchestration
+PHASE_ORDER = [
+    "parsing",
+    "classification",
+    "structure",
+    "ner",
+    "fusion",
+    "attributes",
+    "consistency",
+    "grammar",
+    "alerts",
+    "relationships",
+    "voice",
+    "prose",
+    "health",
+]
+
+
+def _get_calibrated_weights(project_id: int, db_session: object) -> dict[str, float]:
+    """Calcula pesos calibrados basados en duraciones históricas.
+
+    Lee la última ejecución completada del proyecto y mezcla los pesos
+    observados con los pesos por defecto (70% observado / 30% default)
+    para evitar sobre-corrección.
+
+    Falls back a PHASE_WEIGHTS si no hay datos históricos.
+    """
+    import json
+
+    try:
+        with db_session.connection() as conn:
+            row = conn.execute(
+                """SELECT phase_durations_json
+                   FROM version_metrics
+                   WHERE project_id = ?
+                   ORDER BY version_num DESC
+                   LIMIT 1""",
+                (project_id,),
+            ).fetchone()
+
+        if not row or not row[0]:
+            return dict(PHASE_WEIGHTS)
+
+        durations: dict[str, float] = json.loads(row[0])
+        if not durations or not isinstance(durations, dict):
+            return dict(PHASE_WEIGHTS)
+
+        # Solo calibrar fases que tenemos en el orden esperado
+        relevant = {k: v for k, v in durations.items() if k in PHASE_WEIGHTS and v > 0}
+        if len(relevant) < 3:
+            # Insuficientes datos — usar defaults
+            return dict(PHASE_WEIGHTS)
+
+        total_duration = sum(relevant.values())
+        if total_duration <= 0:
+            return dict(PHASE_WEIGHTS)
+
+        # Calcular pesos observados
+        observed = {k: v / total_duration for k, v in relevant.items()}
+
+        # Blending: 70% observado / 30% default
+        blended: dict[str, float] = {}
+        for key in PHASE_ORDER:
+            obs = observed.get(key)
+            default = PHASE_WEIGHTS.get(key, 0.05)
+            if obs is not None:
+                blended[key] = 0.7 * obs + 0.3 * default
+            else:
+                blended[key] = default
+
+        # Normalizar para que sumen 1.0
+        total = sum(blended.values())
+        if total > 0:
+            blended = {k: v / total for k, v in blended.items()}
+
+        logger.debug(
+            f"[Calibration] project {project_id}: "
+            + ", ".join(f"{k}={v:.1%}" for k, v in blended.items())
+        )
+        return blended
+
+    except Exception as e:
+        logger.debug(f"[Calibration] fallback to defaults: {e}")
+        return dict(PHASE_WEIGHTS)
 
 
 def _is_analysis_stuck(project_id: int) -> bool:
@@ -442,45 +527,15 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
             with deps._progress_lock:
                 phases = deps.analysis_progress_storage[project_id]["phases"]
 
-            phase_weights = {
-                "parsing": 0.01,
-                "classification": 0.01,
-                "structure": 0.01,
-                "ner": 0.31,
-                "fusion": 0.15,
-                "attributes": 0.08,
-                "consistency": 0.03,
-                "grammar": 0.06,
-                "alerts": 0.04,
-                "relationships": 0.08,
-                "voice": 0.08,
-                "prose": 0.08,
-                "health": 0.06,
-            }
-            phase_order = [
-                "parsing",
-                "classification",
-                "structure",
-                "ner",
-                "fusion",
-                "attributes",
-                "consistency",
-                "grammar",
-                "alerts",
-                "relationships",
-                "voice",
-                "prose",
-                "health",
-            ]
+            db_session = deps.get_database()
+            phase_weights = _get_calibrated_weights(project_id, db_session=db_session)
 
             # --- S8a-14: Thin orchestrator using extracted phase functions ---
-            db_session = deps.get_database()
-
             tracker = ProgressTracker(
                 project_id=project_id,
                 phases=phases,
                 phase_weights=phase_weights,
-                phase_order=phase_order,
+                phase_order=PHASE_ORDER,
                 db_session=db_session,
             )
 

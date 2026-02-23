@@ -86,22 +86,24 @@ interface PhaseDefinition {
 }
 
 // Rangos alineados con los pesos del backend (13 fases):
-// Tier 1 (paralelo): parsing+classification+structure ~3%
-// Tier 2 (exclusivo): ner..alerts ~67%
-// Tier 3 (enriquecimiento): relationships..health ~30%
+// Tier 1 (rápido): parsing+classification+structure ~3%
+// Tier 2 (NLP pesado): ner+fusion ~50% (fusion incluye correferencias LLM)
+// Tier 3 (análisis): attributes..alerts ~19%
+// Tier 4 (enriquecimiento paralelo): relationships..health ~28%
+// Nota: pesos auto-calibrados por proyecto en el backend
 const allPhases: PhaseDefinition[] = [
   { id: 'parsing', name: 'Lectura del documento', range: [0, 1] },
   { id: 'classification', name: 'Clasificando documento', range: [1, 2] },
   { id: 'structure', name: 'Identificando capítulos', range: [2, 3] },
-  { id: 'ner', name: 'Buscando personajes y lugares', range: [3, 34] },
-  { id: 'fusion', name: 'Unificando entidades', range: [34, 49] },
-  { id: 'attributes', name: 'Analizando características', range: [49, 57] },
-  { id: 'consistency', name: 'Verificando coherencia', range: [57, 60] },
-  { id: 'grammar', name: 'Revisando gramática y ortografía', range: [60, 66] },
-  { id: 'alerts', name: 'Preparando observaciones', range: [66, 70] },
-  { id: 'relationships', name: 'Analizando relaciones', range: [70, 78] },
-  { id: 'voice', name: 'Perfilando voces', range: [78, 86] },
-  { id: 'prose', name: 'Evaluando escritura', range: [86, 94] },
+  { id: 'ner', name: 'Buscando personajes y lugares', range: [3, 25] },
+  { id: 'fusion', name: 'Unificando entidades', range: [25, 53] },
+  { id: 'attributes', name: 'Analizando características', range: [53, 60] },
+  { id: 'consistency', name: 'Verificando coherencia', range: [60, 63] },
+  { id: 'grammar', name: 'Revisando gramática y ortografía', range: [63, 69] },
+  { id: 'alerts', name: 'Preparando observaciones', range: [69, 72] },
+  { id: 'relationships', name: 'Analizando relaciones', range: [72, 80] },
+  { id: 'voice', name: 'Perfilando voces', range: [80, 87] },
+  { id: 'prose', name: 'Evaluando escritura', range: [87, 94] },
   { id: 'health', name: 'Salud narrativa', range: [94, 100] },
 ]
 
