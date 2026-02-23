@@ -92,10 +92,21 @@ def _is_valid_profession_context(
                 # Ejemplo válido: "era médico" (médico etiquetado como ADJ por spaCy)
                 # Ejemplo inválido: "exactamente lo que..." (exactamente como ADJ)
                 if token.pos_ == "ADJ":
+                    # Lista expandida de cópulas españolas (consenso panel de expertos)
+                    # Ver: docs/expert_consultation_copulas.md
+                    COPULA_LEMMAS = {
+                        "ser", "estar",  # Cópulas puras
+                        "parecer", "resultar",  # Semi-cópulas
+                        "hacerse", "convertirse", "tornarse",  # Pseudo-cópulas
+                        "volverse", "quedarse",  # Cambio de estado
+                    }
+
                     # Buscar si hay un verbo copulativo (cop) antes del token
                     has_copula_before = False
                     for ancestor in token.ancestors:
-                        if ancestor.dep_ == "cop" or (ancestor.pos_ == "AUX" and ancestor.lemma_ in {"ser", "estar"}):
+                        if ancestor.dep_ == "cop" or (
+                            ancestor.pos_ == "AUX" and ancestor.lemma_ in COPULA_LEMMAS
+                        ):
                             has_copula_before = True
                             break
                     # También mirar hermanos (para casos donde cop es hermano, no ancestro)
