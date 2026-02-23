@@ -833,6 +833,11 @@ def _persist_sections_recursive(
 
 def run_snapshot(ctx: dict, tracker: ProgressTracker):
     """Captura snapshot pre-reanálisis (BK-05)."""
+    _update_storage(
+        ctx["project_id"],
+        current_phase="Preparando re-análisis...",
+        current_action="Guardando snapshot del análisis anterior",
+    )
     try:
         from narrative_assistant.persistence.snapshot import SnapshotRepository
 
@@ -849,6 +854,11 @@ def run_cleanup(ctx: dict, tracker: ProgressTracker):
     """Limpia datos existentes antes de re-analizar."""
     project_id = ctx["project_id"]
     db_session = ctx["db_session"]
+    _update_storage(
+        project_id,
+        current_phase="Preparando re-análisis...",
+        current_action="Limpiando datos del análisis anterior",
+    )
     logger.info(f"Clearing existing data for project {project_id}")
     try:
         with db_session.connection() as conn:

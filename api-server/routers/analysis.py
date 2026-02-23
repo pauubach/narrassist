@@ -582,7 +582,9 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
             try:
                 # Pre-analysis
+                _t0 = time.time()
                 run_parsing(ctx, tracker)
+                logger.info(f"[TIMING] run_parsing: {time.time() - _t0:.2f}s")
 
                 previous_fp = (ctx.get("previous_document_fingerprint") or "").strip()
                 current_fp = (ctx.get("document_fingerprint") or "").strip()
@@ -747,13 +749,26 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                     ctx["heavy_slot_released"] = True
                     return
 
+                _t0 = time.time()
                 run_snapshot(ctx, tracker)
+                logger.info(f"[TIMING] run_snapshot: {time.time() - _t0:.2f}s")
+
+                _t0 = time.time()
                 run_cleanup(ctx, tracker)
+                logger.info(f"[TIMING] run_cleanup: {time.time() - _t0:.2f}s")
+
+                _t0 = time.time()
                 apply_license_and_settings(ctx, tracker)
+                logger.info(f"[TIMING] apply_license_and_settings: {time.time() - _t0:.2f}s")
 
                 # Tier 1: Lightweight phases
+                _t0 = time.time()
                 run_classification(ctx, tracker)
+                logger.info(f"[TIMING] run_classification: {time.time() - _t0:.2f}s")
+
+                _t0 = time.time()
                 run_structure(ctx, tracker)
+                logger.info(f"[TIMING] run_structure: {time.time() - _t0:.2f}s")
 
                 incremental_plan = build_incremental_plan(
                     db=db_session,
@@ -787,14 +802,26 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                     return  # Will be resumed when heavy slot frees
 
                 # Ollama health check before heavy phases
+                _t0 = time.time()
                 run_ollama_healthcheck(ctx, tracker)
+                logger.info(f"[TIMING] run_ollama_healthcheck: {time.time() - _t0:.2f}s")
 
                 # Tier 2: Heavy phases (exclusive — one project at a time)
                 # NER → LLM validation → Fusion → Timeline (sequential)
+                _t0 = time.time()
                 run_ner(ctx, tracker)
+                logger.info(f"[TIMING] run_ner: {time.time() - _t0:.2f}s")
+                _t0 = time.time()
                 run_llm_entity_validation(ctx, tracker)
+                logger.info(f"[TIMING] run_llm_entity_validation: {time.time() - _t0:.2f}s")
+
+                _t0 = time.time()
                 run_fusion(ctx, tracker)
-                run_timeline(ctx, tracker)  # Construir timeline con entidades listas
+                logger.info(f"[TIMING] run_fusion: {time.time() - _t0:.2f}s")
+
+                _t0 = time.time()
+                run_timeline(ctx, tracker)
+                logger.info(f"[TIMING] run_timeline: {time.time() - _t0:.2f}s")
 
                 # Grammar is independent of attributes/consistency.
                 # Run in parallel: Thread 1 = grammar → grammar_alerts
