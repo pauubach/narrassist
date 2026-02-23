@@ -31,11 +31,21 @@ const props = withDefaults(defineProps<Props>(), {
   chapters: () => [],
 })
 
-/** Formato de capítulo: "1. Título" si hay título, "Cap. N" si no */
-function formatChapter(chapterNum: number): string {
+/** Formato corto para label de barra: "1. Título" truncado */
+function formatChapterShort(chapterNum: number): string {
+  const ch = props.chapters?.find(c => c.chapterNumber === chapterNum)
+  if (ch?.title) {
+    const full = `${chapterNum}. ${ch.title}`
+    return full.length > 20 ? full.slice(0, 18) + '…' : full
+  }
+  return `Cap. ${chapterNum}`
+}
+
+/** Formato completo para tooltip */
+function formatChapterFull(chapterNum: number): string {
   const ch = props.chapters?.find(c => c.chapterNumber === chapterNum)
   if (ch?.title) return `${chapterNum}. ${ch.title}`
-  return `Cap. ${chapterNum}`
+  return `Capítulo ${chapterNum}`
 }
 
 // ============================================================================
@@ -154,9 +164,10 @@ function getCategoryLabel(category: string): string {
     <div v-if="hasChapterData" class="analytics-section">
       <div class="section-header">
         <span class="section-title">Distribución por capítulo</span>
-        <span v-if="topChapter" class="section-hint">
-          {{ formatChapter(topChapter.chapter) }} tiene más alertas ({{ topChapter.count }})
-        </span>
+      </div>
+
+      <div v-if="topChapter" class="top-chapter-hint">
+        {{ formatChapterFull(topChapter.chapter) }} tiene más alertas ({{ topChapter.count }})
       </div>
 
       <div class="chapter-chart">
@@ -164,17 +175,16 @@ function getCategoryLabel(category: string): string {
           v-for="stat in chapterDistribution"
           :key="stat.chapter"
           class="chart-bar-wrapper"
+          :title="formatChapterFull(stat.chapter) + ': ' + stat.count + ' alertas'"
         >
-          <span class="bar-label" :title="formatChapter(stat.chapter)">{{ formatChapter(stat.chapter) }}</span>
-          <div class="bar-container">
+          <span class="bar-label">{{ formatChapterShort(stat.chapter) }}</span>
+          <div class="bar-track">
             <div
               class="bar-fill"
-              :style="{ width: `${Math.max(stat.percentage, 2)}%` }"
-              :title="`${stat.count} alertas`"
-            >
-              <span v-if="stat.count > 0" class="bar-count">{{ stat.count }}</span>
-            </div>
+              :style="{ width: `${Math.max(stat.percentage, 3)}%` }"
+            ></div>
           </div>
+          <span class="bar-count">{{ stat.count }}</span>
         </div>
       </div>
     </div>
@@ -272,48 +282,53 @@ function getCategoryLabel(category: string): string {
 .chapter-chart {
   display: flex;
   flex-direction: column;
-  gap: var(--ds-space-2);
+  gap: 0.375rem;
 }
 
 .chart-bar-wrapper {
   display: grid;
-  grid-template-columns: 70px 1fr;
+  grid-template-columns: minmax(80px, auto) 1fr 28px;
   align-items: center;
-  gap: var(--ds-space-2);
+  gap: 0.5rem;
 }
 
 .bar-label {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--text-color-secondary);
   text-align: right;
-  max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.3;
 }
 
-.bar-container {
-  height: 24px;
+.bar-track {
+  height: 18px;
   background: var(--surface-100);
   border-radius: var(--border-radius);
   overflow: hidden;
-  position: relative;
 }
 
 .bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary-500), var(--primary-600));
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 0.5rem;
+  background: linear-gradient(90deg, var(--primary-500), var(--primary-400));
+  border-radius: inherit;
   transition: width 0.3s ease;
+  min-width: 3px;
 }
 
 .bar-count {
   font-size: 0.75rem;
   font-weight: 600;
-  color: white;
+  color: var(--text-color);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.top-chapter-hint {
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+  margin-top: -0.25rem;
 }
 
 /* Category Table */
@@ -390,7 +405,7 @@ function getCategoryLabel(category: string): string {
   background: var(--surface-800);
 }
 
-.dark .bar-container {
+.dark .bar-track {
   background: var(--surface-700);
 }
 
