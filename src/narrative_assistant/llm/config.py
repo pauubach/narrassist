@@ -128,6 +128,7 @@ CORE_MODELS: dict[str, list[ModelRole]] = {
 
 # Modelos fallback — se usan cuando un core no está disponible
 FALLBACK_MODELS: dict[str, list[ModelRole]] = {
+    "gpt-oss": [ModelRole.SPANISH, ModelRole.REASONING, ModelRole.NARRATIVE],
     "qwen2.5": [ModelRole.SPANISH],
     "gemma2": [ModelRole.NARRATIVE],
     "mistral": [ModelRole.REASONING],  # Legacy
@@ -136,9 +137,9 @@ FALLBACK_MODELS: dict[str, list[ModelRole]] = {
 
 # Cadenas de sustitución por rol (ordenadas por preferencia)
 ROLE_SUBSTITUTES: dict[ModelRole, list[str]] = {
-    ModelRole.SPANISH: ["qwen3", "qwen2.5", "gemma2", "llama3.2"],
-    ModelRole.REASONING: ["deepseek-r1", "qwen3", "mistral", "llama3.2"],
-    ModelRole.NARRATIVE: ["hermes3", "gemma2", "qwen2.5", "llama3.2"],
+    ModelRole.SPANISH: ["qwen3", "gpt-oss", "qwen2.5", "gemma2", "llama3.2"],
+    ModelRole.REASONING: ["deepseek-r1", "gpt-oss", "qwen3", "mistral", "llama3.2"],
+    ModelRole.NARRATIVE: ["hermes3", "gpt-oss", "gemma2", "qwen2.5", "llama3.2"],
 }
 
 
@@ -228,6 +229,7 @@ MODEL_MEMORY_GB: dict[str, float] = {
     "qwen3": 8.5,
     "hermes3": 4.7,
     "deepseek-r1": 4.4,
+    "gpt-oss": 14.0,
     "qwen2.5": 4.4,
     "gemma2": 5.5,
     "mistral": 4.1,
@@ -250,9 +252,9 @@ LEVEL_MIN_BUDGET_GB: dict[QualityLevel, float] = {
 
 # Fallback de modelos por nivel cuando el budget es menor que el core
 LEVEL_FALLBACK_MODELS: dict[QualityLevel, list[str]] = {
-    QualityLevel.RAPIDA: ["qwen2.5", "llama3.2"],  # Si qwen3 no cabe
-    QualityLevel.COMPLETA: ["qwen2.5", "llama3.2"],
-    QualityLevel.EXPERTA: ["qwen2.5", "llama3.2"],
+    QualityLevel.RAPIDA: ["gpt-oss", "qwen2.5", "llama3.2"],  # Si qwen3 no cabe
+    QualityLevel.COMPLETA: ["gpt-oss", "qwen2.5", "llama3.2"],
+    QualityLevel.EXPERTA: ["gpt-oss", "qwen2.5", "llama3.2"],
 }
 
 
@@ -265,6 +267,7 @@ def resolve_fallbacks(
     task_config: TaskVotingConfig,
     available_models: set[str],
     level: QualityLevel = QualityLevel.EXPERTA,
+    budget_gb: float | None = None,
 ) -> TaskVotingConfig:
     """
     Resuelve sustituciones cuando un modelo no está disponible.
@@ -275,11 +278,14 @@ def resolve_fallbacks(
        disponible que NO esté ya asignado a otro slot
     3. Si no hay sustituto: eliminar el slot
     4. Limitar slots al número que corresponde al nivel de calidad
+    5. Si budget_gb se proporciona, descartar modelos que excedan el presupuesto
 
     Args:
         task_config: Configuración ideal de la tarea
         available_models: Modelos realmente instalados/descargados
         level: Nivel de calidad seleccionado
+        budget_gb: Presupuesto de memoria disponible (GB). Si se pasa,
+                   evita asignar modelos que no quepan en RAM/VRAM.
 
     Returns:
         TaskVotingConfig con modelos sustituidos según disponibilidad
@@ -296,13 +302,26 @@ def resolve_fallbacks(
     for slot in active_slots:
         model = slot.model_name
 
-        if model in normalized_available and model not in used_models:
-            # Modelo original disponible
+        # Comprobar que el modelo cabe en el presupuesto de memoria
+        model_fits = True
+        if budget_gb is not None:
+            mem = MODEL_MEMORY_GB.get(model, 0.0)
+            if mem > budget_gb:
+                logger.debug(
+                    f"Modelo {model} excede budget "
+                    f"({mem:.1f} GB > {budget_gb:.1f} GB), buscando sustituto"
+                )
+                model_fits = False
+
+        if model_fits and model in normalized_available and model not in used_models:
+            # Modelo original disponible y cabe en memoria
             resolved_slots.append(slot)
             used_models.add(model)
         else:
-            # Buscar sustituto para el mismo rol
-            substitute = _find_substitute(slot.role, normalized_available, used_models)
+            # Buscar sustituto para el mismo rol (respetando budget)
+            substitute = _find_substitute(
+                slot.role, normalized_available, used_models, budget_gb
+            )
             if substitute:
                 logger.info(
                     f"Fallback: {model} → {substitute} "
@@ -343,11 +362,25 @@ def _find_substitute(
     role: ModelRole,
     available: set[str],
     already_used: set[str],
+    budget_gb: float | None = None,
 ) -> str | None:
-    """Encuentra el mejor sustituto disponible para un rol."""
+    """Encuentra el mejor sustituto disponible para un rol.
+
+    Si se proporciona budget_gb, descarta modelos que excedan el presupuesto
+    de memoria del sistema para evitar OOM / congelamiento.
+    """
     for candidate in ROLE_SUBSTITUTES.get(role, []):
-        if candidate in available and candidate not in already_used:
-            return candidate
+        if candidate not in available or candidate in already_used:
+            continue
+        if budget_gb is not None:
+            mem = MODEL_MEMORY_GB.get(candidate, 0.0)
+            if mem > budget_gb:
+                logger.debug(
+                    f"Descartando {candidate} como sustituto "
+                    f"({mem:.1f} GB > budget {budget_gb:.1f} GB)"
+                )
+                continue
+        return candidate
     return None
 
 
@@ -356,6 +389,7 @@ def get_voting_config(
     available_models: set[str],
     level: QualityLevel = QualityLevel.EXPERTA,
     sensitivity: float = 5.0,
+    budget_gb: float | None = None,
 ) -> TaskVotingConfig:
     """
     Obtiene la configuración de votación resuelta para una tarea.
@@ -365,12 +399,13 @@ def get_voting_config(
         available_models: Modelos instalados
         level: Nivel de calidad
         sensitivity: Valor del slider (1-10), default 5
+        budget_gb: Presupuesto de memoria (GB) para filtrar modelos grandes
 
     Returns:
         TaskVotingConfig con fallbacks resueltos y confianza ajustada
     """
     base_config = QUALITY_MATRIX[task]
-    resolved = resolve_fallbacks(base_config, available_models, level)
+    resolved = resolve_fallbacks(base_config, available_models, level, budget_gb)
 
     # Ajustar min_confidence según sensibilidad
     if sensitivity != 5.0:

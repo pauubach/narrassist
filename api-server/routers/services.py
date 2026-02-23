@@ -18,8 +18,8 @@ from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
 
-_MODEL_SPEED_ORDER = ["llama3.2", "hermes3", "deepseek-r1", "qwen2.5", "qwen3", "mistral", "gemma2"]
-_MODEL_QUALITY_ORDER = ["qwen3", "hermes3", "deepseek-r1", "qwen2.5", "gemma2", "mistral", "llama3.2"]
+_MODEL_SPEED_ORDER = ["llama3.2", "hermes3", "deepseek-r1", "qwen2.5", "qwen3", "gpt-oss", "mistral", "gemma2"]
+_MODEL_QUALITY_ORDER = ["qwen3", "gpt-oss", "hermes3", "deepseek-r1", "qwen2.5", "gemma2", "mistral", "llama3.2"]
 
 
 def _normalize_model_name(model_name: str) -> str:
@@ -336,6 +336,30 @@ def pull_ollama_model(model_name: str):
                     success=False,
                     error=f"No se pudo iniciar el asistente de IA: {msg}"
                 )
+
+        # Verificar que el hardware soporta el modelo antes de descargar
+        from narrative_assistant.llm.ollama_manager import AVAILABLE_MODELS
+
+        model_meta = next((m for m in AVAILABLE_MODELS if m.name == model_name), None)
+        if model_meta and model_meta.min_ram_gb > 0:
+            try:
+                from narrative_assistant.core.device import detect_capacity
+
+                profile = detect_capacity()
+                budget = profile.effective_budget_gb
+                if budget < model_meta.min_ram_gb:
+                    return ApiResponse(
+                        success=False,
+                        error=(
+                            f"{model_meta.display_name} requiere "
+                            f"{model_meta.min_ram_gb:.0f} GB pero este equipo "
+                            f"solo dispone de {budget:.1f} GB. "
+                            f"La descarga se ha cancelado para evitar "
+                            f"bloqueos del sistema."
+                        ),
+                    )
+            except Exception:
+                pass  # Si falla la detección, permitir (el usuario decide)
 
         # Iniciar descarga en segundo plano
         started = manager.start_download_async(model_name)
@@ -1192,15 +1216,33 @@ async def update_llm_config(request: dict):
 
 @router.get("/api/services/llm/models")
 async def get_llm_models():
-    """Lista modelos con estado (installed, available, legacy)."""
+    """Lista modelos con estado (installed, available, legacy, canRun)."""
     try:
         from narrative_assistant.llm.ollama_manager import AVAILABLE_MODELS, get_ollama_manager
 
         manager = get_ollama_manager()
         installed = {m.split(":")[0] for m in manager.downloaded_models}
 
+        # Obtener presupuesto de hardware para filtrar modelos
+        budget_gb: float | None = None
+        try:
+            from narrative_assistant.core.device import detect_capacity
+
+            budget_gb = detect_capacity().effective_budget_gb
+        except Exception:
+            pass
+
         models = []
         for model in AVAILABLE_MODELS:
+            can_run = True
+            hw_reason = None
+            if budget_gb is not None and model.min_ram_gb > budget_gb:
+                can_run = False
+                hw_reason = (
+                    f"Requiere {model.min_ram_gb:.0f} GB "
+                    f"(disponible: {budget_gb:.1f} GB)"
+                )
+
             models.append({
                 "name": model.name,
                 "displayName": model.display_name,
@@ -1211,6 +1253,8 @@ async def get_llm_models():
                 "isLegacy": model.is_legacy,
                 "minRamGb": model.min_ram_gb,
                 "benchmarkToks": model.benchmark_toks,
+                "canRun": can_run,
+                "hwReason": hw_reason,
             })
 
         return ApiResponse(success=True, data={"models": models})

@@ -275,7 +275,9 @@ class TestVotingQueryEdgeCases:
     def mock_client(self):
         """
         Crea un LocalLLMClient mock que no necesita Ollama real.
-        Parchea _initialize_backend para evitar conexiones.
+        Parchea _initialize_backend para evitar conexiones y
+        _get_budget_gb para simular hardware con presupuesto generoso
+        (evita que modelos grandes sean filtrados por el budget real).
         """
         from narrative_assistant.llm.client import LocalLLMClient, LocalLLMConfig
 
@@ -283,7 +285,9 @@ class TestVotingQueryEdgeCases:
             config = LocalLLMConfig(backend="ollama")
             client = LocalLLMClient(config)
             client._backend = "ollama"
-            return client
+            # Budget generoso para que ningún modelo sea filtrado
+            client._get_budget_gb = MagicMock(return_value=24.0)
+            yield client
 
     def test_all_models_return_none(self, mock_client):
         """Si todos los modelos retornan None, el consenso es None."""
@@ -1021,14 +1025,16 @@ class TestIntegrationRoundTrip:
 
     @pytest.fixture
     def mock_client(self):
-        """Crea un mock client para tests de integracion."""
+        """Crea un mock client con budget generoso para tests de integracion."""
         from narrative_assistant.llm.client import LocalLLMClient, LocalLLMConfig
 
         with patch.object(LocalLLMClient, "_initialize_backend"):
             config = LocalLLMConfig(backend="ollama")
             client = LocalLLMClient(config)
             client._backend = "ollama"
-            return client
+            # Budget generoso para que ningún modelo sea filtrado
+            client._get_budget_gb = MagicMock(return_value=24.0)
+            yield client
 
     def test_full_round_trip_experta(self, mock_client):
         """Round-trip completo: config -> resolve -> voting_query en nivel Experta."""
@@ -1390,7 +1396,8 @@ class TestComputeConsensusEdgeCases:
             config = LocalLLMConfig(backend="ollama")
             client = LocalLLMClient(config)
             client._backend = "ollama"
-            return client
+            client._get_budget_gb = MagicMock(return_value=24.0)
+            yield client
 
     def test_empty_results_returns_none(self, mock_client):
         """Resultados vacios -> (None, 0.0)."""

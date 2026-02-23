@@ -372,9 +372,9 @@ class LocalLLMClient:
         # S5-02: Definir orden de preferencia según hardware
         if has_high_vram:
             if prefer_qwen:
-                preference_order = ["qwen2.5", "mistral", "gemma2", "llama3.2"]
+                preference_order = ["qwen2.5", "gpt-oss", "mistral", "gemma2", "llama3.2"]
             else:
-                preference_order = ["mistral", "qwen2.5", "gemma2", "llama3.2"]
+                preference_order = ["gpt-oss", "mistral", "qwen2.5", "gemma2", "llama3.2"]
         elif has_gpu:
             if prefer_qwen:
                 preference_order = ["qwen2.5", "llama3.2", "mistral"]
@@ -382,6 +382,7 @@ class LocalLLMClient:
                 preference_order = ["llama3.2", "qwen2.5", "mistral"]
         else:
             # CPU: llama3.2 (3B) es la mejor opción para velocidad
+            # gpt-oss solo si hay 16+ GB RAM libre (14 GB modelo)
             preference_order = ["llama3.2", "phi3", "gemma2:2b", "qwen2.5"]
 
         # Buscar el primer modelo disponible según preferencia
@@ -777,8 +778,14 @@ class LocalLLMClient:
         # Obtener modelos disponibles
         available = self._get_available_ollama_models()
 
+        # Obtener presupuesto de memoria para evitar seleccionar modelos
+        # que excedan la capacidad del sistema (ej: gpt-oss 14 GB en 8 GB RAM)
+        budget_gb = self._get_budget_gb()
+
         # Resolver configuración de votación
-        config = get_voting_config(task, available, quality_level, sensitivity)
+        config = get_voting_config(
+            task, available, quality_level, sensitivity, budget_gb
+        )
 
         if not config.slots:
             logger.error(f"Votación {task_name}: sin modelos disponibles")
@@ -872,6 +879,15 @@ class LocalLLMClient:
         )
 
         return result
+
+    def _get_budget_gb(self) -> float | None:
+        """Obtiene el presupuesto de memoria efectivo del sistema."""
+        try:
+            from ..core.device import detect_capacity
+
+            return detect_capacity().effective_budget_gb
+        except Exception:
+            return None
 
     def _get_available_ollama_models(self) -> set[str]:
         """Obtiene los modelos de Ollama realmente instalados."""

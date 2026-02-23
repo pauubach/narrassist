@@ -148,6 +148,13 @@ AVAILABLE_MODELS = [
     ),
     # === Modelos Fallback ===
     OllamaModel(
+        name="gpt-oss",
+        display_name="GPT-OSS (20B)",
+        size_gb=14.0,
+        description="OpenAI open-weight. Razonamiento avanzado, requiere 16 GB+ RAM.",
+        min_ram_gb=16.0,
+    ),
+    OllamaModel(
         name="llama3.2",
         display_name="Llama 3.2 (3B)",
         size_gb=2.0,
@@ -1018,6 +1025,24 @@ class OllamaManager:
         # Verificar si ya esta descargado
         if model_name in self._downloaded_models:
             return True, f"Modelo {model_name} ya esta descargado"
+
+        # Verificar que el hardware soporta el modelo
+        model_meta = next((m for m in AVAILABLE_MODELS if m.name == model_name), None)
+        if model_meta and model_meta.min_ram_gb > 0:
+            try:
+                from ..core.device import detect_capacity
+
+                budget = detect_capacity().effective_budget_gb
+                if budget < model_meta.min_ram_gb:
+                    msg = (
+                        f"{model_meta.display_name} requiere "
+                        f"{model_meta.min_ram_gb:.0f} GB pero solo hay "
+                        f"{budget:.1f} GB disponibles. Descarga cancelada."
+                    )
+                    logger.warning(msg)
+                    return False, msg
+            except Exception:
+                pass  # Si falla detección, permitir descarga
 
         logger.info(f"Descargando modelo {model_name}...")
         progress = DownloadProgress(status="downloading")
