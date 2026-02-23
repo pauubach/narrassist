@@ -1141,7 +1141,13 @@ class MorphoCorefMethod:
             try:
                 from ..entities.semantic_fusion import are_hypocoristic_match
                 self._hypocoristic_match = are_hypocoristic_match
-            except ImportError:
+            except ImportError as e:
+                logger.warning(
+                    "Hypocoristic matching disabled: %s. "
+                    "Install semantic_fusion module for full functionality. "
+                    "This may reduce coreference precision for Spanish name variants (Mari↔María).",
+                    e
+                )
                 self._hypocoristic_match = lambda a, b: False
         return self._hypocoristic_match(name1, name2)
 
@@ -1260,7 +1266,13 @@ class HeuristicsCorefMethod:
             try:
                 from ..entities.semantic_fusion import are_hypocoristic_match
                 self._hypocoristic_match = are_hypocoristic_match
-            except ImportError:
+            except ImportError as e:
+                logger.warning(
+                    "Hypocoristic matching disabled: %s. "
+                    "Install semantic_fusion module for full functionality. "
+                    "This may reduce coreference precision for Spanish name variants (Mari↔María).",
+                    e
+                )
                 self._hypocoristic_match = lambda a, b: False
         return self._hypocoristic_match(name1, name2)
 

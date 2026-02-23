@@ -52,6 +52,86 @@ _POST_PROFESSION_BLOCKERS = re.compile(
     re.IGNORECASE,
 )
 
+# Lista expandida de cópulas españolas (consenso panel de expertos)
+# Ver: docs/expert_consultation_copulas.md, docs/ARCHITECTURE_REVIEW_2026-02-23.md
+# Ejemplos reales:
+# - "era médico", "está enfermo" (cópulas puras)
+# - "parece médico", "resultó ingeniera" (semi-cópulas)
+# - "se hizo abogado", "se convirtió en detective" (pseudo-cópulas)
+# - "se volvió médico", "quedó viudo" (cambio de estado)
+COPULA_LEMMAS = frozenset({
+    "ser", "estar",  # Cópulas puras
+    "parecer", "resultar",  # Semi-cópulas
+    "hacerse", "convertirse", "tornarse",  # Pseudo-cópulas
+    "volverse", "quedarse",  # Cambio de estado
+})
+
+
+def _get_token_from_match(doc: Any, match: re.Match, value: str) -> Any | None:
+    """
+    Extrae el token spaCy correspondiente al valor capturado en el match.
+
+    Args:
+        doc: Documento spaCy
+        match: Match regex del patrón de profesión
+        value: Valor capturado (palabra candidata a profesión)
+
+    Returns:
+        Token spaCy correspondiente o None si no se encuentra
+    """
+    match_text = match.group(0)
+    val_start_in_match = match_text.lower().rfind(value.lower())
+    if val_start_in_match >= 0:
+        char_start = match.start() + val_start_in_match
+        char_end = char_start + len(value)
+        span = doc.char_span(char_start, char_end, alignment_mode="expand")
+        if span and len(span) > 0:
+            return span.root
+    return None
+
+
+def _has_copula_before(token: Any) -> bool:
+    """
+    Detecta si un token tiene una cópula antes (en ancestros o hermanos).
+
+    Busca en:
+    1. Ancestros: verbo copulativo marcado con dep_="cop"
+    2. Ancestros: AUX con lemma en COPULA_LEMMAS
+    3. Hermanos: hijos del head con dep_="cop"
+
+    Args:
+        token: Token spaCy a analizar
+
+    Returns:
+        True si tiene cópula antes, False en caso contrario
+
+    Examples:
+        >>> # "era médico" → True (era = AUX cop)
+        >>> # "exactamente lo que" → False (sin cópula)
+    """
+    # Check ancestors
+    for ancestor in token.ancestors:
+        if ancestor.dep_ == "cop" or (
+            ancestor.pos_ == "AUX" and ancestor.lemma_ in COPULA_LEMMAS
+        ):
+            logger.debug(
+                f"Copula detected in ancestors: {ancestor.lemma_} "
+                f"(dep={ancestor.dep_}, pos={ancestor.pos_})"
+            )
+            return True
+
+    # Check siblings (for cases where cop is sibling, not ancestor)
+    if token.head:
+        for child in token.head.children:
+            if child.dep_ == "cop":
+                logger.debug(
+                    f"Copula detected in siblings: {child.lemma_} "
+                    f"(dep={child.dep_})"
+                )
+                return True
+
+    return False
+
 
 def _is_valid_profession_context(
     text: str, match: re.Match, value: str, doc: Any = None,
@@ -59,68 +139,42 @@ def _is_valid_profession_context(
     """
     Verifica que un candidato a profesión sea realmente un sustantivo predicativo.
 
-    Pipeline de validación en 3 capas:
-    1. POS-Tag Gating (si hay doc spaCy): rechaza ADV, ADJ, VERB, DET, PRON.
+    Pipeline de validación en 3 capas (orquestador):
+    1. POS-Tag Gating (si hay doc spaCy): rechaza ADV, ADJ sin cópula, VERB, etc.
     2. Filtro -mente: adverbios terminados en -mente no son profesiones.
-    3. Contexto post-match: si le sigue artículo/pronombre/subordinante,
-       la palabra funciona como adverbio, no como predicado nominal.
+    3. Contexto post-match: si le sigue artículo/pronombre, no es profesión.
+
+    Args:
+        text: Texto completo donde se buscó el patrón
+        match: Match regex del patrón de profesión
+        value: Valor capturado (palabra candidata a profesión)
+        doc: Documento spaCy opcional (si disponible, mejora precisión)
+
+    Returns:
+        True si el contexto es válido para profesión, False en caso contrario
     """
     val = value.lower()
 
     # Capa 1: POS-Tag Gating — la más fiable (spaCy doc disponible)
     if doc is not None:
-        # Buscar el token spaCy que corresponde al valor capturado
-        # El valor está dentro del match; calcular su posición en el texto
-        match_text = match.group(0)
-        val_start_in_match = match_text.lower().rfind(val)
-        if val_start_in_match >= 0:
-            char_start = match.start() + val_start_in_match
-            char_end = char_start + len(value)
-            span = doc.char_span(char_start, char_end, alignment_mode="expand")
-            if span and len(span) > 0:
-                token = span.root
+        token = _get_token_from_match(doc, match, value)
+        if token:
+            # Rechazar adverbios, determinantes, pronombres (siempre)
+            if token.pos_ in {"ADV", "DET", "PRON", "SCONJ", "CCONJ", "ADP"}:
+                return False
 
-                # Rechazar adverbios, determinantes, pronombres (siempre)
-                if token.pos_ in {"ADV", "DET", "PRON", "SCONJ", "CCONJ", "ADP"}:
+            # Rechazar verbos (salvo participios que pueden ser profes: "es graduado")
+            if token.pos_ == "VERB" and not token.morph.get("VerbForm") == ["Part"]:
+                return False
+
+            # ADJ: permitir solo si está en predicado nominal (después de cop)
+            # Ejemplo válido: "era médico" (médico etiquetado como ADJ por spaCy)
+            # Ejemplo inválido: "exactamente lo que..." (exactamente como ADJ)
+            if token.pos_ == "ADJ":
+                if not _has_copula_before(token):
                     return False
 
-                # Rechazar verbos (salvo participios que pueden ser profes: "es graduado")
-                if token.pos_ == "VERB" and not token.morph.get("VerbForm") == ["Part"]:
-                    return False
-
-                # ADJ: permitir solo si está en predicado nominal (después de cop)
-                # Ejemplo válido: "era médico" (médico etiquetado como ADJ por spaCy)
-                # Ejemplo inválido: "exactamente lo que..." (exactamente como ADJ)
-                if token.pos_ == "ADJ":
-                    # Lista expandida de cópulas españolas (consenso panel de expertos)
-                    # Ver: docs/expert_consultation_copulas.md
-                    COPULA_LEMMAS = {
-                        "ser", "estar",  # Cópulas puras
-                        "parecer", "resultar",  # Semi-cópulas
-                        "hacerse", "convertirse", "tornarse",  # Pseudo-cópulas
-                        "volverse", "quedarse",  # Cambio de estado
-                    }
-
-                    # Buscar si hay un verbo copulativo (cop) antes del token
-                    has_copula_before = False
-                    for ancestor in token.ancestors:
-                        if ancestor.dep_ == "cop" or (
-                            ancestor.pos_ == "AUX" and ancestor.lemma_ in COPULA_LEMMAS
-                        ):
-                            has_copula_before = True
-                            break
-                    # También mirar hermanos (para casos donde cop es hermano, no ancestro)
-                    if not has_copula_before and token.head:
-                        for child in token.head.children:
-                            if child.dep_ == "cop":
-                                has_copula_before = True
-                                break
-
-                    # Si no hay cópula, es un ADJ genuino (no predicado nominal)
-                    if not has_copula_before:
-                        return False
-
-                # NOUN o PROPN → probablemente profesión (pasar a capas siguientes)
+            # NOUN o PROPN → probablemente profesión (pasar a capas siguientes)
 
     # Capa 2: Adverbios en -mente
     if val.endswith("mente") and len(val) > 5:
