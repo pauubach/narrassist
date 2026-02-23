@@ -1379,9 +1379,14 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
                 )
                 deps._heavy_analysis_project_id = None
                 deps._heavy_analysis_claimed_at = None
-                # Mark stale project as error
+                # Mark stale project as error — but only if there isn't a
+                # newer analysis already running for the same project (which
+                # would have replaced the storage entry).
                 stale_storage = deps.analysis_progress_storage.get(stale_pid)
-                if stale_storage:
+                if stale_storage and stale_storage.get("status") not in (
+                    "running",
+                    "queued_for_heavy",
+                ):
                     stale_storage["status"] = "error"
                     stale_storage["error"] = "Análisis excedió el tiempo máximo"
 
