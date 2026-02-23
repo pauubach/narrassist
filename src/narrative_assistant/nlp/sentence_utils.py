@@ -16,6 +16,56 @@ import re
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Sentence Splitting — Canonical Implementation
+# ---------------------------------------------------------------------------
+# Pattern consolidado de clarity.py / anacoluto.py (más robusto)
+_SENTENCE_END_RE = re.compile(r'[.!?]+(?:\s|$|"|\)|»|\')')
+
+
+def split_sentences(
+    text: str,
+    min_length: int = 10,
+) -> list[tuple[str, int, int]]:
+    """
+    Divide texto en oraciones con posiciones de inicio/fin.
+
+    Esta es la implementación canónica consolidada de:
+    - clarity.py, anacoluto.py, sticky_sentences.py, sentence_energy.py,
+      readability.py, grammar_checker.py, repetition.py
+
+    Args:
+        text: Texto a dividir en oraciones
+        min_length: Longitud mínima de fragmento final sin puntuación
+
+    Returns:
+        Lista de tuplas (texto_oración, start_char, end_char)
+
+    Examples:
+        >>> split_sentences("Juan corrió. María saltó.")
+        [('Juan corrió.', 0, 13), ('María saltó.', 14, 27)]
+    """
+    sentences = []
+    current_start = 0
+
+    for match in _SENTENCE_END_RE.finditer(text):
+        end = match.end()
+        sentence_text = text[current_start:end].strip()
+
+        if sentence_text:
+            sentences.append((sentence_text, current_start, end))
+
+        current_start = end
+
+    # Última oración si no termina en puntuación
+    if current_start < len(text):
+        remaining = text[current_start:].strip()
+        if remaining and len(remaining) >= min_length:
+            sentences.append((remaining, current_start, len(text)))
+
+    return sentences
+
+
+# ---------------------------------------------------------------------------
 # T1: Normalización de sentence breaks falsos
 # ---------------------------------------------------------------------------
 # Puntos suspensivos → 1 solo break, no 3

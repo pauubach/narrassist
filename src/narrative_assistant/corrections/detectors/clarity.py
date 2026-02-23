@@ -9,6 +9,7 @@ Detecta:
 
 import re
 
+from ...nlp.sentence_utils import split_sentences
 from ..base import BaseDetector, CorrectionIssue
 from ..config import ClarityConfig
 from ..types import CorrectionCategory
@@ -93,31 +94,8 @@ class ClarityDetector(BaseDetector):
         return issues
 
     def _split_sentences(self, text: str) -> list[tuple[str, int, int]]:
-        """
-        Divide el texto en oraciones, retornando (oración, start, end).
-
-        Returns:
-            Lista de tuplas (texto_oración, posición_inicio, posición_fin)
-        """
-        sentences = []
-        current_start = 0
-
-        for match in self.SENTENCE_END.finditer(text):
-            end = match.end()
-            sentence_text = text[current_start:end].strip()
-
-            if sentence_text:
-                sentences.append((sentence_text, current_start, end))
-
-            current_start = end
-
-        # Última oración si no termina en punto
-        if current_start < len(text):
-            remaining = text[current_start:].strip()
-            if remaining and len(remaining) > 10:  # Ignorar fragmentos muy cortos
-                sentences.append((remaining, current_start, len(text)))
-
-        return sentences
+        """Usa la implementación canónica de sentence_utils."""
+        return split_sentences(text, min_length=10)
 
     def _count_words(self, text: str) -> int:
         """Cuenta palabras en un texto."""
