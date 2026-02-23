@@ -283,6 +283,131 @@ def _restore_chapter_mentions_from_cache(mentions_json: str, chapter_start: int)
 
 
 # ============================================================================
+# Coreference Cache Serialization
+# ============================================================================
+
+
+def _serialize_coref_result_for_cache(coref_result) -> str:
+    """Serializa CorefResult a JSON para cache.
+
+    Usa posiciones de carácter (no IDs de DB) para que los datos
+    sobrevivan al cleanup que recrea entidades con IDs nuevos.
+    """
+    data: dict[str, Any] = {
+        "chains": [],
+        "unresolved": [],
+        "method_contributions": {},
+        "voting_details": [],
+        "processing_time_ms": coref_result.processing_time_ms,
+    }
+
+    for chain in coref_result.chains:
+        chain_dict = {
+            "main_mention": chain.main_mention,
+            "entity_id": chain.entity_id,
+            "confidence": chain.confidence,
+            "methods_agreed": [m.value for m in chain.methods_agreed],
+            "mentions": [
+                {
+                    "text": m.text,
+                    "start_char": m.start_char,
+                    "end_char": m.end_char,
+                    "mention_type": m.mention_type.value,
+                    "gender": m.gender.value,
+                    "number": m.number.value,
+                    "sentence_idx": m.sentence_idx,
+                    "chapter_idx": m.chapter_idx,
+                    "head_text": m.head_text,
+                    "context": m.context,
+                }
+                for m in chain.mentions
+            ],
+        }
+        data["chains"].append(chain_dict)
+
+    for m in coref_result.unresolved:
+        data["unresolved"].append({
+            "text": m.text,
+            "start_char": m.start_char,
+            "end_char": m.end_char,
+            "mention_type": m.mention_type.value,
+        })
+
+    for method, count in coref_result.method_contributions.items():
+        data["method_contributions"][method.value] = count
+
+    for detail in coref_result.voting_details.values():
+        data["voting_details"].append(detail.to_dict())
+
+    return json.dumps(data, ensure_ascii=False)
+
+
+def _restore_coref_result_from_cache(chains_json: str):
+    """Restaura CorefResult desde JSON de cache."""
+    from narrative_assistant.nlp.coreference_resolver import (
+        CorefMethod,
+        CorefResult,
+        CoreferenceChain,
+        Gender,
+        Mention,
+        MentionType,
+        MentionVotingDetail,
+        Number,
+    )
+
+    data = json.loads(chains_json)
+    result = CorefResult()
+
+    for chain_dict in data.get("chains", []):
+        chain = CoreferenceChain()
+        chain.main_mention = chain_dict.get("main_mention")
+        chain.entity_id = chain_dict.get("entity_id")
+        chain.confidence = chain_dict.get("confidence", 0.0)
+        chain.methods_agreed = [
+            CorefMethod(v) for v in chain_dict.get("methods_agreed", [])
+        ]
+        for m_dict in chain_dict.get("mentions", []):
+            mention = Mention(
+                text=m_dict["text"],
+                start_char=m_dict["start_char"],
+                end_char=m_dict["end_char"],
+                mention_type=MentionType(m_dict["mention_type"]),
+                gender=Gender(m_dict.get("gender", "unknown")),
+                number=Number(m_dict.get("number", "unknown")),
+                sentence_idx=m_dict.get("sentence_idx", 0),
+                chapter_idx=m_dict.get("chapter_idx"),
+                head_text=m_dict.get("head_text"),
+                context=m_dict.get("context"),
+            )
+            chain.mentions.append(mention)
+        result.chains.append(chain)
+
+    for m_dict in data.get("unresolved", []):
+        result.unresolved.append(Mention(
+            text=m_dict["text"],
+            start_char=m_dict["start_char"],
+            end_char=m_dict["end_char"],
+            mention_type=MentionType(m_dict["mention_type"]),
+            gender=Gender(m_dict.get("gender", "unknown")),
+            number=Number(m_dict.get("number", "unknown")),
+        ))
+
+    for method_str, count in data.get("method_contributions", {}).items():
+        try:
+            result.method_contributions[CorefMethod(method_str)] = count
+        except ValueError:
+            pass
+
+    for detail_dict in data.get("voting_details", []):
+        detail = MentionVotingDetail.from_dict(detail_dict)
+        key = (detail.anaphor_start, detail.anaphor_end)
+        result.voting_details[key] = detail
+
+    result.processing_time_ms = data.get("processing_time_ms", 0.0)
+    return result
+
+
+# ============================================================================
 # Thread-safe progress helper (F-006)
 # ============================================================================
 
@@ -2243,45 +2368,104 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                 sensitivity=ctx.get("sensitivity", 5.0),
             )
 
-            def _on_coref_progress(
-                progress: float,
-                message: str,
-                step: int | None = None,
-                total_steps: int | None = None,
-            ) -> None:
-                bounded = max(0.0, min(1.0, progress))
-                _update_fusion_progress(
-                    0.80 + (bounded * 0.08),
-                    message,
-                    subphase_id="coref",
-                    subphase_label="Resolviendo correferencias",
-                    subphase_progress=bounded,
-                    subphase_step=step,
-                    subphase_total_steps=total_steps,
+            # Check coref cache before expensive computation
+            coref_cache_hit = False
+            try:
+                from narrative_assistant.persistence.analysis_cache import (
+                    get_analysis_cache,
                 )
 
-            coref_result = resolve_coreferences_voting(
-                text=full_text,
-                chapters=chapters_data,
-                config=coref_config,
-                progress_callback=_on_coref_progress,
-            )
+                _coref_cache_r = get_analysis_cache()
+                _coref_fp_r = ctx.get("document_fingerprint", "")
+                _coref_ch_r = _coref_cache_r.compute_coref_config_hash(coref_config)
+                _cached_coref = _coref_cache_r.get_coref_results(
+                    project_id, _coref_fp_r, _coref_ch_r
+                )
+                if _cached_coref is not None:
+                    coref_result = _restore_coref_result_from_cache(
+                        _cached_coref["chains_json"]
+                    )
+                    coref_cache_hit = True
+                    logger.info(
+                        f"[COREF_CACHE] HIT: Restored {_cached_coref['chain_count']} chains, "
+                        f"{_cached_coref['mention_count']} mentions (SKIP coref computation)"
+                    )
+                    _update_fusion_progress(
+                        0.88,
+                        f"Correferencias restauradas: {_cached_coref['chain_count']} cadenas",
+                        subphase_id="coref",
+                        subphase_label="Correferencias restauradas del caché",
+                        subphase_progress=1.0,
+                    )
+            except Exception as _coref_read_err:
+                logger.warning(
+                    f"[COREF_CACHE] Read failed, running full coref: {_coref_read_err}"
+                )
 
-            logger.info(
-                f"Correferencias (votación): {coref_result.total_chains} cadenas, "
-                f"{coref_result.total_mentions} menciones, "
-                f"{len(coref_result.unresolved)} sin resolver"
-            )
-            _update_fusion_progress(
-                0.88,
-                f"Correferencias detectadas: {coref_result.total_chains} cadenas",
-                subphase_id="coref",
-                subphase_label="Resolviendo correferencias",
-                subphase_progress=1.0,
-            )
+            if not coref_cache_hit:
+                def _on_coref_progress(
+                    progress: float,
+                    message: str,
+                    step: int | None = None,
+                    total_steps: int | None = None,
+                ) -> None:
+                    bounded = max(0.0, min(1.0, progress))
+                    _update_fusion_progress(
+                        0.80 + (bounded * 0.08),
+                        message,
+                        subphase_id="coref",
+                        subphase_label="Resolviendo correferencias",
+                        subphase_progress=bounded,
+                        subphase_step=step,
+                        subphase_total_steps=total_steps,
+                    )
+
+                coref_result = resolve_coreferences_voting(
+                    text=full_text,
+                    chapters=chapters_data,
+                    config=coref_config,
+                    progress_callback=_on_coref_progress,
+                )
+
+                logger.info(
+                    f"Correferencias (votación): {coref_result.total_chains} cadenas, "
+                    f"{coref_result.total_mentions} menciones, "
+                    f"{len(coref_result.unresolved)} sin resolver"
+                )
+                _update_fusion_progress(
+                    0.88,
+                    f"Correferencias detectadas: {coref_result.total_chains} cadenas",
+                    subphase_id="coref",
+                    subphase_label="Resolviendo correferencias",
+                    subphase_progress=1.0,
+                )
 
             for method, count in coref_result.method_contributions.items():
                 logger.debug(f"  Método {method.value}: {count} resoluciones")
+
+            # Cache coref results for future re-analysis
+            try:
+                from narrative_assistant.persistence.analysis_cache import get_analysis_cache
+
+                _coref_cache = get_analysis_cache()
+                _coref_fp = ctx.get("document_fingerprint", "")
+                if _coref_fp and coref_result and coref_result.chains:
+                    _coref_config_hash = _coref_cache.compute_coref_config_hash(coref_config)
+                    _coref_json = _serialize_coref_result_for_cache(coref_result)
+                    _coref_cache.set_coref_results(
+                        project_id=project_id,
+                        document_fingerprint=_coref_fp,
+                        config_hash=_coref_config_hash,
+                        chains_json=_coref_json,
+                        chain_count=coref_result.total_chains,
+                        mention_count=coref_result.total_mentions,
+                    )
+                    logger.info(
+                        f"[COREF_CACHE] Cached {coref_result.total_chains} chains, "
+                        f"{coref_result.total_mentions} mentions"
+                    )
+            except Exception as _coref_cache_err:
+                logger.warning(f"[COREF_CACHE] Write failed (continuing): {_coref_cache_err}")
 
             # Vincular cadenas con entidades
             character_entities = [e for e in entities if e.entity_type == EntityType.CHARACTER]

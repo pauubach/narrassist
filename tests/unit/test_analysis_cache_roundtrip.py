@@ -3,6 +3,16 @@ import sys
 from pathlib import Path
 
 from narrative_assistant.entities.models import EntityImportance, EntityType
+from narrative_assistant.nlp.coreference_resolver import (
+    CorefMethod,
+    CorefResult,
+    CoreferenceChain,
+    Gender,
+    Mention,
+    MentionType,
+    MentionVotingDetail,
+    Number,
+)
 from narrative_assistant.persistence.analysis_cache import AnalysisCache
 from narrative_assistant.persistence.database import get_database
 from narrative_assistant.persistence.project import ProjectManager
@@ -11,8 +21,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "api-server"))
 
 from routers._analysis_phases import (  # noqa: E402
     _restore_chapter_mentions_from_cache,
+    _restore_coref_result_from_cache,
     _restore_entities_from_cache,
     _serialize_chapter_mentions_for_cache,
+    _serialize_coref_result_for_cache,
     _serialize_entities_for_cache,
 )
 
@@ -196,3 +208,210 @@ def test_chapter_mentions_cache_serialization_rebases_offsets():
     assert restored[0].label == EntityLabel.PER
     assert restored[0].start_char == 410
     assert restored[0].end_char == 415
+
+
+# ============================================================================
+# Coreference cache roundtrip tests
+# ============================================================================
+
+
+def _make_coref_result() -> CorefResult:
+    """Crea un CorefResult de prueba con cadenas variadas."""
+    chain1 = CoreferenceChain()
+    chain1.main_mention = "María"
+    chain1.confidence = 0.85
+    chain1.methods_agreed = [CorefMethod.EMBEDDINGS, CorefMethod.LLM]
+    chain1.mentions = [
+        Mention(
+            text="María",
+            start_char=10,
+            end_char=15,
+            mention_type=MentionType.PROPER_NOUN,
+            gender=Gender.FEMININE,
+            number=Number.SINGULAR,
+            sentence_idx=0,
+            chapter_idx=0,
+            head_text="María",
+            context="La protagonista María salió de casa.",
+        ),
+        Mention(
+            text="ella",
+            start_char=50,
+            end_char=54,
+            mention_type=MentionType.PRONOUN,
+            gender=Gender.FEMININE,
+            number=Number.SINGULAR,
+            sentence_idx=1,
+            chapter_idx=0,
+        ),
+    ]
+
+    chain2 = CoreferenceChain()
+    chain2.main_mention = "el doctor"
+    chain2.confidence = 0.72
+    chain2.methods_agreed = [CorefMethod.MORPHO]
+    chain2.mentions = [
+        Mention(
+            text="el doctor",
+            start_char=100,
+            end_char=109,
+            mention_type=MentionType.DEFINITE_NP,
+            gender=Gender.MASCULINE,
+            number=Number.SINGULAR,
+            sentence_idx=3,
+        ),
+    ]
+
+    result = CorefResult()
+    result.chains = [chain1, chain2]
+    result.unresolved = [
+        Mention(
+            text="su",
+            start_char=200,
+            end_char=202,
+            mention_type=MentionType.POSSESSIVE,
+        ),
+    ]
+    result.method_contributions = {
+        CorefMethod.EMBEDDINGS: 5,
+        CorefMethod.LLM: 3,
+        CorefMethod.MORPHO: 2,
+        CorefMethod.HEURISTICS: 1,
+    }
+    result.voting_details = {
+        (50, 54): MentionVotingDetail(
+            anaphor_text="ella",
+            anaphor_start=50,
+            anaphor_end=54,
+            resolved_to="María",
+            final_score=0.85,
+            method_votes={
+                "embeddings": {"score": 0.9, "reasoning": "high similarity"},
+                "llm": {"score": 0.8, "reasoning": "context match"},
+            },
+        ),
+    }
+    result.processing_time_ms = 12345.6
+    return result
+
+
+def test_coref_serialize_deserialize_roundtrip():
+    """Serializar y deserializar CorefResult produce datos equivalentes."""
+    original = _make_coref_result()
+
+    serialized = _serialize_coref_result_for_cache(original)
+    restored = _restore_coref_result_from_cache(serialized)
+
+    # Chains
+    assert len(restored.chains) == 2
+    assert restored.chains[0].main_mention == "María"
+    assert restored.chains[0].confidence == 0.85
+    assert len(restored.chains[0].mentions) == 2
+    assert restored.chains[0].mentions[0].text == "María"
+    assert restored.chains[0].mentions[0].mention_type == MentionType.PROPER_NOUN
+    assert restored.chains[0].mentions[0].gender == Gender.FEMININE
+    assert restored.chains[0].mentions[0].number == Number.SINGULAR
+    assert restored.chains[0].mentions[0].head_text == "María"
+    assert restored.chains[0].mentions[0].context == "La protagonista María salió de casa."
+    assert restored.chains[0].mentions[1].text == "ella"
+    assert restored.chains[0].mentions[1].mention_type == MentionType.PRONOUN
+
+    # Second chain
+    assert restored.chains[1].main_mention == "el doctor"
+    assert CorefMethod.MORPHO in restored.chains[1].methods_agreed
+
+    # Unresolved
+    assert len(restored.unresolved) == 1
+    assert restored.unresolved[0].text == "su"
+    assert restored.unresolved[0].mention_type == MentionType.POSSESSIVE
+
+    # Method contributions
+    assert restored.method_contributions[CorefMethod.EMBEDDINGS] == 5
+    assert restored.method_contributions[CorefMethod.LLM] == 3
+
+    # Processing time
+    assert restored.processing_time_ms == 12345.6
+
+
+def test_coref_voting_details_roundtrip():
+    """VotingDetails sobreviven el roundtrip via to_dict/from_dict."""
+    original = _make_coref_result()
+    serialized = _serialize_coref_result_for_cache(original)
+    restored = _restore_coref_result_from_cache(serialized)
+
+    key = (50, 54)
+    assert key in restored.voting_details
+    detail = restored.voting_details[key]
+    assert detail.anaphor_text == "ella"
+    assert detail.resolved_to == "María"
+    assert detail.final_score == 0.85
+    assert "embeddings" in detail.method_votes
+    assert detail.method_votes["embeddings"]["score"] == 0.9
+
+
+def test_coref_empty_result_roundtrip():
+    """Un CorefResult vacío se serializa/deserializa sin errores."""
+    empty = CorefResult()
+    serialized = _serialize_coref_result_for_cache(empty)
+    restored = _restore_coref_result_from_cache(serialized)
+
+    assert len(restored.chains) == 0
+    assert len(restored.unresolved) == 0
+    assert len(restored.method_contributions) == 0
+    assert len(restored.voting_details) == 0
+
+
+def test_coref_positions_survive_cleanup():
+    """Las posiciones de carácter sobreviven (no dependen de IDs de DB)."""
+    original = _make_coref_result()
+    serialized = _serialize_coref_result_for_cache(original)
+    restored = _restore_coref_result_from_cache(serialized)
+
+    # Verificar que start_char/end_char se preservan exactamente
+    assert restored.chains[0].mentions[0].start_char == 10
+    assert restored.chains[0].mentions[0].end_char == 15
+    assert restored.chains[0].mentions[1].start_char == 50
+    assert restored.chains[0].mentions[1].end_char == 54
+    assert restored.chains[1].mentions[0].start_char == 100
+    assert restored.chains[1].mentions[0].end_char == 109
+
+
+def test_coref_cache_db_roundtrip():
+    """Cache write/read via DB tabla coreference_cache."""
+    cache = AnalysisCache(get_database())
+    manager = ProjectManager()
+    create_result = manager.create_from_document(
+        text="Texto de prueba para cache de correferencias",
+        name="Proyecto Coref Cache",
+        document_format="txt",
+        check_existing=False,
+    )
+    assert create_result.is_success
+    project_id = create_result.value.id
+
+    original = _make_coref_result()
+    chains_json = _serialize_coref_result_for_cache(original)
+    fp = "a" * 64
+    config_hash = "test_config_hash"
+
+    cache.set_coref_results(
+        project_id=project_id,
+        document_fingerprint=fp,
+        config_hash=config_hash,
+        chains_json=chains_json,
+        chain_count=original.total_chains,
+        mention_count=original.total_mentions,
+    )
+
+    cached = cache.get_coref_results(project_id, fp, config_hash)
+    assert cached is not None
+    assert cached["chain_count"] == 2
+    assert cached["mention_count"] == 3
+
+    restored = _restore_coref_result_from_cache(cached["chains_json"])
+    assert len(restored.chains) == 2
+    assert restored.chains[0].main_mention == "María"
+
+    # Verify cache miss with different config_hash
+    missed = cache.get_coref_results(project_id, fp, "different_hash")
+    assert missed is None

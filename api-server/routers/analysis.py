@@ -579,6 +579,24 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 previous_fp = (ctx.get("previous_document_fingerprint") or "").strip()
                 current_fp = (ctx.get("document_fingerprint") or "").strip()
                 previous_status = (ctx.get("previous_analysis_status") or "").strip()
+
+                # Invalidar cachés obsoletos si el documento cambió
+                if previous_fp and current_fp and previous_fp != current_fp:
+                    try:
+                        from narrative_assistant.persistence.analysis_cache import (
+                            get_analysis_cache,
+                        )
+
+                        _cache = get_analysis_cache()
+                        _invalidated = _cache.invalidate_by_fingerprint(previous_fp)
+                        if _invalidated:
+                            logger.info(
+                                f"[CACHE] Invalidated {_invalidated} stale cache entries "
+                                f"(document changed)"
+                            )
+                    except Exception as _inv_err:
+                        logger.debug(f"Cache invalidation skipped: {_inv_err}")
+
                 is_same_document = (
                     bool(previous_fp)
                     and bool(current_fp)
