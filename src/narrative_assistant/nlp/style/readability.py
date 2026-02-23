@@ -25,6 +25,7 @@ from typing import Optional
 
 from ...core.errors import ErrorSeverity, NLPError
 from ...core.result import Result
+from ..sentence_utils import split_sentences as _canonical_split_sentences
 
 logger = logging.getLogger(__name__)
 
@@ -601,8 +602,6 @@ class ReadabilityAnalyzer:
 
     def __init__(self):
         """Inicializar analizador."""
-        # Patrón para dividir en oraciones
-        self._sentence_pattern = re.compile(r"[.!?]+(?:\s+|$)|[\n]{2,}", re.UNICODE)
         # Patrón para dividir en párrafos
         self._paragraph_pattern = re.compile(r"\n\s*\n")
 
@@ -794,20 +793,12 @@ class ReadabilityAnalyzer:
             return Result.failure(error)
 
     def _split_sentences(self, text: str) -> list[str]:
-        """Dividir texto en oraciones."""
-        # Primero dividir por puntuación
-        raw_sentences = self._sentence_pattern.split(text)
+        """Dividir texto en oraciones.
 
-        # Limpiar y filtrar
-        sentences = []
-        for sent in raw_sentences:
-            sent = sent.strip()
-            if sent and len(sent) > 1:
-                # Asegurar que tiene al menos una palabra
-                if re.search(r"\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+\b", sent):
-                    sentences.append(sent)
-
-        return sentences
+        Delega a sentence_utils.split_sentences (implementación canónica DRY).
+        Devuelve solo textos (sin posiciones) para compatibilidad.
+        """
+        return [sent_text for sent_text, _, _ in _canonical_split_sentences(text)]
 
     def analyze_by_chapter(
         self,

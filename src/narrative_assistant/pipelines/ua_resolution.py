@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
-from ..core.text_utils import normalize_name as _normalize_name_shared_shared
+from ..core.text_utils import normalize_name as _normalize_name_shared
 
 logger = logging.getLogger(__name__)
 

@@ -32,6 +32,7 @@ from typing import Any, Optional
 from ...core.config import GrammarConfig, get_config
 from ...core.errors import ErrorSeverity, NarrativeError, NLPError
 from ...core.result import Result
+from ..sentence_utils import split_sentences as _canonical_split_sentences
 from .base import (
     GRAMMAR_PATTERNS,
     REDUNDANT_EXPRESSIONS,
@@ -1031,25 +1032,15 @@ Si no hay errores adicionales, responde: []"""
         return consolidated
 
     def _split_sentences(self, text: str) -> list[tuple[int, int, str]]:
-        """Dividir texto en oraciones con posiciones."""
-        sentences = []
-        pattern = r"[.!?]+\s*"
+        """Dividir texto en oraciones con posiciones.
 
-        last_end = 0
-        for match in re.finditer(pattern, text):
-            end = match.end()
-            sentence = text[last_end:end].strip()
-            if sentence:
-                sentences.append((last_end, end, sentence))
-            last_end = end
-
-        # Última oración sin puntuación final
-        if last_end < len(text):
-            sentence = text[last_end:].strip()
-            if sentence:
-                sentences.append((last_end, len(text), sentence))
-
-        return sentences
+        Delega a sentence_utils.split_sentences (implementación canónica DRY).
+        Reordena tuplas a (start, end, text) para compatibilidad.
+        """
+        return [
+            (start, end, sent_text)
+            for sent_text, start, end in _canonical_split_sentences(text)
+        ]
 
     def _extract_sentence(self, text: str, position: int) -> str:
         """Extraer la oración que contiene la posición dada."""

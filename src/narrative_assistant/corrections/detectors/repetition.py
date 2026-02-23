@@ -8,6 +8,7 @@ o deben variarse.
 
 import re
 
+from ...nlp.sentence_utils import split_sentences as _canonical_split_sentences
 from ..base import BaseDetector, CorrectionIssue
 from ..config import RepetitionConfig
 from ..types import CorrectionCategory, RepetitionIssueType
@@ -371,8 +372,8 @@ class RepetitionDetector(BaseDetector):
         """Detecta oraciones consecutivas que empiezan igual."""
         issues = []
 
-        # Dividir en oraciones
-        sentences = re.split(r"[.!?]+\s+", text)
+        # Dividir en oraciones (canonical DRY)
+        sentences = [s for s, _, _ in _canonical_split_sentences(text)]
 
         for i in range(len(sentences) - 1):
             sent1 = sentences[i].strip()

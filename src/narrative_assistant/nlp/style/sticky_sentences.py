@@ -26,6 +26,7 @@ from typing import Optional
 
 from ...core.errors import ErrorSeverity, NLPError
 from ...core.result import Result
+from ..sentence_utils import split_sentences as _canonical_split_sentences
 
 logger = logging.getLogger(__name__)
 
@@ -554,9 +555,6 @@ class StickySentenceDetector:
         self.threshold = threshold
         self.min_words = min_words
 
-        # Patrón para dividir en oraciones
-        self._sentence_pattern = re.compile(r"[.!?]+(?:\s+|$)|[\n]{2,}", re.UNICODE)
-
         # Patrón para extraer palabras
         self._word_pattern = re.compile(r"\b([a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+)\b", re.UNICODE)
 
@@ -730,31 +728,11 @@ class StickySentenceDetector:
     # =========================================================================
 
     def _split_sentences(self, text: str) -> list[tuple[str, int, int]]:
-        """Dividir texto en oraciones con posiciones."""
-        sentences = []
+        """Dividir texto en oraciones con posiciones.
 
-        # Dividir por puntuación
-        parts = self._sentence_pattern.split(text)
-
-        current_pos = 0
-        for part in parts:
-            part = part.strip()
-            if not part:
-                continue
-
-            # Buscar posición real en el texto
-            start = text.find(part, current_pos)
-            if start == -1:
-                start = current_pos
-            end = start + len(part)
-
-            # Verificar que tiene palabras
-            if self._word_pattern.search(part):
-                sentences.append((part, start, end))
-
-            current_pos = end
-
-        return sentences
+        Delega a sentence_utils.split_sentences (implementación canónica DRY).
+        """
+        return _canonical_split_sentences(text)
 
     def _tokenize(self, text: str) -> list[str]:
         """Extraer palabras del texto."""

@@ -395,7 +395,18 @@ const loadChapterDialogues = async (chapterNumber: number) => {
     const data = await api.getRaw<{ success: boolean; data?: any }>(`/api/projects/${props.projectId}/chapters/${chapterNumber}/dialogue-attributions`)
 
     if (data.success && data.data?.attributions) {
-      chapterDialogues.value.set(chapterNumber, data.data.attributions)
+      // Transformar snake_case (API) → camelCase (frontend DialogueAttr)
+      const transformed: DialogueAttr[] = data.data.attributions.map((a: any) => ({
+        text: a.text,
+        speakerName: a.speaker_name ?? null,
+        speakerId: a.speaker_id ?? null,
+        confidence: a.confidence ?? 'unknown',
+        method: a.method ?? 'none',
+        startChar: a.start_char,
+        endChar: a.end_char,
+        chapterNumber: chapterNumber,
+      }))
+      chapterDialogues.value.set(chapterNumber, transformed)
     }
   } catch (err) {
     console.error(`Error loading dialogue attributions for chapter ${chapterNumber}:`, err)
