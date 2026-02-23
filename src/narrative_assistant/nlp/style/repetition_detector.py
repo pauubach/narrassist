@@ -20,6 +20,7 @@ from typing import Optional
 
 from ...core.errors import ErrorSeverity, NLPError
 from ...core.result import Result
+from ..sentence_utils import extract_sentence_context
 
 logger = logging.getLogger(__name__)
 
@@ -780,23 +781,11 @@ class RepetitionDetector:
         return text
 
     def _extract_sentence(self, text: str, position: int) -> str:
-        """Extraer oración que contiene la posición."""
-        start = position
-        while start > 0 and text[start - 1] not in ".!?\n":
-            start -= 1
+        """Extraer oración que contiene la posición.
 
-        end = position
-        while end < len(text) and text[end] not in ".!?\n":
-            end += 1
-
-        sentence = text[start : end + 1].strip()
-        if len(sentence) > 150:
-            word_pos = position - start
-            context_start = max(0, word_pos - 60)
-            context_end = min(len(sentence), word_pos + 60)
-            sentence = "..." + sentence[context_start:context_end] + "..."
-
-        return sentence
+        Delega a sentence_utils.extract_sentence_context (DRY).
+        """
+        return extract_sentence_context(text, position, max_len=150, context_window=60)
 
     def _extract_content_words(self, text: str) -> list[tuple[str, int, int, int]]:
         """Extraer palabras de contenido (sustantivos, verbos, adjetivos)."""

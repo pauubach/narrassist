@@ -158,8 +158,8 @@ class CoherenceDetector(BaseDetector):
             if scheduler:
                 try:
                     scheduler.yield_to_chat()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Could not yield to chat scheduler: %s", e)
 
             # Construir texto de párrafos numerados
             numbered_paragraphs = []

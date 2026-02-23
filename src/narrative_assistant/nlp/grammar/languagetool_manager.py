@@ -164,8 +164,8 @@ class LanguageToolManager:
             result = subprocess.run(["java", "-version"], capture_output=True, timeout=5)
             if result.returncode == 0:
                 return "java"
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("System Java not available: %s", e)
 
         # 2. Verificar Java local
         if self._java_dir:

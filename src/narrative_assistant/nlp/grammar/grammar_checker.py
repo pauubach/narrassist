@@ -32,7 +32,10 @@ from typing import Any, Optional
 from ...core.config import GrammarConfig, get_config
 from ...core.errors import ErrorSeverity, NarrativeError, NLPError
 from ...core.result import Result
-from ..sentence_utils import split_sentences as _canonical_split_sentences
+from ..sentence_utils import (
+    extract_sentence_context,
+    split_sentences as _canonical_split_sentences,
+)
 from .base import (
     GRAMMAR_PATTERNS,
     REDUNDANT_EXPRESSIONS,
@@ -784,8 +787,8 @@ class GrammarChecker:
                                 rule_id="FRAGMENT",
                             )
                         )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Fragment detection failed for sentence: %s", e)
 
             # Coma-splice: coma donde debería ir punto
             comma_splice_pattern = r"[a-záéíóúñ]+,\s+[a-záéíóúñ]+\s+[a-záéíóúñ]+,"
@@ -1043,27 +1046,11 @@ Si no hay errores adicionales, responde: []"""
         ]
 
     def _extract_sentence(self, text: str, position: int) -> str:
-        """Extraer la oración que contiene la posición dada."""
-        # Buscar inicio
-        start = position
-        while start > 0 and text[start - 1] not in ".!?\n":
-            start -= 1
+        """Extraer la oración que contiene la posición dada.
 
-        # Buscar fin
-        end = position
-        while end < len(text) and text[end] not in ".!?\n":
-            end += 1
-
-        sentence = text[start : end + 1].strip()
-
-        # Limitar longitud
-        if len(sentence) > 200:
-            word_start = position - start
-            context_start = max(0, word_start - 80)
-            context_end = min(len(sentence), word_start + 80)
-            sentence = "..." + sentence[context_start:context_end] + "..."
-
-        return sentence
+        Delega a sentence_utils.extract_sentence_context (DRY).
+        """
+        return extract_sentence_context(text, position)
 
     def _generate_suggestion(self, text: str, error_type: GrammarErrorType) -> str | None:
         """Generar sugerencia de corrección."""

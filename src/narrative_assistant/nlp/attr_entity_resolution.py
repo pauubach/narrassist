@@ -341,8 +341,8 @@ class AttributeEntityResolutionMixin:
                             if _mu.is_verb(token) and _mu.get_person(token) == "1":
                                 has_1st_person_verb = True
                                 break
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("spaCy 1st-person verb detection failed: %s", e)
 
         if has_1st_person_verb and person_candidates:
             narrator_entity = self._find_narrator_entity(person_candidates, text)

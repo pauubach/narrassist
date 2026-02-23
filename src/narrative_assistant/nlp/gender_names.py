@@ -61,7 +61,7 @@ FEMININE_NAMES: frozenset[str] = frozenset({
     "joana", "mariana", "beatriz", "carolina",
     # Catalanes / Vascos / Gallegos
     "anna", "meritxell", "montserrat", "neus", "gemma", "mireia",
-    "iria", "nerea", "uxía", "uxia", "ainara", "leire",
+    "iria", "nerea", "uxía", "uxia", "ainara", "leire", "itziar",
     # Árabes frecuentes en narrativa
     "fátima", "fatima", "aisha", "leila", "nadia", "soraya",
     "amina", "yasmin", "zahra", "layla", "hanan",
@@ -112,9 +112,9 @@ MASCULINE_NAMES: frozenset[str] = frozenset({
     # Rusos (frecuentes en literatura)
     "iván", "dimitri", "nikolai", "sergei", "boris", "vladimir",
     # Catalanes / Vascos / Gallegos
-    "pau", "jordi", "oriol", "arnau", "pol", "biel",
+    "pau", "jordi", "oriol", "arnau", "pol", "biel", "sergi",
     "iker", "aitor", "unai", "mikel", "gorka", "eneko",
-    "brais", "xoel",
+    "brais", "xoel", "xoán", "xoan",
     # Árabes frecuentes en narrativa
     "mohammed", "mohamed", "ahmed", "ali", "omar", "hassan",
     "youssef", "karim", "said", "mustafa", "rashid", "tariq",

@@ -32,6 +32,7 @@ try:
 except ImportError:
     EMBEDDINGS_AVAILABLE = False
 
+from ..sentence_utils import extract_sentence_context
 from .base import DetectionMethod, SpellingErrorType, SpellingIssue, SpellingSeverity
 
 logger = logging.getLogger(__name__)
@@ -1286,23 +1287,8 @@ def check_semantic_context(text: str, window: int = CONTEXT_WINDOW) -> list[Spel
 
 
 def _extract_sentence(text: str, position: int, max_len: int = 200) -> str:
-    """Extraer oración que contiene la posición dada."""
-    # Buscar hacia atrás hasta . ! ? o inicio
-    start = position
-    while start > 0 and text[start - 1] not in ".!?\n":
-        start -= 1
-        if position - start > max_len:
-            break
+    """Extraer oración que contiene la posición dada.
 
-    # Buscar hacia adelante hasta . ! ? o fin
-    end = position
-    while end < len(text) and text[end] not in ".!?\n":
-        end += 1
-        if end - position > max_len:
-            break
-
-    sentence = text[start:end].strip()
-    if len(sentence) > max_len:
-        sentence = sentence[:max_len] + "..."
-
-    return sentence
+    Delega a sentence_utils.extract_sentence_context (DRY).
+    """
+    return extract_sentence_context(text, position, max_len=max_len)

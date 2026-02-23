@@ -242,3 +242,65 @@ def _detect_continuity_signal_spacy(
                     signal = max(signal, 0.60)
 
     return signal
+
+
+# ---------------------------------------------------------------------------
+# Extract sentence context — Canonical Implementation
+# ---------------------------------------------------------------------------
+
+
+def extract_sentence_context(
+    text: str,
+    position: int,
+    max_len: int = 200,
+    context_window: int = 80,
+) -> str:
+    """
+    Extrae la oración que contiene la posición dada.
+
+    Implementación canónica consolidada de:
+    - grammar_checker._extract_sentence
+    - semantic_checker._extract_sentence
+    - spelling_checker._extract_sentence
+    - voting_checker._extract_sentence
+    - repetition_detector._extract_sentence
+
+    Busca límites de oración (.!?\\n) hacia atrás y adelante.
+    Si la oración supera max_len, centra una ventana de context_window
+    alrededor de la posición.
+
+    Args:
+        text: Texto completo
+        position: Posición (char offset) del punto de interés
+        max_len: Longitud máxima de la oración extraída
+        context_window: Radio de contexto si se trunca
+
+    Returns:
+        Texto de la oración (posiblemente truncado con "...")
+    """
+    if not text or position < 0 or position >= len(text):
+        return ""
+
+    # Buscar inicio de oración
+    start = position
+    while start > 0 and text[start - 1] not in ".!?\n":
+        start -= 1
+        if position - start > max_len:
+            break
+
+    # Buscar fin de oración
+    end = position
+    while end < len(text) and text[end] not in ".!?\n":
+        end += 1
+        if end - position > max_len:
+            break
+
+    sentence = text[start : end + 1].strip()
+
+    if len(sentence) > max_len:
+        word_start = position - start
+        context_start = max(0, word_start - context_window)
+        context_end = min(len(sentence), word_start + context_window)
+        sentence = "..." + sentence[context_start:context_end] + "..."
+
+    return sentence

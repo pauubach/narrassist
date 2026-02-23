@@ -125,8 +125,8 @@ def detect_name_variants(
                     try:
                         if are_hypocoristic_match(variant_form, canonical):
                             continue
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning("Hypocoristic match check failed for '%s'/'%s': %s", variant_form, canonical, e)
 
                 # Construir detalles de menciones variantes
                 variant_details = []

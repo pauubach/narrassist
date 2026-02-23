@@ -1652,8 +1652,8 @@ class CoreferenceVotingResolver(
             try:
                 from narrative_assistant.llm.client import get_llm_scheduler
                 get_llm_scheduler().yield_to_chat()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Could not yield to chat scheduler: %s", e)
 
             # Si es pronombre de primera persona y hay narrador, saltar
             if anaphor.start_char in first_person_already_resolved:

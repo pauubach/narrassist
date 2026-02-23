@@ -340,5 +340,5 @@ class ContradictionValidator:
             scheduler = get_llm_scheduler()
             if scheduler:
                 scheduler.yield_to_chat()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not yield to chat scheduler: %s", e)

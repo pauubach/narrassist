@@ -29,6 +29,7 @@ from enum import Enum
 from pathlib import Path
 
 from ...core.result import Result
+from ..sentence_utils import extract_sentence_context
 from .base import (
     DetectionMethod,
     SpellingErrorType,
@@ -2007,23 +2008,11 @@ class VotingSpellingChecker:
         return Result.success(report)
 
     def _extract_sentence(self, text: str, position: int) -> str:
-        """Extraer la oración que contiene la posición dada."""
-        start = position
-        while start > 0 and text[start - 1] not in ".!?\n":
-            start -= 1
+        """Extraer la oración que contiene la posición dada.
 
-        end = position
-        while end < len(text) and text[end] not in ".!?\n":
-            end += 1
-
-        sentence = text[start : end + 1].strip()
-        if len(sentence) > 200:
-            word_start = position - start
-            context_start = max(0, word_start - 80)
-            context_end = min(len(sentence), word_start + 80)
-            sentence = "..." + sentence[context_start:context_end] + "..."
-
-        return sentence
+        Delega a sentence_utils.extract_sentence_context (DRY).
+        """
+        return extract_sentence_context(text, position)
 
 
 # =============================================================================
