@@ -1645,7 +1645,16 @@ class CoreferenceVotingResolver(
         # Resolver cada anáfora (excluyendo las de primera persona ya resueltas)
         resolved_pairs: list[tuple[Mention, Mention, float]] = []
         total_anaphors = len(anaphors)
-        progress_update_every = max(1, total_anaphors // 40) if total_anaphors else 1
+        progress_update_every = max(1, total_anaphors // 80) if total_anaphors else 1
+
+        # Labels legibles para cada método (para el subproceso en la UI)
+        _method_labels = {
+            CorefMethod.MORPHO: "análisis morfológico",
+            CorefMethod.HEURISTICS: "heurísticas narrativas",
+            CorefMethod.EMBEDDINGS: "similitud semántica",
+            CorefMethod.LLM: "modelo de lenguaje",
+        }
+        num_methods = len(self._methods) or 1
 
         for index, anaphor in enumerate(anaphors, start=1):
             # Ceder turno al chat interactivo si hay uno esperando
@@ -1672,7 +1681,20 @@ class CoreferenceVotingResolver(
             # Aplicar cada método y recolectar votos
             all_votes: dict[Mention, list[tuple[float, CorefMethod, str]]] = {}
 
-            for method, resolver in self._methods.items():
+            for method_idx, (method, resolver) in enumerate(self._methods.items()):
+                # Progreso granular: emitir ANTES de cada método para que la UI
+                # muestre qué método está ejecutándose (especialmente útil cuando
+                # el LLM tarda mucho por anáfora)
+                method_fraction = method_idx / num_methods
+                overall = ((index - 1) + method_fraction) / total_anaphors
+                method_label = _method_labels.get(method, method.value)
+                emit_progress(
+                    0.22 + (overall * 0.68),
+                    f"Anáfora {index}/{total_anaphors} — {method_label}",
+                    index,
+                    total_anaphors,
+                )
+
                 try:
                     method_results = resolver.resolve(anaphor, candidates, context)
 

@@ -539,7 +539,7 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
 
         # --- 10a: Character Network ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Calculando red de personajes...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Calculando red de personajes...")
         _run_enrichment(
             db,
             project_id,
@@ -551,7 +551,7 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
 
         # --- 10b: Character Timeline ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Generando línea temporal...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Generando línea temporal...")
         _run_enrichment(
             db,
             project_id,
@@ -563,7 +563,7 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
 
         # --- 10c: Character Profiles (6 indicators) ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Perfilando personajes...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Perfilando personajes...")
         _run_enrichment(
             db,
             project_id,
@@ -575,7 +575,7 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
 
         # --- 10d: Emotional Analysis ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Analizando coherencia emocional...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Analizando coherencia emocional...")
         _run_enrichment(
             db,
             project_id,
@@ -587,7 +587,7 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
 
         # --- 10e: Character Archetypes ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Detectando arquetipos...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Detectando arquetipos...")
         _run_enrichment(
             db,
             project_id,
@@ -947,7 +947,7 @@ def run_voice_enrichment(ctx: dict, tracker) -> None:
 
         # --- 11a: Voice Profiles ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Construyendo perfiles de voz...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Construyendo perfiles de voz...")
         profiles_result = None
 
         def compute_voice_profiles():
@@ -965,7 +965,7 @@ def run_voice_enrichment(ctx: dict, tracker) -> None:
 
         # --- 11b: Voice Deviations ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Detectando desviaciones de voz...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Detectando desviaciones de voz...")
         if profiles_result:
             _run_enrichment(
                 db,
@@ -978,7 +978,7 @@ def run_voice_enrichment(ctx: dict, tracker) -> None:
 
         # --- 11c: Register Analysis ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Analizando registro lingüístico...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Analizando registro lingüístico...")
         _run_enrichment(
             db,
             project_id,
@@ -990,7 +990,7 @@ def run_voice_enrichment(ctx: dict, tracker) -> None:
 
         # --- 11d: Focalization Violations ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Verificando focalización...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Verificando focalización...")
         _run_enrichment(
             db,
             project_id,
@@ -1106,7 +1106,7 @@ def run_prose_enrichment(ctx: dict, tracker) -> None:
 
         # --- 12a: Sticky Sentences ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Detectando frases pegajosas...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Detectando frases pegajosas...")
         _run_enrichment(
             db,
             project_id,
@@ -1118,7 +1118,7 @@ def run_prose_enrichment(ctx: dict, tracker) -> None:
 
         # --- 12b: Sentence Energy ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Midiendo energía narrativa...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Midiendo energía narrativa...")
         _run_enrichment(
             db,
             project_id,
@@ -1130,14 +1130,14 @@ def run_prose_enrichment(ctx: dict, tracker) -> None:
 
         # --- 12c: Echo Report (lexical only — skip semantic to avoid embeddings) ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Buscando repeticiones...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Buscando repeticiones...")
         _run_enrichment(
             db, project_id, "echo_report", 12, lambda: _compute_echo_report(chapters), "echo_report"
         )
 
         # --- 12d: Pacing Analysis ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Analizando ritmo narrativo...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Analizando ritmo narrativo...")
         _run_enrichment(
             db,
             project_id,
@@ -1149,7 +1149,7 @@ def run_prose_enrichment(ctx: dict, tracker) -> None:
 
         # --- 12e: Tension Curve ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Trazando curva de tensión...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Trazando curva de tensión...")
         _run_enrichment(
             db,
             project_id,
@@ -1161,7 +1161,7 @@ def run_prose_enrichment(ctx: dict, tracker) -> None:
 
         # --- 12f: Sensory Report ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Evaluando detalles sensoriales...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Evaluando detalles sensoriales...")
         _run_enrichment(
             db,
             project_id,
@@ -1173,7 +1173,7 @@ def run_prose_enrichment(ctx: dict, tracker) -> None:
 
         # --- 12g: Age Readability ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Calculando legibilidad...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Calculando legibilidad...")
         _run_enrichment(
             db,
             project_id,
@@ -1185,7 +1185,7 @@ def run_prose_enrichment(ctx: dict, tracker) -> None:
 
         # --- 12h: Sentence Variation ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Analizando variación sintáctica...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Analizando variación sintáctica...")
         _run_enrichment(
             db,
             project_id,
@@ -1197,7 +1197,7 @@ def run_prose_enrichment(ctx: dict, tracker) -> None:
 
         # --- 12i: Dialogue Validation ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Validando diálogos...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Validando diálogos...")
         _run_enrichment(
             db,
             project_id,
@@ -1209,7 +1209,7 @@ def run_prose_enrichment(ctx: dict, tracker) -> None:
 
         # --- 12j: Narrative Structure ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Detectando estructura narrativa...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Detectando estructura narrativa...")
         _run_enrichment(
             db,
             project_id,
@@ -1460,7 +1460,7 @@ def run_health_enrichment(ctx: dict, tracker) -> None:
 
         # --- 13c: Narrative Health (12 dimensions) ---
         step += 1
-        tracker.update_progress(phase_key, step / total_steps, "Calculando puntuación de salud...")
+        tracker.update_parallel_progress(phase_key, step / total_steps, "Calculando puntuación de salud...")
         if progress_data is not None:
             _run_enrichment(
                 db,

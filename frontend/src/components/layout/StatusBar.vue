@@ -397,28 +397,6 @@ onBeforeUnmount(() => {
           />
         </div>
 
-        <!-- Acción actual con indicador de actividad -->
-        <div v-if="currentAction" class="current-action">
-          <span class="activity-indicator"></span>
-          <span class="action-text">{{ currentAction }}</span>
-        </div>
-
-        <div v-if="currentSubphase" class="current-subphase">
-          <div class="subphase-header">
-            <span class="subphase-label">{{ currentSubphase.label }}</span>
-            <span
-              v-if="currentSubphase.step !== undefined && currentSubphase.total_steps !== undefined"
-              class="subphase-step"
-            >
-              {{ currentSubphase.step }}/{{ currentSubphase.total_steps }}
-            </span>
-            <span class="subphase-percent">{{ currentSubphase.progress }}%</span>
-          </div>
-          <div class="subphase-progress-bar">
-            <div class="subphase-progress-fill" :style="{ width: `${currentSubphase.progress}%` }"></div>
-          </div>
-        </div>
-
         <div class="details-steps">
           <div
             v-for="step in steps"
@@ -444,6 +422,28 @@ onBeforeUnmount(() => {
               <!-- Mini barra de progreso para la fase activa -->
               <div v-if="step.status === 'in_progress'" class="step-progress-bar">
                 <div class="step-progress-fill" :style="{ width: `${step.progress}%` }"></div>
+              </div>
+              <!-- Subproceso inline: detalle de lo que se está haciendo dentro de esta fase -->
+              <div
+                v-if="step.status === 'in_progress' && (currentSubphase || currentAction)"
+                class="step-subphase"
+              >
+                <div class="step-subphase-header">
+                  <span class="activity-indicator"></span>
+                  <span class="step-subphase-text">{{ currentAction || currentSubphase?.label || '' }}</span>
+                  <span
+                    v-if="currentSubphase?.step != null && currentSubphase?.total_steps != null"
+                    class="step-subphase-counter"
+                  >
+                    {{ currentSubphase.step }}/{{ currentSubphase.total_steps }}
+                  </span>
+                </div>
+                <div v-if="currentSubphase" class="step-subphase-bar">
+                  <div
+                    class="step-subphase-fill"
+                    :style="{ width: `${currentSubphase.progress}%` }"
+                  ></div>
+                </div>
               </div>
             </div>
           </div>
@@ -634,6 +634,7 @@ onBeforeUnmount(() => {
 
 .progress-bar :deep(.p-progressbar-value) {
   background: var(--primary-color);
+  transition: width 0.6s ease;
 }
 
 .expand-btn {
@@ -758,28 +759,60 @@ onBeforeUnmount(() => {
   height: 100%;
   background: var(--p-primary-500, #3b82f6);
   border-radius: var(--app-radius-sm);
-  transition: width 0.3s ease;
+  transition: width 0.6s ease;
 }
 
-/* Current action indicator */
-.current-action {
+/* Subphase inline (dentro de la fase activa) */
+.step-subphase {
+  margin-top: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  background: var(--surface-50);
+  border-left: 2px solid var(--p-primary-300, rgba(59, 130, 246, 0.4));
+  border-radius: 0 var(--app-radius-sm, 4px) var(--app-radius-sm, 4px) 0;
+  font-size: 0.75rem;
+}
+
+.step-subphase-header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.75rem;
-  background: var(--p-primary-50, rgba(59, 130, 246, 0.1));
-  border: 1px solid var(--p-primary-200, rgba(59, 130, 246, 0.3));
-  border-radius: var(--app-radius);
-  font-size: 0.8125rem;
+  gap: 0.375rem;
+  margin-bottom: 0.25rem;
+}
+
+.step-subphase-text {
+  flex: 1;
   color: var(--p-primary-700, #1d4ed8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.step-subphase-counter {
+  font-size: 0.6875rem;
+  color: var(--text-color-secondary);
+  flex-shrink: 0;
+}
+
+.step-subphase-bar {
+  height: 3px;
+  background: var(--surface-300);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.step-subphase-fill {
+  height: 100%;
+  background: var(--p-primary-400, #60a5fa);
+  border-radius: 2px;
+  transition: width 0.6s ease;
 }
 
 .activity-indicator {
-  width: 8px;
-  height: 8px;
-  background: var(--primary-500);
+  width: 6px;
+  height: 6px;
+  background: var(--p-primary-500, #3b82f6);
   border-radius: 50%;
+  flex-shrink: 0;
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -802,62 +835,7 @@ onBeforeUnmount(() => {
   }
 }
 
-.action-text {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
-.current-subphase {
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.75rem;
-  background: var(--surface-50);
-  border: 1px solid var(--surface-300);
-  border-radius: var(--app-radius);
-}
-
-.subphase-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.35rem;
-  font-size: 0.75rem;
-}
-
-.subphase-label {
-  flex: 1;
-  font-weight: 600;
-  color: var(--text-color);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.subphase-step {
-  font-size: 0.6875rem;
-  color: var(--text-color-secondary);
-}
-
-.subphase-percent {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--p-primary-600, #2563eb);
-}
-
-.subphase-progress-bar {
-  height: 4px;
-  background: var(--surface-300);
-  border-radius: var(--app-radius-sm);
-  overflow: hidden;
-}
-
-.subphase-progress-fill {
-  height: 100%;
-  background: var(--p-primary-500, #3b82f6);
-  border-radius: var(--app-radius-sm);
-  transition: width 0.2s ease;
-}
 
 .step-completed {
   color: var(--p-green-600, #16a34a);

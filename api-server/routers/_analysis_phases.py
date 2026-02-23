@@ -360,6 +360,8 @@ class ProgressTracker:
         self.current_phase_key = "parsing"
         self.phase_start_times: dict[str, float] = {}
         self.phase_durations: dict[str, float] = {}
+        # Progreso paralelo para fases de enrichment (thread-safe via deps._progress_lock)
+        self._parallel_progress: dict[str, float] = {}
 
     def _write(self, **updates):
         """Thread-safe update de progress storage (F-006)."""
@@ -409,6 +411,39 @@ class ProgressTracker:
         pct_start, pct_end = self.get_phase_progress_range(phase_key)
         pct = int(pct_start + (pct_end - pct_start) * fraction)
         self._write(progress=pct, current_action=message)
+
+    def update_parallel_progress(self, phase_key: str, fraction: float, message: str):
+        """Thread-safe progress for parallel enrichment phases.
+
+        Computes a monotonically increasing weighted aggregate across all
+        parallel enrichment phases so the global progress never jumps backwards.
+        """
+        enrichment_keys = ["relationships", "voice", "prose", "health"]
+        with deps._progress_lock:
+            # Actualizar fracción de esta fase (nunca decrecer)
+            self._parallel_progress[phase_key] = max(
+                self._parallel_progress.get(phase_key, 0.0), fraction
+            )
+
+            # Agregar todas las fases de enrichment con media ponderada
+            total_w = 0.0
+            weighted_sum = 0.0
+            for k in enrichment_keys:
+                w = self.phase_weights.get(k, 0.08)
+                total_w += w
+                weighted_sum += w * self._parallel_progress.get(k, 0.0)
+            agg = weighted_sum / total_w if total_w > 0 else 0.0
+
+            # Calcular % global: enrichment ocupa desde su inicio hasta el final
+            enrich_start_pct = self.get_phase_progress_range(enrichment_keys[0])[0]
+            global_pct = enrich_start_pct + int(agg * (100 - enrich_start_pct))
+
+            # Monotónico: nunca reducir el progreso global
+            storage = deps.analysis_progress_storage.get(self.project_id)
+            if storage:
+                current = storage.get("progress", 0)
+                storage["progress"] = max(current, global_pct)
+                storage["current_action"] = message
 
     def complete_phase(self, phase_key: str, phase_index: int):
         """Alias for end_phase."""
