@@ -2494,12 +2494,11 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
 
             # Check coref cache before expensive computation
             coref_cache_hit = False
+            from narrative_assistant.persistence.analysis_cache import (
+                get_analysis_cache,
+            )
+            _coref_cache_r = get_analysis_cache()
             try:
-                from narrative_assistant.persistence.analysis_cache import (
-                    get_analysis_cache,
-                )
-
-                _coref_cache_r = get_analysis_cache()
                 _coref_fp_r = ctx.get("document_fingerprint", "")
                 _coref_ch_r = _coref_cache_r.compute_coref_config_hash(coref_config)
                 _cached_coref = _coref_cache_r.get_coref_results(
@@ -2549,9 +2548,58 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                         subphase_total_steps=total_steps,
                     )
 
+                # Checkpoint callback: guarda progreso parcial para reanudar
+                _ckpt_fp = ctx.get("document_fingerprint", "")
+                _ckpt_ch = _coref_cache_r.compute_coref_config_hash(coref_config) if _coref_cache_r else ""
+
+                def _on_coref_checkpoint(
+                    processed_index: int,
+                    total_anaphors: int,
+                    state_json: str,
+                ) -> None:
+                    try:
+                        _ckpt_cache = get_analysis_cache()
+                        _ckpt_cache.set_coref_checkpoint(
+                            project_id=project_id,
+                            document_fingerprint=_ckpt_fp,
+                            config_hash=_ckpt_ch,
+                            processed_index=processed_index,
+                            total_anaphors=total_anaphors,
+                            state_json=state_json,
+                        )
+                    except Exception as _ckpt_err:
+                        logger.debug(f"[COREF_CHECKPOINT] Save failed: {_ckpt_err}")
+
+                # Check for existing checkpoint to resume from
+                _resume_state = None
+                try:
+                    if _ckpt_fp and _ckpt_ch:
+                        _ckpt_data = _coref_cache_r.get_coref_checkpoint(
+                            project_id, _ckpt_fp, _ckpt_ch
+                        )
+                        if _ckpt_data:
+                            _resume_state = _ckpt_data
+                            logger.info(
+                                f"[COREF_CHECKPOINT] Resuming from checkpoint: "
+                                f"{_ckpt_data['processed_index']}/{_ckpt_data['total_anaphors']} anaphors"
+                            )
+                            _update_fusion_progress(
+                                0.30,
+                                f"Reanudando correferencias desde checkpoint "
+                                f"({_ckpt_data['processed_index']}/{_ckpt_data['total_anaphors']})",
+                                subphase_id="coref",
+                                subphase_label="Reanudando correferencias",
+                                subphase_progress=0.0,
+                            )
+                except AnalysisCancelledError:
+                    raise
+                except Exception as _ckpt_read_err:
+                    logger.debug(f"[COREF_CHECKPOINT] Read failed: {_ckpt_read_err}")
+
                 logger.info(
                     f"[COREF_DIAG] Starting coref for project {project_id}, "
-                    f"run_id={tracker.run_id}, is_stale={tracker._is_stale()}"
+                    f"run_id={tracker.run_id}, is_stale={tracker._is_stale()}, "
+                    f"resume={'yes' if _resume_state else 'no'}"
                 )
                 try:
                     coref_result = resolve_coreferences_voting(
@@ -2559,6 +2607,8 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                         chapters=chapters_data,
                         config=coref_config,
                         progress_callback=_on_coref_progress,
+                        checkpoint_callback=_on_coref_checkpoint,
+                        resume_state=_resume_state,
                     )
                 except AnalysisCancelledError:
                     logger.info(
@@ -2589,7 +2639,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             for method, count in coref_result.method_contributions.items():
                 logger.debug(f"  Método {method.value}: {count} resoluciones")
 
-            # Cache coref results for future re-analysis
+            # Cache coref results + delete checkpoint (completed successfully)
             try:
                 from narrative_assistant.persistence.analysis_cache import get_analysis_cache
 
@@ -2605,6 +2655,10 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                         chains_json=_coref_json,
                         chain_count=coref_result.total_chains,
                         mention_count=coref_result.total_mentions,
+                    )
+                    # Eliminar checkpoint (ya no necesario, coref completo)
+                    _coref_cache.delete_coref_checkpoint(
+                        project_id, _coref_fp, _coref_config_hash
                     )
                     logger.info(
                         f"[COREF_CACHE] Cached {coref_result.total_chains} chains, "

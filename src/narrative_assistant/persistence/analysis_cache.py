@@ -506,6 +506,122 @@ class AnalysisCache:
             logger.warning(f"Attribute cache write failed (continuing): {e}")
 
     # ========================================================================
+    # Coref Checkpoint (incremental, survives cancellation)
+    # ========================================================================
+
+    def get_coref_checkpoint(
+        self,
+        project_id: int,
+        document_fingerprint: str,
+        config_hash: str,
+    ) -> Optional[dict]:
+        """
+        Recupera checkpoint parcial de correferencias.
+
+        Returns:
+            Dict con {processed_index, total_anaphors, state_json} o None
+        """
+        if not CACHE_ENABLED:
+            return None
+
+        try:
+            with self._db.connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT processed_index, total_anaphors, state_json
+                    FROM coref_checkpoint
+                    WHERE project_id = ?
+                      AND document_fingerprint = ?
+                      AND config_hash = ?
+                    """,
+                    (project_id, document_fingerprint, config_hash),
+                )
+                row = cursor.fetchone()
+
+                if row:
+                    logger.info(
+                        f"[COREF_CHECKPOINT] FOUND: project={project_id}, "
+                        f"progress={row[0]}/{row[1]} anaphors"
+                    )
+                    return {
+                        "processed_index": row[0],
+                        "total_anaphors": row[1],
+                        "state_json": row[2],
+                    }
+                return None
+        except Exception as e:
+            logger.warning(f"Coref checkpoint read failed (continuing): {e}")
+            return None
+
+    def set_coref_checkpoint(
+        self,
+        project_id: int,
+        document_fingerprint: str,
+        config_hash: str,
+        processed_index: int,
+        total_anaphors: int,
+        state_json: str,
+    ) -> None:
+        """Guarda checkpoint parcial de correferencias."""
+        if not CACHE_ENABLED:
+            return
+
+        try:
+            with self._db.connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO coref_checkpoint (
+                        project_id, document_fingerprint, config_hash,
+                        processed_index, total_anaphors, state_json
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        project_id,
+                        document_fingerprint,
+                        config_hash,
+                        processed_index,
+                        total_anaphors,
+                        state_json,
+                    ),
+                )
+                conn.commit()
+                logger.info(
+                    f"[COREF_CHECKPOINT] SAVED: project={project_id}, "
+                    f"progress={processed_index}/{total_anaphors}"
+                )
+        except Exception as e:
+            logger.warning(f"Coref checkpoint write failed (continuing): {e}")
+
+    def delete_coref_checkpoint(
+        self,
+        project_id: int,
+        document_fingerprint: str,
+        config_hash: str,
+    ) -> None:
+        """Elimina checkpoint tras completar correferencias."""
+        try:
+            with self._db.connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    DELETE FROM coref_checkpoint
+                    WHERE project_id = ?
+                      AND document_fingerprint = ?
+                      AND config_hash = ?
+                    """,
+                    (project_id, document_fingerprint, config_hash),
+                )
+                conn.commit()
+                if cursor.rowcount > 0:
+                    logger.info(
+                        f"[COREF_CHECKPOINT] DELETED: project={project_id} (coref completed)"
+                    )
+        except Exception as e:
+            logger.warning(f"Coref checkpoint delete failed (continuing): {e}")
+
+    # ========================================================================
     # Config Hashing (deterministic, reproducible)
     # ========================================================================
 
@@ -608,6 +724,13 @@ class AnalysisCache:
                 )
                 total_deleted += cursor.rowcount
 
+                # Coref checkpoint
+                cursor.execute(
+                    "DELETE FROM coref_checkpoint WHERE document_fingerprint = ?",
+                    (old_fingerprint,),
+                )
+                total_deleted += cursor.rowcount
+
                 # Attr cache
                 cursor.execute(
                     "DELETE FROM attribute_cache WHERE document_fingerprint = ?",
@@ -647,6 +770,9 @@ class AnalysisCache:
                 total_deleted += cursor.rowcount
 
                 cursor.execute("DELETE FROM coreference_cache")
+                total_deleted += cursor.rowcount
+
+                cursor.execute("DELETE FROM coref_checkpoint")
                 total_deleted += cursor.rowcount
 
                 cursor.execute("DELETE FROM attribute_cache")

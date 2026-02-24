@@ -44,6 +44,7 @@ from typing import Callable, Protocol
 logger = logging.getLogger(__name__)
 
 CorefProgressCallback = Callable[[float, str, int | None, int | None], None]
+CorefCheckpointCallback = Callable[[int, int, str], None]  # (processed_index, total, state_json)
 
 
 # =============================================================================
@@ -1538,11 +1539,116 @@ class CoreferenceVotingResolver(
                 except Exception as e:
                     logger.warning(f"No se pudo inicializar {method.value}: {e}")
 
+    @staticmethod
+    def _emit_checkpoint(
+        callback: CorefCheckpointCallback,
+        processed_index: int,
+        total_anaphors: int,
+        resolved_pairs: list[tuple["Mention", "Mention", float]],
+        result: "CorefResult",
+    ) -> None:
+        """Serializa el estado actual y lo emite al callback de checkpoint."""
+        import json
+
+        state = {
+            "resolved_pairs": [
+                [a.start_char, a.end_char, ant.start_char, ant.end_char, score]
+                for a, ant, score in resolved_pairs
+            ],
+            "unresolved": [
+                [m.start_char, m.end_char] for m in result.unresolved
+            ],
+            "method_contributions": {
+                m.value: c for m, c in result.method_contributions.items()
+            },
+            "voting_details": {
+                f"{k[0]},{k[1]}": v.to_dict()
+                for k, v in result.voting_details.items()
+            },
+        }
+        try:
+            callback(processed_index, total_anaphors, json.dumps(state))
+        except Exception:
+            logger.debug("Checkpoint callback failed", exc_info=True)
+
+    def _restore_checkpoint(
+        self,
+        resume_state: dict,
+        anaphors: list["Mention"],
+        all_mentions: list["Mention"],
+        result: "CorefResult",
+        resolved_pairs: list[tuple["Mention", "Mention", float]],
+    ) -> int:
+        """
+        Restaura estado desde un checkpoint previo.
+
+        Returns:
+            Índice (1-based) hasta el cual se procesaron anáforas.
+            El loop debe empezar desde index > returned_value.
+        """
+        import json
+
+        processed_index = resume_state.get("processed_index", 0)
+        state_json = resume_state.get("state_json", "{}")
+
+        try:
+            state = json.loads(state_json) if isinstance(state_json, str) else state_json
+        except (json.JSONDecodeError, TypeError):
+            logger.warning("[COREF_CHECKPOINT] Invalid state_json, starting from scratch")
+            return 0
+
+        # Lookup de menciones por posición
+        mention_by_pos: dict[tuple[int, int], "Mention"] = {
+            (m.start_char, m.end_char): m for m in all_mentions
+        }
+
+        # Restaurar resolved_pairs
+        for pair_data in state.get("resolved_pairs", []):
+            if len(pair_data) >= 5:
+                a_start, a_end, ant_start, ant_end, score = pair_data[:5]
+                anaphor_m = mention_by_pos.get((a_start, a_end))
+                antecedent_m = mention_by_pos.get((ant_start, ant_end))
+                if anaphor_m and antecedent_m:
+                    resolved_pairs.append((anaphor_m, antecedent_m, float(score)))
+
+        # Restaurar unresolved
+        for unres_data in state.get("unresolved", []):
+            if len(unres_data) >= 2:
+                m = mention_by_pos.get((unres_data[0], unres_data[1]))
+                if m:
+                    result.unresolved.append(m)
+
+        # Restaurar method_contributions
+        for method_str, count in state.get("method_contributions", {}).items():
+            try:
+                method = CorefMethod(method_str)
+                result.method_contributions[method] = count
+            except ValueError:
+                pass
+
+        # Restaurar voting_details
+        for key_str, detail_dict in state.get("voting_details", {}).items():
+            parts = key_str.split(",")
+            if len(parts) == 2:
+                try:
+                    key = (int(parts[0]), int(parts[1]))
+                    result.voting_details[key] = MentionVotingDetail.from_dict(detail_dict)
+                except (ValueError, TypeError):
+                    pass
+
+        logger.info(
+            f"[COREF_CHECKPOINT] RESUMED: {processed_index} anaphors already done, "
+            f"{len(resolved_pairs)} pairs, {len(result.unresolved)} unresolved"
+        )
+        return processed_index
+
     def resolve_document(
         self,
         text: str,
         chapters: list[dict] | None = None,
         progress_callback: CorefProgressCallback | None = None,
+        checkpoint_callback: CorefCheckpointCallback | None = None,
+        resume_state: dict | None = None,
     ) -> CorefResult:
         """
         Resuelve correferencias en un documento completo.
@@ -1550,6 +1656,10 @@ class CoreferenceVotingResolver(
         Args:
             text: Texto completo del documento
             chapters: Lista de capítulos con start_char/end_char
+            checkpoint_callback: Se invoca cada N anáforas con (index, total, state_json)
+                para persistir progreso incremental.
+            resume_state: Estado previo de un checkpoint interrumpido.
+                Dict con {processed_index, state_json}.
 
         Returns:
             CorefResult con cadenas y estadísticas
@@ -1669,6 +1779,16 @@ class CoreferenceVotingResolver(
         total_anaphors = len(anaphors)
         progress_update_every = max(1, total_anaphors // 80) if total_anaphors else 1
 
+        # Checkpoint: intervalo de guardado (~10% del total o cada 25, lo que sea mayor)
+        checkpoint_every = max(25, total_anaphors // 10) if total_anaphors else 25
+        resume_from_index = 0  # 1-based: primer índice a procesar
+
+        # Restaurar estado previo de checkpoint si existe
+        if resume_state:
+            resume_from_index = self._restore_checkpoint(
+                resume_state, anaphors, mentions, result, resolved_pairs
+            )
+
         # Labels legibles para cada método (para el subproceso en la UI)
         _method_labels = {
             CorefMethod.MORPHO: "análisis morfológico",
@@ -1684,7 +1804,17 @@ class CoreferenceVotingResolver(
                 logger.info(
                     f"[COREF_ABORT] Aborting at top of anaphor loop (index={index})"
                 )
+                # Guardar checkpoint antes de abortar
+                if checkpoint_callback and index > 1:
+                    self._emit_checkpoint(
+                        checkpoint_callback, index - 1, total_anaphors,
+                        resolved_pairs, result,
+                    )
                 raise _abort_error[0]
+
+            # Saltar anáforas ya procesadas (resume de checkpoint)
+            if index <= resume_from_index:
+                continue
 
             # Ceder turno al chat interactivo si hay uno esperando
             try:
@@ -1692,6 +1822,12 @@ class CoreferenceVotingResolver(
                 get_llm_scheduler().yield_to_chat()
             except Exception as e:
                 if _abort_error:
+                    # Checkpoint antes de abortar
+                    if checkpoint_callback and index > 1:
+                        self._emit_checkpoint(
+                            checkpoint_callback, index - 1, total_anaphors,
+                            resolved_pairs, result,
+                        )
                     raise _abort_error[0]
                 logger.debug("Could not yield to chat scheduler: %s", e)
 
@@ -1781,6 +1917,13 @@ class CoreferenceVotingResolver(
                     f"Resolviendo anáforas ({index}/{total_anaphors})",
                     index,
                     total_anaphors,
+                )
+
+            # Guardar checkpoint periódico
+            if checkpoint_callback and index % checkpoint_every == 0:
+                self._emit_checkpoint(
+                    checkpoint_callback, index, total_anaphors,
+                    resolved_pairs, result,
                 )
 
         # Añadir resoluciones de primera persona al narrador
@@ -1879,6 +2022,8 @@ def resolve_coreferences_voting(
     chapters: list[dict] | None = None,
     config: CorefConfig | None = None,
     progress_callback: CorefProgressCallback | None = None,
+    checkpoint_callback: CorefCheckpointCallback | None = None,
+    resume_state: dict | None = None,
 ) -> CorefResult:
     """
     Función de conveniencia para resolver correferencias.
@@ -1887,12 +2032,19 @@ def resolve_coreferences_voting(
         text: Texto a procesar
         chapters: Capítulos opcionales
         config: Configuración opcional
+        checkpoint_callback: Callback para guardar progreso incremental
+        resume_state: Estado previo de checkpoint para reanudar
 
     Returns:
         CorefResult con las cadenas de correferencia
     """
     resolver = get_coref_resolver(config)
-    return resolver.resolve_document(text, chapters, progress_callback=progress_callback)
+    return resolver.resolve_document(
+        text, chapters,
+        progress_callback=progress_callback,
+        checkpoint_callback=checkpoint_callback,
+        resume_state=resume_state,
+    )
 
 
 def build_pronoun_resolution_map(

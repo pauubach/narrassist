@@ -1436,6 +1436,23 @@ CREATE INDEX IF NOT EXISTS idx_attr_cache_lookup ON attribute_cache(
     config_hash
 );
 
+-- Checkpoint incremental de correferencias
+-- Guarda progreso parcial para reanudar tras cancelación (evita empezar de 0).
+CREATE TABLE IF NOT EXISTS coref_checkpoint (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    document_fingerprint TEXT NOT NULL,
+    config_hash TEXT NOT NULL,
+    processed_index INTEGER NOT NULL DEFAULT 0,   -- Última anáfora completada (0-based)
+    total_anaphors INTEGER NOT NULL DEFAULT 0,
+    state_json TEXT NOT NULL,                     -- JSON: resolved_pairs, unresolved, method_contributions, voting_details
+    cache_version INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    UNIQUE(project_id, document_fingerprint, config_hash)
+);
+
 -- Cache NER por capítulo (optimización incremental por cambios locales)
 -- Reutiliza menciones de capítulos intactos cuando cambia solo parte del manuscrito.
 CREATE TABLE IF NOT EXISTS ner_chapter_cache (
@@ -1867,6 +1884,20 @@ class Database:
                 UNIQUE (project_id, chapter_number, dialogue_start_char, dialogue_end_char)
             )""",
             "CREATE INDEX IF NOT EXISTS idx_speaker_corrections_project ON speaker_corrections(project_id, chapter_number)",
+            # v35: Checkpoint incremental de correferencias
+            """CREATE TABLE IF NOT EXISTS coref_checkpoint (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                document_fingerprint TEXT NOT NULL,
+                config_hash TEXT NOT NULL,
+                processed_index INTEGER NOT NULL DEFAULT 0,
+                total_anaphors INTEGER NOT NULL DEFAULT 0,
+                state_json TEXT NOT NULL,
+                cache_version INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                UNIQUE(project_id, document_fingerprint, config_hash)
+            )""",
         ]
         for sql in table_migrations:
             try:
