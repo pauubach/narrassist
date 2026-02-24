@@ -410,13 +410,18 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
         # Inicializar progreso (protegido por lock)
         import time as time_module
+        import uuid
 
         now = time_module.time()
+        # ID único por ejecución: permite detectar que una ejecución cancelada
+        # no debe seguir escribiendo en el storage de una ejecución nueva.
+        analysis_run_id = uuid.uuid4().hex[:12]
         with deps._progress_lock:
             # Clear any old cancellation flag for this project
             deps.analysis_cancellation_flags.pop(project_id, None)
             deps.analysis_progress_storage[project_id] = {
                 "project_id": project_id,
+                "_run_id": analysis_run_id,
                 "status": "running",
                 "progress": 0,
                 "current_phase": "Iniciando análisis...",
@@ -572,6 +577,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 phase_weights=phase_weights,
                 phase_order=PHASE_ORDER,
                 db_session=db_session,
+                run_id=analysis_run_id,
             )
 
             # Build shared context dict
@@ -587,6 +593,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 "previous_analysis_status": previous_analysis_status,
                 "previous_document_fingerprint": getattr(project, "document_fingerprint", "") or "",
                 "fast_path_same_document": False,
+                "_run_id": analysis_run_id,
             }
 
             # Log inicio con timestamp claro

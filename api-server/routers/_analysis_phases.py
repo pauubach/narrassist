@@ -440,14 +440,26 @@ def _ensure_storage_exists(project_id: int) -> None:
 
 
 def _update_storage(
-    project_id: int, *, metrics_update: dict[str, Any] | None = None, **updates
+    project_id: int,
+    *,
+    metrics_update: dict[str, Any] | None = None,
+    _run_id: str = "",
+    **updates,
 ) -> None:
-    """Thread-safe update de progress storage para código sin tracker."""
+    """Thread-safe update de progress storage para código sin tracker.
+
+    Si _run_id se pasa y no coincide con el storage actual, la escritura
+    se ignora silenciosamente (la ejecución fue reemplazada por otra).
+    """
     import time
 
     with deps._progress_lock:
         storage = deps.analysis_progress_storage.get(project_id)
         if not storage:
+            return
+        # Si tenemos run_id, verificar que coincide (evitar que thread viejo
+        # sobrescriba storage de una ejecución nueva)
+        if _run_id and storage.get("_run_id", "") != _run_id:
             return
         if metrics_update:
             storage.setdefault("metrics", {}).update(metrics_update)
@@ -476,23 +488,38 @@ class ProgressTracker:
         phase_weights: dict[str, float],
         phase_order: list[str],
         db_session: Any,
+        run_id: str = "",
     ):
         self.project_id = project_id
         self.phases = phases
         self.phase_weights = phase_weights
         self.phase_order = phase_order
         self.db_session = db_session
+        self.run_id = run_id
         self.current_phase_key = "parsing"
         self.phase_start_times: dict[str, float] = {}
         self.phase_durations: dict[str, float] = {}
         # Progreso paralelo para fases de enrichment (thread-safe via deps._progress_lock)
         self._parallel_progress: dict[str, float] = {}
 
+    def _is_stale(self) -> bool:
+        """Verifica si esta ejecución ya fue reemplazada por otra más nueva.
+
+        Retorna True si el storage actual tiene un run_id diferente al nuestro,
+        lo que indica que el usuario canceló y lanzó un nuevo análisis.
+        """
+        if not self.run_id:
+            return False
+        storage = deps.analysis_progress_storage.get(self.project_id)
+        if not storage:
+            return True
+        return storage.get("_run_id", "") != self.run_id
+
     def _write(self, **updates):
         """Thread-safe update de progress storage (F-006)."""
         with deps._progress_lock:
             storage = deps.analysis_progress_storage.get(self.project_id)
-            if storage:
+            if storage and storage.get("_run_id", "") == self.run_id:
                 for key, value in updates.items():
                     if key == "metrics_update" and isinstance(value, dict):
                         storage.setdefault("metrics", {}).update(value)
@@ -715,9 +742,23 @@ class ProgressTracker:
         self.persist_progress()
 
     def check_cancelled(self):
-        """Verifica si el análisis fue cancelado por el usuario."""
+        """Verifica si el análisis fue cancelado por el usuario.
+
+        También detecta si esta ejecución fue reemplazada por una nueva
+        (el usuario canceló y lanzó un re-análisis). En ese caso, el
+        storage ya pertenece a la nueva ejecución y esta debe parar.
+        """
         with deps._progress_lock:
-            # Check dedicated cancellation flag (primary) or status (fallback)
+            # Check 1: ¿Esta ejecución fue reemplazada por otra?
+            if self._is_stale():
+                logger.info(
+                    f"[STALE] Project {self.project_id}: run {self.run_id} "
+                    f"superseded by newer analysis — stopping"
+                )
+                raise AnalysisCancelledError(
+                    "Análisis cancelado (reemplazado por nueva ejecución)"
+                )
+            # Check 2: cancellation flag (primary) or status (fallback)
             cancelled = (
                 deps.analysis_cancellation_flags.get(self.project_id, False)
                 or deps.analysis_progress_storage.get(self.project_id, {}).get("status")
@@ -2092,6 +2133,10 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
         """Actualiza progreso interno de la fase fusion y su sub-etapa activa."""
         nonlocal fusion_progress
 
+        # Si esta ejecución fue reemplazada por otra, no escribir nada
+        if tracker._is_stale():
+            return
+
         bounded = max(0.0, min(0.99, target_fraction))
         if bounded < fusion_progress:
             bounded = fusion_progress
@@ -2128,7 +2173,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
         if not updates:
             return
 
-        _update_storage(project_id, **updates)
+        _update_storage(project_id, _run_id=tracker.run_id, **updates)
         if progress_changed:
             tracker.update_time_remaining()
 
@@ -2475,6 +2520,9 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                     step: int | None = None,
                     total_steps: int | None = None,
                 ) -> None:
+                    # Detectar cancelación/reemplazo en cada callback de anáfora
+                    # (más rápido que esperar al siguiente check_cancelled del loop)
+                    tracker.check_cancelled()
                     bounded = max(0.0, min(1.0, progress))
                     _update_fusion_progress(
                         0.30 + (bounded * 0.58),
