@@ -604,6 +604,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
             logger.info(f"▶ ANÁLISIS INICIADO - Proyecto {project_id}")
             logger.info(f"  Inicio: {start_timestamp}")
             logger.info(f"  Documento: {project.name}")
+            logger.info(f"  run_id: {analysis_run_id}")
             logger.info("=" * 80)
 
             try:
@@ -963,6 +964,10 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 run_completion(ctx, tracker)
 
             except Exception as e:
+                logger.info(
+                    f"[ANALYSIS_DIAG] Exception caught in main analysis loop: "
+                    f"{type(e).__name__}: {e} (run_id={ctx.get('_run_id', '?')})"
+                )
                 handle_analysis_error(ctx, e)
 
             finally:

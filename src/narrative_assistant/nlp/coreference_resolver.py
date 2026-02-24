@@ -1575,6 +1575,10 @@ class CoreferenceVotingResolver(
                 return
             # Si ya detectamos cancelación, re-lanzar directamente
             if _abort_error:
+                logger.info(
+                    "[COREF_ABORT] Re-raising stored abort error in emit_progress "
+                    f"(step={step})"
+                )
                 raise _abort_error[0]
             bounded = max(0.0, min(1.0, progress))
             try:
@@ -1584,6 +1588,10 @@ class CoreferenceVotingResolver(
             except Exception as _cb_err:
                 err_type = type(_cb_err).__name__
                 if "Cancel" in err_type or "Cancelled" in err_type:
+                    logger.info(
+                        f"[COREF_ABORT] Cancel detected in emit_progress: "
+                        f"{err_type} (step={step}) — setting abort flag"
+                    )
                     _abort_error.append(_cb_err)
                     raise
                 logger.debug("Coref progress callback failed", exc_info=True)
@@ -1673,6 +1681,9 @@ class CoreferenceVotingResolver(
         for index, anaphor in enumerate(anaphors, start=1):
             # Abortar inmediatamente si se detectó cancelación en iteración previa
             if _abort_error:
+                logger.info(
+                    f"[COREF_ABORT] Aborting at top of anaphor loop (index={index})"
+                )
                 raise _abort_error[0]
 
             # Ceder turno al chat interactivo si hay uno esperando

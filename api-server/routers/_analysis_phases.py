@@ -2549,12 +2549,29 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                         subphase_total_steps=total_steps,
                     )
 
-                coref_result = resolve_coreferences_voting(
-                    text=full_text,
-                    chapters=chapters_data,
-                    config=coref_config,
-                    progress_callback=_on_coref_progress,
+                logger.info(
+                    f"[COREF_DIAG] Starting coref for project {project_id}, "
+                    f"run_id={tracker.run_id}, is_stale={tracker._is_stale()}"
                 )
+                try:
+                    coref_result = resolve_coreferences_voting(
+                        text=full_text,
+                        chapters=chapters_data,
+                        config=coref_config,
+                        progress_callback=_on_coref_progress,
+                    )
+                except AnalysisCancelledError:
+                    logger.info(
+                        f"[COREF_DIAG] AnalysisCancelledError caught from resolve_coreferences_voting "
+                        f"for project {project_id}, run_id={tracker.run_id} — re-raising"
+                    )
+                    raise
+                except Exception as _coref_err:
+                    logger.warning(
+                        f"[COREF_DIAG] UNEXPECTED exception from resolve_coreferences_voting: "
+                        f"{type(_coref_err).__name__}: {_coref_err}"
+                    )
+                    raise
 
                 logger.info(
                     f"Correferencias (votación): {coref_result.total_chains} cadenas, "
