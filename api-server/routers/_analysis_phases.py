@@ -2708,6 +2708,8 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
 
         except ImportError as e:
             logger.warning(f"Módulo de correferencias no disponible: {e}")
+        except AnalysisCancelledError:
+            raise
         except Exception as e:
             logger.warning(f"Error en resolución de correferencias: {e}")
 
@@ -4867,19 +4869,29 @@ def handle_analysis_error(ctx: dict, error: Exception):
     # Cancelación por el usuario: no es un error, es una acción intencional
     if isinstance(error, AnalysisCancelledError):
         logger.info(f"Analysis cancelled by user for project {project_id}")
+        my_run_id = ctx.get("_run_id", "")
         with deps._progress_lock:
             storage = deps.analysis_progress_storage.get(project_id, {})
-            storage["status"] = "cancelled"
-            storage["current_phase"] = "Análisis cancelado por el usuario"
+            # Solo escribir en storage si somos la ejecución actual.
+            # Si fue reemplazada (STALE), el storage pertenece al nuevo análisis.
+            if not my_run_id or storage.get("_run_id", "") == my_run_id:
+                storage["status"] = "cancelled"
+                storage["current_phase"] = "Análisis cancelado por el usuario"
+            else:
+                logger.info(
+                    f"[STALE] Skipping cancel status write for project {project_id} "
+                    f"(run {my_run_id} replaced)"
+                )
             # Clear cancellation flag
             deps.analysis_cancellation_flags.pop(project_id, None)
         try:
-            # Resetear a 'cancelled' en DB para que el frontend sepa que fue cancelado
-            project.analysis_status = "cancelled"
-            project.analysis_progress = 0.0
-            proj_manager = ProjectManager(ctx["db_session"])
-            proj_manager.update(project)
-            logger.info(f"Project {project_id} status set to 'cancelled'")
+            # Solo actualizar DB si somos la ejecución actual
+            if not my_run_id or storage.get("_run_id", "") == my_run_id:
+                project.analysis_status = "cancelled"
+                project.analysis_progress = 0.0
+                proj_manager = ProjectManager(ctx["db_session"])
+                proj_manager.update(project)
+                logger.info(f"Project {project_id} status set to 'cancelled'")
         except Exception as db_error:
             logger.error(f"Failed to update project status after cancellation: {db_error}")
         return

@@ -1571,7 +1571,13 @@ class CoreferenceVotingResolver(
             bounded = max(0.0, min(1.0, progress))
             try:
                 progress_callback(bounded, message, step, total_steps)
-            except Exception:
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except Exception as _cb_err:
+                # Re-lanzar errores de cancelación para que el loop se detenga
+                err_type = type(_cb_err).__name__
+                if "Cancel" in err_type or "Cancelled" in err_type:
+                    raise
                 logger.debug("Coref progress callback failed", exc_info=True)
 
         # Extraer menciones
