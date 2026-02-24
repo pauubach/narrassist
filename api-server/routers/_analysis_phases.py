@@ -544,7 +544,14 @@ class ProgressTracker:
         self.phase_start_times[phase_key] = time.time()
         pct_start, _ = self.get_phase_progress_range(phase_key)
         self.phases[phase_index]["current"] = True
-        self._write(progress=pct_start, current_phase=message, subphase=None)
+        # Limpiar current_action de la fase anterior para que no se muestre
+        # texto estancado (ej: "Limpiando datos" durante NER)
+        self._write(
+            progress=pct_start,
+            current_phase=message,
+            current_action="",
+            subphase=None,
+        )
 
     def end_phase(self, phase_key: str, phase_index: int):
         """Marca el fin de una fase."""
@@ -554,6 +561,12 @@ class ProgressTracker:
         self.phases[phase_index]["completed"] = True
         self.phases[phase_index]["current"] = False
         self.phases[phase_index]["duration"] = round(self.phase_durations[phase_key], 1)
+        # Pre-activar la siguiente fase para que el spinner no desaparezca
+        # entre end_phase() y el siguiente start_phase() (evita que parezca
+        # que el análisis se ha colgado durante el gap de transición)
+        next_index = phase_index + 1
+        if next_index < len(self.phases):
+            self.phases[next_index]["current"] = True
         self.check_cancelled()
         self.update_time_remaining()
         self.persist_progress()
