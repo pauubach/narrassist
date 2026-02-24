@@ -10,7 +10,7 @@ from deps import ApiResponse, ProjectResponse, _get_project_stats, logger
 from fastapi import APIRouter, Body, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 
-from narrative_assistant.alerts.models import AlertStatus
+
 from narrative_assistant.persistence.document_fingerprint import generate_fingerprint
 from narrative_assistant.persistence.manuscript_identity import (
     IDENTITY_DIFFERENT_DOCUMENT,
@@ -251,18 +251,21 @@ def list_projects():
             # Obtener estadísticas desde la BD (source of truth)
             stats = _get_project_stats(p.id, db)
 
-            # Determinar severidad más alta de alertas
+            # Determinar severidad más alta de alertas (SQL directo)
             highest_severity = None
-            if deps.alert_repository:
-                alerts_result = deps.alert_repository.get_by_project(p.id)
-                if alerts_result.is_success:
-                    open_alerts = [a for a in alerts_result.value if a.status == AlertStatus.OPEN]
-                    if open_alerts:
-                        severity_priority = {"critical": 3, "warning": 2, "info": 1}
-                        highest_severity = max(
-                            (a.severity.value for a in open_alerts),
-                            key=lambda s: severity_priority.get(s, 0),
-                        )
+            try:
+                sev_row = db.fetchone(
+                    """SELECT severity FROM alerts
+                       WHERE project_id = ? AND status = 'open'
+                       ORDER BY CASE severity
+                           WHEN 'critical' THEN 3 WHEN 'warning' THEN 2 ELSE 1
+                       END DESC LIMIT 1""",
+                    (p.id,),
+                )
+                if sev_row:
+                    highest_severity = sev_row["severity"]
+            except Exception:
+                pass
 
             projects_data.append(
                 {
@@ -340,18 +343,21 @@ def get_project(project_id: int):
         db = deps.get_database()
         stats = _get_project_stats(project_id, db)
 
-        # Obtener severidad más alta de alertas
+        # Obtener severidad más alta de alertas (SQL directo, sin cargar todas)
         highest_severity = None
-        if deps.alert_repository:
-            alerts_result = deps.alert_repository.get_by_project(project.id)
-            if alerts_result.is_success:
-                open_alerts = [a for a in alerts_result.value if a.status == AlertStatus.OPEN]
-                if open_alerts:
-                    severity_priority = {"critical": 3, "warning": 2, "info": 1}
-                    highest_severity = max(
-                        (a.severity.value for a in open_alerts),
-                        key=lambda s: severity_priority.get(s, 0),
-                    )
+        try:
+            sev_row = db.fetchone(
+                """SELECT severity FROM alerts
+                   WHERE project_id = ? AND status = 'open'
+                   ORDER BY CASE severity
+                       WHEN 'critical' THEN 3 WHEN 'warning' THEN 2 ELSE 1
+                   END DESC LIMIT 1""",
+                (project_id,),
+            )
+            if sev_row:
+                highest_severity = sev_row["severity"]
+        except Exception:
+            pass
 
         # Extraer document_type (preferir columna DB sobre settings JSON)
         project_settings = project.settings or {}

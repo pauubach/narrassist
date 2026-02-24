@@ -71,13 +71,31 @@ def list_chapters(project_id: int):
             except Exception as e:
                 logger.debug(f"Could not count entities per chapter: {e}")
 
+        # Batch-load secciones (1 query para todo el proyecto, no N queries)
+        sections_by_chapter: dict[int, list] = {}
+        if deps.section_repository:
+            all_sections = deps.section_repository.get_by_project(project_id)
+            # Agrupar por chapter_id
+            flat_by_chapter: dict[int, list] = {}
+            for s in all_sections:
+                flat_by_chapter.setdefault(s.chapter_id, []).append(s)
+            # Construir jerarquía por capítulo
+            for ch_id, ch_sections in flat_by_chapter.items():
+                section_map = {s.id: s for s in ch_sections}
+                top_level = []
+                for section in ch_sections:
+                    if section.parent_section_id is None:
+                        top_level.append(section)
+                    else:
+                        parent = section_map.get(section.parent_section_id)
+                        if parent:
+                            parent.subsections.append(section)
+                sections_by_chapter[ch_id] = top_level
+
         # Convertir a formato de respuesta con secciones
         chapters_data = []
         for ch in chapters:
-            # Obtener secciones jerárquicas de este capítulo
-            sections = []
-            if deps.section_repository:
-                sections = deps.section_repository.get_by_chapter_hierarchical(ch.id)
+            sections = sections_by_chapter.get(ch.id, [])
 
             chapters_data.append(
                 {

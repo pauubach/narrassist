@@ -734,26 +734,19 @@ def _get_project_stats(project_id: int, db) -> dict:
 
     try:
         row = db.fetchone(
-            "SELECT COUNT(*) as cnt FROM chapters WHERE project_id = ?", (project_id,)
+            """SELECT
+                (SELECT COUNT(*) FROM chapters WHERE project_id = ?) as chapter_count,
+                (SELECT COUNT(*) FROM entities WHERE project_id = ?) as entity_count,
+                (SELECT COUNT(*) FROM alerts WHERE project_id = ? AND status = 'open') as open_alerts_count,
+                (SELECT COALESCE(SUM(word_count), 0) FROM chapters WHERE project_id = ?) as word_count
+            """,
+            (project_id, project_id, project_id, project_id),
         )
-        stats["chapter_count"] = row["cnt"] if row else 0
-
-        row = db.fetchone(
-            "SELECT COUNT(*) as cnt FROM entities WHERE project_id = ?", (project_id,)
-        )
-        stats["entity_count"] = row["cnt"] if row else 0
-
-        row = db.fetchone(
-            "SELECT COUNT(*) as cnt FROM alerts WHERE project_id = ? AND status = 'open'",
-            (project_id,),
-        )
-        stats["open_alerts_count"] = row["cnt"] if row else 0
-
-        row = db.fetchone(
-            "SELECT COALESCE(SUM(word_count), 0) as total FROM chapters WHERE project_id = ?",
-            (project_id,),
-        )
-        stats["word_count"] = row["total"] if row else 0
+        if row:
+            stats["chapter_count"] = row["chapter_count"] or 0
+            stats["entity_count"] = row["entity_count"] or 0
+            stats["open_alerts_count"] = row["open_alerts_count"] or 0
+            stats["word_count"] = row["word_count"] or 0
 
     except Exception as e:
         logger.warning(f"Error getting project stats: {e}")

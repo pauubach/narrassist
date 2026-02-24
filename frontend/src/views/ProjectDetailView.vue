@@ -544,7 +544,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectsStore } from '@/stores/projects'
 import { useWorkspaceStore, type WorkspaceTab } from '@/stores/workspace'
@@ -559,12 +559,27 @@ import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
 import ExportDialog from '@/components/ExportDialog.vue'
 import StatusBar from '@/components/layout/StatusBar.vue'
-import { WorkspaceTabs, TextTab, AlertsDashboard, EntitiesTab, RelationsTab, StyleTab, GlossaryTab, ResumenTab, PanelResizer } from '@/components/workspace'
+import { WorkspaceTabs, TextTab, PanelResizer } from '@/components/workspace'
 import { AnalysisRequired } from '@/components/analysis'
-import { TimelineView } from '@/components/timeline'
 import DialogueAttributionPanel from '@/components/DialogueAttributionPanel.vue'
-import { ChaptersPanel, AlertsPanel, CharactersPanel, AssistantPanel, HistoryPanel, SemanticSearchPanel } from '@/components/sidebar'
-import { ProjectSummary, EntityInspector, AlertInspector, ChapterInspector, TextSelectionInspector } from '@/components/inspector'
+import { ChaptersPanel, AlertsPanel, CharactersPanel } from '@/components/sidebar'
+import { ProjectSummary, EntityInspector } from '@/components/inspector'
+
+// Idle-prefetch: tabs y paneles que no se ven al inicio se cargan en background
+// tras el primer render. defineAsyncComponent es transparente para el template.
+const AlertsDashboard = defineAsyncComponent(() => import('@/components/workspace/AlertsDashboard.vue'))
+const EntitiesTab = defineAsyncComponent(() => import('@/components/workspace/EntitiesTab.vue'))
+const RelationsTab = defineAsyncComponent(() => import('@/components/workspace/RelationsTab.vue'))
+const StyleTab = defineAsyncComponent(() => import('@/components/workspace/StyleTab.vue'))
+const GlossaryTab = defineAsyncComponent(() => import('@/components/workspace/GlossaryTab.vue'))
+const ResumenTab = defineAsyncComponent(() => import('@/components/workspace/ResumenTab.vue'))
+const TimelineView = defineAsyncComponent(() => import('@/components/timeline/TimelineView.vue'))
+const AlertInspector = defineAsyncComponent(() => import('@/components/inspector/AlertInspector.vue'))
+const ChapterInspector = defineAsyncComponent(() => import('@/components/inspector/ChapterInspector.vue'))
+const TextSelectionInspector = defineAsyncComponent(() => import('@/components/inspector/TextSelectionInspector.vue'))
+const AssistantPanel = defineAsyncComponent(() => import('@/components/sidebar/AssistantPanel.vue'))
+const HistoryPanel = defineAsyncComponent(() => import('@/components/sidebar/HistoryPanel.vue'))
+const SemanticSearchPanel = defineAsyncComponent(() => import('@/components/sidebar/SemanticSearchPanel.vue'))
 import ComparisonBanner from '@/components/alerts/ComparisonBanner.vue'
 import DocumentTypeChip from '@/components/DocumentTypeChip.vue'
 import CorrectionConfigModal from '@/components/workspace/CorrectionConfigModal.vue'
@@ -974,11 +989,14 @@ onMounted(async () => {
     }
 
     await projectsStore.fetchProject(projectId)
-    await analysisStore.loadExecutedPhases(projectId)
-    await loadEntities(projectId)
-    await loadAlerts(projectId)
-    await loadChapters(projectId, project.value ?? undefined)
-    await loadRelationships(projectId)
+    // Cargar datos en paralelo — ninguno depende de otro
+    await Promise.all([
+      analysisStore.loadExecutedPhases(projectId),
+      loadEntities(projectId),
+      loadAlerts(projectId),
+      loadChapters(projectId, project.value ?? undefined),
+      loadRelationships(projectId),
+    ])
 
     // Check for alert query parameter (para navegación desde AlertsView)
     const alertParam = route.query.alert as string
@@ -1517,9 +1535,16 @@ watch(() => workspaceStore.activeTab, async (newTab) => {
 
 // Cachear stats de alertas para métricas globales (HomeView)
 // Guard: solo watch el length, no el array completo (performance optimization)
+// Debounce: evitar localStorage.setItem repetidos si se resuelven muchas alertas seguidas
+let _statsDebounce: ReturnType<typeof setTimeout> | null = null
 watch(() => alerts.value.length, (newLength, oldLength) => {
   if (project.value && newLength > 0 && newLength !== oldLength) {
-    updateProjectStats(project.value.id, project.value.name, alerts.value)
+    if (_statsDebounce) clearTimeout(_statsDebounce)
+    _statsDebounce = setTimeout(() => {
+      if (project.value) {
+        updateProjectStats(project.value.id, project.value.name, alerts.value)
+      }
+    }, 500)
   }
 })
 
@@ -1532,6 +1557,29 @@ const handleSettingsChange = async () => {
 
 onMounted(() => {
   window.addEventListener('settings-changed', handleSettingsChange)
+
+  // Idle-prefetch: pre-cargar tabs en background para que estén listos
+  // cuando el usuario cambie de pestaña (sin flash de carga)
+  const prefetch = () => {
+    import('@/components/workspace/AlertsDashboard.vue')
+    import('@/components/workspace/EntitiesTab.vue')
+    import('@/components/workspace/RelationsTab.vue')
+    import('@/components/workspace/StyleTab.vue')
+    import('@/components/workspace/GlossaryTab.vue')
+    import('@/components/workspace/ResumenTab.vue')
+    import('@/components/timeline/TimelineView.vue')
+    import('@/components/inspector/AlertInspector.vue')
+    import('@/components/inspector/ChapterInspector.vue')
+    import('@/components/inspector/TextSelectionInspector.vue')
+    import('@/components/sidebar/AssistantPanel.vue')
+    import('@/components/sidebar/HistoryPanel.vue')
+    import('@/components/sidebar/SemanticSearchPanel.vue')
+  }
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(prefetch)
+  } else {
+    setTimeout(prefetch, 200)
+  }
 })
 
 onUnmounted(() => {
