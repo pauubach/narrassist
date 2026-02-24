@@ -1560,6 +1560,11 @@ class CoreferenceVotingResolver(
 
         result = CorefResult()
 
+        # Flag de aborto: se setea cuando el callback detecta cancelación.
+        # El loop principal verifica este flag al inicio de cada iteración
+        # para garantizar la parada incluso si except-Exception traga la excepción.
+        _abort_error: list[Exception] = []  # mutable container for nonlocal in closure
+
         def emit_progress(
             progress: float,
             message: str,
@@ -1568,15 +1573,18 @@ class CoreferenceVotingResolver(
         ) -> None:
             if progress_callback is None:
                 return
+            # Si ya detectamos cancelación, re-lanzar directamente
+            if _abort_error:
+                raise _abort_error[0]
             bounded = max(0.0, min(1.0, progress))
             try:
                 progress_callback(bounded, message, step, total_steps)
             except (KeyboardInterrupt, SystemExit):
                 raise
             except Exception as _cb_err:
-                # Re-lanzar errores de cancelación para que el loop se detenga
                 err_type = type(_cb_err).__name__
                 if "Cancel" in err_type or "Cancelled" in err_type:
+                    _abort_error.append(_cb_err)
                     raise
                 logger.debug("Coref progress callback failed", exc_info=True)
 
@@ -1663,11 +1671,17 @@ class CoreferenceVotingResolver(
         num_methods = len(self._methods) or 1
 
         for index, anaphor in enumerate(anaphors, start=1):
+            # Abortar inmediatamente si se detectó cancelación en iteración previa
+            if _abort_error:
+                raise _abort_error[0]
+
             # Ceder turno al chat interactivo si hay uno esperando
             try:
                 from narrative_assistant.llm.client import get_llm_scheduler
                 get_llm_scheduler().yield_to_chat()
             except Exception as e:
+                if _abort_error:
+                    raise _abort_error[0]
                 logger.debug("Could not yield to chat scheduler: %s", e)
 
             # Si es pronombre de primera persona y hay narrador, saltar
@@ -1710,6 +1724,8 @@ class CoreferenceVotingResolver(
                         all_votes[candidate].append((score, method, reasoning))
 
                 except Exception as e:
+                    if _abort_error:
+                        raise _abort_error[0]
                     logger.debug(f"Error en método {method.value}: {e}")
 
             # Validar que hay votos disponibles

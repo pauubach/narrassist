@@ -2521,6 +2521,8 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                         subphase_label="Correferencias restauradas del caché",
                         subphase_progress=1.0,
                     )
+            except AnalysisCancelledError:
+                raise
             except Exception as _coref_read_err:
                 logger.warning(
                     f"[COREF_CACHE] Read failed, running full coref: {_coref_read_err}"
@@ -2903,6 +2905,8 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             f"{len(entities)} entidades activas"
         )
 
+    except AnalysisCancelledError:
+        raise
     except Exception as e:
         logger.warning(f"Error en fusión de entidades (continuando sin fusión): {e}")
         tracker.phase_durations["fusion"] = time.time() - tracker.phase_start_times.get(
