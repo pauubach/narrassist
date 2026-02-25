@@ -615,7 +615,8 @@ function resolveAsUnassigned() {
 
 .status-active {
   background: var(--ds-color-warning-soft);
-  color: var(--ds-color-warning);
+  color: var(--ds-text-warning);
+  font-weight: var(--ds-font-weight-semibold);
 }
 
 .status-resolved {
