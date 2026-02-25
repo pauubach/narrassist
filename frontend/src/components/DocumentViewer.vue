@@ -1764,16 +1764,40 @@ watch(() => props.alertHighlightRanges, async (ranges) => {
 // Limpiar todos los highlights de alerta
 const clearAllAlertHighlights = () => {
   const highlights = viewerContainer.value?.querySelectorAll('.alert-multi-highlight')
-  if (highlights) {
-    highlights.forEach(el => {
-      const parent = el.parentNode
-      if (parent) {
-        while (el.firstChild) {
-          parent.insertBefore(el.firstChild, el)
-        }
-        parent.removeChild(el)
-        parent.normalize()
+  if (!highlights || highlights.length === 0) return
+
+  // Recopilar chapter IDs afectados ANTES de modificar el DOM
+  const affectedChapterIds = new Set<number>()
+  highlights.forEach(el => {
+    const chapterElement = el.closest('[data-chapter-id]')
+    if (chapterElement) {
+      const chapterId = parseInt(chapterElement.getAttribute('data-chapter-id') || '0')
+      if (chapterId) affectedChapterIds.add(chapterId)
+    }
+  })
+
+  // Limpiar highlights
+  highlights.forEach(el => {
+    const parent = el.parentNode
+    if (parent) {
+      while (el.firstChild) {
+        parent.insertBefore(el.firstChild, el)
       }
+      parent.removeChild(el)
+      parent.normalize()
+    }
+  })
+
+  // Forzar re-render de capítulos afectados
+  // Esto regenera el HTML limpio sin los highlights dinámicos rotos
+  for (const chapterId of affectedChapterIds) {
+    highlightedContentCache.value.delete(chapterId)
+
+    // Forzar re-render removiendo y volviendo a añadir el capítulo
+    loadedChapters.value.delete(chapterId)
+    nextTick(() => {
+      loadedChapters.value.add(chapterId)
+      touchChapter(chapterId)
     })
   }
 }
