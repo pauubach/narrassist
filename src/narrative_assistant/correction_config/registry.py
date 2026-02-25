@@ -365,6 +365,36 @@ SUBTYPES_REGISTRY = {
             },
         },
     },
+    "FIC_POL": {
+        "name": "Novela policial/misterio",
+        "parent": "FIC",
+        "config": {},
+    },
+    "FIC_ROM": {
+        "name": "Novela romántica",
+        "parent": "FIC",
+        "config": {},
+    },
+    "FIC_THR": {
+        "name": "Thriller/Suspense",
+        "parent": "FIC",
+        "config": {},
+    },
+    "FIC_FAN": {
+        "name": "Fantasía",
+        "parent": "FIC",
+        "config": {},
+    },
+    "FIC_SCI": {
+        "name": "Ciencia ficción",
+        "parent": "FIC",
+        "config": {},
+    },
+    "FIC_TER": {
+        "name": "Terror/Horror",
+        "parent": "FIC",
+        "config": {},
+    },
     # =========================================================================
     # MEMORIAS
     # =========================================================================

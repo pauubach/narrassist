@@ -20,8 +20,11 @@ const props = withDefaults(defineProps<{
   alertCount: number
   /** Alertas cargadas para mostrar progreso detallado */
   alerts?: Alert[]
+  /** Resumen global del manuscrito */
+  globalSummary?: string | null
 }>(), {
   alerts: () => [],
+  globalSummary: null,
 })
 
 const emit = defineEmits<{
@@ -153,6 +156,15 @@ const categoryOverview = computed(() => {
           <span class="stat-label">alertas</span>
         </div>
       </button>
+    </div>
+
+    <!-- Resumen global del manuscrito -->
+    <div v-if="globalSummary" class="summary-section synopsis-section">
+      <div class="section-title">
+        <i class="pi pi-book"></i>
+        <span>Sinopsis</span>
+      </div>
+      <p class="synopsis-text">{{ globalSummary }}</p>
     </div>
 
     <div v-if="hasDetailedAlerts" class="summary-section">
@@ -374,6 +386,27 @@ const categoryOverview = computed(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-1-5);
+}
+
+.section-title i {
+  color: var(--ds-color-primary);
+  font-size: var(--ds-font-size-sm);
+}
+
+.synopsis-section {
+  background: var(--ds-surface-section);
+  border-color: var(--ds-color-primary-light);
+}
+
+.synopsis-text {
+  margin: 0;
+  font-size: var(--ds-font-size-sm);
+  line-height: var(--ds-leading-relaxed);
+  color: var(--ds-color-text);
+  text-align: justify;
 }
 
 .section-link {

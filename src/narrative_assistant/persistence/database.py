@@ -1123,6 +1123,7 @@ CREATE TABLE IF NOT EXISTS enrichment_cache (
     error_message TEXT,                  -- error details if status='failed'
     phase INTEGER,                      -- pipeline phase that produced this (10-13)
     revision INTEGER NOT NULL DEFAULT 0,
+    schema_version INTEGER NOT NULL DEFAULT 0,  -- code schema version (invalidate on bump)
     computed_at TEXT,                    -- timestamp of last successful computation
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -1664,6 +1665,8 @@ class Database:
             ("review_history", "depends_on_ids", "TEXT DEFAULT '[]'"),
             ("review_history", "schema_version", "INTEGER DEFAULT 25"),
             ("review_history", "undone_at", "TEXT"),
+            # v35: Schema versioning for enrichment cache (invalidate on code changes)
+            ("enrichment_cache", "schema_version", "INTEGER NOT NULL DEFAULT 0"),
         ]
         for table, column, col_def in migrations:
             try:
@@ -1911,6 +1914,11 @@ class Database:
         # así que recreamos la tabla si la columna falta.
         self._migrate_detector_weights_v24(conn)
 
+        # v35: Fix enrichment_cache UNIQUE constraint for NULL entity_scope.
+        # SQLite treats NULL != NULL, so INSERT OR REPLACE creates duplicates.
+        # Create a proper unique index using COALESCE, and clean up existing dupes.
+        self._migrate_enrichment_cache_unique(conn)
+
     def _migrate_detector_weights_v24(self, conn) -> None:
         """Migra project_detector_weights de v23 a v24 (añade entity_canonical_name).
 
@@ -1968,6 +1976,42 @@ class Database:
             logger.info("[MIGRATE] v24: project_detector_weights migrada exitosamente")
         except Exception as e:
             logger.warning(f"[MIGRATE] v24 detector_weights migration error: {e}")
+
+    def _migrate_enrichment_cache_unique(self, conn) -> None:
+        """Fix enrichment_cache UNIQUE constraint for NULL entity_scope.
+
+        SQLite treats NULL != NULL in UNIQUE constraints, so
+        INSERT OR REPLACE creates duplicate rows when entity_scope IS NULL.
+        Solution: create a unique index using COALESCE and clean up existing dupes.
+        """
+        try:
+            # Check if the fix is already applied (the index exists)
+            indexes = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' "
+                "AND tbl_name='enrichment_cache' AND name='idx_enrichment_unique_scope'"
+            ).fetchall()
+            if indexes:
+                return  # Already migrated
+
+            # Step 1: Clean up duplicate rows — keep only the most recent per key
+            conn.execute("""
+                DELETE FROM enrichment_cache
+                WHERE id NOT IN (
+                    SELECT MAX(id) FROM enrichment_cache
+                    GROUP BY project_id, enrichment_type, COALESCE(entity_scope, '')
+                )
+            """)
+
+            # Step 2: Create a unique index that handles NULLs correctly
+            conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_enrichment_unique_scope
+                ON enrichment_cache(project_id, enrichment_type, COALESCE(entity_scope, ''))
+            """)
+            conn.commit()
+
+            logger.info("[MIGRATE] v35: enrichment_cache unique index created, duplicates cleaned")
+        except Exception as e:
+            logger.warning(f"[MIGRATE] v35 enrichment_cache unique index error: {e}")
 
     def _create_schema_from_scratch(self) -> None:
         """Crea el schema completo desde cero."""

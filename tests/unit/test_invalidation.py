@@ -40,6 +40,7 @@ def _create_test_db():
             error_message TEXT,
             phase INTEGER,
             revision INTEGER NOT NULL DEFAULT 0,
+            schema_version INTEGER NOT NULL DEFAULT 0,
             computed_at TEXT,
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now')),
@@ -339,3 +340,202 @@ class TestEventTypeCoverage:
 
         rev = emit_invalidation_event(db, 1, event_type, [1])
         assert rev >= 1
+
+
+# ── Schema version invalidation ──────────────────────────
+
+class TestSchemaVersionInvalidation:
+    """Verify that cached entries with outdated schema_version are rejected."""
+
+    def test_current_schema_returns_cache(self):
+        """Cache hit when schema_version matches current."""
+        import os
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
+        from routers._enrichment_cache import get_cached_enrichment, get_schema_version
+
+        conn = _create_test_db()
+        db = _mock_db_session(conn)
+
+        current_v = get_schema_version("chapter_progress")
+        conn.execute(
+            """INSERT INTO enrichment_cache
+               (project_id, enrichment_type, entity_scope, status, result_json,
+                output_hash, phase, schema_version)
+               VALUES (1, 'chapter_progress', NULL, 'completed', '{"test": true}',
+                       'h1', 13, ?)""",
+            (current_v,),
+        )
+        conn.commit()
+
+        result = get_cached_enrichment(db, 1, "chapter_progress")
+        assert result is not None
+        assert result["test"] is True
+
+    def test_outdated_schema_returns_none(self):
+        """Cache miss when schema_version is older than current code."""
+        import os
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
+        from routers._enrichment_cache import get_cached_enrichment, get_schema_version
+
+        conn = _create_test_db()
+        db = _mock_db_session(conn)
+
+        current_v = get_schema_version("chapter_progress")
+        old_v = current_v - 1  # Simular versión antigua
+
+        conn.execute(
+            """INSERT INTO enrichment_cache
+               (project_id, enrichment_type, entity_scope, status, result_json,
+                output_hash, phase, schema_version)
+               VALUES (1, 'chapter_progress', NULL, 'completed', '{"old": true}',
+                       'h1', 13, ?)""",
+            (old_v,),
+        )
+        conn.commit()
+
+        result = get_cached_enrichment(db, 1, "chapter_progress")
+        assert result is None  # Rechazado por schema_version
+
+    def test_zero_schema_treated_as_outdated(self):
+        """Entries with schema_version=0 (pre-migration) are outdated for bumped types."""
+        import os
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
+        from routers._enrichment_cache import get_cached_enrichment, get_schema_version
+
+        conn = _create_test_db()
+        db = _mock_db_session(conn)
+
+        # chapter_progress has schema_version=2, so v0 should be rejected
+        assert get_schema_version("chapter_progress") >= 2
+
+        conn.execute(
+            """INSERT INTO enrichment_cache
+               (project_id, enrichment_type, entity_scope, status, result_json,
+                output_hash, phase, schema_version)
+               VALUES (1, 'chapter_progress', NULL, 'completed', '{"legacy": true}',
+                       'h1', 13, 0)""",
+        )
+        conn.commit()
+
+        result = get_cached_enrichment(db, 1, "chapter_progress")
+        assert result is None
+
+    def test_unbumped_type_with_zero_schema_still_works(self):
+        """Types with schema_version=1 accept cached entries at v1 or v0 (never bumped)."""
+        import os
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
+        from routers._enrichment_cache import get_cached_enrichment, get_schema_version
+
+        conn = _create_test_db()
+        db = _mock_db_session(conn)
+
+        # sticky_sentences has schema_version=1
+        assert get_schema_version("sticky_sentences") == 1
+
+        # v1 entry should be accepted
+        conn.execute(
+            """INSERT INTO enrichment_cache
+               (project_id, enrichment_type, entity_scope, status, result_json,
+                output_hash, phase, schema_version)
+               VALUES (1, 'sticky_sentences', NULL, 'completed', '{"ok": true}',
+                       'h1', 12, 1)""",
+        )
+        conn.commit()
+
+        result = get_cached_enrichment(db, 1, "sticky_sentences")
+        assert result is not None
+        assert result["ok"] is True
+
+    def test_schema_version_in_cache_metadata(self):
+        """Cache metadata includes schema_version."""
+        import os
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
+        from routers._enrichment_cache import get_cached_enrichment, get_schema_version
+
+        conn = _create_test_db()
+        db = _mock_db_session(conn)
+
+        current_v = get_schema_version("echo_report")
+        conn.execute(
+            """INSERT INTO enrichment_cache
+               (project_id, enrichment_type, entity_scope, status, result_json,
+                output_hash, phase, schema_version)
+               VALUES (1, 'echo_report', NULL, 'completed', '{"data": 1}',
+                       'h1', 12, ?)""",
+            (current_v,),
+        )
+        conn.commit()
+
+        result = get_cached_enrichment(db, 1, "echo_report")
+        assert result is not None
+        assert "_cache" in result
+        assert result["_cache"]["schema_version"] == current_v
+
+    def test_get_stale_enrichment_phases_detects_outdated(self):
+        """get_stale_enrichment_phases returns phase names with outdated schema."""
+        import os
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
+        from routers._enrichment_cache import get_stale_enrichment_phases, get_schema_version
+
+        conn = _create_test_db()
+        db = _mock_db_session(conn)
+
+        # chapter_progress at old schema → health phase should be stale
+        current_v = get_schema_version("chapter_progress")
+        conn.execute(
+            """INSERT INTO enrichment_cache
+               (project_id, enrichment_type, entity_scope, status, result_json,
+                output_hash, phase, schema_version)
+               VALUES (1, 'chapter_progress', NULL, 'completed', '{"x": 1}',
+                       'h1', 13, ?)""",
+            (current_v - 1,),
+        )
+        # echo_report at current schema → prose should NOT be stale
+        conn.execute(
+            """INSERT INTO enrichment_cache
+               (project_id, enrichment_type, entity_scope, status, result_json,
+                output_hash, phase, schema_version)
+               VALUES (1, 'echo_report', NULL, 'completed', '{"x": 2}',
+                       'h2', 12, ?)""",
+            (get_schema_version("echo_report"),),
+        )
+        conn.commit()
+
+        stale = get_stale_enrichment_phases(db, 1)
+        assert "health" in stale
+        # prose has other types with no cache entries (schema_version=1, cached=0)
+        # so prose is stale too (missing entries count as outdated)
+        assert "prose" in stale
+
+    def test_get_stale_enrichment_phases_empty_when_all_current(self):
+        """No stale phases when all enrichment types have current schema."""
+        import os
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
+        from routers._enrichment_cache import (
+            ENRICHMENT_SCHEMA_VERSIONS,
+            get_stale_enrichment_phases,
+        )
+
+        conn = _create_test_db()
+        db = _mock_db_session(conn)
+
+        # Insert ALL enrichment types at current schema version
+        for etype, version in ENRICHMENT_SCHEMA_VERSIONS.items():
+            conn.execute(
+                """INSERT INTO enrichment_cache
+                   (project_id, enrichment_type, entity_scope, status, result_json,
+                    output_hash, phase, schema_version)
+                   VALUES (1, ?, NULL, 'completed', '{}', 'h', 10, ?)""",
+                (etype, version),
+            )
+        conn.commit()
+
+        stale = get_stale_enrichment_phases(db, 1)
+        assert len(stale) == 0

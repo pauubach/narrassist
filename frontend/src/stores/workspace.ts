@@ -37,7 +37,7 @@ export const TAB_LAYOUT_CONFIG: Record<WorkspaceTab, TabLayoutConfig> = {
   text: {
     showLeftPanel: true,
     showRightPanel: true,
-    sidebarTabs: ['chapters', 'alerts', 'characters', 'search', 'assistant', 'history'],
+    sidebarTabs: ['chapters', 'alerts', 'characters', 'assistant', 'history'],
     defaultSidebarTab: 'chapters'
   },
   entities: {

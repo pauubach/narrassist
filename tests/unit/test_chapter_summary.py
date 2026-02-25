@@ -5,6 +5,8 @@ import pytest
 from narrative_assistant.analysis.chapter_summary import (
     DEATH_PATTERNS,
     DECISION_PATTERNS,
+    GENRE_INSTRUCTIONS,
+    GENRE_LABELS,
     REVELATION_PATTERNS,
     AbandonedThread,
     AnalysisMode,
@@ -16,6 +18,8 @@ from narrative_assistant.analysis.chapter_summary import (
     ChekhovElement,
     EventType,
     NarrativeEvent,
+    _get_genre_instruction,
+    _get_genre_label,
 )
 
 
@@ -1275,3 +1279,298 @@ class TestScoreSentence:
         score_last = ChapterSummaryAnalyzer._score_sentence(sent, 9, 10, set())
         score_mid = ChapterSummaryAnalyzer._score_sentence(sent, 5, 10, set())
         assert score_last > score_mid
+
+
+# =============================================================================
+# Tests para detección de género/subgénero y resúmenes inteligentes
+# =============================================================================
+
+
+class TestGenreLabels:
+    """Tests para GENRE_LABELS y _get_genre_label()."""
+
+    def test_all_main_types_have_labels(self):
+        """Todos los tipos principales tienen label legible."""
+        main_types = ["FIC", "MEM", "BIO", "ENS", "AUT", "DIV", "CEL", "TEC", "PRA", "INF", "DRA", "GRA"]
+        for code in main_types:
+            assert code in GENRE_LABELS, f"Missing label for {code}"
+
+    def test_fiction_subtypes_have_labels(self):
+        """Los subgéneros de ficción tienen labels."""
+        fiction_subtypes = ["FIC_POL", "FIC_ROM", "FIC_THR", "FIC_FAN", "FIC_SCI", "FIC_TER", "FIC_HIS"]
+        for code in fiction_subtypes:
+            assert code in GENRE_LABELS, f"Missing label for {code}"
+
+    def test_get_genre_label_subtype_priority(self):
+        """El subtipo tiene prioridad sobre el tipo."""
+        label = _get_genre_label("FIC", "FIC_POL")
+        assert label == "Novela policial/misterio"
+
+    def test_get_genre_label_fallback_to_type(self):
+        """Sin subtipo, usa el tipo."""
+        label = _get_genre_label("FIC", None)
+        assert label == "Ficción"
+
+    def test_get_genre_label_unknown_type(self):
+        """Tipo desconocido retorna 'Texto'."""
+        label = _get_genre_label("XXX", None)
+        assert label == "Texto"
+
+
+class TestGenreInstructions:
+    """Tests para GENRE_INSTRUCTIONS y _get_genre_instruction()."""
+
+    def test_all_main_types_have_instructions(self):
+        """Todos los tipos principales tienen instrucciones."""
+        main_types = ["FIC", "MEM", "BIO", "ENS", "AUT", "DIV"]
+        for code in main_types:
+            assert code in GENRE_INSTRUCTIONS, f"Missing instruction for {code}"
+
+    def test_fiction_subtypes_have_instructions(self):
+        """Los subgéneros de ficción tienen instrucciones específicas."""
+        fiction_subtypes = ["FIC_POL", "FIC_ROM", "FIC_THR", "FIC_FAN", "FIC_SCI", "FIC_TER", "FIC_HIS"]
+        for code in fiction_subtypes:
+            assert code in GENRE_INSTRUCTIONS, f"Missing instruction for {code}"
+            assert "Prioriza:" in GENRE_INSTRUCTIONS[code]
+
+    def test_get_genre_instruction_subtype_priority(self):
+        """El subtipo tiene prioridad sobre el tipo."""
+        instruction = _get_genre_instruction("FIC", "FIC_POL")
+        assert "pistas" in instruction.lower() or "coartada" in instruction.lower()
+
+    def test_get_genre_instruction_fallback_to_type(self):
+        """Sin subtipo, usa el tipo."""
+        instruction = _get_genre_instruction("FIC", None)
+        assert "giros" in instruction.lower() or "trama" in instruction.lower()
+
+    def test_get_genre_instruction_unknown_fallback(self):
+        """Tipo desconocido retorna instrucción genérica."""
+        instruction = _get_genre_instruction("XXX", None)
+        assert "eventos" in instruction.lower() or "Prioriza" in instruction
+
+
+class TestFictionSubgenreDetection:
+    """Tests para detección heurística de subgéneros de ficción."""
+
+    def test_detect_policial(self):
+        """Detecta novela policial/misterio."""
+        from narrative_assistant.parsers.document_classifier import DocumentClassifier
+
+        classifier = DocumentClassifier()
+        text = (
+            "El detective Marín llegó a la escena del crimen. El cadáver yacía junto a la puerta. "
+            "Después de interrogar a los sospechosos, encontró una pista crucial: la coartada "
+            "del jardinero no se sostenía. El inspector ordenó registrar la casa mientras "
+            "el comisario llamaba al juez para la orden de arresto."
+        )
+        result = classifier._detect_fiction_subgenre(text)
+        assert result == "FIC_POL"
+
+    def test_detect_fantasy(self):
+        """Detecta fantasía."""
+        from narrative_assistant.parsers.document_classifier import DocumentClassifier
+
+        classifier = DocumentClassifier()
+        text = (
+            "El hechicero levantó su bastón y pronunció un conjuro ancestral. "
+            "El dragón rugió desde lo alto del castillo mientras los elfos "
+            "preparaban sus espadas para la batalla final. La profecía anunciaba "
+            "que el elegido reclamaría el trono del reino perdido."
+        )
+        result = classifier._detect_fiction_subgenre(text)
+        assert result == "FIC_FAN"
+
+    def test_detect_scifi(self):
+        """Detecta ciencia ficción."""
+        from narrative_assistant.parsers.document_classifier import DocumentClassifier
+
+        classifier = DocumentClassifier()
+        text = (
+            "La nave espacial emergió del salto dimensional sobre la órbita del planeta rojo. "
+            "El androide piloto ajustó los escudos de energía mientras la colonia marciana "
+            "enviaba señales de auxilio. En la galaxia exterior, otra estación espacial "
+            "preparaba el teletransporte de emergencia."
+        )
+        result = classifier._detect_fiction_subgenre(text)
+        assert result == "FIC_SCI"
+
+    def test_no_subgenre_for_generic_fiction(self):
+        """Texto genérico no fuerza un subgénero."""
+        from narrative_assistant.parsers.document_classifier import DocumentClassifier
+
+        classifier = DocumentClassifier()
+        text = (
+            "Juan caminó por el parque. Se sentó en un banco y miró el cielo. "
+            "Pensó en María y en todo lo que había pasado aquel verano."
+        )
+        result = classifier._detect_fiction_subgenre(text)
+        assert result is None  # Insuficiente señal
+
+    def test_classification_includes_subtype(self):
+        """DocumentClassification incluye subgénero cuando es ficción."""
+        from narrative_assistant.parsers.document_classifier import DocumentClassifier
+
+        classifier = DocumentClassifier()
+        text = (
+            "El detective recogió la pistola del suelo. La víctima yacía sin vida. "
+            "Los sospechosos fueron llevados a comisaría para el interrogatorio. "
+            "La investigación avanzaba lentamente pero las pistas comenzaban a encajar."
+        ) * 5  # Repetir para más señal
+        result = classifier.classify(text)
+        # Si detecta ficción, debería tener subtype
+        if result.document_type.value == "fiction":
+            assert result.document_subtype is not None
+
+
+class TestChapterProgressReportGlobalSummary:
+    """Tests para el campo global_summary en ChapterProgressReport."""
+
+    def test_global_summary_default_none(self):
+        """global_summary es None por defecto."""
+        report = ChapterProgressReport(project_id=1)
+        assert report.global_summary is None
+
+    def test_global_summary_in_to_dict(self):
+        """global_summary aparece en to_dict."""
+        report = ChapterProgressReport(
+            project_id=1,
+            global_summary="Elena investiga la desaparición de Isabel en la mansión Aldebarán.",
+        )
+        d = report.to_dict()
+        assert "global_summary" in d
+        assert "Elena" in d["global_summary"]
+
+    def test_global_summary_none_in_to_dict(self):
+        """global_summary None también aparece en to_dict."""
+        report = ChapterProgressReport(project_id=1)
+        d = report.to_dict()
+        assert "global_summary" in d
+        assert d["global_summary"] is None
+
+
+class TestPromptFormatting:
+    """Tests para el formato del nuevo prompt EVENTS_EXTRACTION_PROMPT."""
+
+    def test_prompt_has_genre_placeholders(self):
+        """El prompt incluye placeholders de género."""
+        from narrative_assistant.analysis.chapter_summary import EVENTS_EXTRACTION_PROMPT
+
+        assert "{genre_label}" in EVENTS_EXTRACTION_PROMPT
+        assert "{genre_instruction}" in EVENTS_EXTRACTION_PROMPT
+        assert "{character_roster_block}" in EVENTS_EXTRACTION_PROMPT
+        assert "{prev_summary_block}" in EVENTS_EXTRACTION_PROMPT
+        assert "{total_chapters}" in EVENTS_EXTRACTION_PROMPT
+
+    def test_prompt_asks_for_chapter_type(self):
+        """El prompt solicita chapter_type y genre_hint."""
+        from narrative_assistant.analysis.chapter_summary import EVENTS_EXTRACTION_PROMPT
+
+        assert "chapter_type" in EVENTS_EXTRACTION_PROMPT
+        assert "genre_hint" in EVENTS_EXTRACTION_PROMPT
+        assert "front_matter" in EVENTS_EXTRACTION_PROMPT
+        assert "back_matter" in EVENTS_EXTRACTION_PROMPT
+
+    def test_prompt_asks_for_character_inferences(self):
+        """El prompt solicita character_inferences."""
+        from narrative_assistant.analysis.chapter_summary import EVENTS_EXTRACTION_PROMPT
+
+        assert "character_inferences" in EVENTS_EXTRACTION_PROMPT
+        assert "inferred_role" in EVENTS_EXTRACTION_PROMPT
+
+    def test_prompt_can_be_formatted(self):
+        """El prompt se puede formatear sin errores."""
+        from narrative_assistant.analysis.chapter_summary import EVENTS_EXTRACTION_PROMPT
+
+        formatted = EVENTS_EXTRACTION_PROMPT.format(
+            genre_label="Novela policial/misterio",
+            chapter_num=1,
+            total_chapters=10,
+            title_part=" - La Llegada",
+            character_roster_block="- Personajes conocidos: Elena, Don Ramiro\n",
+            prev_summary_block="",
+            text="Elena llegó a la mansión.",
+            genre_instruction="Prioriza: pistas descubiertas, coartadas.",
+        )
+        assert "Novela policial/misterio" in formatted
+        assert "La Llegada" in formatted
+        assert "Elena, Don Ramiro" in formatted
+        assert "Elena llegó a la mansión." in formatted
+
+
+class TestGenreConsensus:
+    """Tests para _apply_genre_consensus."""
+
+    def _make_analyzer(self):
+        """Crea analyzer sin DB."""
+        analyzer = object.__new__(ChapterSummaryAnalyzer)
+        analyzer.mode = AnalysisMode.BASIC
+        analyzer.document_type = "FIC"
+        analyzer.document_subtype = None
+        analyzer.db = None
+        return analyzer
+
+    def test_majority_consensus_updates_subtype(self):
+        """Con mayoría clara, actualiza el subtipo."""
+        analyzer = self._make_analyzer()
+        hints = ["policial", "policial", "policial", "romance"]
+        # Can't test DB update without real DB, but can check in-memory
+        # Mock the DB part by catching the exception
+        try:
+            analyzer._apply_genre_consensus(hints, project_id=999)
+        except Exception:
+            pass  # DB access will fail, but in-memory update should happen
+        assert analyzer.document_subtype == "FIC_POL"
+
+    def test_weak_consensus_does_not_update(self):
+        """Sin mayoría clara, no actualiza."""
+        analyzer = self._make_analyzer()
+        hints = ["policial", "romance", "fantasía", "thriller"]
+        try:
+            analyzer._apply_genre_consensus(hints, project_id=999)
+        except Exception:
+            pass
+        assert analyzer.document_subtype is None
+
+    def test_empty_hints_no_change(self):
+        """Sin hints, no cambia nada."""
+        analyzer = self._make_analyzer()
+        try:
+            analyzer._apply_genre_consensus([], project_id=999)
+        except Exception:
+            pass
+        assert analyzer.document_subtype is None
+
+
+class TestSubtypesRegistryNewEntries:
+    """Tests para los nuevos subtipos en SUBTYPES_REGISTRY."""
+
+    def test_new_fiction_subtypes_exist(self):
+        """Los nuevos subtipos de ficción existen en el registro."""
+        from narrative_assistant.correction_config.registry import SUBTYPES_REGISTRY
+
+        new_subtypes = ["FIC_POL", "FIC_ROM", "FIC_THR", "FIC_FAN", "FIC_SCI", "FIC_TER"]
+        for code in new_subtypes:
+            assert code in SUBTYPES_REGISTRY, f"Missing subtype: {code}"
+            assert SUBTYPES_REGISTRY[code]["parent"] == "FIC"
+
+    def test_new_subtypes_have_names(self):
+        """Los nuevos subtipos tienen nombres descriptivos."""
+        from narrative_assistant.correction_config.registry import SUBTYPES_REGISTRY
+
+        names = {
+            "FIC_POL": "policial",
+            "FIC_ROM": "romántica",
+            "FIC_THR": "Thriller",
+            "FIC_FAN": "Fantasía",
+            "FIC_SCI": "Ciencia ficción",
+            "FIC_TER": "Terror",
+        }
+        for code, expected_fragment in names.items():
+            assert expected_fragment in SUBTYPES_REGISTRY[code]["name"]
+
+    def test_config_inherits_from_fiction(self):
+        """Los nuevos subtipos heredan config de FIC (config vacío = herencia pura)."""
+        from narrative_assistant.correction_config.registry import SUBTYPES_REGISTRY
+
+        for code in ["FIC_POL", "FIC_ROM", "FIC_THR", "FIC_FAN", "FIC_SCI", "FIC_TER"]:
+            assert SUBTYPES_REGISTRY[code]["config"] == {}

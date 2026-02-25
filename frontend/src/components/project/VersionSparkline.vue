@@ -86,7 +86,7 @@ const dots = computed(() => {
     x: PADDING + (i / (data.length - 1)) * usableW,
     y: PADDING + usableH - ((values[i] - min) / range) * usableH,
     label: `v${p.versionNum}: ${metric.value === 'healthScore'
-      ? ((p.healthScore ?? 0) * 100).toFixed(0) + '%'
+      ? (p.healthScore ?? 0).toFixed(0) + '%'
       : p.alertCount + ' alertas'}`,
   }))
 })

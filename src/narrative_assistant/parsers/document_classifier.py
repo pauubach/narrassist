@@ -63,6 +63,7 @@ class DocumentClassification:
     confidence: float  # 0.0 - 1.0
     indicators: list[str]  # Indicadores que llevaron a la clasificación
     recommended_settings: dict  # Configuración recomendada
+    document_subtype: str | None = None  # Subgénero detectado (FIC_POL, etc.)
 
 
 # Indicadores por tipo de documento
@@ -371,6 +372,98 @@ GRAPHIC_INDICATORS = {
 }
 
 
+# ============================================================================
+# SUBGÉNEROS DE FICCIÓN - Patrones para detección heurística
+# ============================================================================
+
+FICTION_SUBGENRE_PATTERNS: dict[str, dict[str, list[str]]] = {
+    "FIC_POL": {
+        "investigation": [
+            r"\b(investigar?|investigación|pesquisa)\b",
+            r"\b(detective|inspector|comisari[oa]|policía|agente)\b",
+            r"\b(pista|coartada|sospechoso|cómplice)\b",
+            r"\b(crimen|homicidio|asesinato|cadáver|víctima)\b",
+            r"\b(interrogatori?o|declaración|testigo|prueba)\b",
+            r"\b(caso|expediente|escena del crimen)\b",
+        ],
+    },
+    "FIC_ROM": {
+        "romance": [
+            r"\b(beso|besó|besaron|besarse)\b",
+            r"\b(abrazo|abrazó|abrazaron)\b",
+            r"\bcorazón\s+lat[ií]\w+\b",
+            r"\b(enamorar?|enamorad[oa])\b",
+            r"\bmirada\s+(intensa|profunda|ardiente)\b",
+            r"\b(pasión|deseo|anhelo|amor)\b",
+            r"\b(caricias?|roce|estremecimiento)\b",
+        ],
+    },
+    "FIC_THR": {
+        "thriller": [
+            r"\b(amenaza|amenazó|amenazante)\b",
+            r"\b(persecución|perseguir|perseguido)\b",
+            r"\b(peligro|peligroso|mortal)\b",
+            r"\b(secuestro|secuestrar|rehén)\b",
+            r"\b(huir|escapar|fugarse)\b",
+            r"\b(trampa|conspiración|complot)\b",
+            r"\b(adrenalina|pánico|terror)\b",
+            r"\b(vigilar?|espiar?|acechar)\b",
+        ],
+    },
+    "FIC_FAN": {
+        "fantasy": [
+            r"\b(magia|mágic[oa]|hechizo|conjuro|encantamiento)\b",
+            r"\b(dragón|dragoness?|elfo|enano|orco)\b",
+            r"\b(espada|escudo|armadura|forja)\b",
+            r"\b(reino|trono|castillo|fortaleza)\b",
+            r"\b(profecía|elegido|destino)\b",
+            r"\b(hechicero|mago|bruja|nigromante)\b",
+        ],
+    },
+    "FIC_SCI": {
+        "scifi": [
+            r"\b(nave\s+espacial|estación\s+espacial|transbordador)\b",
+            r"\b(galaxia|planeta|estrella|nebulosa|órbita)\b",
+            r"\b(androide|robot|ciborg|inteligencia\s+artificial)\b",
+            r"\b(teletransporte|hiperesp|warp|salto\s+dimensional)\b",
+            r"\b(colonia|terraformación|criogeni[az])\b",
+            r"\b(láser|plasma|escudo\s+de\s+energía)\b",
+        ],
+    },
+    "FIC_TER": {
+        "horror": [
+            r"\b(oscuridad|tinieblas|penumbra)\b.*\b(acech|surgió|movió)\b",
+            r"\b(grito|alarido|aullido)\s+(desgarrador|aterrador|escalofriante)\b",
+            r"\b(criatura|engendro|monstruo|bestia)\b",
+            r"\b(pesadilla|visión\s+horr|alucinación)\b",
+            r"\b(sangre|desangr|mutila)\b",
+            r"\b(escalofrío|escalofriante|estremecimiento)\b",
+            r"\b(demonio|posesión|maldición|espectro)\b",
+        ],
+    },
+    "FIC_HIS": {
+        "historical": [
+            r"\b(siglo\s+(?:XVII|XVIII|XIX|XV|XVI|XIV))\b",
+            r"\b(guerra\s+(?:civil|mundial|de\s+independencia))\b",
+            r"\b(reinado|monarquía|corte\s+del\s+rey)\b",
+            r"\b(colonia|virreinato|imperio)\b",
+            r"\b(revolución|independencia|levantamiento)\b",
+        ],
+    },
+}
+
+# Pesos para scoring de subgéneros
+FICTION_SUBGENRE_WEIGHTS: dict[str, float] = {
+    "investigation": 2.5,
+    "romance": 2.0,
+    "thriller": 2.0,
+    "fantasy": 3.0,  # Muy discriminativo
+    "scifi": 3.0,  # Muy discriminativo
+    "horror": 2.0,
+    "historical": 2.5,
+}
+
+
 class DocumentClassifier:
     """
     Clasificador de documentos basado en análisis heurístico.
@@ -518,11 +611,17 @@ class DocumentClassifier:
                 recommended_settings=self._get_default_settings(),
             )
 
+        # Detectar subgénero si es ficción
+        subgenre = None
+        if best_type == DocumentType.FICTION:
+            subgenre = self._detect_fiction_subgenre(combined_sample)
+
         return DocumentClassification(
             document_type=best_type,
             confidence=min(confidence, 1.0),
             indicators=indicators[:5],  # Top 5 indicadores
             recommended_settings=self._get_settings_for_type(best_type),
+            document_subtype=subgenre,
         )
 
     def _get_samples(self, text: str) -> list[str]:
@@ -645,6 +744,52 @@ class DocumentClassifier:
     def _score_graphic(self, text: str, text_lower: str) -> tuple[float, list[str]]:
         """Puntúa indicadores de novela gráfica/cómic."""
         return self._count_matches(text, GRAPHIC_INDICATORS)
+
+    def _detect_fiction_subgenre(self, text: str) -> str | None:
+        """Detecta el subgénero de ficción usando patrones heurísticos.
+
+        Ejecuta una segunda pasada rápida sobre el texto para asignar
+        un subtipo específico (FIC_POL, FIC_ROM, etc.) cuando el tipo
+        principal es FICTION.
+
+        Returns:
+            Código de subtipo (FIC_POL, FIC_HIS, etc.) o None si no hay
+            suficiente señal para clasificar.
+        """
+        scores: dict[str, tuple[float, int]] = {}  # subgenre -> (score, matches)
+
+        for subgenre_code, categories in FICTION_SUBGENRE_PATTERNS.items():
+            total_score = 0.0
+            total_matches = 0
+            for category, patterns in categories.items():
+                cat_matches = 0
+                for pattern in patterns:
+                    try:
+                        matches = len(re.findall(pattern, text, re.IGNORECASE))
+                        cat_matches += matches
+                    except re.error:
+                        continue
+                if cat_matches > 0:
+                    weight = FICTION_SUBGENRE_WEIGHTS.get(category, 1.0)
+                    total_score += weight * (1 + min(cat_matches, 15) * 0.3)
+                    total_matches += cat_matches
+            scores[subgenre_code] = (total_score, total_matches)
+
+        if not scores:
+            return None
+
+        best_subgenre = max(scores, key=lambda k: scores[k][0])
+        best_score, best_matches = scores[best_subgenre]
+
+        # Umbral mínimo: al menos 3 matches y score > 4
+        if best_matches < 3 or best_score < 4.0:
+            return None
+
+        logger.debug(
+            f"Fiction subgenre detected: {best_subgenre} "
+            f"(score={best_score:.1f}, matches={best_matches})"
+        )
+        return best_subgenre
 
     def _adjust_scores_from_title(
         self,

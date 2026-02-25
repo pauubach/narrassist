@@ -1184,16 +1184,26 @@ def run_classification(ctx: dict, tracker: ProgressTracker):
         ctx["classification"] = classification
         ctx["document_type"] = document_type_str
 
+        # Subgénero detectado por heurísticas
+        document_subtype_str = None
+        if classification and classification.document_subtype:
+            document_subtype_str = classification.document_subtype
+        ctx["document_subtype"] = document_subtype_str
+
         logger.info(f"Document classified as: {document_type_str}")
         if classification:
             logger.info(f"  Confidence: {classification.confidence:.2f}")
             logger.info(f"  Type: {document_type_str}")
+            if document_subtype_str:
+                logger.info(f"  Subtype: {document_subtype_str}")
 
         # Guardar en proyecto
         try:
             project = ctx["project"]
             if hasattr(project, "document_type"):
                 project.document_type = document_type_str
+            if hasattr(project, "document_subtype") and document_subtype_str:
+                project.document_subtype = document_subtype_str
             from narrative_assistant.persistence.project import ProjectManager
 
             proj_manager = ProjectManager(ctx["db_session"])
@@ -1205,6 +1215,7 @@ def run_classification(ctx: dict, tracker: ProgressTracker):
         logger.warning(f"Document classification failed (continuing): {e}")
         ctx["classification"] = None
         ctx["document_type"] = "FIC"  # Default coherente con Project.document_type
+        ctx["document_subtype"] = None
 
     tracker.end_phase("classification", 1)
 

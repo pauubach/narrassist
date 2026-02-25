@@ -311,6 +311,7 @@ class ChapterProgressReport:
     abandoned_threads: list[AbandonedThread] = field(default_factory=list)
 
     structural_notes: str | None = None  # Análisis LLM de estructura
+    global_summary: str | None = None  # Sinopsis global del manuscrito
 
     def to_dict(self) -> dict:
         return {
@@ -325,28 +326,114 @@ class ChapterProgressReport:
             "chekhov_elements": [c.to_dict() for c in self.chekhov_elements],
             "abandoned_threads": [t.to_dict() for t in self.abandoned_threads],
             "structural_notes": self.structural_notes,
+            "global_summary": self.global_summary,
         }
 
 
-# Prompt para extracción de eventos con LLM
-EVENTS_EXTRACTION_PROMPT = """Analiza el siguiente fragmento de capítulo y extrae los eventos SIGNIFICATIVOS para la trama.
+# ============================================================================
+# Instrucciones específicas por género/subgénero
+# ============================================================================
 
-CAPÍTULO {chapter_num}{title_part}
+GENRE_INSTRUCTIONS: dict[str, str] = {
+    # Subgéneros de ficción (prioridad alta)
+    "FIC_POL": "Prioriza: pistas descubiertas, coartadas, interrogatorios, sospechas, deducciones del investigador.",
+    "FIC_ROM": "Prioriza: desarrollo de la relación, obstáculos emocionales, malentendidos, momentos de conexión.",
+    "FIC_THR": "Prioriza: escalada de tensión, amenazas, persecuciones, giros inesperados, revelaciones peligrosas.",
+    "FIC_FAN": "Prioriza: sistema de magia, alianzas, profecías, conflictos de poder, worldbuilding relevante.",
+    "FIC_SCI": "Prioriza: tecnología clave, conflictos éticos, exploración, descubrimientos, worldbuilding.",
+    "FIC_TER": "Prioriza: escalada del horror, amenazas sobrenaturales o psicológicas, muertes, revelaciones aterradoras.",
+    "FIC_HIS": "Prioriza: eventos históricos, anacronismos potenciales, tensión entre ficción y contexto real.",
+    "FIC_LIT": "Prioriza: giros de trama, revelaciones, conflictos internos, decisiones con consecuencias.",
+    # Tipos principales (fallback)
+    "FIC": "Prioriza: giros de trama, revelaciones, conflictos, decisiones con consecuencias.",
+    "MEM": "Prioriza: momentos formativos, relaciones clave, puntos de inflexión vitales.",
+    "BIO": "Prioriza: hitos vitales, relaciones determinantes, logros y fracasos.",
+    "ENS": "Prioriza: tesis principal, argumentos, contraargumentos, conclusiones.",
+    "AUT": "Prioriza: problema planteado, técnica propuesta, ejemplos prácticos.",
+    "DIV": "Prioriza: descubrimientos explicados, datos sorprendentes, conexiones entre conceptos.",
+    "CEL": "Prioriza: anécdotas reveladoras, lecciones personales, momentos de autenticidad.",
+    "TEC": "Prioriza: conceptos clave, procedimientos, decisiones técnicas.",
+    "PRA": "Prioriza: técnicas explicadas, pasos importantes, consejos prácticos.",
+    "INF": "Prioriza: momentos emocionales, lecciones, aventuras, resolución de conflictos.",
+    "DRA": "Prioriza: conflictos entre personajes, revelaciones, clímax de actos.",
+    "GRA": "Prioriza: giros visuales, acción, diálogos impactantes.",
+}
+
+# Labels legibles para tipos de documento
+GENRE_LABELS: dict[str, str] = {
+    "FIC": "Ficción",
+    "FIC_POL": "Novela policial/misterio",
+    "FIC_ROM": "Novela romántica",
+    "FIC_THR": "Thriller/Suspense",
+    "FIC_FAN": "Fantasía",
+    "FIC_SCI": "Ciencia ficción",
+    "FIC_TER": "Terror/Horror",
+    "FIC_HIS": "Novela histórica",
+    "FIC_LIT": "Novela literaria",
+    "FIC_GEN": "Novela de género",
+    "FIC_COR": "Relato/Cuento",
+    "FIC_MIC": "Microrrelatos",
+    "MEM": "Memorias/Autobiografía",
+    "BIO": "Biografía",
+    "ENS": "Ensayo",
+    "AUT": "Autoayuda",
+    "DIV": "Divulgación",
+    "CEL": "Famosos/Influencers",
+    "TEC": "Manual técnico",
+    "PRA": "Libro práctico",
+    "INF": "Infantil/Juvenil",
+    "DRA": "Teatro/Guion",
+    "GRA": "Novela gráfica",
+}
+
+
+def _get_genre_label(document_type: str, document_subtype: str | None = None) -> str:
+    """Obtiene label legible para un tipo/subtipo de documento."""
+    if document_subtype and document_subtype in GENRE_LABELS:
+        return GENRE_LABELS[document_subtype]
+    return GENRE_LABELS.get(document_type, "Texto")
+
+
+def _get_genre_instruction(document_type: str, document_subtype: str | None = None) -> str:
+    """Obtiene instrucción específica de género para el prompt.
+
+    Lookup: primero subtipo, luego tipo, luego fallback genérico.
+    """
+    if document_subtype and document_subtype in GENRE_INSTRUCTIONS:
+        return GENRE_INSTRUCTIONS[document_subtype]
+    if document_type in GENRE_INSTRUCTIONS:
+        return GENRE_INSTRUCTIONS[document_type]
+    return "Prioriza: eventos que cambian el estado narrativo, revelaciones y decisiones con consecuencias."
+
+
+# Prompt para extracción de eventos con LLM (genre-aware)
+EVENTS_EXTRACTION_PROMPT = """Eres un analista literario profesional. Responde SIEMPRE en español correcto (nunca uses posesivos ingleses como "'s", ni mezcles idiomas).
+
+CONTEXTO:
+- Tipo de obra: {genre_label}
+- Capítulo {chapter_num} de {total_chapters}{title_part}
+{character_roster_block}{prev_summary_block}
+TEXTO DEL CAPÍTULO:
 ---
 {text}
 ---
 
-Extrae los 3-5 eventos MÁS IMPORTANTES que:
-1. Cambian el estado de un personaje o relación
-2. Revelan información crucial
-3. Impulsan la trama hacia adelante
-4. Representan un punto de no retorno
-5. Tienen consecuencia en el cierre del capítulo
+Primero, clasifica este capítulo:
+- "chapter_type": "narrative" si es contenido de la obra, "front_matter" si es dedicatoria/agradecimientos/prólogo ajeno, "back_matter" si es epílogo/bibliografía/notas del autor.
+- "genre_hint": en una palabra, qué género o subgénero percibes (ej: "policial", "romance", "fantasía", "ensayo", "memorias"). Solo para capítulos narrativos.
+
+Extrae 3-5 eventos que un EDITOR profesional necesitaría para verificar consistencia. Ignora acciones rutinarias (despertar, comer, caminar) salvo que desencadenen algo significativo.
+
+{genre_instruction}
+
+Cada evento debe responder: QUIÉN hace QUÉ a QUIÉN, y qué CAMBIA.
 
 El campo "summary" DEBE:
-- Explicar qué sucede en el capítulo (causa -> efecto)
-- Ser narrativo en 2-3 frases, no un listado ni esquema
-- Evitar fórmulas tipo "personajes principales", "interacciones", "escenarios"
+- Nombrar personajes por su nombre propio
+- Explicar QUÉ sucede y POR QUÉ importa para la trama
+- Indicar qué CAMBIA respecto al estado anterior
+- Señalar qué queda ABIERTO o sin resolver
+- 2-3 frases narrativas (causa → efecto)
 
 Responde SOLO con JSON válido (sin markdown):
 {{
@@ -358,7 +445,12 @@ Responde SOLO con JSON válido (sin markdown):
       "importance": 1-5
     }}
   ],
-  "summary": "Resumen narrativo de 2-3 frases sobre lo que ocurre en el capítulo"
+  "summary": "Resumen narrativo de 2-3 frases",
+  "character_inferences": [
+    {{"character": "nombre", "inferred_role": "detective/protagonista/antagonista/...", "evidence": "breve evidencia"}}
+  ],
+  "chapter_type": "narrative",
+  "genre_hint": "policial"
 }}"""
 
 # Prompt para análisis de arcos narrativos
@@ -421,6 +513,29 @@ Responde SOLO con JSON:
 }}"""
 
 
+# Prompt para resumen global del manuscrito
+GLOBAL_SUMMARY_PROMPT = """Eres un editor literario profesional. Escribe una sinopsis narrativa del manuscrito en UN PÁRRAFO de 4-6 frases.
+
+TIPO: {genre_label}
+PERSONAJES: {characters}
+
+CAPÍTULOS:
+{all_chapter_summaries}
+
+REQUISITOS ESTILÍSTICOS:
+- Usa lenguaje narrativo y fluido (evita sustantivos abstractos sin artículo: "la misteriosa desaparición" en vez de "Desaparecimiento")
+- Escribe en presente narrativo para mayor inmediatez
+- Incluye: premisa, protagonistas, conflicto central, desarrollo y tensión actual
+- Captura el tono del género ({genre_label})
+- Sé específico con nombres propios, NO uses "el protagonista" o "la detective"
+
+EJEMPLO DE BUENA SINOPSIS:
+"Elena Montero llega a la mansión Aldebarán para investigar la misteriosa desaparición de Isabel, la hija de los propietarios. Desde el primer momento, nota comportamientos extraños en el servicio, especialmente en Don Ramiro, el mayordomo. A medida que explora la mansión y sus alrededores, descubre pistas inquietantes que apuntan a secretos familiares enterrados hace décadas. La tensión aumenta cuando Elena se da cuenta de que alguien en la casa no quiere que descubra la verdad."
+
+Responde SOLO con este JSON (el valor DEBE ser un string de texto narrativo, NO un objeto estructurado):
+{{"global_summary": "[tu sinopsis narrativa aquí]"}}"""
+
+
 class ChapterSummaryAnalyzer:
     """
     Analizador de resúmenes por capítulo.
@@ -436,25 +551,29 @@ class ChapterSummaryAnalyzer:
         db_path: str | None = None,
         mode: AnalysisMode = AnalysisMode.BASIC,
         llm_model: str = "llama3.2",
+        document_type: str = "FIC",
+        document_subtype: str | None = None,
     ):
         from ..persistence.database import get_database
 
         self.db = get_database(db_path)
         self.mode = mode
         self.llm_model = llm_model
+        self.document_type = document_type
+        self.document_subtype = document_subtype
         self._ollama_client = None
         self._embeddings_model = None
 
     @property
     def ollama_client(self):
-        """Lazy loading del cliente Ollama."""
+        """Lazy loading del cliente LLM local."""
         if self._ollama_client is None and self.mode != AnalysisMode.BASIC:
             try:
-                from ..llm.ollama_client import OllamaClient
+                from ..llm.client import get_llm_client
 
-                self._ollama_client = OllamaClient()
+                self._ollama_client = get_llm_client()
             except Exception as e:
-                logger.warning(f"No se pudo inicializar Ollama: {e}")
+                logger.warning(f"No se pudo inicializar LLM client: {e}")
         return self._ollama_client
 
     @property
@@ -482,11 +601,24 @@ class ChapterSummaryAnalyzer:
         if not chapters:
             return report
 
+        # Cargar tipo/subtipo de documento desde BD si no se pasó al constructor
+        if self.document_type == "FIC":
+            db_type, db_subtype = self._get_document_type(project_id)
+            if db_type:
+                self.document_type = db_type
+            if db_subtype:
+                self.document_subtype = db_subtype
+
         all_characters = self._get_characters(project_id)
         report.total_characters = len(all_characters)
 
         first_appearances = self._get_first_appearances(project_id)
         last_appearances: dict[int, int] = {}
+
+        # Context threading: acumular personajes conocidos y resumen previo
+        known_character_names: list[str] = []
+        prev_llm_summary: str | None = None
+        genre_hints: list[str] = []  # Para consenso LLM
 
         # Procesar cada capítulo
         for chapter in chapters:
@@ -496,11 +628,29 @@ class ChapterSummaryAnalyzer:
                 all_characters=all_characters,
                 first_appearances=first_appearances,
                 last_appearances=last_appearances,
+                total_chapters=report.total_chapters,
+                known_character_names=known_character_names,
+                prev_llm_summary=prev_llm_summary,
             )
             report.chapters.append(chapter_summary)
 
             for char in chapter_summary.characters_present:
                 last_appearances[char.entity_id] = chapter["chapter_number"]
+                if char.name not in known_character_names:
+                    known_character_names.append(char.name)
+
+            # Actualizar resumen previo para el siguiente capítulo
+            prev_llm_summary = chapter_summary.llm_summary or chapter_summary.auto_summary
+
+            # Acumular genre_hints de capítulos narrativos
+            ch_type = getattr(chapter_summary, "_chapter_type", "narrative")
+            ch_hint = getattr(chapter_summary, "_genre_hint", None)
+            if ch_type == "narrative" and ch_hint:
+                genre_hints.append(ch_hint)
+
+        # Consenso de genre_hints del LLM
+        if genre_hints:
+            self._apply_genre_consensus(genre_hints, project_id)
 
         # Detectar personajes dormidos
         if report.total_chapters >= 3:
@@ -522,10 +672,94 @@ class ChapterSummaryAnalyzer:
         if self.mode != AnalysisMode.BASIC:
             self._enhance_with_llm(report, all_characters)
 
+        # Resumen global del manuscrito (1 sola llamada LLM, incluso en modo basic)
+        self._generate_global_summary(report, all_characters)
+
         # Detectar Chekhov's Guns
         report.chekhov_elements = self._detect_chekhov_elements(project_id)
 
         return report
+
+    def _get_document_type(self, project_id: int) -> tuple[str | None, str | None]:
+        """Obtiene el tipo y subtipo de documento desde la BD."""
+        try:
+            with self.db.connection() as conn:
+                row = conn.execute(
+                    "SELECT document_type, document_subtype FROM projects WHERE id = ?",
+                    (project_id,),
+                ).fetchone()
+                if row:
+                    return row["document_type"], row["document_subtype"]
+        except Exception:
+            pass
+        return None, None
+
+    def _apply_genre_consensus(self, genre_hints: list[str], project_id: int) -> None:
+        """Aplica consenso de genre_hints del LLM para refinar subgénero.
+
+        Vota el hint más frecuente entre capítulos narrativos.
+        Si difiere del heurístico, usa el del LLM (tiene más contexto).
+        """
+        from collections import Counter
+
+        # Normalizar hints
+        normalized = [h.lower().strip() for h in genre_hints if h]
+        if not normalized:
+            return
+
+        hint_counts = Counter(normalized)
+        best_hint, best_count = hint_counts.most_common(1)[0]
+
+        # Mapeo de hints libres a códigos de subtipo
+        hint_to_subtype: dict[str, str] = {
+            "policial": "FIC_POL", "misterio": "FIC_POL", "detective": "FIC_POL",
+            "noir": "FIC_POL", "crimen": "FIC_POL",
+            "romance": "FIC_ROM", "romántica": "FIC_ROM", "romántico": "FIC_ROM",
+            "amor": "FIC_ROM",
+            "thriller": "FIC_THR", "suspense": "FIC_THR", "intriga": "FIC_THR",
+            "fantasía": "FIC_FAN", "fantasy": "FIC_FAN", "épica": "FIC_FAN",
+            "ciencia ficción": "FIC_SCI", "sci-fi": "FIC_SCI", "espacial": "FIC_SCI",
+            "terror": "FIC_TER", "horror": "FIC_TER", "gótico": "FIC_TER",
+            "histórica": "FIC_HIS", "histórico": "FIC_HIS", "época": "FIC_HIS",
+            "literaria": "FIC_LIT", "literario": "FIC_LIT",
+        }
+
+        llm_subtype = hint_to_subtype.get(best_hint)
+        if not llm_subtype:
+            logger.debug(f"Genre hint '{best_hint}' not mapped to known subtype")
+            return
+
+        # Solo actualizar si el LLM tiene señal fuerte (>50% consenso)
+        consensus_ratio = best_count / len(normalized)
+        if consensus_ratio < 0.5:
+            logger.debug(
+                f"Genre consensus too weak: {best_hint} ({best_count}/{len(normalized)})"
+            )
+            return
+
+        # Comparar con heurística actual
+        if self.document_subtype and self.document_subtype == llm_subtype:
+            logger.debug(f"LLM genre consensus matches heuristic: {llm_subtype}")
+            return
+
+        # El LLM difiere o no había subgénero heurístico → actualizar
+        logger.info(
+            f"LLM genre consensus: {best_hint} → {llm_subtype} "
+            f"({best_count}/{len(normalized)} chapters, "
+            f"heuristic was: {self.document_subtype or 'none'})"
+        )
+        self.document_subtype = llm_subtype
+
+        # Persistir en BD
+        try:
+            with self.db.connection() as conn:
+                conn.execute(
+                    "UPDATE projects SET document_subtype = ? WHERE id = ?",
+                    (llm_subtype, project_id),
+                )
+                conn.commit()
+        except Exception as e:
+            logger.debug(f"Could not persist LLM genre consensus: {e}")
 
     def _get_chapters(self, project_id: int) -> list[dict]:
         """Obtiene los capítulos del proyecto."""
@@ -637,6 +871,9 @@ class ChapterSummaryAnalyzer:
         all_characters: dict[int, str],
         first_appearances: dict[int, int],
         last_appearances: dict[int, int],
+        total_chapters: int = 0,
+        known_character_names: list[str] | None = None,
+        prev_llm_summary: str | None = None,
     ) -> ChapterSummary:
         """Analiza un capítulo individual."""
         summary = ChapterSummary(
@@ -784,7 +1021,13 @@ class ChapterSummaryAnalyzer:
 
         # Análisis LLM del capítulo
         if self.mode != AnalysisMode.BASIC and chapter_text:
-            self._analyze_chapter_with_llm(summary, chapter_text)
+            self._analyze_chapter_with_llm(
+                summary,
+                chapter_text,
+                total_chapters=total_chapters,
+                known_character_names=known_character_names or [],
+                prev_llm_summary=prev_llm_summary,
+            )
 
         return summary
 
@@ -838,7 +1081,14 @@ class ChapterSummaryAnalyzer:
                 )
                 break
 
-    def _analyze_chapter_with_llm(self, summary: ChapterSummary, chapter_text: str) -> None:
+    def _analyze_chapter_with_llm(
+        self,
+        summary: ChapterSummary,
+        chapter_text: str,
+        total_chapters: int = 0,
+        known_character_names: list[str] | None = None,
+        prev_llm_summary: str | None = None,
+    ) -> None:
         """Analiza el capítulo con LLM para extraer eventos significativos."""
         if not self.ollama_client:
             return
@@ -863,17 +1113,41 @@ class ChapterSummaryAnalyzer:
 
             title_part = f" - {summary.chapter_title}" if summary.chapter_title else ""
 
-            prompt = EVENTS_EXTRACTION_PROMPT.format(
-                chapter_num=summary.chapter_number,
-                title_part=title_part,
-                text=text_to_analyze,
+            # Construir bloques de contexto
+            genre_label = _get_genre_label(self.document_type, self.document_subtype)
+            genre_instruction = _get_genre_instruction(
+                self.document_type, self.document_subtype
             )
 
-            response = self.ollama_client.generate(
+            # Roster de personajes conocidos
+            character_roster_block = ""
+            if known_character_names:
+                roster = ", ".join(known_character_names[:20])
+                character_roster_block = f"- Personajes conocidos: {roster}\n"
+
+            # Resumen del capítulo anterior
+            prev_summary_block = ""
+            if prev_llm_summary:
+                sanitized_prev = sanitize_for_prompt(prev_llm_summary, max_length=300)
+                prev_summary_block = (
+                    f"- Capítulo anterior: {sanitized_prev}\n"
+                )
+
+            prompt = EVENTS_EXTRACTION_PROMPT.format(
+                genre_label=genre_label,
+                chapter_num=summary.chapter_number,
+                total_chapters=total_chapters or "?",
+                title_part=title_part,
+                character_roster_block=character_roster_block,
+                prev_summary_block=prev_summary_block,
+                text=text_to_analyze,
+                genre_instruction=genre_instruction,
+            )
+
+            response = self.ollama_client.complete(
                 prompt=prompt,
-                model=self.llm_model,
+                model_name=self.llm_model,
                 temperature=0.3,
-                timeout=60,
             )
 
             if response:
@@ -908,6 +1182,22 @@ class ChapterSummaryAnalyzer:
 
                 # Guardar resumen LLM
                 summary.llm_summary = data.get("summary")
+
+                # Parsear chapter_type y genre_hint (Frente 1D)
+                chapter_type = data.get("chapter_type", "narrative")
+                genre_hint = data.get("genre_hint")
+
+                # Almacenar como atributos privados para el loop de analyze_project
+                summary._chapter_type = chapter_type  # type: ignore[attr-defined]
+                summary._genre_hint = genre_hint  # type: ignore[attr-defined]
+
+                # Log character_inferences si existen
+                char_inferences = data.get("character_inferences", [])
+                if char_inferences:
+                    logger.info(
+                        f"Cap. {summary.chapter_number} character inferences: "
+                        f"{[ci.get('character', '?') + '=' + ci.get('inferred_role', '?') for ci in char_inferences]}"
+                    )
 
         except Exception as e:
             logger.warning(f"Error en análisis LLM del capítulo {summary.chapter_number}: {e}")
@@ -1006,40 +1296,50 @@ class ChapterSummaryAnalyzer:
         """Puntúa una oración para resumen extractivo.
 
         Criterios:
-        - Posición: primeras y últimas oraciones valen más
+        - Posición: leve bonus a inicio/final (no dominante)
         - Personajes: menciona personajes presentes en el capítulo
-        - Verbos de acción narrativa: decidir, descubrir, revelar, etc.
+        - Eventos narrativos significativos: muerte, desaparición, revelación, etc.
+        - Conectores causales: indican progresión narrativa
         - Longitud: ni demasiado corta ni demasiado larga
         """
         score = 0.0
         sent_lower = sent.lower()
 
-        # --- Posición (primeras oraciones suelen introducir la escena) ---
+        # --- Posición (leve bonus, NO debe dominar) ---
         if idx == 0:
-            score += 3.0
+            score += 1.0
         elif idx == 1:
-            score += 1.5
-        elif idx == 2:
             score += 0.5
         # Últimas oraciones suelen cerrar/concluir
         if total > 3 and idx >= total - 2:
-            score += 1.5
+            score += 1.0
 
-        # --- Mención de personajes ---
+        # --- Mención de personajes (alta prioridad) ---
         name_hits = sum(1 for name in char_names if name in sent_lower)
-        score += min(name_hits * 1.0, 3.0)  # Max 3 puntos por personajes
+        score += min(name_hits * 1.2, 3.6)  # Max 3.6 puntos por personajes
+
+        # --- Eventos narrativos de alto impacto ---
+        high_impact_patterns = [
+            r"\b(?:desapareci|desaparic|muri|muert|asesina|matar|mat[óo])\w*\b",
+            r"\b(?:revel|confes|descubr|secret|traicion|enga[ñn])\w*\b",
+            r"\b(?:secuestr|rapt|encarcel|prision|encerr|captur)\w*\b",
+            r"\b(?:cadáver|cuerpo sin vida|sangre|herida|arma)\b",
+        ]
+        for pattern in high_impact_patterns:
+            if re.search(pattern, sent_lower):
+                score += 2.0
 
         # --- Verbos de acción narrativa significativa ---
         action_patterns = [
-            r"\b(?:descubr|revel|confes|decid|resolv|comprend)\w+\b",
-            r"\b(?:lleg|part|huy|escap|regres|abandon)\w+\b",
-            r"\b(?:enfrent|luch|atac|defend|traicion)\w+\b",
-            r"\b(?:record|olvid|prometi|jur|advirti)\w+\b",
-            r"\b(?:muri|naci|desapareci|transform)\w+\b",
+            r"\b(?:decid|resolv|comprend|interrog)\w+\b",
+            r"\b(?:huy|escap|regres|abandon|march)\w+\b",
+            r"\b(?:enfrent|luch|atac|defend|acus)\w+\b",
+            r"\b(?:prometi|jur|advirti|amenaz|exigi)\w+\b",
+            r"\b(?:naci|transform|cambi|convirti)\w+\b",
         ]
         for pattern in action_patterns:
             if re.search(pattern, sent_lower):
-                score += 0.8
+                score += 1.2
 
         # --- Conectores causales/temporales (indican progresión narrativa) ---
         if re.search(
@@ -1049,15 +1349,29 @@ class ChapterSummaryAnalyzer:
         ):
             score += 0.5
 
+        # --- Contraste/negación (suelen indicar giros) ---
+        if re.search(
+            r"\b(?:pero|aunque|a pesar de|en cambio|nadie|nunca|jamás|"
+            r"tampoco|ni siquiera|no lograba|no podía)\b",
+            sent_lower,
+        ):
+            score += 0.5
+
         # --- Penalización por oraciones genéricas/descriptivas ---
         if re.search(r"^(?:el sol|la noche|el día|hacía|era un)\b", sent_lower):
+            score -= 1.0
+        # Penalizar acciones cotidianas
+        if re.search(
+            r"\b(?:se levant|despert|desayun|camin|se sent[óo]|cerr[óo] la puerta)\b",
+            sent_lower,
+        ):
             score -= 0.5
 
-        # --- Longitud óptima (40-150 chars) ---
+        # --- Longitud óptima (40-180 chars) ---
         length = len(sent)
-        if 40 <= length <= 150:
-            score += 0.5
-        elif length > 250:
+        if 40 <= length <= 180:
+            score += 0.3
+        elif length > 300:
             score -= 0.3
 
         return score
@@ -1138,11 +1452,10 @@ class ChapterSummaryAnalyzer:
                 ),
             )
 
-            response = self.ollama_client.generate(
+            response = self.ollama_client.complete(
                 prompt=prompt,
-                model=self.llm_model,
+                model_name=self.llm_model,
                 temperature=0.3,
-                timeout=120,
             )
 
             if response:
@@ -1184,6 +1497,115 @@ class ChapterSummaryAnalyzer:
 
         except Exception as e:
             logger.warning(f"Error en análisis LLM de arcos: {e}")
+
+        # Resumen global se genera en _generate_global_summary() — llamado aparte
+
+    def _generate_global_summary(
+        self, report: ChapterProgressReport, all_characters: dict[int, str]
+    ) -> None:
+        """Genera resumen global del manuscrito con 1 llamada LLM.
+
+        Se invoca para TODOS los modos (incluyendo basic) porque solo requiere
+        una única llamada LLM y el valor para el usuario es alto.
+        Inicializa su propio cliente Ollama si es necesario (en modo basic,
+        self.ollama_client es None por diseño).
+        """
+        # Obtener cliente LLM — en modo basic, self.ollama_client es None por el
+        # guard en la property. Lo inicializamos aquí directamente.
+        client = self._ollama_client
+        if client is None:
+            try:
+                from ..llm.client import get_llm_client
+
+                client = get_llm_client()
+            except Exception as e:
+                logger.debug(f"LLM client not available for global summary: {e}")
+                return
+        if not client:
+            return
+
+        try:
+            import json
+
+            from narrative_assistant.llm.sanitization import sanitize_for_prompt
+
+            genre_label = _get_genre_label(self.document_type, self.document_subtype)
+            main_chars = list(all_characters.values())[:10]
+
+            # Filtrar solo capítulos narrativos para el resumen global
+            narrative_summaries = []
+            for ch in report.chapters:
+                ch_type = getattr(ch, "_chapter_type", "narrative")
+                if ch_type in ("front_matter", "back_matter"):
+                    continue
+                summary_text = ch.llm_summary or ch.auto_summary
+                narrative_summaries.append(
+                    f"Cap. {ch.chapter_number}: {sanitize_for_prompt(summary_text, max_length=400)}"
+                )
+
+            if not narrative_summaries:
+                return
+
+            global_prompt = GLOBAL_SUMMARY_PROMPT.format(
+                genre_label=genre_label,
+                characters=", ".join(
+                    sanitize_for_prompt(c, max_length=100) for c in main_chars
+                ),
+                all_chapter_summaries="\n".join(narrative_summaries),
+            )
+
+            global_response = client.complete(
+                prompt=global_prompt,
+                model_name=self.llm_model,
+                temperature=0.3,
+            )
+
+            if global_response:
+                clean_global = global_response.strip()
+                if clean_global.startswith("```"):
+                    clean_global = re.sub(r"^```(?:json)?\n?", "", clean_global)
+                    clean_global = re.sub(r"\n?```$", "", clean_global)
+
+                global_data = json.loads(clean_global)
+                summary_val = global_data.get("global_summary")
+
+                # LLM a veces devuelve un dict en vez de string — extraer texto
+                if isinstance(summary_val, dict):
+                    # Extraer recursivamente todos los strings del dict
+                    def _extract_strings(obj: object) -> list[str]:
+                        if isinstance(obj, str):
+                            return [obj]
+                        if isinstance(obj, dict):
+                            parts: list[str] = []
+                            for v in obj.values():
+                                parts.extend(_extract_strings(v))
+                            return parts
+                        if isinstance(obj, list):
+                            parts = []
+                            for item in obj:
+                                parts.extend(_extract_strings(item))
+                            return parts
+                        return []
+
+                    all_parts = _extract_strings(summary_val)
+                    summary_val = " ".join(all_parts) if all_parts else None
+                elif isinstance(summary_val, list):
+                    summary_val = " ".join(str(s) for s in summary_val)
+
+                if isinstance(summary_val, str) and len(summary_val) > 20:
+                    report.global_summary = summary_val
+                    logger.info(
+                        f"Global summary generated: {len(summary_val)} chars"
+                    )
+                else:
+                    logger.warning(
+                        f"Global summary rejected: type={type(summary_val).__name__}, "
+                        f"len={len(summary_val) if isinstance(summary_val, str) else 'N/A'}, "
+                        f"raw={repr(summary_val)[:200]}"
+                    )
+
+        except Exception as e:
+            logger.warning(f"Error generating global summary: {e}", exc_info=True)
 
     def _detect_chekhov_elements(self, project_id: int) -> list[ChekhovElement]:
         """
@@ -1295,6 +1717,8 @@ def analyze_chapter_progress(
     db_path: str | None = None,
     mode: str = "basic",
     llm_model: str = "llama3.2",
+    document_type: str = "FIC",
+    document_subtype: str | None = None,
 ) -> ChapterProgressReport:
     """
     Función de conveniencia para analizar el avance de un proyecto.
@@ -1307,14 +1731,22 @@ def analyze_chapter_progress(
         db_path: Ruta opcional a la base de datos
         mode: Modo de análisis (basic, standard, deep)
         llm_model: Modelo LLM a usar (llama3.2, qwen2.5, mistral)
+        document_type: Tipo de documento (FIC, MEM, etc.)
+        document_subtype: Subtipo (FIC_POL, etc.)
 
     Returns:
         ChapterProgressReport con el análisis completo
     """
     analysis_mode = AnalysisMode(mode)
-    analyzer = ChapterSummaryAnalyzer(db_path, mode=analysis_mode, llm_model=llm_model)
+    analyzer = ChapterSummaryAnalyzer(
+        db_path,
+        mode=analysis_mode,
+        llm_model=llm_model,
+        document_type=document_type,
+        document_subtype=document_subtype,
+    )
     revision = _get_project_revision(analyzer.db, project_id)
-    cache_key = f"{project_id}:{mode}:{llm_model}:rev{revision}"
+    cache_key = f"{project_id}:{mode}:{llm_model}:{document_type}:rev{revision}"
     now = time.monotonic()
 
     with _cache_lock:

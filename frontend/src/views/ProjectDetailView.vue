@@ -424,6 +424,7 @@
                     :entity-count="entitiesCount"
                     :alert-count="alertsCount"
                     :alerts="alerts"
+                    :global-summary="globalSummary"
                     @stat-click="handleStatClick"
                   />
                 </template>
@@ -435,6 +436,7 @@
                     :project-id="project.id"
                     :entities="entities"
                     :alerts="alerts"
+                    :summaries="chapterSummaries"
                     @back-to-document="onBackToDocumentSummary"
                     @go-to-start="onGoToChapterStart"
                     @view-alerts="onViewChapterAlerts"
@@ -449,6 +451,7 @@
                     :entity-count="entitiesCount"
                     :alert-count="alertsCount"
                     :alerts="alerts"
+                    :global-summary="globalSummary"
                     @stat-click="handleStatClick"
                   />
                 </template>
@@ -503,6 +506,7 @@
                     :project-id="project.id"
                     :entities="entities"
                     :alerts="alerts"
+                    :summaries="chapterSummaries"
                     @back-to-document="onBackToDocumentSummary"
                     @go-to-start="onGoToChapterStart"
                     @view-alerts="onViewChapterAlerts"
@@ -518,6 +522,7 @@
                     :entity-count="entitiesCount"
                     :alert-count="alertsCount"
                     :alerts="alerts"
+                    :global-summary="globalSummary"
                     @stat-click="handleStatClick"
                   />
                 </template>
@@ -607,8 +612,8 @@ const { undoableCount } = useGlobalUndo(() => project.value?.id ?? null)
 // ── Composables ────────────────────────────────────────────
 const project = computed(() => projectsStore.currentProject)
 
-const { entities, alerts, chapters, relationships, entitiesCount, alertsCount,
-        loadEntities, loadAlerts, loadChapters, loadRelationships } = useProjectData()
+const { entities, alerts, chapters, relationships, chapterSummaries, globalSummary, entitiesCount, alertsCount,
+        loadEntities, loadAlerts, loadChapters, loadRelationships, loadChapterSummaries } = useProjectData()
 
 // Wrapper para loadChapters que coincide con la firma esperada por useAnalysisPolling
 const loadChaptersWrapper = async (projectId: number, forceReload = false) => {
@@ -996,6 +1001,7 @@ onMounted(async () => {
       loadAlerts(projectId),
       loadChapters(projectId, project.value ?? undefined),
       loadRelationships(projectId),
+      loadChapterSummaries(projectId),
     ])
 
     // Check for alert query parameter (para navegación desde AlertsView)
@@ -1545,6 +1551,13 @@ watch(() => alerts.value.length, (newLength, oldLength) => {
         updateProjectStats(project.value.id, project.value.name, alerts.value)
       }
     }, 500)
+  }
+})
+
+// Reload summaries when analysis finishes
+watch(isAnalyzing, (analyzing, wasAnalyzing) => {
+  if (wasAnalyzing && !analyzing && project.value) {
+    loadChapterSummaries(project.value.id, true)
   }
 })
 

@@ -39,8 +39,8 @@ def get_chapter_progress(
     Returns:
         ChapterProgressReport con resúmenes de todos los capítulos
     """
-    # Check enrichment cache first (S8a-13) — only for basic mode (what pipeline caches)
-    if mode == "basic":
+    # Check enrichment cache first (S8a-13) — pipeline caches standard mode
+    if mode in ("basic", "standard"):
         from routers._enrichment_cache import get_cached_enrichment
         cached = get_cached_enrichment(deps.get_database(), project_id, "chapter_progress")
         if cached:

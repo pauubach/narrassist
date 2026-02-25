@@ -6,12 +6,11 @@ import Accordion from 'primevue/accordion'
 import AccordionPanel from 'primevue/accordionpanel'
 import AccordionHeader from 'primevue/accordionheader'
 import AccordionContent from 'primevue/accordioncontent'
-import ProgressSpinner from 'primevue/progressspinner'
 import type { Chapter, Entity, Alert } from '@/types'
-import { api } from '@/services/apiClient'
 import { getChapterEvents, type ChapterEventsResponse } from '@/services/events'
 import EventsExportDialog from '@/components/events/EventsExportDialog.vue'
 import EventStatsCard from '@/components/events/EventStatsCard.vue'
+import type { ChapterSummaryData } from '@/composables/useProjectData'
 
 /**
  * ChapterInspector - Panel de detalles de capítulo para el inspector.
@@ -19,45 +18,10 @@ import EventStatsCard from '@/components/events/EventStatsCard.vue'
  * Muestra información del capítulo actualmente visible:
  * - Botón para volver al resumen del documento
  * - Título y número
- * - Resumen automático del capítulo (si disponible)
+ * - Resumen del capítulo (precargado desde el análisis)
  * - Personajes presentes con conteo de menciones
  * - Alertas del capítulo agrupadas por severidad
  */
-
-interface CharacterPresence {
-  entity_id: number
-  name: string
-  mention_count: number
-  is_first_appearance: boolean
-  is_return: boolean
-  chapters_absent: number
-}
-
-interface ChapterSummaryData {
-  chapter_number: number
-  chapter_title: string | null
-  word_count: number
-  characters_present: CharacterPresence[]
-  new_characters: string[]
-  returning_characters: string[]
-  key_events: Array<{
-    event_type: string
-    description: string
-    characters_involved: string[]
-  }>
-  llm_events: Array<{
-    event_type: string
-    description: string
-    characters_involved: string[]
-  }>
-  total_interactions: number
-  conflict_interactions: number
-  positive_interactions: number
-  dominant_tone: string
-  locations_mentioned: string[]
-  auto_summary: string
-  llm_summary: string | null
-}
 
 const props = defineProps<{
   /** Capítulo a mostrar */
@@ -68,6 +32,8 @@ const props = defineProps<{
   entities?: Entity[]
   /** Alertas del proyecto (para filtrar las del capítulo) */
   alerts?: Alert[]
+  /** Resúmenes precargados (Map<chapter_number, data>) */
+  summaries?: Map<number, ChapterSummaryData>
 }>()
 
 const emit = defineEmits<{
@@ -85,15 +51,13 @@ const emit = defineEmits<{
   (e: 'navigate-to-chapter', chapterNumber: number): void
 }>()
 
-// Chapter summary data
-const summaryLoading = ref(false)
-const summaryError = ref<string | null>(null)
-const chapterSummary = ref<ChapterSummaryData | null>(null)
+// Chapter summary: derived from preloaded prop (instant, no API call)
+const chapterSummary = computed<ChapterSummaryData | null>(() => {
+  if (!props.chapter || !props.summaries) return null
+  return props.summaries.get(props.chapter.chapterNumber) ?? null
+})
 
-// Cache for chapter summaries
-const summaryCache = ref<Map<number, ChapterSummaryData>>(new Map())
-
-// Events data
+// Events data (still lazy-loaded — separate endpoint)
 const eventsLoading = ref(false)
 const eventsError = ref<string | null>(null)
 const chapterEvents = ref<ChapterEventsResponse | null>(null)
@@ -102,43 +66,6 @@ const eventsCache = ref<Map<number, ChapterEventsResponse>>(new Map())
 // Export/Stats UI state
 const showExportDialog = ref(false)
 const showStats = ref(false)
-
-// Load chapter summary when chapter changes
-async function loadChapterSummary(force = false) {
-  if (!props.chapter) return
-
-  // Check cache first
-  if (!force) {
-    const cached = summaryCache.value.get(props.chapter.chapterNumber)
-    if (cached) {
-      chapterSummary.value = cached
-      return
-    }
-  }
-
-  summaryLoading.value = true
-  summaryError.value = null
-
-  try {
-    const data = await api.getRaw<any>(
-      `/api/projects/${props.projectId}/chapter-progress?mode=basic`
-    )
-
-    if (data.success && data.data.chapters) {
-      // Cache all chapters
-      for (const ch of data.data.chapters) {
-        summaryCache.value.set(ch.chapter_number, ch)
-      }
-      // Get the summary for this chapter
-      chapterSummary.value = summaryCache.value.get(props.chapter.chapterNumber) || null
-    }
-  } catch (err) {
-    console.error('Error loading chapter summary:', err)
-    summaryError.value = 'Error al cargar el resumen'
-  } finally {
-    summaryLoading.value = false
-  }
-}
 
 // Load chapter events
 async function loadChapterEvents() {
@@ -166,38 +93,23 @@ async function loadChapterEvents() {
   }
 }
 
-// Watch for chapter changes
+// Watch for chapter changes — only events need loading
 watch(
   () => props.chapter?.id,
   () => {
     if (props.chapter) {
-      loadChapterSummary()
       loadChapterEvents()
     }
   },
   { immediate: true }
 )
 
-// Refresh chapter summaries when the entity list changes (merge/reject/rename).
-watch(
-  () => props.entities,
-  () => {
-    summaryCache.value.clear()
-    if (props.chapter) {
-      loadChapterSummary(true)
-    }
-  }
-)
-
 watch(
   () => props.projectId,
   () => {
-    summaryCache.value.clear()
     eventsCache.value.clear()
-    chapterSummary.value = null
     chapterEvents.value = null
     if (props.chapter) {
-      loadChapterSummary(true)
       loadChapterEvents()
     }
   }
@@ -431,14 +343,8 @@ function navigateToChapter(chapterNumber: number) {
         />
       </div>
 
-      <!-- Loading state -->
-      <div v-if="summaryLoading" class="loading-section">
-        <ProgressSpinner class="summary-spinner" />
-        <span>Cargando resumen...</span>
-      </div>
-
-      <!-- Summary section -->
-      <div v-else-if="displaySummary" class="summary-section">
+      <!-- Summary section (precargado desde análisis) -->
+      <div v-if="displaySummary" class="summary-section">
         <p class="summary-text">{{ displaySummary }}</p>
       </div>
 
@@ -605,7 +511,7 @@ function navigateToChapter(chapterNumber: number) {
       </Accordion>
 
       <!-- Sin alertas badge -->
-      <div v-if="!hasAlerts && !summaryLoading" class="no-alerts-badge">
+      <div v-if="!hasAlerts" class="no-alerts-badge">
         <i class="pi pi-check-circle"></i>
         <span>Sin alertas</span>
       </div>
@@ -722,22 +628,8 @@ function navigateToChapter(chapterNumber: number) {
   flex: 1;
 }
 
-.summary-spinner {
-  width: var(--ds-space-6);
-  height: var(--ds-space-6);
-}
-
 .tone-tag {
   flex-shrink: 0;
-}
-
-.loading-section {
-  display: flex;
-  align-items: center;
-  gap: var(--ds-space-2);
-  padding: var(--ds-space-3);
-  color: var(--text-color-secondary);
-  font-size: var(--ds-font-sm);
 }
 
 .summary-section {

@@ -81,8 +81,8 @@ const metrics = computed<MetricRow[]>(() => [
   {
     label: 'Salud narrativa',
     icon: 'pi pi-heart',
-    oldValue: (props.older.healthScore ?? 0) * 100,
-    newValue: (props.newer.healthScore ?? 0) * 100,
+    oldValue: props.older.healthScore ?? 0,
+    newValue: props.newer.healthScore ?? 0,
     format: (v) => v.toFixed(0) + '%',
   },
   {

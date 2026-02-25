@@ -753,22 +753,34 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                     ctx["_consistency_alerts_emitted"] = True
                     run_alerts(ctx, tracker)
 
-                    _mark_skipped_phase(
-                        "relationships",
-                        9,
-                        "Relaciones reutilizadas (documento sin cambios).",
-                    )
-                    _mark_skipped_phase("voice", 10, "Voz reutilizada (documento sin cambios).")
-                    _mark_skipped_phase(
-                        "prose",
-                        11,
-                        "Prosa reutilizada (documento sin cambios).",
-                    )
-                    _mark_skipped_phase(
-                        "health",
-                        12,
-                        "Salud narrativa reutilizada (documento sin cambios).",
-                    )
+                    # Check if any enrichment phases need recomputation
+                    # due to schema_version bumps (code logic changed).
+                    from routers._enrichment_cache import get_stale_enrichment_phases
+
+                    stale_phases = get_stale_enrichment_phases(db_session, project_id)
+
+                    if stale_phases:
+                        logger.info(
+                            f"[FAST_PATH] Project {project_id}: schema version outdated for "
+                            f"phases: {stale_phases}. Running selective enrichment."
+                        )
+
+                    _enrichment_phase_map = {
+                        "relationships": (9, "Relaciones", run_relationships_enrichment),
+                        "voice": (10, "Voz", run_voice_enrichment),
+                        "prose": (11, "Prosa", run_prose_enrichment),
+                        "health": (12, "Salud narrativa", run_health_enrichment),
+                    }
+
+                    for phase_name, (idx, label, runner) in _enrichment_phase_map.items():
+                        if phase_name in stale_phases:
+                            runner(ctx, tracker)
+                        else:
+                            _mark_skipped_phase(
+                                phase_name,
+                                idx,
+                                f"{label} reutilizada (documento sin cambios).",
+                            )
 
                     run_reconciliation(ctx, tracker)
                     run_completion(ctx, tracker)

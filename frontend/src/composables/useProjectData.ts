@@ -1,8 +1,8 @@
 /**
- * Composable: project data loading (entities, alerts, chapters, relationships).
+ * Composable: project data loading (entities, alerts, chapters, relationships, summaries).
  *
  * Extracted from ProjectDetailView — provides reactive refs and async loaders
- * for the four main data collections of a project.
+ * for the main data collections of a project.
  */
 
 import { ref, computed } from 'vue'
@@ -10,11 +10,39 @@ import { api } from '@/services/apiClient'
 import { transformEntities, transformAlerts, transformChapters } from '@/types/transformers'
 import type { Entity, Alert, Chapter } from '@/types'
 
+/** Summary data per chapter — matches backend ChapterSummary.to_dict() */
+export interface ChapterSummaryData {
+  chapter_number: number
+  chapter_title: string | null
+  word_count: number
+  characters_present: Array<{
+    entity_id: number
+    name: string
+    mention_count: number
+    is_first_appearance: boolean
+    is_return: boolean
+    chapters_absent: number
+  }>
+  new_characters: string[]
+  returning_characters: string[]
+  key_events: Array<{ event_type: string; description: string; characters_involved: string[] }>
+  llm_events: Array<{ event_type: string; description: string; characters_involved: string[] }>
+  total_interactions: number
+  conflict_interactions: number
+  positive_interactions: number
+  dominant_tone: string
+  locations_mentioned: string[]
+  auto_summary: string
+  llm_summary: string | null
+}
+
 export function useProjectData() {
   const entities = ref<Entity[]>([])
   const alerts = ref<Alert[]>([])
   const chapters = ref<Chapter[]>([])
   const relationships = ref<any>(null)
+  const chapterSummaries = ref<Map<number, ChapterSummaryData>>(new Map())
+  const globalSummary = ref<string | null>(null)
 
   // Estados de carga y cache
   const loadingChapters = ref(false)
@@ -25,6 +53,8 @@ export function useProjectData() {
   const alertsLoaded = ref(false)
   const loadingRelationships = ref(false)
   const relationshipsLoaded = ref(false)
+  const summariesLoaded = ref(false)
+  const loadingSummaries = ref(false)
   const lastLoadedProjectId = ref<number | null>(null)
 
   const entitiesCount = computed(() => entities.value.length)
@@ -174,11 +204,49 @@ export function useProjectData() {
     }
   }
 
+  async function loadChapterSummaries(projectId: number, forceReload = false) {
+    if (!forceReload && summariesLoaded.value && lastLoadedProjectId.value === projectId && chapterSummaries.value.size > 0) {
+      return
+    }
+    if (loadingSummaries.value) {
+      while (loadingSummaries.value) {
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
+      return
+    }
+
+    loadingSummaries.value = true
+    try {
+      const data = await api.getRaw<{ success: boolean; data?: { chapters?: ChapterSummaryData[]; global_summary?: string } }>(
+        `/api/projects/${projectId}/chapter-progress?mode=basic`
+      )
+      if (data.success && data.data) {
+        if (data.data.chapters) {
+          const map = new Map<number, ChapterSummaryData>()
+          for (const ch of data.data.chapters) {
+            map.set(ch.chapter_number, ch)
+          }
+          chapterSummaries.value = map
+        }
+        globalSummary.value = data.data.global_summary ?? null
+        summariesLoaded.value = true
+        lastLoadedProjectId.value = projectId
+      }
+    } catch (err) {
+      console.error('Error loading chapter summaries:', err)
+      summariesLoaded.value = false
+    } finally {
+      loadingSummaries.value = false
+    }
+  }
+
   return {
     entities,
     alerts,
     chapters,
     relationships,
+    chapterSummaries,
+    globalSummary,
     entitiesCount,
     alertsCount,
     loadingChapters,
@@ -189,9 +257,11 @@ export function useProjectData() {
     alertsLoaded,
     loadingRelationships,
     relationshipsLoaded,
+    summariesLoaded,
     loadEntities,
     loadAlerts,
     loadChapters,
     loadRelationships,
+    loadChapterSummaries,
   }
 }

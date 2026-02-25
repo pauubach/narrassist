@@ -142,7 +142,7 @@ describe('workspaceStore', () => {
     it('should return all sidebar tabs for text tab', () => {
       const store = useWorkspaceStore()
       store.setActiveTab('text', false)
-      expect(store.availableSidebarTabs).toEqual(['chapters', 'alerts', 'characters', 'search', 'assistant', 'history'])
+      expect(store.availableSidebarTabs).toEqual(['chapters', 'alerts', 'characters', 'assistant', 'history'])
     })
 
     it('should return empty array for entities tab', () => {

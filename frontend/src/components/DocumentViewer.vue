@@ -473,7 +473,10 @@ type ComponentPublicInstance = { $el: Element }
 
 // Computed
 const totalWords = computed(() => {
-  return chapters.value.reduce((sum, ch) => sum + ch.wordCount, 0)
+  return chapters.value.reduce((sum, ch) => {
+    const titleWords = ch.title ? ch.title.trim().split(/\s+/).length : 0
+    return sum + ch.wordCount + titleWords
+  }, 0)
 })
 
 // Cargar documento

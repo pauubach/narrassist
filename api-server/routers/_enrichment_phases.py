@@ -39,9 +39,12 @@ def _cache_result(
 
     Returns True if result was written, False if early cutoff (output unchanged).
     """
+    from routers._enrichment_cache import get_schema_version
+
     try:
         result_json = json.dumps(result, ensure_ascii=False, default=str, sort_keys=True)
         output_hash = hashlib.sha256(result_json.encode()).hexdigest()[:16]
+        current_schema = get_schema_version(enrichment_type)
 
         with db_session.connection() as conn:
             # Early cutoff: si el output_hash no cambió, solo marcar completed
@@ -51,13 +54,17 @@ def _cache_result(
                 params.append(entity_scope)
 
             existing = conn.execute(
-                f"""SELECT output_hash, status FROM enrichment_cache
+                f"""SELECT output_hash, status, schema_version FROM enrichment_cache
                     WHERE project_id = ? AND enrichment_type = ? AND {scope_filter}
                     LIMIT 1""",
                 params,
             ).fetchone()
 
-            if existing and existing[0] == output_hash and existing[1] in ("completed", "stale"):
+            # Schema version changed → force update even if output_hash matches
+            cached_schema = existing[2] if existing and len(existing) > 2 and existing[2] is not None else 0
+            schema_outdated = cached_schema < current_schema
+
+            if existing and existing[0] == output_hash and not schema_outdated and existing[1] in ("completed", "stale"):
                 # Output no cambió — solo actualizar status y timestamp
                 update_params = [project_id, enrichment_type]
                 if entity_scope is not None:
@@ -76,10 +83,10 @@ def _cache_result(
                 """INSERT OR REPLACE INTO enrichment_cache
                    (project_id, enrichment_type, entity_scope, status,
                     output_hash, result_json, phase, revision,
-                    computed_at, updated_at)
+                    schema_version, computed_at, updated_at)
                    VALUES (?, ?, ?, 'completed', ?, ?, ?, 0,
-                           datetime('now'), datetime('now'))""",
-                (project_id, enrichment_type, entity_scope, output_hash, result_json, phase),
+                           ?, datetime('now'), datetime('now'))""",
+                (project_id, enrichment_type, entity_scope, output_hash, result_json, phase, current_schema),
             )
             conn.commit()
             return True
@@ -223,7 +230,13 @@ def _build_default_input_payload(
     enrichment_type: str,
     phase: int,
 ) -> dict[str, Any]:
-    """Payload base para input_hash, estable entre ejecuciones equivalentes."""
+    """Payload base para input_hash, estable entre ejecuciones equivalentes.
+
+    Incluye schema_version para que un bump de versión invalide el hash
+    y fuerce recomputación incluso si los datos de entrada no cambiaron.
+    """
+    from routers._enrichment_cache import get_schema_version
+
     chapter_signature, chapter_count = _build_chapter_signature(db_session, project_id)
     entity_signature, entity_count = _build_entity_signature(db_session, project_id)
     mentions_signature = _build_mentions_signature(db_session, project_id)
@@ -245,6 +258,7 @@ def _build_default_input_payload(
     return {
         "enrichment_type": enrichment_type,
         "phase": phase,
+        "schema_version": get_schema_version(enrichment_type),
         "chapter_count": chapter_count,
         "chapter_signature": chapter_signature,
         "entity_count": entity_count,
@@ -1421,10 +1435,10 @@ def run_health_enrichment(ctx: dict, tracker) -> None:
         total_steps = 3
         step = 0
 
-        # --- 13a: Chapter Progress (basic mode — no LLM) ---
+        # --- 13a: Chapter Progress (standard mode — LLM per chapter) ---
         step += 1
         tracker.update_progress(
-            phase_key, step / total_steps, "Analizando progreso por capítulo..."
+            phase_key, step / total_steps, "Analizando progreso por capítulo (LLM)..."
         )
         progress_data = None
 
@@ -1432,7 +1446,7 @@ def run_health_enrichment(ctx: dict, tracker) -> None:
             nonlocal progress_data
             from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
 
-            result = analyze_chapter_progress(project_id, mode="basic")
+            result = analyze_chapter_progress(project_id, mode="standard", llm_model="qwen2.5")
             if hasattr(result, "is_failure") and result.is_failure:
                 raise RuntimeError(f"Chapter progress failed: {result.error}")
             data = result.value if hasattr(result, "value") else result
