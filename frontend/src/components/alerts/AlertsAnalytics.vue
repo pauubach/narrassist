@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { Alert, AlertCategory } from '@/types'
 import { META_CATEGORIES, type MetaCategoryKey } from '@/composables/useAlertUtils'
+import DsBarChart, { type BarChartItem } from '@/components/ds/DsBarChart.vue'
 
 /**
  * AlertsAnalytics - Componente de analytics para el Tab de Alertas
@@ -134,6 +135,23 @@ const chapterDistribution = computed((): ChapterStat[] => {
 
 const hasChapterData = computed(() => chapterDistribution.value.length > 0)
 
+/** Transforma chapterDistribution a formato BarChartItem */
+const chapterBarItems = computed((): BarChartItem[] => {
+  const maxCount = Math.max(...chapterDistribution.value.map(s => s.count), 1)
+
+  return chapterDistribution.value.map(stat => ({
+    label: formatChapterShort(stat.chapter),
+    value: stat.count,
+    max: maxCount,
+    segments: stat.segments.map(seg => ({
+      value: seg.count,
+      color: seg.color,
+      label: META_CATEGORIES[seg.metaCategory].label
+    })),
+    tooltip: `${formatChapterFull(stat.chapter)}: ${stat.count} alertas`
+  }))
+})
+
 // ============================================================================
 // Distribución por categoría
 // ============================================================================
@@ -167,6 +185,19 @@ const categoryDistribution = computed((): CategoryStat[] => {
 })
 
 const hasCategoryData = computed(() => categoryDistribution.value.length > 0)
+
+/** Transforma categoryDistribution a formato BarChartItem */
+const categoryBarItems = computed((): BarChartItem[] => {
+  const maxPercentage = 100 // Porcentajes siempre van 0-100
+
+  return categoryDistribution.value.map(stat => ({
+    label: getCategoryLabel(stat.category),
+    value: stat.count,
+    max: maxPercentage,
+    color: getCategoryColor(stat.category),
+    tooltip: `${getCategoryLabel(stat.category)}: ${stat.count} (${stat.percentage.toFixed(1)}%)`
+  }))
+})
 
 // ============================================================================
 // Helpers
@@ -218,36 +249,7 @@ function getCategoryLabel(category: string): string {
         </div>
       </div>
 
-      <div class="chapter-chart">
-        <div
-          v-for="stat in chapterDistribution"
-          :key="stat.chapter"
-          class="chart-bar-wrapper"
-        >
-          <span class="bar-label" :title="formatChapterFull(stat.chapter)">
-            {{ formatChapterShort(stat.chapter) }}
-          </span>
-          <div class="bar-track">
-            <div
-              class="bar-fill-container"
-              :style="{ width: `${Math.max(stat.percentage, 3)}%` }"
-            >
-              <!-- Segmentos por meta-categoría -->
-              <div
-                v-for="segment in stat.segments"
-                :key="segment.metaCategory"
-                class="bar-segment"
-                :style="{
-                  width: `${segment.percentage}%`,
-                  backgroundColor: segment.color
-                }"
-                :title="`${META_CATEGORIES[segment.metaCategory].label}: ${segment.count}`"
-              ></div>
-            </div>
-          </div>
-          <span class="bar-count">{{ stat.count }}</span>
-        </div>
-      </div>
+      <DsBarChart :items="chapterBarItems" size="prominent" />
     </div>
 
     <!-- Top categorías -->
@@ -256,27 +258,7 @@ function getCategoryLabel(category: string): string {
         <span class="section-title">Top categorías</span>
       </div>
 
-      <div class="category-chart">
-        <div
-          v-for="stat in categoryDistribution"
-          :key="stat.category"
-          class="chart-bar-wrapper"
-        >
-          <span class="bar-label" :title="getCategoryLabel(stat.category)">
-            {{ getCategoryLabel(stat.category) }}
-          </span>
-          <div class="bar-track">
-            <div
-              class="bar-fill-container"
-              :style="{
-                width: `${Math.max(stat.percentage, 3)}%`,
-                backgroundColor: getCategoryColor(stat.category)
-              }"
-            ></div>
-          </div>
-          <span class="bar-count">{{ stat.count }}</span>
-        </div>
-      </div>
+      <DsBarChart :items="categoryBarItems" size="normal" />
     </div>
 
     <!-- Empty state -->
@@ -344,81 +326,6 @@ function getCategoryLabel(category: string): string {
   color: var(--text-color-secondary);
 }
 
-/* Gráficos de barras - Estilos compartidos */
-.chapter-chart,
-.category-chart {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-}
-
-.chart-bar-wrapper {
-  display: grid;
-  grid-template-columns: 120px 1fr 40px; /* Columnas fijas para alineación consistente */
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0; /* Permite que grid respete restricciones */
-}
-
-.bar-label {
-  font-size: 0.75rem;
-  color: var(--text-color-secondary);
-  text-align: left; /* Alineación a la izquierda para consistencia */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  line-height: 1.3;
-  cursor: default; /* Mostrar que tiene tooltip */
-}
-
-.bar-track {
-  height: 14px; /* Altura unificada para todas las barras */
-  background: var(--surface-100);
-  border-radius: var(--border-radius);
-  overflow: hidden;
-  position: relative;
-}
-
-/* Contenedor de la barra completa */
-.bar-fill-container {
-  height: 100%;
-  display: flex;
-  flex-direction: row;
-  border-radius: inherit;
-  transition: width 0.3s ease;
-  min-width: 3px;
-  overflow: hidden;
-}
-
-.bar-fill-container:hover {
-  filter: brightness(1.1);
-}
-
-/* Segmentos individuales por categoría (para barras segmentadas) */
-.bar-segment {
-  height: 100%;
-  transition: width 0.3s ease, background-color 0.3s ease;
-  cursor: help; /* Indica que tiene tooltip */
-  position: relative;
-}
-
-.bar-segment:hover {
-  filter: brightness(1.15);
-}
-
-/* Separadores entre segmentos */
-.bar-segment + .bar-segment {
-  border-left: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.bar-count {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-color);
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
 /* Leyenda de colores */
 .color-legend {
   display: flex;
@@ -479,13 +386,5 @@ function getCategoryLabel(category: string): string {
 /* Dark mode */
 .dark .alerts-analytics {
   background: var(--surface-800);
-}
-
-.dark .bar-track {
-  background: var(--surface-700);
-}
-
-.dark .bar-segment + .bar-segment {
-  border-left: 1px solid rgba(0, 0, 0, 0.3); /* Separadores más oscuros en dark mode */
 }
 </style>
