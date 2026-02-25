@@ -72,7 +72,7 @@ const confidenceColor = computed(() => {
   if (confidence >= 0.8) {
     return 'var(--ds-color-success, #22c55e)' // Verde (alta confianza)
   } else if (confidence >= 0.5) {
-    return 'var(--ds-color-warning, #f59e0b)' // Amarillo (media confianza)
+    return 'var(--ds-color-warning, #facc15)' // Amarillo vibrante (media confianza)
   } else {
     return 'var(--ds-color-danger, #ef4444)' // Rojo (baja confianza)
   }

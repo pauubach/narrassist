@@ -253,7 +253,7 @@
               ref="entitiesTabRef"
               :entities="entities"
               :project-id="project.id"
-              :loading="loading"
+              :loading="loadingEntities"
               :initial-entity-id="initialEntityId"
               :chapter-count="chapters.length"
               @entity-select="onEntitySelect"
@@ -274,6 +274,7 @@
               :project-id="project.id"
               :entities="entities"
               :relationships="relationships"
+              :loading="loadingRelations"
               @entity-select="onEntitySelect"
               @refresh="loadRelationships(project.id)"
             />
@@ -290,7 +291,7 @@
               :alerts="alerts"
               :chapters="chapters"
               :entities="entities"
-              :loading="loading"
+              :loading="loadingAlerts"
               :analysis-executed="project.analysisStatus === 'completed'"
               @alert-select="onAlertSelect"
               @alert-navigate="onAlertNavigate"
@@ -651,6 +652,9 @@ const tabStatuses = computed(() => {
   const tabs: WorkspaceTab[] = ['text', 'entities', 'relationships', 'alerts', 'timeline', 'style', 'glossary', 'summary']
   return analysisStore.getBatchTabStatuses(pid, tabs)
 })
+
+// Loading combinado para RelationsTab (necesita entities + relationships)
+const loadingRelations = computed(() => loadingEntities.value || loadingRelationships.value)
 
 // ── Local UI state ─────────────────────────────────────────
 const loading = ref(true) // Loading inicial del proyecto
