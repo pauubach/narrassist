@@ -620,6 +620,7 @@ const { undoableCount } = useGlobalUndo(() => project.value?.id ?? null)
 const project = computed(() => projectsStore.currentProject)
 
 const { entities, alerts, chapters, relationships, chapterSummaries, globalSummary, entitiesCount, alertsCount,
+        loadingEntities, loadingAlerts, loadingRelationships, loadingSummaries,
         loadEntities, loadAlerts, loadChapters, loadRelationships, loadChapterSummaries } = useProjectData()
 
 // Wrapper para loadChapters que coincide con la firma esperada por useAnalysisPolling
@@ -652,7 +653,7 @@ const tabStatuses = computed(() => {
 })
 
 // ── Local UI state ─────────────────────────────────────────
-const loading = ref(true)
+const loading = ref(true) // Loading inicial del proyecto
 const error = ref('')
 const showExportDialog = ref(false)
 const replaceDocumentInputRef = ref<HTMLInputElement | null>(null)
@@ -660,6 +661,9 @@ const showReanalyzeDialog = ref(false)
 const correctionConfigModalRef = ref<InstanceType<typeof CorrectionConfigModal> | null>(null)
 const reanalyzing = ref(false)
 const exportingStyleGuide = ref(false)
+
+// Estados de carga individuales vienen de useProjectData()
+// loadingEntities, loadingAlerts, loadingRelationships, loadingSummaries
 
 // Refs to tab components (for Ctrl+F routing)
 const textTabRef = ref<InstanceType<typeof TextTab> | null>(null)
@@ -1000,16 +1004,58 @@ onMounted(async () => {
       initialEntityId.value = parseInt(entityParam)
     }
 
-    await projectsStore.fetchProject(projectId)
-    // Cargar datos en paralelo — ninguno depende de otro
+    // ═══════════════════════════════════════════════════════════
+    // FASE 1: Carga crítica - Datos necesarios para mostrar UI
+    // ═══════════════════════════════════════════════════════════
     await Promise.all([
+      projectsStore.fetchProject(projectId),
       analysisStore.loadExecutedPhases(projectId),
-      loadEntities(projectId),
-      loadAlerts(projectId),
       loadChapters(projectId, project.value ?? undefined),
-      loadRelationships(projectId),
-      loadChapterSummaries(projectId),
     ])
+
+    // Mostrar UI inmediatamente
+    loading.value = false
+
+    // ═══════════════════════════════════════════════════════════
+    // FASE 2: Carga prioritaria - Según tab activo
+    // ═══════════════════════════════════════════════════════════
+    const activeTab = workspaceStore.activeTab
+
+    if (activeTab === 'alerts') {
+      // Si está en Alertas, cargar alertas primero
+      await loadAlerts(projectId)
+      // Luego entidades y relaciones en segundo plano
+      Promise.all([
+        loadEntities(projectId),
+        loadRelationships(projectId),
+        loadChapterSummaries(projectId),
+      ])
+    } else if (activeTab === 'entities') {
+      // Si está en Entidades, cargar entidades primero
+      await loadEntities(projectId)
+      // Luego alertas y relaciones en segundo plano
+      Promise.all([
+        loadAlerts(projectId),
+        loadRelationships(projectId),
+        loadChapterSummaries(projectId),
+      ])
+    } else if (activeTab === 'relationships') {
+      // Si está en Relaciones, cargar entidades y relaciones primero
+      await Promise.all([loadEntities(projectId), loadRelationships(projectId)])
+      // Luego alertas y resúmenes en segundo plano
+      Promise.all([
+        loadAlerts(projectId),
+        loadChapterSummaries(projectId),
+      ])
+    } else {
+      // Para otras tabs (text, timeline, style, summary), cargar todo en paralelo
+      Promise.all([
+        loadEntities(projectId),
+        loadAlerts(projectId),
+        loadRelationships(projectId),
+        loadChapterSummaries(projectId),
+      ])
+    }
 
     // Check for alert query parameter (para navegación desde AlertsView)
     const alertParam = route.query.alert as string
