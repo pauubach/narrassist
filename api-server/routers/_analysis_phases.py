@@ -4856,6 +4856,7 @@ def run_completion(ctx: dict, tracker: ProgressTracker):
         storage = deps.analysis_progress_storage.get(project_id, {})
         storage["status"] = "completed"
         storage["current_phase"] = "Análisis completado"
+        storage["progress"] = 1.0  # Explicitly set to 100%
         storage["estimated_seconds_remaining"] = 0
         storage.setdefault("metrics", {})["total_duration_seconds"] = total_duration
         metrics = storage.get("metrics", {})
