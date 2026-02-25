@@ -474,9 +474,17 @@ try:
             "Accept-Language",
             "Authorization",
             "X-Requested-With",
+            "X-Response-Time",  # Para timing metrics
         ],
+        expose_headers=["X-Response-Time"],  # Permitir que frontend lea el header
     )
     _early_logger.info("CORS middleware added successfully")
+
+    # Add timing middleware
+    _early_logger.info("Adding timing middleware...")
+    from middleware.timing import TimingMiddleware
+    app.add_middleware(TimingMiddleware)
+    _early_logger.info("Timing middleware added successfully")
 
     # Middlewares de seguridad: Rate Limiting y CSRF Protection
     # Nota: los middlewares se ejecutan en orden inverso al de registro,

@@ -70,11 +70,11 @@ const confidencePercent = computed(() => Math.round(props.alert.confidence * 100
 const confidenceColor = computed(() => {
   const confidence = props.alert.confidence
   if (confidence >= 0.8) {
-    return 'var(--ds-color-success, #22c55e)' // Verde (alta confianza)
+    return '#22c55e' // Verde (alta confianza)
   } else if (confidence >= 0.5) {
-    return 'var(--ds-color-warning, #facc15)' // Amarillo vibrante (media confianza)
+    return '#facc15' // Amarillo vibrante (media confianza)
   } else {
-    return 'var(--ds-color-danger, #ef4444)' // Rojo (baja confianza)
+    return '#ef4444' // Rojo (baja confianza)
   }
 })
 
