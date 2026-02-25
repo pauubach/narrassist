@@ -102,9 +102,9 @@
   /* Warning */
   --ds-warning-50: #FEFCE8;
   --ds-warning-100: #FEF9C3;
-  --ds-warning-500: #EAB308;
-  --ds-warning-600: #A67304;
-  --ds-warning-700: #A16207;
+  --ds-warning-500: #FACC15;
+  --ds-warning-600: #FACC15;
+  --ds-warning-700: #EAB308;
 
   /* Error/Danger */
   --ds-error-50: #FEF2F2;

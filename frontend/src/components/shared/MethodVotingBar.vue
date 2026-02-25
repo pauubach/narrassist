@@ -13,31 +13,13 @@
       />
     </div>
 
-    <!-- Methods list -->
-    <div class="methods-list">
-      <div
-        v-for="method in sortedMethods"
-        :key="method.name"
-        :class="['method-item', { agreed: method.agreed, compact }]"
-      >
-        <div class="method-info">
-          <span class="method-name">{{ getMethodLabel(method.name) }}</span>
-          <span v-if="!compact" class="method-score">{{ formatScore(method.score) }}</span>
-        </div>
-        <div class="method-bar">
-          <div
-            class="method-fill"
-            :style="{ width: `${method.score * 100}%` }"
-            :class="{ agreed: method.agreed }"
-          ></div>
-        </div>
-        <i
-          v-if="method.agreed"
-          v-tooltip.top="'Coincide con el consenso'"
-          class="pi pi-check agreed-icon"
-        ></i>
-      </div>
-    </div>
+    <!-- Barras usando DsBarChart -->
+    <DsBarChart
+      :items="barItems"
+      :size="compact ? 'compact' : 'normal'"
+      :label-width="compact ? 80 : 120"
+      :show-count="false"
+    />
 
     <!-- Compact summary -->
     <div v-if="compact" class="compact-summary">
@@ -49,6 +31,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import ConfidenceBadge from './ConfidenceBadge.vue'
+import DsBarChart, { type BarChartItem } from '@/components/ds/DsBarChart.vue'
 
 interface MethodVote {
   name: string
@@ -118,6 +101,24 @@ const sortedMethods = computed(() => {
     return b.score - a.score
   })
 })
+
+// Transform to BarChartItem format
+const barItems = computed((): BarChartItem[] => {
+  return sortedMethods.value.map(method => {
+    const label = getMethodLabel(method.name)
+    const displayLabel = method.agreed
+      ? `✓ ${label}`
+      : label
+
+    return {
+      label: displayLabel,
+      value: method.score,
+      max: 1, // Scores are 0-1
+      color: method.agreed ? 'var(--green-500)' : 'var(--surface-400)',
+      tooltip: `${label}: ${formatScore(method.score)}${method.agreed ? ' (consenso)' : ''}`
+    }
+  })
+})
 </script>
 
 <style scoped>
@@ -146,75 +147,6 @@ const sortedMethods = computed(() => {
 
 .voting-summary strong {
   color: var(--primary-color);
-}
-
-.methods-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.compact .methods-list {
-  flex-direction: row;
-  gap: 0.25rem;
-  flex: 1;
-}
-
-.method-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  background: var(--surface-50);
-  border-radius: var(--app-radius);
-  border-left: 3px solid var(--surface-300);
-  transition: border-color 0.2s;
-}
-
-.method-item.agreed {
-  border-left-color: var(--app-success-hover, var(--p-green-600, #16a34a)); /* WCAG AA */
-  background: var(--app-success-bg, var(--p-green-50, #f0fdf4));
-}
-
-.method-item.compact {
-  padding: 0.25rem 0.5rem;
-  border-left-width: 2px;
-}
-
-.method-info {
-  flex: 1;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  min-width: 0;
-}
-
-.compact .method-info {
-  display: none;
-}
-
-.method-name {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--text-color);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.method-score {
-  font-size: 0.75rem;
-  color: var(--text-color-secondary);
-  flex-shrink: 0;
-}
-
-.method-bar {
-  width: 80px;
-  height: 6px;
-  background: var(--surface-200);
-  border-radius: var(--app-radius-sm);
-  overflow: hidden;
-  flex-shrink: 0;
 }
 
 .compact .method-bar {
