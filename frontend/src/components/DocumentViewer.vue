@@ -699,57 +699,6 @@ const getHighlightedContent = (chapter: Chapter): string => {
   const titleOffset = getTitleOffset(chapter.content, chapter.title)
   let content = escapeHtml(contentWithoutTitle)
 
-  // Aplicar anotaciones de gramática/ortografía
-  if (showSpellingErrors.value || showGrammarErrors.value) {
-    const annotations = chapterAnnotations.value.get(chapter.chapterNumber) || []
-
-    // Filtrar por tipo según los toggles activos
-    const filteredAnnotations = annotations.filter(a => {
-      const type = (a.type || '').toLowerCase()
-      const isGrammarType = type === 'grammar' || type === 'agreement'
-      const isSpellingType = type === 'spelling' || type === 'orthography' || type === 'typography' || type === 'punctuation'
-
-      if (isGrammarType && !showGrammarErrors.value) return false
-      if (isSpellingType && !showSpellingErrors.value) return false
-      return true
-    })
-
-    // Ordenar de mayor a menor posición para no afectar índices
-    const sortedAnnotations = [...filteredAnnotations]
-      .filter(a => a.start_char !== undefined && a.end_char !== undefined)
-      .sort((a, b) => b.start_char - a.start_char)
-
-    sortedAnnotations.forEach(annotation => {
-      // Calcular posición ajustada (el HTML escaping puede cambiar longitudes)
-      // Por simplicidad, aplicamos sobre el contenido escapado
-      const type = (annotation.type || '').toLowerCase()
-      const annotationClass =
-        type === 'grammar' || type === 'agreement'
-          ? 'grammar-error'
-          : 'spelling-error'
-      const severityClass = `severity-${annotation.severity}`
-      const tooltip = annotation.suggestion
-        ? `${annotation.title}. Sugerencia: ${annotation.suggestion}`
-        : annotation.title
-
-      // Buscar el texto del excerpt en el contenido
-      if (annotation.excerpt) {
-        const excerptEscaped = escapeHtml(annotation.excerpt)
-        const excerptIndex = content.indexOf(excerptEscaped)
-        if (excerptIndex !== -1) {
-          const before = content.substring(0, excerptIndex)
-          const after = content.substring(excerptIndex + excerptEscaped.length)
-          content = before +
-            `<span class="annotation ${annotationClass} ${severityClass}" ` +
-            `data-annotation-id="${annotation.id}" title="${escapeHtml(tooltip)}">` +
-            excerptEscaped +
-            `</span>` +
-            after
-        }
-      }
-    })
-  }
-
   // Aplicar highlighting de diálogos si el panel está abierto
   if (showDialoguePanel.value && showDialogueHighlights.value) {
     const dialogues = chapterDialogues.value.get(chapter.chapterNumber) || []
