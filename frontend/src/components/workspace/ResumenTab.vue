@@ -5,6 +5,7 @@ import Button from 'primevue/button'
 // import DsBadge from '@/components/ds/DsBadge.vue'  // Reserved
 import VersionSparkline from '@/components/project/VersionSparkline.vue'
 import VersionHistory from '@/components/project/VersionHistory.vue'
+import DsBarChart, { type BarChartItem } from '@/components/ds/DsBarChart.vue'
 // EventDensityStrip removed from ResumenTab (redundant with alerts-per-chapter)
 import type { Project, Entity, Alert, Chapter } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
@@ -93,6 +94,18 @@ const entityDistribution = computed(() => {
     }))
 })
 
+// Transformar entityDistribution a formato BarChartItem
+const entityBarItems = computed((): BarChartItem[] => {
+  const maxCount = Math.max(...entityDistribution.value.map(e => e.count), 1)
+  return entityDistribution.value.map(item => ({
+    label: item.label,
+    value: item.count,
+    max: maxCount,
+    // No especificar color - usa automáticamente el color primario del tema
+    tooltip: `${item.label}: ${item.count} entidades`
+  }))
+})
+
 // Top personajes por menciones
 const topCharacters = computed(() => {
   return props.entities
@@ -165,13 +178,6 @@ const errorTrend = computed(() => {
   if (percentChange > 15) return { direction: 'worsening', percent: percentChange }
   return { direction: 'stable', percent: Math.abs(percentChange) }
 })
-
-// Colors for entity bars
-const entityColors = [
-  'var(--blue-500)', 'var(--teal-500)', 'var(--purple-500)',
-  'var(--cyan-500)', 'var(--indigo-500)', 'var(--pink-500)',
-  'var(--green-500)', 'var(--orange-500)',
-]
 
 // Severity colors for donut
 const severityColors: Record<string, string> = {
@@ -382,35 +388,14 @@ const originalDocumentName = computed(() => {
           </template>
         </Card>
 
-        <!-- Right: Entity distribution (horizontal bars with color) -->
+        <!-- Right: Entity distribution (horizontal bars with theme color) -->
         <Card class="chart-card entities-card">
           <template #title>
             <i class="pi pi-tags"></i>
             Entidades por Tipo
           </template>
           <template #content>
-            <div class="entity-bars">
-              <div
-                v-for="(item, index) in entityDistribution"
-                :key="item.type"
-                class="entity-bar-row"
-              >
-                <div class="entity-bar-label">
-                  <i :class="item.icon" :style="{ color: entityColors[index % entityColors.length] }"></i>
-                  <span>{{ item.label }}</span>
-                </div>
-                <div class="entity-bar-track">
-                  <div
-                    class="entity-bar-fill"
-                    :style="{
-                      width: (item.count / Math.max(entityDistribution[0]?.count || 1, 1)) * 100 + '%',
-                      background: entityColors[index % entityColors.length]
-                    }"
-                  ></div>
-                </div>
-                <span class="entity-bar-count">{{ item.count }}</span>
-              </div>
-            </div>
+            <DsBarChart :items="entityBarItems" size="normal" />
           </template>
         </Card>
       </div>
@@ -865,57 +850,6 @@ const originalDocumentName = computed(() => {
   color: var(--text-color);
 }
 
-/* ── Entity bars ── */
-.entity-bars {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.entity-bar-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.entity-bar-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 110px;
-  min-width: 110px;
-  font-size: 0.8125rem;
-  color: var(--text-color-secondary);
-}
-
-.entity-bar-label i {
-  font-size: 1rem;
-  flex-shrink: 0;
-}
-
-.entity-bar-track {
-  flex: 1;
-  height: 12px;
-  background: var(--surface-100);
-  border-radius: var(--app-radius);
-  overflow: hidden;
-}
-
-.entity-bar-fill {
-  height: 100%;
-  border-radius: var(--app-radius);
-  transition: width 0.4s ease;
-  min-width: 6px;
-}
-
-.entity-bar-count {
-  width: 30px;
-  text-align: right;
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: var(--text-color);
-}
-
 /* ── Density chart (alerts per chapter) ── */
 .density-card :deep(.p-card-title) {
   display: flex;
@@ -1193,7 +1127,6 @@ const originalDocumentName = computed(() => {
   border-color: var(--surface-600);
 }
 
-:deep(.dark) .entity-bar-track,
 :deep(.dark) .character-bar-track {
   background: var(--surface-700);
 }
