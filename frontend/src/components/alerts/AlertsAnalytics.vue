@@ -37,7 +37,7 @@ function formatChapterShort(chapterNum: number): string {
   const ch = props.chapters?.find(c => c.chapterNumber === chapterNum)
   if (ch?.title) {
     const full = `${chapterNum}. ${ch.title}`
-    return full.length > 20 ? full.slice(0, 18) + '…' : full
+    return full.length > 18 ? full.slice(0, 16) + '…' : full
   }
   return `Cap. ${chapterNum}`
 }
@@ -47,6 +47,12 @@ function formatChapterFull(chapterNum: number): string {
   const ch = props.chapters?.find(c => c.chapterNumber === chapterNum)
   if (ch?.title) return `${chapterNum}. ${ch.title}`
   return `Capítulo ${chapterNum}`
+}
+
+/** Obtiene el color de una categoría según su meta-categoría */
+function getCategoryColor(category: string): string {
+  const metaCat = getMetaCategory(category as AlertCategory)
+  return META_CATEGORIES[metaCat].color
 }
 
 // ============================================================================
@@ -250,20 +256,25 @@ function getCategoryLabel(category: string): string {
         <span class="section-title">Top categorías</span>
       </div>
 
-      <div class="category-table">
+      <div class="category-chart">
         <div
           v-for="stat in categoryDistribution"
           :key="stat.category"
-          class="category-row"
+          class="chart-bar-wrapper"
         >
-          <span class="category-name">{{ getCategoryLabel(stat.category) }}</span>
-          <div class="category-bar-container">
+          <span class="bar-label" :title="getCategoryLabel(stat.category)">
+            {{ getCategoryLabel(stat.category) }}
+          </span>
+          <div class="bar-track">
             <div
-              class="category-bar-fill"
-              :style="{ width: `${stat.percentage}%` }"
+              class="bar-fill-container"
+              :style="{
+                width: `${Math.max(stat.percentage, 3)}%`,
+                backgroundColor: getCategoryColor(stat.category)
+              }"
             ></div>
           </div>
-          <span class="category-count">{{ stat.count }}</span>
+          <span class="bar-count">{{ stat.count }}</span>
         </div>
       </div>
     </div>
@@ -333,8 +344,9 @@ function getCategoryLabel(category: string): string {
   color: var(--text-color-secondary);
 }
 
-/* Chapter Chart */
-.chapter-chart {
+/* Gráficos de barras - Estilos compartidos */
+.chapter-chart,
+.category-chart {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
@@ -360,7 +372,7 @@ function getCategoryLabel(category: string): string {
 }
 
 .bar-track {
-  height: 18px;
+  height: 14px; /* Altura unificada para todas las barras */
   background: var(--surface-100);
   border-radius: var(--border-radius);
   overflow: hidden;
@@ -378,7 +390,11 @@ function getCategoryLabel(category: string): string {
   overflow: hidden;
 }
 
-/* Segmentos individuales por categoría */
+.bar-fill-container:hover {
+  filter: brightness(1.1);
+}
+
+/* Segmentos individuales por categoría (para barras segmentadas) */
 .bar-segment {
   height: 100%;
   transition: width 0.3s ease, background-color 0.3s ease;
@@ -430,45 +446,6 @@ function getCategoryLabel(category: string): string {
   white-space: nowrap;
 }
 
-/* Category Table */
-.category-table {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ds-space-2);
-}
-
-.category-row {
-  display: grid;
-  grid-template-columns: 150px 1fr 50px;
-  align-items: center;
-  gap: var(--ds-space-2);
-}
-
-.category-name {
-  font-size: 0.85rem;
-  color: var(--text-color);
-}
-
-.category-bar-container {
-  height: 8px;
-  background: var(--surface-100);
-  border-radius: var(--border-radius-xl);
-  overflow: hidden;
-}
-
-.category-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--blue-500), var(--blue-600));
-  transition: width 0.3s ease;
-}
-
-.category-count {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-color);
-  text-align: right;
-}
-
 /* Empty State */
 .analytics-empty {
   display: flex;
@@ -510,9 +487,5 @@ function getCategoryLabel(category: string): string {
 
 .dark .bar-segment + .bar-segment {
   border-left: 1px solid rgba(0, 0, 0, 0.3); /* Separadores más oscuros en dark mode */
-}
-
-.dark .category-bar-container {
-  background: var(--surface-700);
 }
 </style>
