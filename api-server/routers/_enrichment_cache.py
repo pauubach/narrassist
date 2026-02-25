@@ -52,7 +52,7 @@ ENRICHMENT_SCHEMA_VERSIONS: dict[str, int] = {
     "narrative_structure": 1,
     "duplicate_content": 1,
     # Phase 13 — Health
-    "chapter_progress": 8,  # v8: improved global_summary prompt (narrative style)
+    "chapter_progress": 9,  # v9: shortened global_summary (2-3 frases en vez de 4-6)
     "narrative_templates": 1,
     "narrative_health": 1,
 }

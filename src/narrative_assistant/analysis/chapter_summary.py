@@ -514,7 +514,7 @@ Responde SOLO con JSON:
 
 
 # Prompt para resumen global del manuscrito
-GLOBAL_SUMMARY_PROMPT = """Eres un editor literario profesional. Escribe una sinopsis narrativa del manuscrito en UN PÁRRAFO de 4-6 frases.
+GLOBAL_SUMMARY_PROMPT = """Eres un editor literario profesional. Escribe una sinopsis narrativa del manuscrito en UN PÁRRAFO de 2-3 frases.
 
 TIPO: {genre_label}
 PERSONAJES: {characters}
@@ -525,12 +525,12 @@ CAPÍTULOS:
 REQUISITOS ESTILÍSTICOS:
 - Usa lenguaje narrativo y fluido (evita sustantivos abstractos sin artículo: "la misteriosa desaparición" en vez de "Desaparecimiento")
 - Escribe en presente narrativo para mayor inmediatez
-- Incluye: premisa, protagonistas, conflicto central, desarrollo y tensión actual
+- Sé CONCISO: enfócate en premisa y conflicto central, omite detalles secundarios
 - Captura el tono del género ({genre_label})
 - Sé específico con nombres propios, NO uses "el protagonista" o "la detective"
 
-EJEMPLO DE BUENA SINOPSIS:
-"Elena Montero llega a la mansión Aldebarán para investigar la misteriosa desaparición de Isabel, la hija de los propietarios. Desde el primer momento, nota comportamientos extraños en el servicio, especialmente en Don Ramiro, el mayordomo. A medida que explora la mansión y sus alrededores, descubre pistas inquietantes que apuntan a secretos familiares enterrados hace décadas. La tensión aumenta cuando Elena se da cuenta de que alguien en la casa no quiere que descubra la verdad."
+EJEMPLO DE BUENA SINOPSIS (2-3 frases):
+"Elena Montero llega a la mansión Aldebarán para investigar la misteriosa desaparición de Isabel. Desde el primer momento, nota comportamientos extraños en el servicio y descubre pistas inquietantes que apuntan a secretos familiares enterrados hace décadas. La tensión aumenta cuando se da cuenta de que alguien no quiere que descubra la verdad."
 
 Responde SOLO con este JSON (el valor DEBE ser un string de texto narrativo, NO un objeto estructurado):
 {{"global_summary": "[tu sinopsis narrativa aquí]"}}"""
