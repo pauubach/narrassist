@@ -675,6 +675,10 @@ const getHighlightedContent = (chapter: Chapter): string => {
   const annotations = chapterAnnotations.value.get(chapter.chapterNumber) || []
   const dialogues = chapterDialogues.value.get(chapter.chapterNumber) || []
 
+  // Rangos de alerta activos para este capítulo
+  const chapterAlertRanges = (props.alertHighlightRanges || [])
+    .filter(r => r.chapterId === chapter.id)
+
   const currentDeps = {
     chapterId: chapter.id,
     showSpelling: showSpellingErrors.value,
@@ -686,6 +690,9 @@ const getHighlightedContent = (chapter: Chapter): string => {
     dialoguesCount: dialogues.length,
     dialoguesKey: dialogues
       .map(d => `${d.startChar}:${d.endChar}:${d.confidence}:${d.method}:${d.text?.length ?? 0}`)
+      .join('|'),
+    alertRangesKey: chapterAlertRanges
+      .map(r => `${r.startChar}:${r.endChar}:${r.color}:${r.text?.length ?? 0}`)
       .join('|')
   }
 
@@ -851,6 +858,27 @@ const getHighlightedContent = (chapter: Chapter): string => {
       content = replaceOutsideHtmlTags(content, annotationRegex, (match) => {
         return `<span class="annotation ${annotationClass} ${severityClass}" ` +
           `data-annotation-id="${annotation.id}" title="${escapeHtml(tooltip)}">${match}</span>`
+      })
+    }
+  }
+
+  // Aplicar highlights de alertas multi-source (ej: "ojos verdes" vs "ojos azules")
+  if (chapterAlertRanges.length > 0) {
+    for (const range of chapterAlertRanges) {
+      if (!range.text) continue
+
+      const searchText = escapeHtml(range.text)
+      const searchRegex = new RegExp(escapeRegex(searchText), 'g')
+      const color = range.color || '#fbbf24'
+      const bgColor = hexToRgba(color, 0.35)
+      const borderColor = hexToRgba(color, 0.6)
+      const label = range.label ? escapeHtml(range.label) : ''
+
+      content = replaceOutsideHtmlTags(content, searchRegex, (match) => {
+        return `<span class="alert-multi-highlight" ` +
+          `style="background-color:${bgColor};box-shadow:0 0 0 2px ${borderColor};border-radius:3px;padding:1px 2px;margin:-1px -2px" ` +
+          `${label ? `title="${label}" data-label="${label}"` : ''}>` +
+          match + `</span>`
       })
     }
   }
@@ -1156,9 +1184,6 @@ const highlightRangeInChapter = (chapterElement: Element, start: number, end: nu
 // Scroll a una mención específica dentro del documento
 const scrollToMention = async (target: ScrollTarget) => {
   clearTemporaryMentionHighlights()
-  if (!target.preserveMultiHighlights) {
-    clearAllAlertHighlights()
-  }
   const isDialogueTarget = target.endPosition !== undefined && !!target.text
 
   console.log('scrollToMention called:', {
@@ -1713,13 +1738,12 @@ watch(() => props.chapterBadges, () => {
 })
 
 // Watch para resaltar múltiples rangos de alerta (inconsistencias)
+// Cuando cambian los rangos de alertas, invalidar cache y hacer scroll
 watch(() => props.alertHighlightRanges, async (ranges) => {
-  // Primero limpiar highlights anteriores
-  clearAllAlertHighlights()
+  // Invalidar cache de capítulos afectados para que se regeneren con los nuevos highlights
+  highlightedContentCache.value.clear()
 
   if (!ranges || ranges.length === 0) return
-
-  console.log('[DocumentViewer] Applying alert highlights:', ranges.length, 'ranges')
 
   // Cargar los capítulos necesarios
   const chapterIds = new Set<number>()
@@ -1729,7 +1753,6 @@ watch(() => props.alertHighlightRanges, async (ranges) => {
     }
   }
 
-  // Cargar capítulos necesarios y esperar a que estén listos
   for (const chId of chapterIds) {
     if (!loadedChapters.value.has(chId)) {
       loadedChapters.value.add(chId)
@@ -1738,12 +1761,6 @@ watch(() => props.alertHighlightRanges, async (ranges) => {
   }
 
   await nextTick()
-  await new Promise(resolve => setTimeout(resolve, 300))
-
-  // Aplicar cada highlight con su color
-  for (const range of ranges) {
-    await applyAlertHighlight(range)
-  }
 
   // Scroll al primer rango
   if (ranges.length > 0) {
@@ -1760,62 +1777,6 @@ watch(() => props.alertHighlightRanges, async (ranges) => {
     }
   }
 }, { deep: true })
-
-// Limpiar todos los highlights de alerta
-const clearAllAlertHighlights = () => {
-  const highlights = viewerContainer.value?.querySelectorAll('.alert-multi-highlight')
-  if (!highlights || highlights.length === 0) return
-
-  // Recopilar chapter IDs afectados ANTES de modificar el DOM
-  const affectedChapterIds = new Set<number>()
-  highlights.forEach(el => {
-    const chapterElement = el.closest('[data-chapter-id]')
-    if (chapterElement) {
-      const chapterId = parseInt(chapterElement.getAttribute('data-chapter-id') || '0')
-      if (chapterId) affectedChapterIds.add(chapterId)
-    }
-  })
-
-  // Limpiar highlights
-  highlights.forEach(el => {
-    const parent = el.parentNode
-    if (parent) {
-      while (el.firstChild) {
-        parent.insertBefore(el.firstChild, el)
-      }
-      parent.removeChild(el)
-      parent.normalize()
-    }
-  })
-
-  // Forzar re-render de capítulos afectados
-  // Esto regenera el HTML limpio sin los highlights dinámicos rotos
-  for (const chapterId of affectedChapterIds) {
-    highlightedContentCache.value.delete(chapterId)
-
-    // Forzar re-render removiendo y volviendo a añadir el capítulo
-    loadedChapters.value.delete(chapterId)
-    nextTick(() => {
-      loadedChapters.value.add(chapterId)
-      touchChapter(chapterId)
-    })
-  }
-}
-
-// Aplicar highlight para un rango específico de alerta
-// NOTA: Deshabilitado temporalmente porque rompe el HTML de anotaciones/entidades
-// TODO: Refactorizar para usar CSS clases en lugar de manipulación DOM
-const applyAlertHighlight = async (range: AlertHighlightRange): Promise<void> => {
-  console.log('[DocumentViewer] applyAlertHighlight disabled (would break HTML):', range)
-  // El highlighting dinámico está deshabilitado porque:
-  // 1. Usa TreeWalker para modificar el DOM directamente
-  // 2. Rompe los spans de anotaciones/entidades ya renderizados
-  // 3. Causa saltos de línea y texto malformado
-  //
-  // Solución temporal: solo hacer scroll, sin highlight visual
-  // Solución permanente: refactorizar para usar CSS clases o regenerar HTML completo
-  return
-}
 
 // Convertir hex a rgba
 const hexToRgba = (hex: string, alpha: number): string => {

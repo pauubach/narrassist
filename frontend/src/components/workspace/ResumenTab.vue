@@ -994,9 +994,12 @@ const originalDocumentName = computed(() => {
   color: var(--text-color-secondary);
 }
 
-.character-rank.rank-1 { background: var(--yellow-100); color: var(--yellow-700); }
-.character-rank.rank-2 { background: var(--gray-200); color: var(--gray-700); }
-.character-rank.rank-3 { background: var(--orange-100); color: var(--orange-700); }
+/* Escala basada en color primary con diferentes saturaciones */
+.character-rank.rank-1 { background: var(--primary-600); color: white; font-weight: 700; }
+.character-rank.rank-2 { background: var(--primary-500); color: white; font-weight: 600; }
+.character-rank.rank-3 { background: var(--primary-400); color: white; font-weight: 600; }
+.character-rank.rank-4 { background: var(--primary-200); color: var(--primary-700); }
+.character-rank.rank-5 { background: var(--primary-100); color: var(--primary-700); }
 
 .character-info {
   flex: 1;
@@ -1135,9 +1138,12 @@ const originalDocumentName = computed(() => {
   background: var(--surface-700);
 }
 
-:deep(.dark) .character-rank.rank-1 { background: var(--yellow-900); color: var(--yellow-300); }
-:deep(.dark) .character-rank.rank-2 { background: var(--gray-700); color: var(--gray-300); }
-:deep(.dark) .character-rank.rank-3 { background: var(--orange-900); color: var(--orange-300); }
+/* Dark mode - escala primary adaptada */
+:deep(.dark) .character-rank.rank-1 { background: var(--primary-500); color: white; font-weight: 700; }
+:deep(.dark) .character-rank.rank-2 { background: var(--primary-600); color: white; font-weight: 600; }
+:deep(.dark) .character-rank.rank-3 { background: var(--primary-700); color: white; font-weight: 600; }
+:deep(.dark) .character-rank.rank-4 { background: var(--primary-800); color: var(--primary-200); }
+:deep(.dark) .character-rank.rank-5 { background: var(--primary-900); color: var(--primary-300); }
 
 :deep(.dark) .density-bar-container {
   background: var(--surface-700);

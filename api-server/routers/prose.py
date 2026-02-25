@@ -329,6 +329,7 @@ def get_sticky_sentences(
             })
 
         # Calcular estadísticas globales
+        # avg_glue ya viene como porcentaje (0-100) porque chapter_sticky["glue_percentage"] ya está * 100
         avg_glue = (global_total_glue / len(global_sticky)) if global_sticky else 0
 
         recommendations = []

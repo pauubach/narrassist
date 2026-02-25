@@ -116,7 +116,6 @@ const comparisonVersions = computed(() => {
 <template>
   <div class="version-history">
     <div class="history-header">
-      <h3>Historial de versiones</h3>
       <Button
         v-if="versions.length >= 2"
         label="Comparar seleccionadas"
