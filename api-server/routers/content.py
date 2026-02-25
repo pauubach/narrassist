@@ -373,13 +373,10 @@ def get_glossary_suggestions(
         existing_terms = repo.get_all_terms(project_id)
 
         # Obtener capítulos del proyecto
-        chapters_result = project.get_chapters()
-        if chapters_result.is_failure:
-            return ApiResponse(
-                success=False,
-                error="No se pudieron obtener los capítulos del proyecto"
-            )
-        chapters = chapters_result.value
+        from narrative_assistant.persistence.chapter import ChapterRepository
+
+        chapter_repo = ChapterRepository()
+        chapters = chapter_repo.get_by_project(project_id)
 
         if not chapters:
             return ApiResponse(
@@ -401,19 +398,23 @@ def get_glossary_suggestions(
         entities = None
         if use_entities:
             try:
-                entities_result = project.get_entities()
-                if entities_result.is_success:
+                from narrative_assistant.entities.repository import EntityRepository
+
+                entity_repo = EntityRepository()
+                entity_list = entity_repo.get_entities_by_project(project_id)
+
+                if entity_list:
                     entities = [
                         {
-                            "name": e.name,
-                            "type": e.entity_type,
+                            "name": e.canonical_name,
+                            "type": e.entity_type.value,
                             "mention_count": e.mention_count,
-                            "first_mention_chapter": e.first_mention_chapter,
+                            "first_mention_chapter": None,  # TODO: calculate from first_appearance_char
                         }
-                        for e in entities_result.value
+                        for e in entity_list
                     ]
             except Exception as e:
-                logger.warning(f"No se pudieron obtener entidades: {e}")
+                logger.warning(f"No se pudieron obtener entidades: {e}", exc_info=True)
 
         # Ejecutar extractor
         extractor = GlossaryExtractor(
