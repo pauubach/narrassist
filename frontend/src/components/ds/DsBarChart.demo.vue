@@ -63,6 +63,15 @@ const compactItems: BarChartItem[] = [
   { label: 'Medio', value: 28, color: '#fde047' },
   { label: 'Bajo', value: 45, color: '#3b82f6' }
 ]
+
+// Ejemplo 5: Sin colores específicos (usa color del tema)
+const themeColorItems: BarChartItem[] = [
+  { label: 'el', value: 245 },
+  { label: 'de', value: 189 },
+  { label: 'que', value: 156 },
+  { label: 'la', value: 142 },
+  { label: 'en', value: 98 }
+]
 </script>
 
 <template>
@@ -114,6 +123,17 @@ const compactItems: BarChartItem[] = [
         Barras ordenadas por valor con colores consistentes por meta-categoría.
       </p>
       <DsBarChart :items="categoryItems" size="normal" />
+    </section>
+
+    <!-- Color del tema por defecto -->
+    <section class="demo-section">
+      <h2>Color del Tema (Por Defecto)</h2>
+      <p class="description">
+        Sin especificar <code>color</code>, las barras usan automáticamente
+        <code>var(--primary-color)</code> del tema activo. Ideal para datos
+        sin clasificación semántica (ej: palabras más usadas, capítulos más largos).
+      </p>
+      <DsBarChart :items="themeColorItems" size="normal" />
     </section>
 
     <!-- Sin contador -->

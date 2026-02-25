@@ -25,6 +25,32 @@ const items = [
 </template>
 ```
 
+#### Barras con Color del Tema (Recomendado por defecto)
+
+```vue
+// SIN colores específicos - usa el color primario del tema
+const items = [
+  { label: 'el', value: 245 },
+  { label: 'de', value: 189 },
+  { label: 'que', value: 156 }
+]
+```
+
+**Cuándo usar**: Datos sin clasificación semántica (palabras frecuentes, capítulos más largos, etc.)
+
+#### Barras con Colores Específicos
+
+```vue
+// CON colores - solo cuando hay clasificación semántica
+const items = [
+  { label: 'Errores', value: 45, color: '#dc2626' },
+  { label: 'Warnings', value: 28, color: '#f59e0b' },
+  { label: 'Info', value: 12, color: '#3b82f6' }
+]
+```
+
+**Cuándo usar**: Severidades, categorías, estados (donde el color comunica significado)
+
 #### Barras Segmentadas
 
 ```vue
@@ -38,6 +64,8 @@ const items = [{
   ]
 }]
 ```
+
+**Cuándo usar**: Mostrar composición de un total (tipos de alertas por capítulo, etc.)
 
 #### Tamaños
 
