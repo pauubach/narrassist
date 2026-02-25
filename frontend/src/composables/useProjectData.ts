@@ -218,7 +218,7 @@ export function useProjectData() {
     loadingSummaries.value = true
     try {
       const data = await api.getRaw<{ success: boolean; data?: { chapters?: ChapterSummaryData[]; global_summary?: string } }>(
-        `/api/projects/${projectId}/chapter-progress?mode=basic`
+        `/api/projects/${projectId}/chapter-progress?mode=standard`
       )
       if (data.success && data.data) {
         if (data.data.chapters) {

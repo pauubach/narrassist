@@ -517,7 +517,7 @@ const loading = ref(false)
 const loadingMessage = ref('Cargando análisis...')
 const error = ref<string | null>(null)
 const report = ref<ChapterProgressReport | null>(null)
-const selectedMode = ref('basic')
+const selectedMode = ref('standard')
 
 const analysisModesOptions = [
   { label: 'Básico (rápido)', value: 'basic' },
