@@ -841,9 +841,11 @@ const getHighlightedContent = (chapter: Chapter): string => {
         ? `${annotation.title}. Sugerencia: ${annotation.suggestion}`
         : annotation.title
 
-      // Escapar el excerpt para usarlo en regex
-      const escapedExcerpt = escapeRegex(annotation.excerpt)
-      const annotationRegex = new RegExp(escapedExcerpt, 'g')
+      // El excerpt viene sin escapar, pero content ya está escapado
+      // Necesitamos escapar el excerpt para que coincida con el contenido
+      const excerptEscapedHtml = escapeHtml(annotation.excerpt)
+      const excerptForRegex = escapeRegex(excerptEscapedHtml)
+      const annotationRegex = new RegExp(excerptForRegex, 'g')
 
       // Aplicar highlight usando replaceOutsideHtmlTags (respeta tags existentes)
       content = replaceOutsideHtmlTags(content, annotationRegex, (match) => {

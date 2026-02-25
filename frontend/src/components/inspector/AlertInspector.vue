@@ -64,6 +64,21 @@ const categoryLabel = computed(() => categoryConfig.value.label)
 const confidencePercent = computed(() => Math.round(props.alert.confidence * 100))
 
 /**
+ * Color de la barra de confianza basado en el nivel de confianza.
+ * Usa colores progresivos: rojo (baja) -> amarillo (media) -> verde (alta)
+ */
+const confidenceColor = computed(() => {
+  const confidence = props.alert.confidence
+  if (confidence >= 0.8) {
+    return 'var(--ds-color-success, #22c55e)' // Verde (alta confianza)
+  } else if (confidence >= 0.5) {
+    return 'var(--ds-color-warning, #f59e0b)' // Amarillo (media confianza)
+  } else {
+    return 'var(--ds-color-danger, #ef4444)' // Rojo (baja confianza)
+  }
+})
+
+/**
  * Obtiene el título del capítulo por número.
  */
 function getChapterTitle(chapterNumber: number): string {
@@ -268,7 +283,7 @@ function resolveAsUnassigned() {
         <div class="confidence-bar">
           <div
             class="confidence-fill"
-            :style="{ width: confidencePercent + '%', backgroundColor: severityColor }"
+            :style="{ width: confidencePercent + '%', backgroundColor: confidenceColor }"
           ></div>
           <span class="confidence-value">{{ confidencePercent }}%</span>
         </div>
