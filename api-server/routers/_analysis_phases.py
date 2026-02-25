@@ -3059,8 +3059,16 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
         except Exception as e:
             logger.debug(f"Could not load entity mentions for temporal extraction: {e}")
 
-        # Extraer por capítulo
-        for chapter in chapters_with_ids:
+        # Extraer por capítulo con progreso granular
+        total_chapters = len(chapters_with_ids)
+        for idx, chapter in enumerate(chapters_with_ids, start=1):
+            # Actualizar progreso (0-50% de la fase se dedica a extracción)
+            _update_storage(
+                project_id,
+                current_action=f"Extrayendo marcadores temporales del capítulo {idx}/{total_chapters}..."
+            )
+            tracker.update_time_remaining()
+
             chapter_mentions = entity_mentions_by_chapter.get(chapter.chapter_number, [])
             if chapter_mentions:
                 chapter_markers = marker_extractor.extract_with_entities(
@@ -3076,6 +3084,10 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
 
         logger.info(f"Timeline: {len(chapters_with_ids)} chapters, {len(all_markers)} markers")
 
+        # Actualizar progreso (50% - construcción de timeline)
+        _update_storage(project_id, current_action="Construyendo línea temporal...")
+        tracker.update_time_remaining()
+
         # Construir timeline
         builder = TimelineBuilder()
         chapter_data = [
@@ -3090,7 +3102,10 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
 
         timeline = builder.build_from_markers(all_markers, chapter_data)
 
-        # Verificar consistencia temporal
+        # Verificar consistencia temporal (75%)
+        _update_storage(project_id, current_action="Verificando consistencia temporal...")
+        tracker.update_time_remaining()
+
         checker = TemporalConsistencyChecker()
         inconsistencies = checker.check(timeline, all_markers)
 
@@ -3098,7 +3113,9 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
             f"Timeline built: {len(timeline.events)} events, {len(inconsistencies)} inconsistencies"
         )
 
-        # Persistir timeline en BD
+        # Persistir timeline en BD (90%)
+        _update_storage(project_id, current_action="Guardando timeline en base de datos...")
+        tracker.update_time_remaining()
         try:
             # Limpiar timeline anterior si existe
             timeline_repo.clear_timeline(project_id)
@@ -3520,12 +3537,18 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
         if check_result.is_success:
             inconsistencies = check_result.value or []
 
-    # Sub-fase 5.1: Estado vital
+    # Sub-fase 5.1: Estado vital (0-33%)
     vital_status_report = None
     location_report = None
     chapter_progress_report = None
 
-    _update_storage(project_id, current_action="Verificando estado vital de personajes...")
+    sub_progress = cons_pct_start + int((cons_pct_end - cons_pct_start) * 0.0)
+    _update_storage(
+        project_id,
+        current_action="Verificando estado vital de personajes...",
+        progress=sub_progress
+    )
+    tracker.update_time_remaining()
 
     # Preparar datos para sub-fases
     chapters_for_analysis = [
@@ -3647,8 +3670,14 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
 
     tracker.check_cancelled()
 
-    # Sub-fase 5.2: Ubicaciones
-    _update_storage(project_id, current_action="Verificando ubicaciones de personajes...")
+    # Sub-fase 5.2: Ubicaciones (33-66%)
+    sub_progress = cons_pct_start + int((cons_pct_end - cons_pct_start) * 0.33)
+    _update_storage(
+        project_id,
+        current_action="Verificando ubicaciones de personajes...",
+        progress=sub_progress
+    )
+    tracker.update_time_remaining()
 
     try:
         from narrative_assistant.analysis.character_location import (
@@ -3720,8 +3749,14 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
 
     tracker.check_cancelled()
 
-    # Sub-fase 5.3: Resumen por capítulo
-    _update_storage(project_id, current_action="Generando resumen de avance narrativo...")
+    # Sub-fase 5.3: Resumen por capítulo (66-100%)
+    sub_progress = cons_pct_start + int((cons_pct_end - cons_pct_start) * 0.66)
+    _update_storage(
+        project_id,
+        current_action="Generando resumen de avance narrativo...",
+        progress=sub_progress
+    )
+    tracker.update_time_remaining()
 
     try:
         from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
@@ -4137,8 +4172,6 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
     # Correcciones editoriales
     correction_issues = []
     try:
-        _update_storage(project_id, current_phase="Buscando repeticiones y errores tipográficos...")
-
         from narrative_assistant.corrections import CorrectionConfig
         from narrative_assistant.corrections.orchestrator import CorrectionOrchestrator
 
@@ -4210,11 +4243,47 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
 
         orchestrator = CorrectionOrchestrator(config=correction_config)
 
-        correction_issues = orchestrator.analyze(
-            text=full_text,
-            chapter_index=None,
-            spacy_doc=ctx.get("spacy_doc"),
-        )
+        # Análisis por capítulos con progreso granular
+        chapters_data = ctx.get("chapters_data", [])
+        total_chapters = len(chapters_data)
+
+        def corrections_progress_callback(message: str, current: int, total: int):
+            """Callback para reportar progreso de correcciones."""
+            _update_storage(
+                project_id,
+                current_action=f"Revisando capítulo {current}/{total} (tipografía y repeticiones)..."
+            )
+            tracker.update_time_remaining()
+
+        if total_chapters > 0:
+            # Convertir chapters_data a formato esperado por orchestrator
+            chapters_list = []
+            for i, ch_dict in enumerate(chapters_data):
+                chapters_list.append({
+                    "index": ch_dict.get("chapter_number", i + 1),
+                    "title": ch_dict.get("title", f"Capítulo {i + 1}"),
+                    "content": ch_dict.get("content", "")
+                })
+
+            correction_issues_by_chapter = orchestrator.analyze_by_chapters(
+                chapters=chapters_list,
+                spacy_docs=None,
+                project_id=project_id,
+                progress_callback=corrections_progress_callback,
+            )
+
+            # Aplanar resultados
+            correction_issues = []
+            for ch_issues in correction_issues_by_chapter.values():
+                correction_issues.extend(ch_issues)
+        else:
+            # Fallback: análisis monolítico si no hay capítulos
+            _update_storage(project_id, current_action="Buscando repeticiones y errores tipográficos...")
+            correction_issues = orchestrator.analyze(
+                text=full_text,
+                chapter_index=None,
+                spacy_doc=ctx.get("spacy_doc"),
+            )
 
         logger.info(f"Corrections analysis found {len(correction_issues)} suggestions")
 
