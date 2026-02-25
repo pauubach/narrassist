@@ -811,6 +811,48 @@ const getHighlightedContent = (chapter: Chapter): string => {
     }
   }
 
+  // Aplicar anotaciones de gramática/ortografía DESPUÉS de entidades
+  // Usamos replaceOutsideHtmlTags para respetar los tags ya insertados
+  if (showSpellingErrors.value || showGrammarErrors.value) {
+    const annotations = chapterAnnotations.value.get(chapter.chapterNumber) || []
+
+    // Filtrar por tipo según los toggles activos
+    const filteredAnnotations = annotations.filter(a => {
+      const type = (a.type || '').toLowerCase()
+      const isGrammarType = type === 'grammar' || type === 'agreement'
+      const isSpellingType = type === 'spelling' || type === 'orthography' || type === 'typography' || type === 'punctuation'
+
+      if (isGrammarType && !showGrammarErrors.value) return false
+      if (isSpellingType && !showSpellingErrors.value) return false
+      return true
+    })
+
+    // Construir regex para cada anotación
+    for (const annotation of filteredAnnotations) {
+      if (!annotation.excerpt) continue
+
+      const type = (annotation.type || '').toLowerCase()
+      const annotationClass =
+        type === 'grammar' || type === 'agreement'
+          ? 'grammar-error'
+          : 'spelling-error'
+      const severityClass = `severity-${annotation.severity}`
+      const tooltip = annotation.suggestion
+        ? `${annotation.title}. Sugerencia: ${annotation.suggestion}`
+        : annotation.title
+
+      // Escapar el excerpt para usarlo en regex
+      const escapedExcerpt = escapeRegex(annotation.excerpt)
+      const annotationRegex = new RegExp(escapedExcerpt, 'g')
+
+      // Aplicar highlight usando replaceOutsideHtmlTags (respeta tags existentes)
+      content = replaceOutsideHtmlTags(content, annotationRegex, (match) => {
+        return `<span class="annotation ${annotationClass} ${severityClass}" ` +
+          `data-annotation-id="${annotation.id}" title="${escapeHtml(tooltip)}">${match}</span>`
+      })
+    }
+  }
+
   // Convertir saltos de línea en párrafos y detectar encabezados de sección
   const html = content
     .split('\n\n')
