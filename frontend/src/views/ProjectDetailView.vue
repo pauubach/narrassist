@@ -2,7 +2,14 @@
   <div class="project-detail-view">
     <!-- Loading state -->
     <div v-if="loading" class="loading-state">
-      <DsSkeleton variant="list" :rows="5" />
+      <div class="loading-content">
+        <i class="pi pi-spin pi-spinner loading-icon"></i>
+        <h2>Cargando proyecto...</h2>
+        <p class="loading-hint">
+          Esto puede tardar unos segundos para proyectos grandes
+        </p>
+        <DsSkeleton variant="list" :rows="3" />
+      </div>
     </div>
 
     <!-- Error state -->
@@ -1712,6 +1719,35 @@ const onReplaceDocumentSelected = async (event: Event) => {
   justify-content: center;
   height: 100%;
   gap: var(--ds-space-4);
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ds-space-3);
+  max-width: 600px;
+  text-align: center;
+}
+
+.loading-icon {
+  font-size: 3rem;
+  color: var(--primary-color);
+  margin-bottom: var(--ds-space-2);
+}
+
+.loading-content h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.loading-hint {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-color-secondary);
+  margin-bottom: var(--ds-space-3);
 }
 
 /* Layout */
