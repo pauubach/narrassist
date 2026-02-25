@@ -433,7 +433,7 @@ El campo "summary" DEBE:
 - Explicar QUÉ sucede y POR QUÉ importa para la trama
 - Indicar qué CAMBIA respecto al estado anterior
 - Señalar qué queda ABIERTO o sin resolver
-- 2-3 frases narrativas (causa → efecto)
+- 3-5 frases narrativas (causa → efecto)
 
 Responde SOLO con JSON válido (sin markdown):
 {{
@@ -445,7 +445,7 @@ Responde SOLO con JSON válido (sin markdown):
       "importance": 1-5
     }}
   ],
-  "summary": "Resumen narrativo de 2-3 frases",
+  "summary": "Resumen narrativo de 3-5 frases",
   "character_inferences": [
     {{"character": "nombre", "inferred_role": "detective/protagonista/antagonista/...", "evidence": "breve evidencia"}}
   ],
@@ -514,7 +514,7 @@ Responde SOLO con JSON:
 
 
 # Prompt para resumen global del manuscrito
-GLOBAL_SUMMARY_PROMPT = """Eres un editor literario profesional. Escribe una sinopsis narrativa del manuscrito en UN PÁRRAFO de 2-3 frases.
+GLOBAL_SUMMARY_PROMPT = """Eres un editor literario profesional. Escribe una sinopsis narrativa del manuscrito en UN PÁRRAFO de 3-5 frases.
 
 TIPO: {genre_label}
 PERSONAJES: {characters}
@@ -529,7 +529,7 @@ REQUISITOS ESTILÍSTICOS:
 - Captura el tono del género ({genre_label})
 - Sé específico con nombres propios, NO uses "el protagonista" o "la detective"
 
-EJEMPLO DE BUENA SINOPSIS (2-3 frases):
+EJEMPLO DE BUENA SINOPSIS (3-5 frases):
 "Elena Montero llega a la mansión Aldebarán para investigar la misteriosa desaparición de Isabel. Desde el primer momento, nota comportamientos extraños en el servicio y descubre pistas inquietantes que apuntan a secretos familiares enterrados hace décadas. La tensión aumenta cuando se da cuenta de que alguien no quiere que descubra la verdad."
 
 Responde SOLO con este JSON (el valor DEBE ser un string de texto narrativo, NO un objeto estructurado):
@@ -622,7 +622,9 @@ class ChapterSummaryAnalyzer:
 
         # Procesar cada capítulo
         for idx, chapter in enumerate(chapters, 1):
-            logger.info(f"Analizando capítulo {idx}/{len(chapters)} (LLM: {self.mode.value}, modelo: {self.llm_model})...")
+            logger.info(
+                f"Analizando capítulo {idx}/{len(chapters)} (LLM: {self.mode.value}, modelo: {self.llm_model})..."
+            )
             chapter_summary = self._analyze_chapter(
                 project_id=project_id,
                 chapter=chapter,
@@ -713,16 +715,32 @@ class ChapterSummaryAnalyzer:
 
         # Mapeo de hints libres a códigos de subtipo
         hint_to_subtype: dict[str, str] = {
-            "policial": "FIC_POL", "misterio": "FIC_POL", "detective": "FIC_POL",
-            "noir": "FIC_POL", "crimen": "FIC_POL",
-            "romance": "FIC_ROM", "romántica": "FIC_ROM", "romántico": "FIC_ROM",
+            "policial": "FIC_POL",
+            "misterio": "FIC_POL",
+            "detective": "FIC_POL",
+            "noir": "FIC_POL",
+            "crimen": "FIC_POL",
+            "romance": "FIC_ROM",
+            "romántica": "FIC_ROM",
+            "romántico": "FIC_ROM",
             "amor": "FIC_ROM",
-            "thriller": "FIC_THR", "suspense": "FIC_THR", "intriga": "FIC_THR",
-            "fantasía": "FIC_FAN", "fantasy": "FIC_FAN", "épica": "FIC_FAN",
-            "ciencia ficción": "FIC_SCI", "sci-fi": "FIC_SCI", "espacial": "FIC_SCI",
-            "terror": "FIC_TER", "horror": "FIC_TER", "gótico": "FIC_TER",
-            "histórica": "FIC_HIS", "histórico": "FIC_HIS", "época": "FIC_HIS",
-            "literaria": "FIC_LIT", "literario": "FIC_LIT",
+            "thriller": "FIC_THR",
+            "suspense": "FIC_THR",
+            "intriga": "FIC_THR",
+            "fantasía": "FIC_FAN",
+            "fantasy": "FIC_FAN",
+            "épica": "FIC_FAN",
+            "ciencia ficción": "FIC_SCI",
+            "sci-fi": "FIC_SCI",
+            "espacial": "FIC_SCI",
+            "terror": "FIC_TER",
+            "horror": "FIC_TER",
+            "gótico": "FIC_TER",
+            "histórica": "FIC_HIS",
+            "histórico": "FIC_HIS",
+            "época": "FIC_HIS",
+            "literaria": "FIC_LIT",
+            "literario": "FIC_LIT",
         }
 
         llm_subtype = hint_to_subtype.get(best_hint)
@@ -733,9 +751,7 @@ class ChapterSummaryAnalyzer:
         # Solo actualizar si el LLM tiene señal fuerte (>50% consenso)
         consensus_ratio = best_count / len(normalized)
         if consensus_ratio < 0.5:
-            logger.debug(
-                f"Genre consensus too weak: {best_hint} ({best_count}/{len(normalized)})"
-            )
+            logger.debug(f"Genre consensus too weak: {best_hint} ({best_count}/{len(normalized)})")
             return
 
         # Comparar con heurística actual
@@ -1116,9 +1132,7 @@ class ChapterSummaryAnalyzer:
 
             # Construir bloques de contexto
             genre_label = _get_genre_label(self.document_type, self.document_subtype)
-            genre_instruction = _get_genre_instruction(
-                self.document_type, self.document_subtype
-            )
+            genre_instruction = _get_genre_instruction(self.document_type, self.document_subtype)
 
             # Roster de personajes conocidos
             character_roster_block = ""
@@ -1130,9 +1144,7 @@ class ChapterSummaryAnalyzer:
             prev_summary_block = ""
             if prev_llm_summary:
                 sanitized_prev = sanitize_for_prompt(prev_llm_summary, max_length=300)
-                prev_summary_block = (
-                    f"- Capítulo anterior: {sanitized_prev}\n"
-                )
+                prev_summary_block = f"- Capítulo anterior: {sanitized_prev}\n"
 
             prompt = EVENTS_EXTRACTION_PROMPT.format(
                 genre_label=genre_label,
@@ -1203,9 +1215,7 @@ class ChapterSummaryAnalyzer:
         except Exception as e:
             logger.warning(f"Error en análisis LLM del capítulo {summary.chapter_number}: {e}")
 
-    def _generate_text_summary(
-        self, summary: ChapterSummary, chapter_text: str = ""
-    ) -> str:
+    def _generate_text_summary(self, summary: ChapterSummary, chapter_text: str = "") -> str:
         """Genera un resumen narrativo extractivo del capítulo.
 
         Selecciona las oraciones más representativas del texto original
@@ -1262,7 +1272,7 @@ class ChapterSummaryAnalyzer:
         for line in lines:
             stripped = line.strip()
             # Ignorar líneas de diálogo y separadores
-            if stripped.startswith(("—", "–", "-\"", "«")) or stripped in ("", "* * *", "***"):
+            if stripped.startswith(("—", "–", '-"', "«")) or stripped in ("", "* * *", "***"):
                 continue
             narrative_lines.append(stripped)
 
@@ -1291,9 +1301,7 @@ class ChapterSummaryAnalyzer:
         return result
 
     @staticmethod
-    def _score_sentence(
-        sent: str, idx: int, total: int, char_names: set[str]
-    ) -> float:
+    def _score_sentence(sent: str, idx: int, total: int, char_names: set[str]) -> float:
         """Puntúa una oración para resumen extractivo.
 
         Criterios:
@@ -1549,9 +1557,7 @@ class ChapterSummaryAnalyzer:
 
             global_prompt = GLOBAL_SUMMARY_PROMPT.format(
                 genre_label=genre_label,
-                characters=", ".join(
-                    sanitize_for_prompt(c, max_length=100) for c in main_chars
-                ),
+                characters=", ".join(sanitize_for_prompt(c, max_length=100) for c in main_chars),
                 all_chapter_summaries="\n".join(narrative_summaries),
             )
 
@@ -1595,9 +1601,7 @@ class ChapterSummaryAnalyzer:
 
                 if isinstance(summary_val, str) and len(summary_val) > 20:
                     report.global_summary = summary_val
-                    logger.info(
-                        f"Global summary generated: {len(summary_val)} chars"
-                    )
+                    logger.info(f"Global summary generated: {len(summary_val)} chars")
                 else:
                     logger.warning(
                         f"Global summary rejected: type={type(summary_val).__name__}, "
