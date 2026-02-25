@@ -1803,120 +1803,18 @@ const clearAllAlertHighlights = () => {
 }
 
 // Aplicar highlight para un rango específico de alerta
+// NOTA: Deshabilitado temporalmente porque rompe el HTML de anotaciones/entidades
+// TODO: Refactorizar para usar CSS clases en lugar de manipulación DOM
 const applyAlertHighlight = async (range: AlertHighlightRange): Promise<void> => {
-  if (!range.chapterId) {
-    console.warn('[DocumentViewer] No chapterId in range:', range)
-    return
-  }
-
-  const chapterElement = viewerContainer.value?.querySelector(`[data-chapter-id="${range.chapterId}"]`)
-  if (!chapterElement) {
-    console.warn('[DocumentViewer] Chapter element not found:', range.chapterId)
-    return
-  }
-
-  const contentElement = chapterElement.querySelector('.chapter-text')
-  if (!contentElement) {
-    console.warn('[DocumentViewer] No .chapter-text in chapter')
-    return
-  }
-
-  // Si no hay texto, intentar buscar por posición
-  const searchText = range.text ? cleanExcerptForSearch(range.text) : null
-  if (!searchText) {
-    console.warn('[DocumentViewer] No text to search for in range')
-    return
-  }
-
-  // Buscar el texto en el capítulo
-  const walker = document.createTreeWalker(contentElement, NodeFilter.SHOW_TEXT, null)
-
-  interface TextMatch {
-    node: Text
-    index: number
-    length: number
-    charPosition: number
-  }
-  const matches: TextMatch[] = []
-  let node: Text | null
-  let charCount = 0
-
-  while ((node = walker.nextNode() as Text | null)) {
-    const nodeText = node.textContent || ''
-    let searchIndex = 0
-
-    while (true) {
-      const index = nodeText.toLowerCase().indexOf(searchText.toLowerCase(), searchIndex)
-      if (index === -1) break
-
-      matches.push({
-        node,
-        index,
-        length: searchText.length,
-        charPosition: charCount + index
-      })
-      searchIndex = index + 1
-    }
-
-    charCount += nodeText.length
-  }
-
-  if (matches.length === 0) {
-    console.warn('[DocumentViewer] Text not found in chapter:', searchText.substring(0, 50))
-    return
-  }
-
-  // Seleccionar la ocurrencia más cercana a la posición indicada
-  let match = matches[0]
-  if (range.startChar !== undefined && matches.length > 1) {
-    // Calcular posición ajustada (restar offset del título si existe)
-    const chapter = chapters.value.find(ch => ch.id === range.chapterId)
-    let adjustedPosition = range.startChar
-    if (chapter) {
-      const titleOffset = getTitleOffset(chapter.content, chapter.title)
-      adjustedPosition = range.startChar - titleOffset
-    }
-
-    let minDistance = Math.abs(matches[0].charPosition - adjustedPosition)
-    for (const m of matches) {
-      const distance = Math.abs(m.charPosition - adjustedPosition)
-      if (distance < minDistance) {
-        minDistance = distance
-        match = m
-      }
-    }
-  }
-
-  // Crear el rango DOM
-  const domRange = document.createRange()
-  domRange.setStart(match.node, match.index)
-  domRange.setEnd(match.node, match.index + match.length)
-
-  // Crear span de highlight con color personalizado
-  const highlightSpan = document.createElement('span')
-  highlightSpan.className = 'alert-multi-highlight'
-
-  // Aplicar color personalizado o default
-  const color = range.color || '#fbbf24' // amarillo por defecto
-  highlightSpan.style.backgroundColor = hexToRgba(color, 0.4)
-  highlightSpan.style.boxShadow = `0 0 0 2px ${hexToRgba(color, 0.3)}`
-  highlightSpan.style.borderRadius = '3px'
-  highlightSpan.style.padding = '2px 4px'
-  highlightSpan.style.margin = '-2px -4px'
-
-  // Añadir etiqueta si existe
-  if (range.label) {
-    highlightSpan.setAttribute('data-label', range.label)
-    highlightSpan.title = range.label
-  }
-
-  try {
-    highlightSpan.appendChild(domRange.extractContents())
-    domRange.insertNode(highlightSpan)
-    console.log('[DocumentViewer] Applied highlight:', range.label || searchText.substring(0, 30))
-  } catch (e) {
-    console.warn('[DocumentViewer] Error creating highlight:', e)
-  }
+  console.log('[DocumentViewer] applyAlertHighlight disabled (would break HTML):', range)
+  // El highlighting dinámico está deshabilitado porque:
+  // 1. Usa TreeWalker para modificar el DOM directamente
+  // 2. Rompe los spans de anotaciones/entidades ya renderizados
+  // 3. Causa saltos de línea y texto malformado
+  //
+  // Solución temporal: solo hacer scroll, sin highlight visual
+  // Solución permanente: refactorizar para usar CSS clases o regenerar HTML completo
+  return
 }
 
 // Convertir hex a rgba
