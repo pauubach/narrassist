@@ -149,32 +149,6 @@ const barItems = computed((): BarChartItem[] => {
   color: var(--primary-color);
 }
 
-.compact .method-bar {
-  width: 40px;
-  height: 4px;
-}
-
-.method-fill {
-  height: 100%;
-  background: var(--surface-400);
-  border-radius: var(--app-radius-sm);
-  transition: width 0.3s ease;
-}
-
-.method-fill.agreed {
-  background: var(--app-success-hover, var(--p-green-600, #16a34a)); /* WCAG AA */
-}
-
-.agreed-icon {
-  color: var(--app-success-hover, var(--p-green-600, #16a34a)); /* WCAG AA: 4.5:1 */
-  font-size: 0.875rem;
-  flex-shrink: 0;
-}
-
-.compact .agreed-icon {
-  font-size: 0.75rem;
-}
-
 .compact-summary {
   font-size: 0.75rem;
   color: var(--text-color-secondary);
