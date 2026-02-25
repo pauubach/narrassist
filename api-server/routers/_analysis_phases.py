@@ -1686,11 +1686,20 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
                     chapter_start = int(chapter.get("start_char", 0) or 0)
                     chapter_number = chapter.get("chapter_number", idx)
 
+                    # Update progress with chapter info
+                    sub_pct = (idx - 1) / total_missing  # Progress BEFORE processing this chapter
+                    sub_progress = ner_pct_start + int(sub_pct * (ner_pct_end - ner_pct_start))
+                    tracker.update_progress(
+                        "ner",
+                        sub_progress / 100.0,
+                        f"Analizando capítulo {idx}/{total_missing} (personajes y lugares)..."
+                    )
                     _update_storage(
                         project_id,
                         current_action=(
-                            f"Reanalizando capítulo {chapter_number} ({idx}/{total_missing})"
+                            f"Analizando capítulo {idx}/{total_missing} (NER)"
                         ),
+                        progress=sub_progress
                     )
 
                     chapter_result = ner_extractor.extract_entities(chapter_text)
@@ -1720,9 +1729,10 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
                             f"NER chapter cache write failed for chapter {chapter_number}: {chapter_cache_err}"
                         )
 
-                    sub_pct = idx / total_missing
-                    sub_progress = ner_pct_start + int(sub_pct * (ner_pct_end - ner_pct_start))
-                    _update_storage(project_id, progress=min(ner_pct_end, sub_progress))
+                    # Final progress update after processing this chapter
+                    final_sub_pct = idx / total_missing
+                    final_sub_progress = ner_pct_start + int(final_sub_pct * (ner_pct_end - ner_pct_start))
+                    _update_storage(project_id, progress=min(ner_pct_end, final_sub_progress))
                     tracker.update_time_remaining()
 
     # Fallback: full-document NER
@@ -3267,15 +3277,18 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
                 else:
                     names_str = ", ".join(batch_names)
 
+                batch_progress = 0.1 + (0.35 * batch_end / max(total_chars, 1))
+                progress_pct = attr_pct_start + int((attr_pct_end - attr_pct_start) * batch_progress)
+
+                tracker.update_progress(
+                    "attributes",
+                    progress_pct / 100.0,
+                    f"Analizando personaje {batch_end}/{total_chars}: {names_str}"
+                )
                 _update_storage(
                     project_id,
                     current_action=f"Analizando: {names_str} ({batch_end}/{total_chars})",
-                )
-
-                batch_progress = 0.1 + (0.35 * batch_end / max(total_chars, 1))
-                _update_storage(
-                    project_id,
-                    progress=attr_pct_start + int((attr_pct_end - attr_pct_start) * batch_progress),
+                    progress=progress_pct,
                 )
 
                 batch_entity_names = {

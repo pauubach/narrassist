@@ -621,7 +621,8 @@ class ChapterSummaryAnalyzer:
         genre_hints: list[str] = []  # Para consenso LLM
 
         # Procesar cada capítulo
-        for chapter in chapters:
+        for idx, chapter in enumerate(chapters, 1):
+            logger.info(f"Analizando capítulo {idx}/{len(chapters)} (LLM: {self.mode.value}, modelo: {self.llm_model})...")
             chapter_summary = self._analyze_chapter(
                 project_id=project_id,
                 chapter=chapter,
