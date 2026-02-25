@@ -428,29 +428,19 @@ class SpellingChecker:
         self._load_hunspell()
 
     def _load_hunspell(self) -> None:
-        """Intentar cargar hunspell si está disponible."""
+        """Intentar cargar corrector ortográfico si está disponible."""
         try:
-            import hunspell
+            # pyspellchecker incluye diccionarios pre-empaquetados (pure Python)
+            from spellchecker import SpellChecker
 
-            # Buscar diccionario español
-            dict_paths = [
-                "/usr/share/hunspell/es_ES",
-                "/usr/share/myspell/es_ES",
-                "C:/Program Files/LibreOffice/share/extensions/dict-es/es_ES",
-                str(Path(__file__).parent / "dictionaries" / "es_ES"),
-            ]
-            for path in dict_paths:
-                aff_path = f"{path}.aff"
-                dic_path = f"{path}.dic"
-                if Path(aff_path).exists() and Path(dic_path).exists():
-                    self._hunspell = hunspell.HunSpell(dic_path, aff_path)
-                    logger.info(f"Hunspell cargado desde {path}")
-                    return
-            logger.warning("Diccionario hunspell no encontrado, usando fallback")
+            # Cargar diccionario español
+            self._hunspell = SpellChecker(language='es')
+            logger.info("Corrector ortográfico cargado con diccionario español (pyspellchecker)")
+            return
         except ImportError:
-            logger.info("Hunspell no instalado, usando diccionario básico")
+            logger.info("pyspellchecker no instalado, usando diccionario básico de fallback")
         except Exception as e:
-            logger.warning(f"Error cargando hunspell: {e}")
+            logger.warning(f"Error cargando corrector ortográfico: {e}, usando fallback")
 
     def add_to_dictionary(self, words: list[str]) -> None:
         """Añadir palabras al diccionario personalizado."""
@@ -587,14 +577,18 @@ class SpellingChecker:
             if word[0].isupper() and start > 0 and text[start - 1] not in ".!?\n":
                 continue
 
-            # Verificar con hunspell si disponible
+            # Verificar con diccionario ortográfico si disponible
             is_error = False
             suggestions: list[str] = []
 
             if self._hunspell:
-                if not self._hunspell.spell(word):
+                # pyspellchecker API: unknown() returns set of misspelled words
+                misspelled = self._hunspell.unknown([word])
+                if misspelled:
                     is_error = True
-                    suggestions = self._hunspell.suggest(word)[:5]
+                    # correction() returns best suggestion, candidates() returns all
+                    candidates = self._hunspell.candidates(word)
+                    suggestions = list(candidates)[:5] if candidates else []
             else:
                 # Fallback: verificar si parece español válido
                 is_error = self._looks_like_error(word)
