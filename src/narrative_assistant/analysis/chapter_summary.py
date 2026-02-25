@@ -428,12 +428,14 @@ Extrae 3-5 eventos que un EDITOR profesional necesitaría para verificar consist
 
 Cada evento debe responder: QUIÉN hace QUÉ a QUIÉN, y qué CAMBIA.
 
-El campo "summary" DEBE:
+El campo "summary" DEBE (CRÍTICO):
+- Priorizar eventos de ALTO IMPACTO narrativo: desapariciones, muertes, revelaciones, descubrimientos, decisiones clave, conflictos importantes
+- Omitir detalles triviales (llegadas rutinarias, saludos, descripciones ambientales)
 - Nombrar personajes por su nombre propio
 - Explicar QUÉ sucede y POR QUÉ importa para la trama
-- Indicar qué CAMBIA respecto al estado anterior
+- Indicar qué CAMBIA respecto al estado anterior (qué está en riesgo, qué se descubre, qué se pierde)
 - Señalar qué queda ABIERTO o sin resolver
-- 3-5 frases narrativas (causa → efecto)
+- 4-6 frases narrativas enfocadas en CONSECUENCIAS (causa → efecto → implicación)
 
 Responde SOLO con JSON válido (sin markdown):
 {{
@@ -529,8 +531,11 @@ REQUISITOS ESTILÍSTICOS:
 - Captura el tono del género ({genre_label})
 - Sé específico con nombres propios, NO uses "el protagonista" o "la detective"
 
-EJEMPLO DE BUENA SINOPSIS (3-5 frases):
-"Elena Montero llega a la mansión Aldebarán para investigar la misteriosa desaparición de Isabel. Desde el primer momento, nota comportamientos extraños en el servicio y descubre pistas inquietantes que apuntan a secretos familiares enterrados hace décadas. La tensión aumenta cuando se da cuenta de que alguien no quiere que descubra la verdad."
+EJEMPLO DE BUENA SINOPSIS enfocada en eventos de ALTO IMPACTO (4-6 frases):
+"Isabel, la heredera de la mansión Aldebarán, ha desaparecido sin dejar rastro. Elena Montero llega para investigar el caso y descubre comportamientos extraños en el servicio, que parece ocultar información. Al explorar la casa, encuentra cartas antiguas que revelan secretos familiares enterrados durante décadas. La tensión aumenta cuando nota que alguien está saboteando activamente su investigación. Elena debe descubrir qué pasó con Isabel antes de que sea demasiado tarde."
+
+CONTRAEJEMPLO DE MAL RESUMEN (demasiado anodino):
+"Elena Montero llegó a la mansión Aldebarán un lunes de noviembre. Don Ramiro la esperaba en el porche. Se instaló en su habitación y conoció al servicio."
 
 Responde SOLO con este JSON (el valor DEBE ser un string de texto narrativo, NO un objeto estructurado):
 {{"global_summary": "[tu sinopsis narrativa aquí]"}}"""
@@ -1251,15 +1256,15 @@ class ChapterSummaryAnalyzer:
         # Seleccionar top oraciones manteniendo orden original
         scored.sort(key=lambda x: x[0], reverse=True)
 
-        # Cuántas oraciones elegir (2-4 según longitud del texto)
-        max_sents = 2 if len(chapter_text) < 3000 else (3 if len(chapter_text) < 8000 else 4)
+        # Cuántas oraciones elegir (INCREMENTADO: 3-6 según longitud del texto)
+        max_sents = 3 if len(chapter_text) < 3000 else (5 if len(chapter_text) < 8000 else 6)
         selected = sorted(scored[:max_sents], key=lambda x: x[1])  # Orden original
 
         result = " ".join(s[2] for s in selected)
 
-        # Limitar a ~400 caracteres
-        if len(result) > 400:
-            result = result[:397].rsplit(" ", 1)[0] + "..."
+        # Limitar a ~600 caracteres (INCREMENTADO de 400)
+        if len(result) > 600:
+            result = result[:597].rsplit(" ", 1)[0] + "..."
 
         return result if result.strip() else "Sin contenido disponible para generar resumen."
 
@@ -1314,20 +1319,21 @@ class ChapterSummaryAnalyzer:
         score = 0.0
         sent_lower = sent.lower()
 
-        # --- Posición (leve bonus, NO debe dominar) ---
+        # --- Posición (bonus MUY leve, NO debe dominar) ---
+        # REDUCIDO: primera oración suele ser setup trivial, no el evento principal
         if idx == 0:
-            score += 1.0
+            score += 0.3
         elif idx == 1:
-            score += 0.5
-        # Últimas oraciones suelen cerrar/concluir
+            score += 0.2
+        # Últimas oraciones suelen cerrar/concluir — bonus moderado
         if total > 3 and idx >= total - 2:
-            score += 1.0
+            score += 0.8
 
         # --- Mención de personajes (alta prioridad) ---
         name_hits = sum(1 for name in char_names if name in sent_lower)
         score += min(name_hits * 1.2, 3.6)  # Max 3.6 puntos por personajes
 
-        # --- Eventos narrativos de alto impacto ---
+        # --- Eventos narrativos de alto impacto (PRIORIDAD MÁXIMA) ---
         high_impact_patterns = [
             r"\b(?:desapareci|desaparic|muri|muert|asesina|matar|mat[óo])\w*\b",
             r"\b(?:revel|confes|descubr|secret|traicion|enga[ñn])\w*\b",
@@ -1336,19 +1342,21 @@ class ChapterSummaryAnalyzer:
         ]
         for pattern in high_impact_patterns:
             if re.search(pattern, sent_lower):
-                score += 2.0
+                score += 4.0  # INCREMENTADO de 2.0 a 4.0
 
         # --- Verbos de acción narrativa significativa ---
         action_patterns = [
-            r"\b(?:decid|resolv|comprend|interrog)\w+\b",
-            r"\b(?:huy|escap|regres|abandon|march)\w+\b",
-            r"\b(?:enfrent|luch|atac|defend|acus)\w+\b",
-            r"\b(?:prometi|jur|advirti|amenaz|exigi)\w+\b",
-            r"\b(?:naci|transform|cambi|convirti)\w+\b",
+            r"\b(?:decid|resolv|comprend|interrog|investig|examin|inspeccion)\w+\b",
+            r"\b(?:huy|escap|regres|abandon|march|desaparec)\w+\b",
+            r"\b(?:enfrent|luch|atac|defend|acus|culp)\w+\b",
+            r"\b(?:prometi|jur|advirti|amenaz|exigi|orden)\w+\b",
+            r"\b(?:naci|transform|cambi|convirti|volvi)\w+\b",
+            r"\b(?:testific|declar|afirm|neg|reconoc|admit)\w+\b",  # NUEVO: testimonios
+            r"\b(?:sospech|dud|desconfí|tem|tem[ií])\w+\b",  # NUEVO: sospechas
         ]
         for pattern in action_patterns:
             if re.search(pattern, sent_lower):
-                score += 1.2
+                score += 1.5  # INCREMENTADO de 1.2
 
         # --- Conectores causales/temporales (indican progresión narrativa) ---
         if re.search(
@@ -1366,15 +1374,23 @@ class ChapterSummaryAnalyzer:
         ):
             score += 0.5
 
-        # --- Penalización por oraciones genéricas/descriptivas ---
-        if re.search(r"^(?:el sol|la noche|el día|hacía|era un)\b", sent_lower):
-            score -= 1.0
-        # Penalizar acciones cotidianas
+        # --- Penalización por oraciones genéricas/descriptivas (INCREMENTADA) ---
+        # Oraciones de setup ambiental/temporal genérico
+        if re.search(r"^(?:el sol|la noche|el día|hacía|era un|llegó a|se encontraba)\b", sent_lower):
+            score -= 2.5  # INCREMENTADO de -1.0
+        # Penalizar acciones cotidianas rutinarias
         if re.search(
-            r"\b(?:se levant|despert|desayun|camin|se sent[óo]|cerr[óo] la puerta)\b",
+            r"\b(?:se levant|despert|desayun|camin|se sent[óo]|cerr[óo] la puerta|esperaba en|"
+            r"le explicó|habló con|conversó|charlaron)\b",
             sent_lower,
         ):
-            score -= 0.5
+            score -= 1.5  # INCREMENTADO de -0.5
+        # Penalizar descripciones triviales sin eventos
+        if re.search(
+            r"\b(?:estaba podando|regando|limpiando|cocinando|preparando|ordenando)\b",
+            sent_lower,
+        ):
+            score -= 2.0  # NUEVO: penalizar acciones descriptivas sin impacto narrativo
 
         # --- Longitud óptima (40-180 chars) ---
         length = len(sent)
