@@ -43,6 +43,7 @@ ENRICHMENT_SCHEMA_VERSIONS: dict[str, int] = {
     "voice_deviations": 1,
     "register_analysis": 1,
     "focalization": 1,
+    "focalization_violations": 1,
     # Phase 12 — Prose
     "sticky_sentences": 1,
     "sentence_energy": 1,
@@ -92,6 +93,7 @@ ENRICHMENT_TO_PHASE: dict[str, str] = {
     "voice_deviations": "voice",
     "register_analysis": "voice",
     "focalization": "voice",
+    "focalization_violations": "voice",
     # Phase 12 — Prose
     "sticky_sentences": "prose",
     "sentence_energy": "prose",

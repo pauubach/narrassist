@@ -189,7 +189,7 @@ def get_voice_profiles(
             profile_dict = profile.to_dict()
             profiles_data.append(profile_dict)
 
-        # Cachear perfiles en BD
+        # Cachear perfiles en BD (legacy table)
         if deps.get_database and profiles_data:
             try:
                 db = deps.get_database()
@@ -229,19 +229,31 @@ def get_voice_profiles(
             except Exception as cache_err:
                 logger.warning(f"Failed to cache voice profiles: {cache_err}")
 
-        return ApiResponse(
-            success=True,
-            data={
-                "project_id": project_id,
-                "profiles": profiles_data,
-                "stats": {
-                    "characters_analyzed": len(profiles_data),
-                    "total_dialogues": len(dialogues),
-                    "chapters_analyzed": len(chapters),
-                },
-                "cached": False,
+        # Preparar datos para respuesta
+        result_data = {
+            "project_id": project_id,
+            "profiles": profiles_data,
+            "stats": {
+                "characters_analyzed": len(profiles_data),
+                "total_dialogues": len(dialogues),
+                "chapters_analyzed": len(chapters),
             },
-        )
+            "cached": False,
+        }
+
+        # Guardar en caché de enrichment (solo cuando no hay force_refresh)
+        if not force_refresh:
+            from routers._enrichment_phases import _cache_result
+
+            _cache_result(
+                db_session=deps.get_database(),
+                project_id=project_id,
+                enrichment_type="voice_profiles",
+                result=result_data,
+                phase=11,
+            )
+
+        return ApiResponse(success=True, data=result_data)
 
     except HTTPException:
         raise
@@ -594,22 +606,34 @@ def get_voice_deviations(
             for name, info in by_character.items()
         }
 
-        return ApiResponse(
-            success=True,
-            data={
-                "project_id": project_id,
-                "deviations": deviations_data,
-                "summary_by_character": summary,
-                "stats": {
-                    "total_deviations": len(filtered),
-                    "characters_with_deviations": len(by_character),
-                    "profiles_built": len(profiles),
-                    "dialogues_analyzed": len(dialogues),
-                    "chapters_analyzed": len(chapters),
-                    "min_severity_filter": min_severity,
-                },
+        # Preparar datos para respuesta
+        result_data = {
+            "project_id": project_id,
+            "deviations": deviations_data,
+            "summary_by_character": summary,
+            "stats": {
+                "total_deviations": len(filtered),
+                "characters_with_deviations": len(by_character),
+                "profiles_built": len(profiles),
+                "dialogues_analyzed": len(dialogues),
+                "chapters_analyzed": len(chapters),
+                "min_severity_filter": min_severity,
             },
-        )
+        }
+
+        # Guardar en caché de enrichment (solo cuando no hay filtros activos)
+        if chapter_number is None:
+            from routers._enrichment_phases import _cache_result
+
+            _cache_result(
+                db_session=deps.get_database(),
+                project_id=project_id,
+                enrichment_type="voice_deviations",
+                result=result_data,
+                phase=11,
+            )
+
+        return ApiResponse(success=True, data=result_data)
 
     except HTTPException:
         raise
@@ -795,25 +819,37 @@ def get_register_analysis(
             consistency_pct = 100.0
             distribution_pct = {}
 
-        return ApiResponse(
-            success=True,
-            data={
-                "project_id": project_id,
-                "analyses": analyses_data,
-                "changes": changes_data,
-                "summary": {
-                    **summary,
-                    "consistency_pct": consistency_pct,
-                    "distribution_pct": distribution_pct,
-                },
-                "per_chapter": per_chapter,
-                "stats": {
-                    "segments_analyzed": len(analyses),
-                    "changes_detected": len(changes),
-                    "chapters_analyzed": len(chapters),
-                },
+        # Preparar datos para respuesta
+        result_data = {
+            "project_id": project_id,
+            "analyses": analyses_data,
+            "changes": changes_data,
+            "summary": {
+                **summary,
+                "consistency_pct": consistency_pct,
+                "distribution_pct": distribution_pct,
             },
-        )
+            "per_chapter": per_chapter,
+            "stats": {
+                "segments_analyzed": len(analyses),
+                "changes_detected": len(changes),
+                "chapters_analyzed": len(chapters),
+            },
+        }
+
+        # Guardar en caché de enrichment (solo cuando no hay filtros activos)
+        if chapter_number is None:
+            from routers._enrichment_phases import _cache_result
+
+            _cache_result(
+                db_session=deps.get_database(),
+                project_id=project_id,
+                enrichment_type="register_analysis",
+                result=result_data,
+                phase=11,
+            )
+
+        return ApiResponse(success=True, data=result_data)
 
     except HTTPException:
         raise
@@ -1225,10 +1261,21 @@ def detect_focalization_violations(project_id: int):
             stats["by_type"][v["violation_type"]] = stats["by_type"].get(v["violation_type"], 0) + 1
             stats["by_severity"][v["severity"]] = stats["by_severity"].get(v["severity"], 0) + 1
 
-        return ApiResponse(
-            success=True,
-            data={"violations": all_violations, "by_chapter": by_chapter, "stats": stats},
+        # Preparar datos para respuesta
+        result_data = {"violations": all_violations, "by_chapter": by_chapter, "stats": stats}
+
+        # Guardar en caché de enrichment
+        from routers._enrichment_phases import _cache_result
+
+        _cache_result(
+            db_session=deps.get_database(),
+            project_id=project_id,
+            enrichment_type="focalization_violations",
+            result=result_data,
+            phase=11,
         )
+
+        return ApiResponse(success=True, data=result_data)
     except HTTPException:
         raise
     except Exception as e:
