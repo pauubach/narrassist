@@ -42,6 +42,7 @@ const emit = defineEmits<{
   'export-style-guide': []
   'export-corrected': []
   're-analyze': []
+  'navigate-to-character': [entityId: number]
 }>()
 
 const { getEntityIcon, getEntityLabel } = useEntityUtils()
@@ -63,7 +64,25 @@ const reviewStats = computed(() => {
   const reviewed = resolved + dismissed
   const pending = total - reviewed
   const percent = total > 0 ? Math.round((reviewed / total) * 100) : 0
-  return { total, resolved, dismissed, reviewed, pending, percent }
+
+  // Estimación de tiempo restante
+  // Peso uniforme: ~30 segundos por alerta independientemente de la severidad
+  // (Un fallo severo no necesariamente tarda más en corregir que uno leve)
+  const pendingAlerts = props.alerts.filter(a => a.status === 'active')
+  const SECONDS_PER_ALERT = 30
+  const estimatedSeconds = pendingAlerts.length * SECONDS_PER_ALERT
+  const estimatedMinutes = Math.ceil(estimatedSeconds / 60)
+
+  let timeEstimate = ''
+  if (estimatedMinutes < 60) {
+    timeEstimate = `~${estimatedMinutes} min`
+  } else {
+    const hours = Math.floor(estimatedMinutes / 60)
+    const mins = estimatedMinutes % 60
+    timeEstimate = mins > 0 ? `~${hours}h ${mins}m` : `~${hours}h`
+  }
+
+  return { total, resolved, dismissed, reviewed, pending, percent, timeEstimate }
 })
 
 // Distribución de alertas por severidad
@@ -106,6 +125,27 @@ const entityBarItems = computed((): BarChartItem[] => {
   }))
 })
 
+// Transformar alertDistribution a formato BarChartItem
+const alertDistributionBars = computed((): BarChartItem[] => {
+  const items = [
+    { key: 'critical', label: 'Críticas', count: alertDistribution.value.critical, color: severityColors.critical },
+    { key: 'high', label: 'Altas', count: alertDistribution.value.high, color: severityColors.high },
+    { key: 'medium', label: 'Medias', count: alertDistribution.value.medium, color: severityColors.medium },
+    { key: 'low', label: 'Bajas', count: alertDistribution.value.low, color: severityColors.low },
+    { key: 'info', label: 'Info', count: alertDistribution.value.info, color: severityColors.info },
+  ]
+  const maxCount = Math.max(...items.map(i => i.count), 1)
+  return items
+    .filter(i => i.count > 0)
+    .map(item => ({
+      label: item.label,
+      value: item.count,
+      max: maxCount,
+      color: item.color,
+      tooltip: `${item.label}: ${item.count} alertas`
+    }))
+})
+
 // Top personajes por menciones
 const topCharacters = computed(() => {
   return props.entities
@@ -139,15 +179,27 @@ const chapterDensity = computed(() => {
     byChapter[chapter].bySeverity[alert.severity]++
   }
 
+  // Crear mapa de palabras por capítulo
+  const wordsByChapter: Record<number, number> = {}
+  if (props.chapters && props.chapters.length > 0) {
+    for (const ch of props.chapters) {
+      wordsByChapter[ch.chapterNumber] = ch.wordCount || 0
+    }
+  }
+
   // Convertir a array ordenado
   const chapters = Object.entries(byChapter)
     .map(([chapterNum, data]) => {
       const num = parseInt(chapterNum)
+      const words = wordsByChapter[num] || 0
+      const density = words > 0 ? (data.count / words) * 1000 : 0 // alertas por 1000 palabras
       return {
         chapter: num,
         // Usar el nombre del capítulo si existe, si no "Sin capítulo" para 0
         name: num === 0 ? 'Sin capítulo' : (chapterNameMap.value[num] || `Capítulo ${num}`),
         count: data.count,
+        words,
+        density: Math.round(density * 10) / 10, // 1 decimal
         bySeverity: data.bySeverity,
       }
     })
@@ -155,8 +207,9 @@ const chapterDensity = computed(() => {
 
   // Calcular el máximo para normalizar barras
   const maxCount = Math.max(...chapters.map(c => c.count), 1)
+  const maxDensity = Math.max(...chapters.map(c => c.density), 1)
 
-  return { chapters, maxCount }
+  return { chapters, maxCount, maxDensity }
 })
 
 // Tendencia de errores (mejorando o empeorando)
@@ -179,7 +232,7 @@ const errorTrend = computed(() => {
   return { direction: 'stable', percent: Math.abs(percentChange) }
 })
 
-// Severity colors for donut
+// Severity colors for alerts
 const severityColors: Record<string, string> = {
   critical: 'var(--ds-color-danger, #ef4444)',
   high: 'var(--orange-500)',
@@ -187,43 +240,6 @@ const severityColors: Record<string, string> = {
   low: 'var(--blue-500)',
   info: 'var(--gray-400)',
 }
-
-// Donut segments computed from alert distribution
-const donutSegments = computed(() => {
-  const total = stats.value.activeAlerts
-  if (total === 0) return []
-
-  const circumference = 2 * Math.PI * 48 // r=48
-  const severities = ['critical', 'high', 'medium', 'low', 'info'] as const
-  const segments: Array<{ color: string; dashArray: string; dashOffset: number }> = []
-  let cumulativeOffset = 0
-
-  for (const sev of severities) {
-    const count = alertDistribution.value[sev]
-    if (count === 0) continue
-    const fraction = count / total
-    const segLength = fraction * circumference
-    segments.push({
-      color: severityColors[sev],
-      dashArray: `${segLength} ${circumference - segLength}`,
-      dashOffset: -cumulativeOffset + circumference * 0.25, // start at top
-    })
-    cumulativeOffset += segLength
-  }
-  return segments
-})
-
-// Legend items for alert donut
-const alertLegendItems = computed(() => {
-  const items = [
-    { key: 'critical', label: 'Críticas', count: alertDistribution.value.critical, color: severityColors.critical },
-    { key: 'high', label: 'Altas', count: alertDistribution.value.high, color: severityColors.high },
-    { key: 'medium', label: 'Medias', count: alertDistribution.value.medium, color: severityColors.medium },
-    { key: 'low', label: 'Bajas', count: alertDistribution.value.low, color: severityColors.low },
-    { key: 'info', label: 'Info', count: alertDistribution.value.info, color: severityColors.info },
-  ]
-  return items.filter(i => i.count > 0)
-})
 
 // Verificar si el documento es Word (para exportar con Track Changes)
 const isWordDocument = computed(() => {
@@ -320,27 +336,29 @@ const originalDocumentName = computed(() => {
           <div class="review-progress-content">
             <div class="review-progress-header">
               <span class="review-percent">{{ reviewStats.percent }}%</span>
-              <span class="review-fraction">{{ reviewStats.reviewed }} / {{ reviewStats.total }}</span>
+              <div class="review-meta">
+                <span class="review-fraction">{{ reviewStats.reviewed }} / {{ reviewStats.total }} completadas</span>
+                <span v-if="reviewStats.pending > 0" class="review-estimate">{{ reviewStats.timeEstimate }} restantes</span>
+              </div>
             </div>
             <div class="review-bar-track">
               <div class="review-bar-fill" :style="{ width: reviewStats.percent + '%' }"></div>
             </div>
             <div class="review-breakdown">
-              <div class="review-breakdown-item">
+              <span class="breakdown-item">
                 <span class="breakdown-dot breakdown-resolved"></span>
-                <span class="breakdown-label">Resueltas</span>
-                <span class="breakdown-count">{{ reviewStats.resolved }}</span>
-              </div>
-              <div class="review-breakdown-item">
+                {{ reviewStats.resolved }} resueltas
+              </span>
+              <span class="breakdown-separator">·</span>
+              <span class="breakdown-item">
                 <span class="breakdown-dot breakdown-dismissed"></span>
-                <span class="breakdown-label">Descartadas</span>
-                <span class="breakdown-count">{{ reviewStats.dismissed }}</span>
-              </div>
-              <div class="review-breakdown-item">
+                {{ reviewStats.dismissed }} descartadas
+              </span>
+              <span class="breakdown-separator">·</span>
+              <span class="breakdown-item">
                 <span class="breakdown-dot breakdown-pending"></span>
-                <span class="breakdown-label">Pendientes</span>
-                <span class="breakdown-count">{{ reviewStats.pending }}</span>
-              </div>
+                {{ reviewStats.pending }} pendientes
+              </span>
             </div>
           </div>
         </template>
@@ -348,42 +366,19 @@ const originalDocumentName = computed(() => {
 
       <!-- Row 2: Two-column grid for charts -->
       <div class="charts-row">
-        <!-- Left: Alert distribution (donut-like visual) -->
+        <!-- Left: Alert distribution (horizontal bars) -->
         <Card class="chart-card distribution-card">
           <template #title>
-            <i class="pi pi-chart-pie"></i>
+            <i class="pi pi-chart-bar"></i>
             Distribución de Alertas
           </template>
           <template #content>
-            <!-- Donut chart visualization -->
-            <div v-if="stats.activeAlerts > 0" class="donut-container">
-              <svg viewBox="0 0 120 120" class="donut-chart">
-                <circle
-                  v-for="(seg, i) in donutSegments"
-                  :key="i"
-                  cx="60" cy="60" r="48"
-                  fill="none"
-                  :stroke="seg.color"
-                  stroke-width="18"
-                  :stroke-dasharray="seg.dashArray"
-                  :stroke-dashoffset="seg.dashOffset"
-                  :class="'donut-segment'"
-                />
-                <text x="60" y="56" text-anchor="middle" class="donut-total">{{ stats.activeAlerts }}</text>
-                <text x="60" y="72" text-anchor="middle" class="donut-label">alertas</text>
-              </svg>
+            <div v-if="stats.activeAlerts > 0">
+              <DsBarChart :items="alertDistributionBars" size="compact" />
             </div>
-            <div v-else class="empty-donut">
+            <div v-else class="empty-state">
               <i class="pi pi-check-circle"></i>
               <span>Sin alertas activas</span>
-            </div>
-            <!-- Legend below donut -->
-            <div class="alert-legend">
-              <div v-for="item in alertLegendItems" :key="item.key" class="alert-legend-item">
-                <span class="legend-dot" :style="{ background: item.color }"></span>
-                <span class="legend-label">{{ item.label }}</span>
-                <span class="legend-count">{{ item.count }}</span>
-              </div>
             </div>
           </template>
         </Card>
@@ -462,6 +457,9 @@ const originalDocumentName = computed(() => {
                 </div>
               </div>
               <span class="density-count">{{ item.count }}</span>
+              <span v-if="item.words > 0" class="density-metric" :title="`${item.density} alertas por cada 1000 palabras`">
+                {{ item.density }}
+              </span>
             </div>
           </div>
           <div class="density-legend">
@@ -479,7 +477,7 @@ const originalDocumentName = computed(() => {
 
       <!-- Row 3c: Version History -->
       <Card v-if="project" class="chart-card version-history-card">
-        <template #title><i class="pi pi-history"></i> Historial de Versiones</template>
+        <template #title><i class="pi pi-history"></i> Versiones</template>
         <template #content>
           <VersionHistory :project-id="project.id" />
         </template>
@@ -499,6 +497,7 @@ const originalDocumentName = computed(() => {
                 v-for="(char, index) in topCharacters"
                 :key="char.id"
                 class="character-item"
+                @click="emit('navigate-to-character', char.id)"
               >
                 <span class="character-rank" :class="'rank-' + (index + 1)">{{ index + 1 }}</span>
                 <div class="character-info">
@@ -511,6 +510,7 @@ const originalDocumentName = computed(() => {
                   </div>
                 </div>
                 <span class="character-mentions">{{ char.mentionCount || 0 }}</span>
+                <i class="pi pi-chevron-right character-chevron"></i>
               </div>
             </div>
           </template>
@@ -565,6 +565,7 @@ const originalDocumentName = computed(() => {
           <template #content>
             <div class="actions-stack">
               <Button
+                v-tooltip.top="'Exportar informe PDF con todas las alertas, estadísticas y análisis del documento'"
                 label="Exportar Informe"
                 icon="pi pi-download"
                 outlined
@@ -582,6 +583,7 @@ const originalDocumentName = computed(() => {
                 @click="emit('export-corrected')"
               />
               <Button
+                v-tooltip.top="'Exportar guía de estilo personalizada basada en los patrones detectados en el manuscrito'"
                 label="Guía de Estilo"
                 icon="pi pi-book"
                 outlined
@@ -589,6 +591,7 @@ const originalDocumentName = computed(() => {
                 @click="emit('export-style-guide')"
               />
               <Button
+                v-tooltip.top="'Volver a analizar el documento para actualizar alertas, entidades y métricas'"
                 label="Re-analizar"
                 icon="pi pi-refresh"
                 outlined
@@ -694,7 +697,8 @@ const originalDocumentName = computed(() => {
 .review-progress-header {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: flex-start;
+  gap: 1rem;
 }
 
 .review-percent {
@@ -702,11 +706,25 @@ const originalDocumentName = computed(() => {
   font-weight: 700;
   color: var(--ds-color-success, #16a34a);
   line-height: 1;
+  flex-shrink: 0;
+}
+
+.review-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.125rem;
+  font-size: 0.8125rem;
+  text-align: right;
 }
 
 .review-fraction {
-  font-size: 0.875rem;
   color: var(--text-color-secondary);
+}
+
+.review-estimate {
+  color: var(--text-color);
+  font-weight: 500;
 }
 
 .review-bar-track {
@@ -725,15 +743,21 @@ const originalDocumentName = computed(() => {
 
 .review-breakdown {
   display: flex;
-  gap: 1.5rem;
+  align-items: center;
+  gap: 0.5rem;
   margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--text-color-secondary);
 }
 
-.review-breakdown-item {
-  display: flex;
+.breakdown-item {
+  display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  font-size: 0.8125rem;
+}
+
+.breakdown-separator {
+  color: var(--surface-400);
 }
 
 .breakdown-dot {
@@ -744,17 +768,8 @@ const originalDocumentName = computed(() => {
 }
 
 .breakdown-resolved { background: var(--green-500); }
-.breakdown-dismissed { background: var(--surface-400); }
+.breakdown-dismissed { background: var(--blue-400); }
 .breakdown-pending { background: var(--orange-400); }
-
-.breakdown-label {
-  color: var(--text-color-secondary);
-}
-
-.breakdown-count {
-  font-weight: 600;
-  color: var(--text-color);
-}
 
 /* ── Row 2: Charts row (two columns) ── */
 .charts-row {
@@ -775,38 +790,8 @@ const originalDocumentName = computed(() => {
   height: 100%;
 }
 
-/* ── Donut chart ── */
-.donut-container {
-  display: flex;
-  justify-content: center;
-  padding: 0.5rem 0 1rem;
-}
-
-.donut-chart {
-  width: 160px;
-  height: 160px;
-}
-
-.donut-segment {
-  transition: opacity 0.2s;
-}
-
-.donut-segment:hover {
-  opacity: 0.8;
-}
-
-.donut-total {
-  font-size: 1.5rem;
-  font-weight: 700;
-  fill: var(--text-color);
-}
-
-.donut-label {
-  font-size: 0.6875rem;
-  fill: var(--text-color-secondary);
-}
-
-.empty-donut {
+/* ── Empty state ── */
+.empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -815,39 +800,8 @@ const originalDocumentName = computed(() => {
   color: var(--ds-color-success, #16a34a);
 }
 
-.empty-donut i {
+.empty-state i {
   font-size: 2rem;
-}
-
-/* Alert legend */
-.alert-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  justify-content: center;
-}
-
-.alert-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: 0.8125rem;
-}
-
-.alert-legend-item .legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.alert-legend-item .legend-label {
-  color: var(--text-color-secondary);
-}
-
-.alert-legend-item .legend-count {
-  font-weight: 600;
-  color: var(--text-color);
 }
 
 /* ── Density chart (alerts per chapter) ── */
@@ -931,6 +885,14 @@ const originalDocumentName = computed(() => {
   color: var(--text-color);
 }
 
+.density-metric {
+  width: 40px;
+  text-align: right;
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+  font-style: italic;
+}
+
 .density-legend {
   display: flex;
   gap: 1rem;
@@ -978,6 +940,19 @@ const originalDocumentName = computed(() => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  padding: 0.5rem;
+  margin: -0.5rem;
+  border-radius: var(--app-radius);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.character-item:hover {
+  background: var(--surface-100);
+}
+
+.character-item:active {
+  background: var(--surface-200);
 }
 
 .character-rank {
@@ -1038,6 +1013,18 @@ const originalDocumentName = computed(() => {
   flex-shrink: 0;
 }
 
+.character-chevron {
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+  opacity: 0;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.character-item:hover .character-chevron {
+  opacity: 1;
+}
+
 /* ── Info card ── */
 .info-list {
   display: flex;
@@ -1090,7 +1077,13 @@ const originalDocumentName = computed(() => {
 }
 
 /* ── Responsive ── */
-@media (max-width: 1200px) {
+@media (max-width: 1366px) {
+  .stats-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
   .stats-row {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1115,6 +1108,16 @@ const originalDocumentName = computed(() => {
 
   .bottom-row {
     grid-template-columns: 1fr;
+  }
+
+  .density-label {
+    width: 100px;
+    min-width: 100px;
+    max-width: 100px;
+  }
+
+  .density-metric {
+    display: none;
   }
 }
 

@@ -72,7 +72,8 @@ function healthSeverity(score: number | null): 'success' | 'warn' | 'danger' | '
 
 function formatHealth(score: number | null): string {
   if (score === null) return '-'
-  return (score * 100).toFixed(0) + '%'
+  // Backend devuelve score en escala 0-100, no 0-1
+  return score.toFixed(0) + '%'
 }
 
 function formatRatio(ratio: number | null): string {

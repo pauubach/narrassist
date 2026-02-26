@@ -347,6 +347,7 @@
             @export-style-guide="handleExportStyleGuide"
             @export-corrected="handleExportCorrected"
             @re-analyze="showReanalyzeDialog = true"
+            @navigate-to-character="handleNavigateToCharacter"
           />
         </div>
 
@@ -1531,6 +1532,12 @@ const onChatReferenceNavigate = (ref: ChatReference) => {
 
 const handleExportStyleGuide = () => {
   showExportDialog.value = true
+}
+
+const handleNavigateToCharacter = (entityId: number) => {
+  workspaceStore.setActiveTab('entities')
+  // El tab de entidades debería auto-seleccionar la entidad si se pasa como prop
+  // Por ahora solo cambiamos de tab
 }
 
 const handleExportCorrected = async () => {
