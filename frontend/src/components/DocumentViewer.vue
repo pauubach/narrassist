@@ -49,6 +49,19 @@
         </span>
       </div>
       <div class="toolbar-right">
+        <!-- Keyboard navigation indicator (Mejora #7) -->
+        <span
+          v-if="alertHighlightRanges && alertHighlightRanges.length > 0"
+          v-tooltip.bottom="'Navega con ↑↓ entre alertas'"
+          class="keyboard-nav-hint"
+        >
+          <i class="pi pi-arrow-up-down"></i>
+          <span v-if="currentHighlightIndex >= 0">
+            {{ currentHighlightIndex + 1 }}/{{ alertHighlightRanges.length }}
+          </span>
+          <span v-else>{{ alertHighlightRanges.length }}</span>
+        </span>
+        <span v-if="alertHighlightRanges && alertHighlightRanges.length > 0" class="toolbar-divider"></span>
         <!-- Toggle errores de ortografia -->
         <Button
           v-tooltip.bottom="showSpellingErrors ? 'Ocultar errores de ortografia' : 'Mostrar errores de ortografia'"
@@ -1067,6 +1080,9 @@ let highlightTimer: ReturnType<typeof setTimeout> | null = null
 const activeScrollTimers = new Set<ReturnType<typeof setTimeout>>()
 let scrollAbortController: AbortController | null = null
 
+// Keyboard navigation state (Mejora #7)
+const currentHighlightIndex = ref<number>(-1)
+
 const clearTemporaryMentionHighlights = () => {
   if (highlightTimer) {
     clearTimeout(highlightTimer)
@@ -1086,6 +1102,69 @@ const cleanupScrollTimers = () => {
   if (scrollAbortController) {
     scrollAbortController.abort()
     scrollAbortController = null
+  }
+}
+
+// Keyboard navigation (Mejora #7)
+const navigateToNextHighlight = () => {
+  if (!props.alertHighlightRanges || props.alertHighlightRanges.length === 0) return
+
+  const nextIndex = (currentHighlightIndex.value + 1) % props.alertHighlightRanges.length
+  navigateToHighlight(nextIndex)
+}
+
+const navigateToPrevHighlight = () => {
+  if (!props.alertHighlightRanges || props.alertHighlightRanges.length === 0) return
+
+  const prevIndex = currentHighlightIndex.value <= 0
+    ? props.alertHighlightRanges.length - 1
+    : currentHighlightIndex.value - 1
+  navigateToHighlight(prevIndex)
+}
+
+const navigateToHighlight = (index: number) => {
+  if (!props.alertHighlightRanges || index < 0 || index >= props.alertHighlightRanges.length) return
+
+  currentHighlightIndex.value = index
+  const range = props.alertHighlightRanges[index]
+
+  if (range.chapterId) {
+    const target: ScrollTarget = {
+      chapterId: range.chapterId,
+      position: range.startChar,
+      endPosition: range.endChar,
+      text: range.text,
+    }
+    scrollToMention(target)
+  }
+}
+
+const handleKeyDown = (event: KeyboardEvent) => {
+  // Ignorar si el usuario está escribiendo en un input/textarea
+  const target = event.target as HTMLElement
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    return
+  }
+
+  switch (event.key) {
+    case 'ArrowDown':
+      if (props.alertHighlightRanges && props.alertHighlightRanges.length > 0) {
+        event.preventDefault()
+        navigateToNextHighlight()
+      }
+      break
+    case 'ArrowUp':
+      if (props.alertHighlightRanges && props.alertHighlightRanges.length > 0) {
+        event.preventDefault()
+        navigateToPrevHighlight()
+      }
+      break
+    case 'Escape':
+      if (showDialoguePanel.value) {
+        event.preventDefault()
+        showDialoguePanel.value = false
+      }
+      break
   }
 }
 
@@ -1765,6 +1844,11 @@ watch(() => props.projectId, () => {
   loadDocument()
 })
 
+// Mejora #7: Resetear índice de navegación cuando cambien los highlights
+watch(() => props.alertHighlightRanges, () => {
+  currentHighlightIndex.value = -1
+}, { deep: true })
+
 // Watch para capítulos externos (cuando el padre los actualiza durante análisis)
 watch(() => props.externalChapters, (newChapters) => {
   if (newChapters && newChapters.length > 0) {
@@ -1862,6 +1946,8 @@ onMounted(() => {
   })
   // Escuchar cambios de configuración
   window.addEventListener('settings-changed', handleSettingsChange)
+  // Mejora #7: Keyboard shortcuts
+  window.addEventListener('keydown', handleKeyDown)
 })
 
 onUnmounted(() => {
@@ -1876,6 +1962,8 @@ onUnmounted(() => {
   }
   chapterRefs.clear()
   window.removeEventListener('settings-changed', handleSettingsChange)
+  // Mejora #7: Remover keyboard listener
+  window.removeEventListener('keydown', handleKeyDown)
 })
 
 // Exponer métodos para el padre
@@ -1937,6 +2025,24 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+/* Keyboard navigation hint (Mejora #7) */
+.keyboard-nav-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--app-radius-sm, 4px);
+  background: var(--p-primary-50, #eff6ff);
+  color: var(--p-primary-700, #1d4ed8);
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid var(--p-primary-200, #bfdbfe);
+}
+
+.keyboard-nav-hint i {
+  font-size: 0.625rem;
 }
 
 .viewer-content {
