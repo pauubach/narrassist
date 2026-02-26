@@ -66,6 +66,17 @@ def get_chapter_progress(
             llm_model=llm_model,
         )
 
+        # Guardar en caché para evitar recalcular (solo en mode=standard)
+        if mode == "standard":
+            from routers._enrichment_phases import _cache_result
+            _cache_result(
+                db_session=deps.get_database(),
+                project_id=project_id,
+                enrichment_type="chapter_progress",
+                result=report.to_dict(),
+                phase=13,  # Phase 13 = Health
+            )
+
         return ApiResponse(success=True, data=report.to_dict())
 
     except ImportError as e:
@@ -122,6 +133,16 @@ def get_narrative_templates(
         template_report = analyzer.analyze(
             chapters_data=chapters_data,
             total_chapters=report.total_chapters,
+        )
+
+        # Guardar en caché
+        from routers._enrichment_phases import _cache_result
+        _cache_result(
+            db_session=deps.get_database(),
+            project_id=project_id,
+            enrichment_type="narrative_templates",
+            result=template_report.to_dict(),
+            phase=13,
         )
 
         return ApiResponse(success=True, data=template_report.to_dict())
@@ -209,6 +230,16 @@ def get_narrative_health(
             character_arcs=character_arcs,
             chekhov_elements=chekhov_elements,
             abandoned_threads=abandoned_threads,
+        )
+
+        # Guardar en caché
+        from routers._enrichment_phases import _cache_result
+        _cache_result(
+            db_session=deps.get_database(),
+            project_id=project_id,
+            enrichment_type="narrative_health",
+            result=health_report.to_dict(),
+            phase=13,
         )
 
         return ApiResponse(success=True, data=health_report.to_dict())
@@ -338,20 +369,30 @@ def get_sticky_sentences(
         if len(global_sticky) > global_total_sentences * 0.2:
             recommendations.append("Más del 20% de las oraciones son pesadas. Considera simplificar el estilo.")
 
-        return ApiResponse(
-            success=True,
-            data={
-                "global_stats": {
-                    "total_sticky_sentences": len(global_sticky),
-                    "total_sentences": global_total_sentences,
-                    "avg_glue_percentage": round(avg_glue, 1),
-                    "by_severity": by_severity,
-                },
-                "chapters": chapters_data,
-                "recommendations": recommendations,
-                "threshold_used": threshold,
-            }
-        )
+        result_data = {
+            "global_stats": {
+                "total_sticky_sentences": len(global_sticky),
+                "total_sentences": global_total_sentences,
+                "avg_glue_percentage": round(avg_glue, 1),
+                "by_severity": by_severity,
+            },
+            "chapters": chapters_data,
+            "recommendations": recommendations,
+            "threshold_used": threshold,
+        }
+
+        # Guardar en caché (solo si no hay filtro de capítulo)
+        if chapter_number is None:
+            from routers._enrichment_phases import _cache_result
+            _cache_result(
+                db_session=deps.get_database(),
+                project_id=project_id,
+                enrichment_type="sticky_sentences",
+                result=result_data,
+                phase=12,
+            )
+
+        return ApiResponse(success=True, data=result_data)
     except HTTPException:
         raise
     except Exception as e:
