@@ -1089,7 +1089,7 @@ const scrollToChapter = async (chapterId: number) => {
     activeScrollTimers.add(timer)
   })
 
-  const element = viewerContainer.value?.querySelector(`[data-chapter-id="${chapterId}"]`)
+  const element = getChapterElement(chapterId)
   if (element) {
     element.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
@@ -1107,6 +1107,62 @@ let scrollAbortController: AbortController | null = null
 
 // Keyboard navigation state (Mejora #7)
 const currentHighlightIndex = ref<number>(-1)
+
+// Helper functions (Refactor #14: reduce duplication)
+const MAX_RETRIES = 3
+const RETRY_DELAY = 150
+
+/**
+ * Ejecuta función con reintentos automáticos
+ * @param fn Función a ejecutar
+ * @param maxRetries Número máximo de reintentos
+ * @param delay Delay entre reintentos (ms)
+ * @param retryCount Contador interno de reintentos
+ */
+async function withRetry<T>(
+  fn: () => Promise<T | null>,
+  maxRetries: number = MAX_RETRIES,
+  delay: number = RETRY_DELAY,
+  retryCount: number = 0
+): Promise<T | null> {
+  const result = await fn()
+
+  if (result !== null || retryCount >= maxRetries) {
+    return result
+  }
+
+  // Retry con delay trackeado
+  await new Promise<void>(resolve => {
+    const timer = setTimeout(() => {
+      activeScrollTimers.delete(timer)
+      resolve()
+    }, delay)
+    activeScrollTimers.add(timer)
+  })
+  await nextTick()
+
+  return withRetry(fn, maxRetries, delay, retryCount + 1)
+}
+
+/**
+ * Obtiene elemento .chapter-text de un capítulo
+ * @param chapterId ID del capítulo
+ * @returns Element o null si no existe
+ */
+function getChapterContent(chapterId: number): Element | null {
+  const chapterEl = getChapterElement(chapterId)
+  if (!chapterEl) return null
+  return chapterEl.querySelector('.chapter-text')
+}
+
+/**
+ * Obtiene elemento de capítulo por ID
+ * @param chapterId ID del capítulo
+ * @returns Element o null
+ */
+function getChapterElement(chapterId: number): Element | null {
+  return viewerContainer.value?.querySelector(`[data-chapter-id="${chapterId}"]`) ?? null
+}
 
 const clearTemporaryMentionHighlights = () => {
   if (highlightTimer) {
@@ -1393,7 +1449,7 @@ const scrollToMention = async (target: ScrollTarget) => {
   // Check si la operación fue abortada
   if (signal.aborted) return
 
-  const chapterElement = viewerContainer.value?.querySelector(`[data-chapter-id="${target.chapterId}"]`)
+  const chapterElement = getChapterElement(target.chapterId)
   if (!chapterElement) {
     console.warn(`Chapter element not found for ${target.chapterId}`)
     return
@@ -1663,7 +1719,7 @@ const onScroll = () => {
   let mostVisibleChapterId: number | null = null
 
   chapters.value.forEach(chapter => {
-    const element = viewerContainer.value?.querySelector(`[data-chapter-id="${chapter.id}"]`)
+    const element = getChapterElement(chapter.id)
     if (!element) return
 
     const rect = element.getBoundingClientRect()
