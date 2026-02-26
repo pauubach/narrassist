@@ -15,6 +15,7 @@ import type { ApiVersionMetrics } from '@/types/api/projects'
 import { transformVersionMetrics } from '@/types/transformers/projects'
 import type { VersionMetrics } from '@/types/domain/projects'
 import VersionComparison from './VersionComparison.vue'
+import VersionSparkline from './VersionSparkline.vue'
 
 const props = defineProps<{
   projectId: number
@@ -117,6 +118,16 @@ const comparisonVersions = computed(() => {
 <template>
   <div class="version-history">
     <div class="history-header">
+      <div class="header-left">
+        <span v-if="versions.length >= 2" class="trend-label">Evolución de salud:</span>
+        <VersionSparkline
+          v-if="versions.length >= 2"
+          :project-id="projectId"
+          metric="healthScore"
+          :width="140"
+          :height="32"
+        />
+      </div>
       <Button
         v-if="versions.length >= 2"
         label="Comparar seleccionadas"
@@ -255,12 +266,19 @@ const comparisonVersions = computed(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
-.history-header h3 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trend-label {
+  font-size: 0.8125rem;
+  color: var(--text-color-secondary);
+  font-weight: 500;
 }
 
 .delta-badge {

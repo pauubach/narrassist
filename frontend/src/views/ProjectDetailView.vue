@@ -1535,9 +1535,8 @@ const handleExportStyleGuide = () => {
 }
 
 const handleNavigateToCharacter = (entityId: number) => {
+  initialEntityId.value = entityId
   workspaceStore.setActiveTab('entities')
-  // El tab de entidades debería auto-seleccionar la entidad si se pasa como prop
-  // Por ahora solo cambiamos de tab
 }
 
 const handleExportCorrected = async () => {
