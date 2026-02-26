@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
@@ -148,29 +148,7 @@ syncWithWorkspaceStore(workspaceStore)
 
 onMounted(() => {
   syncWithWorkspaceStore(workspaceStore)
-
-  // Event listener: filtrar por severidad desde ResumenTab
-  window.addEventListener('alerts:filter', handleExternalFilter)
 })
-
-// Cleanup
-onUnmounted(() => {
-  window.removeEventListener('alerts:filter', handleExternalFilter)
-})
-
-// Manejar filtro externo (desde ResumenTab)
-function handleExternalFilter(event: Event) {
-  const customEvent = event as CustomEvent<{ severity?: AlertSeverity }>
-  if (customEvent.detail?.severity) {
-    // Filtrar solo por severidad especificada
-    selectedSeverities.value = [customEvent.detail.severity]
-    selectedStatuses.value = ['active']
-    // Limpiar otros filtros para foco total
-    searchQuery.value = ''
-    selectedCategories.value = []
-    selectedMetaCategory.value = null
-  }
-}
 
 // Preset options derivados de FILTER_PRESETS (F-6: eliminar duplicación)
 const presetOptions = [

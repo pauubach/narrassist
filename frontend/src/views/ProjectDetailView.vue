@@ -1688,7 +1688,6 @@ const handleSettingsChange = async () => {
 
 onMounted(() => {
   window.addEventListener('settings-changed', handleSettingsChange)
-  window.addEventListener('chapter:navigate', handleChapterNavigate)
 
   // Idle-prefetch: pre-cargar tabs en background para que estén listos
   // cuando el usuario cambie de pestaña (sin flash de carga)
@@ -1716,22 +1715,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('settings-changed', handleSettingsChange)
-  window.removeEventListener('chapter:navigate', handleChapterNavigate)
 })
-
-// Manejar navegación a capítulo desde ResumenTab
-function handleChapterNavigate(event: Event) {
-  const customEvent = event as CustomEvent<{ chapterId: number }>
-  const chapterId = customEvent.detail?.chapterId
-  if (chapterId) {
-    // Encontrar el capítulo
-    const chapter = chapters.value.find(c => c.id === chapterId)
-    if (chapter) {
-      // Navegar al capítulo usando el handler existente
-      handleChapterSelect(chapter.id)
-    }
-  }
-}
 
 const onDocumentTypeChanged = async (_type: string, _subtype: string | null) => {
   // Recargar el proyecto para obtener el nuevo perfil de features
