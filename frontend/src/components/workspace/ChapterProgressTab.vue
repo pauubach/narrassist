@@ -520,17 +520,14 @@ const report = ref<ChapterProgressReport | null>(null)
 const selectedMode = ref('standard')
 
 const analysisModesOptions = [
-  { label: 'Básico (rápido)', value: 'basic' },
   { label: 'Estándar (con LLM)', value: 'standard' },
   { label: 'Profundo (multi-modelo)', value: 'deep' },
 ]
 
 const modeDescription = computed(() => {
   switch (selectedMode.value) {
-    case 'basic':
-      return 'Análisis de patrones sin LLM. Rápido pero limitado.'
     case 'standard':
-      return 'Análisis con IA. Equilibrio entre velocidad y calidad.'
+      return 'Análisis con IA (llama3.2). Resúmenes narrativos coherentes con eventos de alto impacto.'
     case 'deep':
       return 'Análisis multi-modelo con votación. Más preciso pero más lento.'
     default:
@@ -550,9 +547,9 @@ const hasAlerts = computed(() => {
 async function loadReport() {
   loading.value = true
   error.value = null
-  loadingMessage.value = selectedMode.value === 'basic'
-    ? 'Analizando patrones...'
-    : 'Analizando con LLM (puede tardar)...'
+  loadingMessage.value = selectedMode.value === 'deep'
+    ? 'Analizando con multi-modelo (puede tardar)...'
+    : 'Analizando con LLM...'
 
   try {
     const data = await api.getRaw<{ success: boolean; data: ChapterProgressReport; error?: string }>(

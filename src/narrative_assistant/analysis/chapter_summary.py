@@ -413,10 +413,12 @@ CONTEXTO:
 - Tipo de obra: {genre_label}
 - Capítulo {chapter_num} de {total_chapters}{title_part}
 {character_roster_block}{prev_summary_block}
-TEXTO DEL CAPÍTULO:
+TEXTO DEL CAPÍTULO ACTUAL (capítulo {chapter_num}):
 ---
 {text}
 ---
+
+CRÍTICO: Analiza EXCLUSIVAMENTE el TEXTO DEL CAPÍTULO ACTUAL mostrado arriba. El contexto anterior es solo referencia para continuidad narrativa, NO debe formar parte del resumen de este capítulo.
 
 Primero, clasifica este capítulo:
 - "chapter_type": "narrative" si es contenido de la obra, "front_matter" si es dedicatoria/agradecimientos/prólogo ajeno, "back_matter" si es epílogo/bibliografía/notas del autor.
@@ -429,10 +431,12 @@ Extrae 3-5 eventos que un EDITOR profesional necesitaría para verificar consist
 Cada evento debe responder: QUIÉN hace QUÉ a QUIÉN, y qué CAMBIA.
 
 El campo "summary" DEBE (CRÍTICO):
+- Resumir EXCLUSIVAMENTE lo que ocurre en el capítulo {chapter_num} (el TEXTO DEL CAPÍTULO ACTUAL mostrado arriba)
+- NO incluir información de capítulos anteriores o posteriores
 - Priorizar eventos de ALTO IMPACTO narrativo: desapariciones, muertes, revelaciones, descubrimientos, decisiones clave, conflictos importantes
 - Omitir detalles triviales (llegadas rutinarias, saludos, descripciones ambientales)
 - Nombrar personajes por su nombre propio
-- Explicar QUÉ sucede y POR QUÉ importa para la trama
+- Explicar QUÉ sucede en ESTE capítulo y POR QUÉ importa para la trama
 - Indicar qué CAMBIA respecto al estado anterior (qué está en riesgo, qué se descubre, qué se pierde)
 - Señalar qué queda ABIERTO o sin resolver
 - 4-6 frases narrativas enfocadas en CONSECUENCIAS (causa → efecto → implicación)

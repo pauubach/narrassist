@@ -13,7 +13,7 @@ router = APIRouter()
 @router.get("/api/projects/{project_id}/chapter-progress", response_model=ApiResponse)
 def get_chapter_progress(
     project_id: int,
-    mode: str = "basic",  # basic, standard, deep
+    mode: str = "standard",  # standard, deep
     llm_model: str = "llama3.2",
 ):
     """
@@ -21,26 +21,26 @@ def get_chapter_progress(
 
     Incluye:
     - Personajes presentes y sus interacciones por capítulo
-    - Eventos significativos detectados (patrones + LLM)
+    - Eventos significativos detectados con LLM
     - Arcos de personajes (trayectoria narrativa)
     - Chekhov's Guns (objetos introducidos sin payoff)
     - Tramas abandonadas (con análisis LLM)
+    - Resúmenes narrativos coherentes con eventos de alto impacto
 
     Modos:
-    - basic: Solo patrones, sin LLM (rápido)
-    - standard: Análisis LLM con llama3.2
-    - deep: Análisis multi-modelo (más preciso, más lento)
+    - standard: Análisis LLM con llama3.2 (resúmenes narrativos coherentes)
+    - deep: Análisis multi-modelo con votación (más preciso, más lento)
 
     Args:
         project_id: ID del proyecto
-        mode: Modo de análisis (basic/standard/deep)
+        mode: Modo de análisis (standard/deep)
         llm_model: Modelo LLM a usar (llama3.2, qwen2.5, mistral)
 
     Returns:
         ChapterProgressReport con resúmenes de todos los capítulos
     """
     # Check enrichment cache first (S8a-13) — pipeline caches standard mode
-    if mode in ("basic", "standard"):
+    if mode == "standard":
         from routers._enrichment_cache import get_cached_enrichment
         cached = get_cached_enrichment(deps.get_database(), project_id, "chapter_progress")
         if cached:
@@ -52,7 +52,7 @@ def get_chapter_progress(
         )
 
         # Validar modo
-        valid_modes = ["basic", "standard", "deep"]
+        valid_modes = ["standard", "deep"]
         if mode not in valid_modes:
             return ApiResponse(
                 success=False,

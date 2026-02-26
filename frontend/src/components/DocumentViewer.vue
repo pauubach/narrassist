@@ -1034,49 +1034,43 @@ const scrollToChapter = async (chapterId: number) => {
 }
 
 // Variable para almacenar el highlight temporal
-const temporaryHighlightClass = 'mention-highlight-active'
 const temporarySelectedClass = 'mention-highlight-selected'
 const highlightDurationMs = 3000
 
-const unwrapHighlightElement = (element: Element) => {
-  const parent = element.parentNode
-  if (!parent) return
-  while (element.firstChild) {
-    parent.insertBefore(element.firstChild, element)
-  }
-  parent.removeChild(element)
-  parent.normalize()
-}
+// CSS Custom Highlight API — resalta sin tocar el DOM
+let highlightTimer: ReturnType<typeof setTimeout> | null = null
 
 const clearTemporaryMentionHighlights = () => {
-  const highlightSpans = viewerContainer.value?.querySelectorAll(`span.${temporaryHighlightClass}`)
-  highlightSpans?.forEach(el => unwrapHighlightElement(el))
-
-  const highlightedElements = viewerContainer.value?.querySelectorAll(`.${temporaryHighlightClass}`)
-  highlightedElements?.forEach(el => {
-    if (el.tagName.toLowerCase() !== 'span') {
-      el.classList.remove(temporaryHighlightClass, 'highlight-entering', 'highlight-leaving')
-    }
-  })
-
+  if (highlightTimer) {
+    clearTimeout(highlightTimer)
+    highlightTimer = null
+  }
+  CSS.highlights?.delete('mention-temp')
   const selectedElements = viewerContainer.value?.querySelectorAll(`.${temporarySelectedClass}`)
   selectedElements?.forEach(el => {
     el.classList.remove(temporarySelectedClass)
   })
 }
 
-const applyTemporaryHighlightSpan = (highlightSpan: HTMLSpanElement) => {
-  highlightSpan.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  highlightSpan.classList.add('highlight-entering')
-  setTimeout(() => {
-    highlightSpan.classList.remove('highlight-entering')
-  }, 500)
+const applyHighlightFromRange = (range: Range) => {
+  clearTemporaryMentionHighlights()
 
-  setTimeout(() => {
-    highlightSpan.classList.add('highlight-leaving')
-    setTimeout(() => {
-      unwrapHighlightElement(highlightSpan)
-    }, 400)
+  // Registrar highlight nativo vía CSS Custom Highlight API
+  if (CSS.highlights) {
+    const highlight = new Highlight(range)
+    CSS.highlights.set('mention-temp', highlight)
+  }
+
+  // Scroll al texto
+  const el = range.startContainer.parentElement
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
+  // Auto-limpiar después de la duración
+  highlightTimer = setTimeout(() => {
+    CSS.highlights?.delete('mention-temp')
+    highlightTimer = null
   }, highlightDurationMs)
 }
 
@@ -1166,18 +1160,7 @@ const highlightRangeInChapter = (chapterElement: Element, start: number, end: nu
   const range = createRangeFromCharacterOffsets(contentElement, start, end)
   if (!range || range.collapsed) return false
 
-  const highlightSpan = document.createElement('span')
-  highlightSpan.className = temporaryHighlightClass
-
-  try {
-    highlightSpan.appendChild(range.extractContents())
-    range.insertNode(highlightSpan)
-  } catch (e) {
-    console.warn('Error creating range highlight span:', e)
-    return false
-  }
-
-  applyTemporaryHighlightSpan(highlightSpan)
+  applyHighlightFromRange(range)
   return true
 }
 
@@ -1444,19 +1427,7 @@ const highlightTextInChapter = async (chapterElement: Element, text: string, pos
     return false
   }
 
-  // Crear span de highlight
-  const highlightSpan = document.createElement('span')
-  highlightSpan.className = temporaryHighlightClass
-
-  try {
-    // Extraer el contenido y envolverlo en el span
-    highlightSpan.appendChild(range.extractContents())
-    range.insertNode(highlightSpan)
-  } catch (e) {
-    console.warn('Error creating highlight span:', e)
-    return false
-  }
-  applyTemporaryHighlightSpan(highlightSpan)
+  applyHighlightFromRange(range)
   return true
 }
 
@@ -2065,71 +2036,11 @@ defineExpose({
   font-weight: 600;
 }
 
-/* Highlight temporal para scroll to mention */
-.chapter-text :deep(.mention-highlight-active) {
-  background: linear-gradient(90deg, rgba(251, 191, 36, 0.5), rgba(251, 191, 36, 0.3));
-  border-radius: var(--app-radius-sm);
-  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.3);
-  animation: highlight-glow 1.5s ease-in-out infinite;
-  transition: all 0.4s ease-out;
-}
-
+/* Highlight temporal para scroll to mention (via clase en elemento existente) */
 .chapter-text :deep(.mention-highlight-selected) {
-  background: rgba(251, 191, 36, 0.5);
+  background: rgba(251, 191, 36, 0.30);
   border-radius: var(--app-radius-sm);
-  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.35);
   transition: all var(--ds-duration-fast) var(--ds-ease-in-out);
-}
-
-/* Animación de entrada */
-.chapter-text :deep(.mention-highlight-active.highlight-entering) {
-  animation: highlight-enter 0.5s ease-out forwards;
-}
-
-/* Animación de salida */
-.chapter-text :deep(.mention-highlight-active.highlight-leaving) {
-  animation: highlight-leave 0.4s ease-out forwards;
-}
-
-@keyframes highlight-glow {
-  0%, 100% {
-    background: rgba(251, 191, 36, 0.35);
-    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.2);
-  }
-  50% {
-    background: rgba(251, 191, 36, 0.55);
-    box-shadow: 0 0 8px 2px rgba(251, 191, 36, 0.4);
-  }
-}
-
-@keyframes highlight-enter {
-  0% {
-    background: rgba(251, 191, 36, 0);
-    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
-    transform: scale(1.1);
-  }
-  50% {
-    background: rgba(251, 191, 36, 0.7);
-    box-shadow: 0 0 12px 4px rgba(251, 191, 36, 0.5);
-  }
-  100% {
-    background: rgba(251, 191, 36, 0.4);
-    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.3);
-    transform: scale(1);
-  }
-}
-
-@keyframes highlight-leave {
-  0% {
-    background: rgba(251, 191, 36, 0.4);
-    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.3);
-    opacity: 1;
-  }
-  100% {
-    background: rgba(251, 191, 36, 0);
-    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
-    opacity: 0;
-  }
 }
 
 /* Anotaciones de gramática y ortografía */
@@ -2343,66 +2254,16 @@ defineExpose({
 }
 </style>
 
-<!-- Estilos globales para highlight dinámico (insertado via JS, no funciona con scoped) -->
+<!-- Estilos globales para highlight dinámico -->
 <style>
-/* Highlight temporal para navegación a alertas/menciones */
-.mention-highlight-active {
-  background: rgba(251, 191, 36, 0.6) !important;
-  border-radius: var(--app-radius-sm);
-  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.4);
-  animation: mention-highlight-pulse 1.5s ease-in-out infinite;
-  box-decoration-break: clone;
+/* CSS Custom Highlight API — resalta texto sin modificar el DOM */
+::highlight(mention-temp) {
+  background-color: rgba(251, 191, 36, 0.30);
 }
 
 .mention-highlight-selected {
-  background: rgba(251, 191, 36, 0.5) !important;
+  background: rgba(251, 191, 36, 0.30) !important;
   border-radius: var(--app-radius-sm);
-  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.35);
-}
-
-.mention-highlight-active.highlight-entering {
-  animation: mention-highlight-enter 0.5s ease-out forwards;
-}
-
-.mention-highlight-active.highlight-leaving {
-  animation: mention-highlight-leave 0.4s ease-out forwards;
-}
-
-@keyframes mention-highlight-pulse {
-  0%, 100% {
-    background: rgba(251, 191, 36, 0.5);
-    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.3);
-  }
-  50% {
-    background: rgba(251, 191, 36, 0.7);
-    box-shadow: 0 0 12px 4px rgba(251, 191, 36, 0.5);
-  }
-}
-
-@keyframes mention-highlight-enter {
-  0% {
-    background: rgba(251, 191, 36, 0);
-    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
-    transform: scale(1.2);
-  }
-  100% {
-    background: rgba(251, 191, 36, 0.6);
-    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.4);
-    transform: scale(1);
-  }
-}
-
-@keyframes mention-highlight-leave {
-  0% {
-    background: rgba(251, 191, 36, 0.6);
-    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.4);
-    opacity: 1;
-  }
-  100% {
-    background: rgba(251, 191, 36, 0);
-    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
-    opacity: 0;
-  }
 }
 
 /* Multi-highlight para alertas de inconsistencia */
