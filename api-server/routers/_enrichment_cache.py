@@ -28,10 +28,14 @@ logger = logging.getLogger(__name__)
 ENRICHMENT_SCHEMA_VERSIONS: dict[str, int] = {
     # Phase 10 — Relationships
     "network_relationships": 1,
+    "character_network": 1,  # Network metrics (centralidad, puentes, evolución)
     "timeline": 1,
+    "character_timeline": 1,  # Timeline de apariciones por capítulo
     "character_profiles": 1,
     "location_data": 1,
+    "character_locations": 1,  # Análisis de ubicaciones de personajes
     "emotional_arcs": 1,
+    "emotional_analysis": 1,  # Coherencia emocional
     "character_archetypes": 1,
     "knowledge_state": 1,
     # Phase 11 — Voice
@@ -73,10 +77,14 @@ def get_schema_version(enrichment_type: str) -> int:
 ENRICHMENT_TO_PHASE: dict[str, str] = {
     # Phase 10 — Relationships
     "network_relationships": "relationships",
+    "character_network": "relationships",
     "timeline": "relationships",
+    "character_timeline": "relationships",
     "character_profiles": "relationships",
     "location_data": "relationships",
+    "character_locations": "relationships",
     "emotional_arcs": "relationships",
+    "emotional_analysis": "relationships",
     "character_archetypes": "relationships",
     "knowledge_state": "relationships",
     # Phase 11 — Voice

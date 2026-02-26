@@ -292,9 +292,21 @@ def get_project_relationships(project_id: int):
             "asymmetries": asymmetries,
         }
 
+        result_data = convert_numpy_types(response_data)
+
+        # Guardar en caché
+        from routers._enrichment_phases import _cache_result
+        _cache_result(
+            db_session=deps.get_database(),
+            project_id=project_id,
+            enrichment_type="character_network",
+            result=result_data,
+            phase=10,  # Phase 10 = Relationships
+        )
+
         return ApiResponse(
             success=True,
-            data=convert_numpy_types(response_data)
+            data=result_data
         )
 
     except HTTPException:
@@ -1123,17 +1135,29 @@ def get_emotional_analysis(project_id: int):
                 by_type[inc_type] = 0
             by_type[inc_type] += 1
 
+        result_data = {
+            "project_id": project_id,
+            "incoherences": [inc.to_dict() for inc in all_incoherences],
+            "stats": {
+                "total": len(all_incoherences),
+                "by_type": by_type,
+                "chapters_analyzed": len(chapters),
+            }
+        }
+
+        # Guardar en caché
+        from routers._enrichment_phases import _cache_result
+        _cache_result(
+            db_session=deps.get_database(),
+            project_id=project_id,
+            enrichment_type="emotional_analysis",
+            result=result_data,
+            phase=10,  # Phase 10 = Relationships
+        )
+
         return ApiResponse(
             success=True,
-            data={
-                "project_id": project_id,
-                "incoherences": [inc.to_dict() for inc in all_incoherences],
-                "stats": {
-                    "total": len(all_incoherences),
-                    "by_type": by_type,
-                    "chapters_analyzed": len(chapters),
-                }
-            }
+            data=result_data
         )
 
     except ImportError as e:
@@ -1510,7 +1534,19 @@ def get_character_locations(project_id: int):
         if result.is_failure:
             return ApiResponse(success=False, error=str(result.error))
 
-        return ApiResponse(success=True, data=result.value.to_dict())  # type: ignore[union-attr]
+        result_data = result.value.to_dict()  # type: ignore[union-attr]
+
+        # Guardar en caché
+        from routers._enrichment_phases import _cache_result
+        _cache_result(
+            db_session=deps.get_database(),
+            project_id=project_id,
+            enrichment_type="character_locations",
+            result=result_data,
+            phase=10,  # Phase 10 = Relationships
+        )
+
+        return ApiResponse(success=True, data=result_data)
 
     except ImportError as e:
         logger.error(f"Module import error: {e}")
@@ -1671,7 +1707,20 @@ def get_character_archetypes(
             profiles=profiles_data or None,
         )
 
-        return ApiResponse(success=True, data=report.to_dict())
+        result_data = report.to_dict()
+
+        # Guardar en caché (solo si no hay filtros opcionales activos)
+        if mode == "basic" and llm_model == "llama3.2":
+            from routers._enrichment_phases import _cache_result
+            _cache_result(
+                db_session=deps.get_database(),
+                project_id=project_id,
+                enrichment_type="character_archetypes",
+                result=result_data,
+                phase=10,  # Phase 10 = Relationships
+            )
+
+        return ApiResponse(success=True, data=result_data)
 
     except HTTPException:
         raise
@@ -1770,9 +1819,21 @@ def get_character_network(project_id: int):
             total_chapters=len(chapters),
         )
 
+        result_data = convert_numpy_types(report.to_dict())
+
+        # Guardar en caché
+        from routers._enrichment_phases import _cache_result
+        _cache_result(
+            db_session=deps.get_database(),
+            project_id=project_id,
+            enrichment_type="character_network",
+            result=result_data,
+            phase=10,  # Phase 10 = Relationships
+        )
+
         return ApiResponse(
             success=True,
-            data=convert_numpy_types(report.to_dict()),
+            data=result_data,
         )
 
     except HTTPException:
