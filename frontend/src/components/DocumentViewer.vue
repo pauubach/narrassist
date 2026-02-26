@@ -1,5 +1,5 @@
 <template>
-  <div ref="viewerContainer" class="document-viewer">
+  <div ref="viewerContainer" class="document-viewer" tabindex="0">
     <!-- Diálogo de exportación -->
     <Dialog
       :visible="showExportDialog"
@@ -139,6 +139,12 @@
             </span>
             <h2 class="chapter-title">
               {{ chapter.chapterNumber }}. {{ chapter.title }}
+              <!-- Mejora #8: Indicador de loading granular -->
+              <i
+                v-if="chaptersLoadingAnnotations.has(chapter.chapterNumber) || chaptersLoadingDialogues.has(chapter.chapterNumber)"
+                class="pi pi-spin pi-spinner chapter-loading-indicator"
+                title="Cargando datos del capítulo..."
+              ></i>
             </h2>
           </div>
 
@@ -262,6 +268,10 @@ const _entityMentions = ref<EntityMention[]>([])
 const visibleChapters = ref<Set<number>>(new Set())
 const loadedChapters = ref<Set<number>>(new Set())
 const MAX_LOADED_CHAPTERS = 10  // Máximo de capítulos en memoria
+
+// Mejora #8: Loading states granulares por capítulo
+const chaptersLoadingAnnotations = ref<Set<number>>(new Set())
+const chaptersLoadingDialogues = ref<Set<number>>(new Set())
 
 // LRU: Orden de acceso a capítulos (más reciente al final)
 const chapterAccessOrder = ref<number[]>([])
@@ -421,6 +431,9 @@ const contentStyle = computed(() => ({
 const loadChapterDialogues = async (chapterNumber: number) => {
   if (chapterDialogues.value.has(chapterNumber)) return
 
+  // Mejora #8: Indicador de loading granular
+  chaptersLoadingDialogues.value.add(chapterNumber)
+
   try {
     const data = await api.getRaw<{ success: boolean; data?: any }>(`/api/projects/${props.projectId}/chapters/${chapterNumber}/dialogue-attributions`)
 
@@ -440,6 +453,8 @@ const loadChapterDialogues = async (chapterNumber: number) => {
     }
   } catch (err) {
     console.error(`Error loading dialogue attributions for chapter ${chapterNumber}:`, err)
+  } finally {
+    chaptersLoadingDialogues.value.delete(chapterNumber)
   }
 }
 
@@ -462,26 +477,31 @@ const setupIntersectionObserver = () => {
 
   intersectionObserver = new IntersectionObserver(
     (entries) => {
+      // Mejora #9: Error boundary para IntersectionObserver callback
       entries.forEach(entry => {
-        const chapterId = parseInt(entry.target.getAttribute('data-chapter-id') || '0')
-        if (chapterId) {
-          if (entry.isIntersecting) {
-            visibleChapters.value.add(chapterId)
-            // Marcar como cargado y actualizar LRU
-            loadedChapters.value.add(chapterId)
-            touchChapter(chapterId)
+        try {
+          const chapterId = parseInt(entry.target.getAttribute('data-chapter-id') || '0')
+          if (chapterId) {
+            if (entry.isIntersecting) {
+              visibleChapters.value.add(chapterId)
+              // Marcar como cargado y actualizar LRU
+              loadedChapters.value.add(chapterId)
+              touchChapter(chapterId)
 
-            // Cargar anotaciones y diálogos al entrar en viewport (performance optimization #10)
-            const chapter = chapters.value.find(ch => ch.id === chapterId)
-            if (chapter) {
-              loadChapterAnnotations(chapter.chapterNumber)
-              if (showDialoguePanel.value) {
-                loadChapterDialogues(chapter.chapterNumber)
+              // Cargar anotaciones y diálogos al entrar en viewport (performance optimization #10)
+              const chapter = chapters.value.find(ch => ch.id === chapterId)
+              if (chapter) {
+                loadChapterAnnotations(chapter.chapterNumber)
+                if (showDialoguePanel.value) {
+                  loadChapterDialogues(chapter.chapterNumber)
+                }
               }
+            } else {
+              visibleChapters.value.delete(chapterId)
             }
-          } else {
-            visibleChapters.value.delete(chapterId)
           }
+        } catch (err) {
+          console.error('Error in IntersectionObserver callback:', err)
         }
       })
     },
@@ -569,6 +589,9 @@ const loadDocument = async () => {
 const loadChapterAnnotations = async (chapterNumber: number, forceReload = false) => {
   if (!forceReload && chapterAnnotations.value.has(chapterNumber)) return
 
+  // Mejora #8: Indicador de loading granular
+  chaptersLoadingAnnotations.value.add(chapterNumber)
+
   try {
     const data = await api.getRaw<{ success: boolean; data?: any }>(`/api/projects/${props.projectId}/chapters/${chapterNumber}/annotations`)
 
@@ -577,6 +600,8 @@ const loadChapterAnnotations = async (chapterNumber: number, forceReload = false
     }
   } catch (err) {
     console.error(`Error loading annotations for chapter ${chapterNumber}:`, err)
+  } finally {
+    chaptersLoadingAnnotations.value.delete(chapterNumber)
   }
 }
 
@@ -1265,10 +1290,16 @@ const createRangeFromCharacterOffsets = (
 
   if (!startNode || !endNode) return null
 
-  const range = document.createRange()
-  range.setStart(startNode, startOffset)
-  range.setEnd(endNode, endOffset)
-  return range
+  // Mejora #9: Error boundary para range creation
+  try {
+    const range = document.createRange()
+    range.setStart(startNode, startOffset)
+    range.setEnd(endNode, endOffset)
+    return range
+  } catch (err) {
+    console.error('Error creating range:', err)
+    return null
+  }
 }
 
 const highlightRangeInChapter = (chapterElement: Element, start: number, end: number): boolean => {
@@ -1948,6 +1979,10 @@ onMounted(() => {
   window.addEventListener('settings-changed', handleSettingsChange)
   // Mejora #7: Keyboard shortcuts
   window.addEventListener('keydown', handleKeyDown)
+  // Mejora #10: Autofocus para keyboard navigation
+  nextTick(() => {
+    viewerContainer.value?.focus()
+  })
 })
 
 onUnmounted(() => {
@@ -1984,6 +2019,16 @@ defineExpose({
   border-radius: var(--app-radius);
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Mejora #10: Focus outline visible para accesibilidad */
+.document-viewer:focus {
+  outline: 2px solid var(--p-primary-500, #3b82f6);
+  outline-offset: -2px;
+}
+
+.document-viewer:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .viewer-toolbar {
@@ -2149,6 +2194,16 @@ defineExpose({
   margin-bottom: 1.5rem;
   padding-bottom: 0.75rem;
   border-bottom: 2px solid var(--p-primary-color, var(--primary-color));
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Mejora #8: Indicador de loading granular */
+.chapter-loading-indicator {
+  font-size: 0.875rem;
+  color: var(--p-primary-500, #3b82f6);
+  opacity: 0.7;
 }
 
 .chapter-text {
