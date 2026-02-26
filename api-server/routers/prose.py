@@ -509,24 +509,34 @@ def get_sentence_energy(
                 "Sustituya ser/estar/tener/hacer por verbos más específicos."
             )
 
-        return ApiResponse(
-            success=True,
-            data={
-                "global_stats": {
-                    "total_sentences": global_total_sentences,
-                    "analyzed_sentences": analyzed,
-                    "avg_energy": round(avg_energy, 1),
-                    "low_energy_count": global_low_count,
-                    "passive_count": global_passive_count,
-                    "weak_verb_count": global_weak_count,
-                    "nominalization_count": global_nom_count,
-                    "by_level": global_by_level,
-                },
-                "chapters": chapters_data,
-                "recommendations": global_recommendations,
-                "threshold_used": low_threshold,
-            }
-        )
+        result_data = {
+            "global_stats": {
+                "total_sentences": global_total_sentences,
+                "analyzed_sentences": analyzed,
+                "avg_energy": round(avg_energy, 1),
+                "low_energy_count": global_low_count,
+                "passive_count": global_passive_count,
+                "weak_verb_count": global_weak_count,
+                "nominalization_count": global_nom_count,
+                "by_level": global_by_level,
+            },
+            "chapters": chapters_data,
+            "recommendations": global_recommendations,
+            "threshold_used": low_threshold,
+        }
+
+        # Guardar en caché (solo si no hay filtro de capítulo)
+        if chapter_number is None:
+            from routers._enrichment_phases import _cache_result
+            _cache_result(
+                db_session=deps.get_database(),
+                project_id=project_id,
+                enrichment_type="sentence_energy",
+                result=result_data,
+                phase=12,
+            )
+
+        return ApiResponse(success=True, data=result_data)
     except HTTPException:
         raise
     except Exception as e:
@@ -653,19 +663,29 @@ def get_echo_report(
         if len(global_repetitions) > 50:
             recommendations.append("Texto con muchas repeticiones. Considera revisar el vocabulario.")
 
-        return ApiResponse(
-            success=True,
-            data={
-                "global_stats": {
-                    "total_repetitions": len(global_repetitions),
-                    "total_words": global_total_words,
-                    "by_severity": by_severity,
-                    "top_repeated_words": [{"word": w, "count": c} for w, c in top_words],
-                },
-                "chapters": chapters_data,
-                "recommendations": recommendations,
-            }
-        )
+        result_data = {
+            "global_stats": {
+                "total_repetitions": len(global_repetitions),
+                "total_words": global_total_words,
+                "by_severity": by_severity,
+                "top_repeated_words": [{"word": w, "count": c} for w, c in top_words],
+            },
+            "chapters": chapters_data,
+            "recommendations": recommendations,
+        }
+
+        # Guardar en caché (solo si no hay filtros opcionales activos)
+        if chapter_number is None and not include_semantic:
+            from routers._enrichment_phases import _cache_result
+            _cache_result(
+                db_session=deps.get_database(),
+                project_id=project_id,
+                enrichment_type="echo_report",
+                result=result_data,
+                phase=12,
+            )
+
+        return ApiResponse(success=True, data=result_data)
     except HTTPException:
         raise
     except Exception as e:
@@ -879,22 +899,32 @@ def get_narrative_structure(
                     "Evalúa si son intencionales (efecto narrativo) o accidentales."
                 )
 
-        return ApiResponse(
-            success=True,
-            data={
-                "global_stats": {
-                    "total_anomalies": report.total_anomalies,
-                    "prolepsis_count": len(report.prolepsis_found),
-                    "analepsis_count": len(report.analepsis_found),
-                    "chapters_analyzed": report.chapters_analyzed,
-                    "by_type": report.to_dict()["by_type"],
-                    "by_severity": report.to_dict()["by_severity"],
-                },
-                "prolepsis": [p.to_dict() for p in report.prolepsis_found],
-                "analepsis": [a.to_dict() for a in report.analepsis_found],
-                "recommendations": recommendations,
-            }
-        )
+        result_data = {
+            "global_stats": {
+                "total_anomalies": report.total_anomalies,
+                "prolepsis_count": len(report.prolepsis_found),
+                "analepsis_count": len(report.analepsis_found),
+                "chapters_analyzed": report.chapters_analyzed,
+                "by_type": report.to_dict()["by_type"],
+                "by_severity": report.to_dict()["by_severity"],
+            },
+            "prolepsis": [p.to_dict() for p in report.prolepsis_found],
+            "analepsis": [a.to_dict() for a in report.analepsis_found],
+            "recommendations": recommendations,
+        }
+
+        # Guardar en caché (solo si no hay filtros opcionales activos)
+        if chapter_number is None:
+            from routers._enrichment_phases import _cache_result
+            _cache_result(
+                db_session=deps.get_database(),
+                project_id=project_id,
+                enrichment_type="narrative_structure",
+                result=result_data,
+                phase=12,
+            )
+
+        return ApiResponse(success=True, data=result_data)
 
     except HTTPException:
         raise
@@ -1023,25 +1053,35 @@ def get_dialogue_validation(
             else:
                 logger.warning(f"Some dialogue alerts failed: {alerts_result.error}")
 
-        return ApiResponse(
-            success=True,
-            data={
-                "global_stats": {
-                    "total_issues": report.total_issues,
-                    "total_dialogues": report.total_dialogues,
-                    "dialogues_with_attribution": report.dialogues_with_attribution,
-                    "dialogues_without_attribution": report.dialogues_without_attribution,
-                    "attribution_ratio": round(report.attribution_ratio, 2),
-                    "chapters_analyzed": report.chapters_analyzed,
-                    "by_type": report.to_dict()["by_type"],
-                    "by_severity": report.to_dict()["by_severity"],
-                },
-                "issues": [i.to_dict() for i in report.issues],
-                "by_chapter": issues_by_chapter,
-                "recommendations": recommendations,
-                "alerts_created": alerts_created,
-            }
-        )
+        result_data = {
+            "global_stats": {
+                "total_issues": report.total_issues,
+                "total_dialogues": report.total_dialogues,
+                "dialogues_with_attribution": report.dialogues_with_attribution,
+                "dialogues_without_attribution": report.dialogues_without_attribution,
+                "attribution_ratio": round(report.attribution_ratio, 2),
+                "chapters_analyzed": report.chapters_analyzed,
+                "by_type": report.to_dict()["by_type"],
+                "by_severity": report.to_dict()["by_severity"],
+            },
+            "issues": [i.to_dict() for i in report.issues],
+            "by_chapter": issues_by_chapter,
+            "recommendations": recommendations,
+            "alerts_created": alerts_created,
+        }
+
+        # Guardar en caché (solo si no hay filtros opcionales activos)
+        if chapter_number is None and not create_alerts:
+            from routers._enrichment_phases import _cache_result
+            _cache_result(
+                db_session=deps.get_database(),
+                project_id=project_id,
+                enrichment_type="dialogue_validation",
+                result=result_data,
+                phase=12,
+            )
+
+        return ApiResponse(success=True, data=result_data)
 
     except HTTPException:
         raise
@@ -1179,22 +1219,32 @@ def get_sentence_variation(
             if not recommendations:
                 recommendations.append("La variación de oraciones es adecuada. ¡Buen ritmo!")
 
-        return ApiResponse(
-            success=True,
-            data={
-                "global_stats": {
-                    "total_sentences": n_total,
-                    "avg_length": g_avg,
-                    "variation_coefficient": g_var_coeff,
-                    "min_length": g_min,
-                    "max_length": g_max,
-                },
-                "global_distribution": global_distribution,
-                "chapters": chapters_data,
-                "all_issues": all_issues,
-                "recommendations": recommendations,
-            }
-        )
+        result_data = {
+            "global_stats": {
+                "total_sentences": n_total,
+                "avg_length": g_avg,
+                "variation_coefficient": g_var_coeff,
+                "min_length": g_min,
+                "max_length": g_max,
+            },
+            "global_distribution": global_distribution,
+            "chapters": chapters_data,
+            "all_issues": all_issues,
+            "recommendations": recommendations,
+        }
+
+        # Guardar en caché (solo si no hay filtros opcionales activos)
+        if chapter_number is None:
+            from routers._enrichment_phases import _cache_result
+            _cache_result(
+                db_session=deps.get_database(),
+                project_id=project_id,
+                enrichment_type="sentence_variation",
+                result=result_data,
+                phase=12,
+            )
+
+        return ApiResponse(success=True, data=result_data)
     except HTTPException:
         raise
     except Exception as e:
@@ -1369,20 +1419,30 @@ def get_pacing_analysis(
         if not recommendations:
             recommendations.append("El ritmo narrativo es equilibrado. ¡Buen trabajo!")
 
-        return ApiResponse(
-            success=True,
-            data={
-                "summary": {
-                    "total_chapters": num_chapters,
-                    "avg_chapter_words": round(avg_words),
-                    "avg_dialogue_ratio": round(avg_dialogue, 3),
-                    "issues_count": len(issues),
-                },
-                "chapter_metrics": chapter_metrics,
-                "issues": issues,
-                "recommendations": recommendations,
-            }
-        )
+        result_data = {
+            "summary": {
+                "total_chapters": num_chapters,
+                "avg_chapter_words": round(avg_words),
+                "avg_dialogue_ratio": round(avg_dialogue, 3),
+                "issues_count": len(issues),
+            },
+            "chapter_metrics": chapter_metrics,
+            "issues": issues,
+            "recommendations": recommendations,
+        }
+
+        # Guardar en caché (solo si no hay filtros opcionales activos)
+        if chapter_number is None:
+            from routers._enrichment_phases import _cache_result
+            _cache_result(
+                db_session=deps.get_database(),
+                project_id=project_id,
+                enrichment_type="pacing_analysis",
+                result=result_data,
+                phase=12,
+            )
+
+        return ApiResponse(success=True, data=result_data)
     except HTTPException:
         raise
     except Exception as e:
@@ -1465,21 +1525,31 @@ def get_tension_curve(
             "flat": "Plano (tensión uniforme)",
         }
 
-        return ApiResponse(
-            success=True,
-            data={
-                "project_id": project_id,
-                "curve": curve.to_dict(),
-                "arc_label": arc_labels.get(curve.tension_arc_type, curve.tension_arc_type),
-                "stats": {
-                    "chapters_analyzed": len(chapters_data),
-                    "avg_tension": round(curve.avg_tension, 3),
-                    "max_tension": round(curve.max_tension, 3),
-                    "min_tension": round(curve.min_tension, 3),
-                    "tension_range": round(curve.max_tension - curve.min_tension, 3),
-                },
-            }
-        )
+        result_data = {
+            "project_id": project_id,
+            "curve": curve.to_dict(),
+            "arc_label": arc_labels.get(curve.tension_arc_type, curve.tension_arc_type),
+            "stats": {
+                "chapters_analyzed": len(chapters_data),
+                "avg_tension": round(curve.avg_tension, 3),
+                "max_tension": round(curve.max_tension, 3),
+                "min_tension": round(curve.min_tension, 3),
+                "tension_range": round(curve.max_tension - curve.min_tension, 3),
+            },
+        }
+
+        # Guardar en caché (solo si no hay filtros opcionales activos)
+        if chapter_number is None:
+            from routers._enrichment_phases import _cache_result
+            _cache_result(
+                db_session=deps.get_database(),
+                project_id=project_id,
+                enrichment_type="tension_curve",
+                result=result_data,
+                phase=12,
+            )
+
+        return ApiResponse(success=True, data=result_data)
 
     except HTTPException:
         raise
@@ -1849,15 +1919,26 @@ def get_sensory_report(
             return ApiResponse(success=False, error=str(analysis_result.error))
 
         report = analysis_result.value
-        data = report.to_dict()  # type: ignore[union-attr]
+        result_data = report.to_dict()  # type: ignore[union-attr]
 
         # Añadir nombres en español
-        data["sense_names"] = {s.value: name for s, name in SENSE_NAMES.items()}
+        result_data["sense_names"] = {s.value: name for s, name in SENSE_NAMES.items()}
 
         # Añadir sugerencias de enriquecimiento
-        data["suggestions"] = generate_sensory_suggestions(report)  # type: ignore[arg-type]
+        result_data["suggestions"] = generate_sensory_suggestions(report)  # type: ignore[arg-type]
 
-        return ApiResponse(success=True, data=data)
+        # Guardar en caché (solo si no hay filtros opcionales activos)
+        if chapter_number is None:
+            from routers._enrichment_phases import _cache_result
+            _cache_result(
+                db_session=deps.get_database(),
+                project_id=project_id,
+                enrichment_type="sensory_report",
+                result=result_data,
+                phase=12,
+            )
+
+        return ApiResponse(success=True, data=result_data)
 
     except HTTPException:
         raise
@@ -1952,13 +2033,23 @@ def get_age_readability(
                     },
                 })
 
-        return ApiResponse(
-            success=True,
-            data={
-                **report.to_dict(),
-                "chapters": chapters_data,
-            }
-        )
+        result_data = {
+            **report.to_dict(),
+            "chapters": chapters_data,
+        }
+
+        # Guardar en caché (solo si no hay filtros opcionales activos)
+        if not target_age_group:
+            from routers._enrichment_phases import _cache_result
+            _cache_result(
+                db_session=deps.get_database(),
+                project_id=project_id,
+                enrichment_type="age_readability",
+                result=result_data,
+                phase=12,
+            )
+
+        return ApiResponse(success=True, data=result_data)
     except HTTPException:
         raise
     except Exception as e:
