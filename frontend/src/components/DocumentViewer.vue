@@ -267,6 +267,13 @@ const touchChapter = (chapterId: number) => {
     if (oldestId !== undefined && !visibleChapters.value.has(oldestId)) {
       loadedChapters.value.delete(oldestId)
       highlightedContentCache.value.delete(oldestId)
+
+      // FIX #1: Unobserve el elemento del IntersectionObserver para evitar memory leak
+      const el = chapterRefs.get(oldestId)
+      if (el && intersectionObserver) {
+        intersectionObserver.unobserve(el)
+      }
+
       const oldestChapter = chapters.value.find(ch => ch.id === oldestId)
       if (oldestChapter) {
         chapterAnnotations.value.delete(oldestChapter.chapterNumber)
@@ -376,9 +383,19 @@ const saveErrorPreferences = () => {
 // Watch para persistir los cambios
 watch([showSpellingErrors, showGrammarErrors], saveErrorPreferences)
 
-// Invalidar cache cuando cambien opciones de visualización (performance optimization #1)
-watch([showSpellingErrors, showGrammarErrors, showDialoguePanel, showDialogueHighlights], () => {
-  highlightedContentCache.value.clear()
+// FIX #4: Invalidar cache selectivamente cuando cambien opciones de visualización
+watch([showSpellingErrors, showGrammarErrors, showDialoguePanel, showDialogueHighlights], ([newSpelling, newGrammar, newPanel, newHighlight], [oldSpelling, oldGrammar, oldPanel, oldHighlight]) => {
+  // Solo invalidar capítulos con diálogos si cambió el panel/highlight de diálogos
+  if ((newPanel !== oldPanel || newHighlight !== oldHighlight) && (newPanel || oldPanel)) {
+    // Invalidar solo capítulos que tienen diálogos cargados
+    chapterDialogues.value.forEach((_, chNum) => {
+      const ch = chapters.value.find(c => c.chapterNumber === chNum)
+      if (ch) highlightedContentCache.value.delete(ch.id)
+    })
+  } else if (newSpelling !== oldSpelling || newGrammar !== oldGrammar) {
+    // Si cambiaron los errores de ortografía/gramática, invalidar todo
+    highlightedContentCache.value.clear()
+  }
 })
 
 // Computed para el estilo del contenido
