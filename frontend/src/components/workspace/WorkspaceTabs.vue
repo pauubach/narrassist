@@ -70,7 +70,7 @@ const allTabs: TabConfig[] = [
   { id: 'timeline', label: 'Cronología', icon: 'pi pi-clock', configKey: 'timeline' },
   { id: 'style', label: 'Escritura', icon: 'pi pi-pencil', configKey: 'style' },
   { id: 'glossary', label: 'Glosario', icon: 'pi pi-book', configKey: 'text' },
-  { id: 'summary', label: 'Resumen', icon: 'pi pi-chart-bar', configKey: 'text' },
+  { id: 'summary', label: 'Estadísticas', icon: 'pi pi-chart-bar', configKey: 'text' },
 ]
 
 // Tabs filtradas según el tipo de documento

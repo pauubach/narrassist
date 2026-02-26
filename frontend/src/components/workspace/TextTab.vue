@@ -281,6 +281,14 @@ function handleEntityClick(entityId: number) {
   emit('entity-click', entityId)
 }
 
+function handleAnnotationClick(annotationId: number) {
+  // Buscar la alerta correspondiente al annotationId
+  const alert = props.alerts.find(a => a.id === annotationId)
+  if (alert) {
+    emit('alert-click', alert)
+  }
+}
+
 function handleBadgeClick(badge: typeof gutterMarkers.value[0]['badges'][0]) {
   // Emitir la primera alerta del badge para navegación
   if (badge.alerts.length > 0) {
@@ -393,6 +401,7 @@ onMounted(async () => {
         :chapter-badges="chapterBadgesMap"
         @chapter-visible="handleChapterVisible"
         @entity-click="handleEntityClick"
+        @annotation-click="handleAnnotationClick"
       />
     </div>
   </div>

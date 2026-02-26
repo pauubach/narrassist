@@ -225,29 +225,42 @@ try:
             _write_debug(f"Could not get user site-packages: {site_err}")
             _early_logger.warning(f"Could not get user site-packages: {site_err}")
 
-        conda_candidates = [
-            os.path.join(os.environ.get('USERPROFILE', ''), 'anaconda3'),
-            os.path.join(os.environ.get('USERPROFILE', ''), 'miniconda3'),
-            'C:\\ProgramData\\Anaconda3',
-            'C:\\ProgramData\\Miniconda3',
-        ]
+        # Only inject Anaconda/Conda site-packages when NOT inside a virtual environment.
+        # A venv already has the correct packages; injecting conda's path at position 0
+        # can override venv packages with incompatible versions (e.g. broken pydantic_core).
+        in_venv = (
+            hasattr(sys, 'real_prefix')  # virtualenv
+            or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix)  # venv
+            or os.environ.get('VIRTUAL_ENV')
+        )
 
-        python_exe = shutil.which("python3") or shutil.which("python")
-        if python_exe and 'WindowsApps' not in python_exe:
-            conda_candidates.insert(0, os.path.dirname(os.path.dirname(python_exe)))
-
-        for conda_base in conda_candidates:
-            conda_site = os.path.join(conda_base, "Lib", "site-packages")
-            if os.path.exists(conda_site):
-                _write_debug(f"Found Anaconda at: {conda_base}")
-                _early_logger.info(f"Detected Anaconda/Conda at: {conda_base}")
-                if conda_site not in sys.path:
-                    sys.path.insert(0, conda_site)
-                    _write_debug("Added conda site to sys.path")
-                    _early_logger.info("Added Anaconda site-packages to sys.path")
-                break
+        if in_venv:
+            _write_debug("Running inside a virtual environment — skipping Anaconda detection")
+            _early_logger.info("Virtual environment detected — skipping Anaconda site-packages injection")
         else:
-            _write_debug("No Anaconda installation found")
+            conda_candidates = [
+                os.path.join(os.environ.get('USERPROFILE', ''), 'anaconda3'),
+                os.path.join(os.environ.get('USERPROFILE', ''), 'miniconda3'),
+                'C:\\ProgramData\\Anaconda3',
+                'C:\\ProgramData\\Miniconda3',
+            ]
+
+            python_exe = shutil.which("python3") or shutil.which("python")
+            if python_exe and 'WindowsApps' not in python_exe:
+                conda_candidates.insert(0, os.path.dirname(os.path.dirname(python_exe)))
+
+            for conda_base in conda_candidates:
+                conda_site = os.path.join(conda_base, "Lib", "site-packages")
+                if os.path.exists(conda_site):
+                    _write_debug(f"Found Anaconda at: {conda_base}")
+                    _early_logger.info(f"Detected Anaconda/Conda at: {conda_base}")
+                    if conda_site not in sys.path:
+                        sys.path.insert(0, conda_site)
+                        _write_debug("Added conda site to sys.path")
+                        _early_logger.info("Added Anaconda site-packages to sys.path")
+                    break
+            else:
+                _write_debug("No Anaconda installation found")
 
     _write_debug(f"sys.path after (first 3): {sys.path[:3]}")
 

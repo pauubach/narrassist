@@ -105,7 +105,7 @@
           <div class="alert-detail-header">
             <Tag :severity="getSeverityColor(selectedAlert.severity)" class="large-tag">
               <i :class="getSeverityIcon(selectedAlert.severity)"></i>
-              {{ selectedAlert.severity.toUpperCase() }}
+              {{ getSeverityLabel(selectedAlert.severity) }}
             </Tag>
             <Tag severity="secondary" class="large-tag">
               {{ getCategoryLabel(selectedAlert.category) }}
@@ -296,7 +296,7 @@ import { useToast } from 'primevue/usetoast'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import { api } from '@/services/apiClient'
 
-const { getSeverityConfig, getCategoryConfig, getStatusConfig } = useAlertUtils()
+const { getSeverityConfig, getCategoryConfig, getStatusConfig, getSeverityLabel } = useAlertUtils()
 
 const route = useRoute()
 const router = useRouter()

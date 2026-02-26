@@ -229,7 +229,7 @@
             ref="textTabRef"
             :project-id="project.id"
             :document-title="project.name"
-            :alerts="alerts"
+            :alerts="activeAlerts"
             :chapters="chapters"
             :highlight-entity-id="highlightedEntityId"
             :scroll-to-chapter-id="scrollToChapterId"
@@ -427,13 +427,12 @@
               >
                 <template v-if="workspaceStore.activeTab === 'text' && rightInspectorTab === 'summary'">
                   <ProjectSummary
-                    :word-count="project.wordCount"
-                    :chapter-count="project.chapterCount"
-                    :entity-count="entitiesCount"
-                    :alert-count="alertsCount"
                     :alerts="alerts"
                     :global-summary="globalSummary"
-                    @stat-click="handleStatClick"
+                    @navigate-to-alert="onAlertClick"
+                    @view-alerts="handleViewAlerts"
+                    @filter-alerts="handleFilterAlerts"
+                    @alert-action="handleAlertAction"
                   />
                 </template>
 
@@ -764,6 +763,11 @@ const entitiesById = computed(() =>
 
 const alertsById = computed(() =>
   new Map(alerts.value.map(a => [a.id, a]))
+)
+
+// Alertas activas para mostrar en el documento (sin resueltas/descartadas)
+const activeAlerts = computed(() =>
+  alerts.value.filter(a => a.status === 'active')
 )
 
 const chaptersById = computed(() =>
@@ -1186,7 +1190,10 @@ const onAlertSelect = (alert: Alert) => {
 }
 
 const onAlertClickFromText = (alert: Alert) => {
+  // Seleccionar la alerta en el store
   selectionStore.selectAlert(alert)
+  // Asegurar que el inspector derecho esté abierto
+  rightInspectorTab.value = 'inspector'
 }
 
 /**
@@ -1374,6 +1381,60 @@ const handleStatClick = (stat: 'words' | 'chapters' | 'entities' | 'alerts') => 
     default:
       // words - ir al texto
       workspaceStore.setActiveTab('text')
+  }
+}
+
+// ProjectSummary handlers (panel derecho optimizado)
+const handleViewAlerts = () => {
+  workspaceStore.setActiveTab('alerts')
+}
+
+const handleFilterAlerts = (_category: Alert['category']) => {
+  // TODO: Implementar filtro por categoría en workspace store
+  workspaceStore.setActiveTab('alerts')
+}
+
+const onAlertClick = (alert: Alert) => {
+  // Seleccionar la alerta en el inspector
+  selectionStore.selectAlert(alert)
+  // Asegurar que estamos en la pestaña de texto y en el inspector derecho
+  workspaceStore.setActiveTab('text')
+  rightInspectorTab.value = 'inspector'
+}
+
+const handleAlertAction = async (alert: Alert, action: 'accept' | 'reject') => {
+  if (!project.value) return
+
+  const newStatus = action === 'accept' ? 'resolved' : 'dismissed'
+
+  try {
+    await api.patch(`/api/projects/${project.value.id}/alerts/${alert.id}/status`, {
+      status: newStatus
+    })
+
+    // Recargar las alertas desde el servidor para sincronizar
+    await loadAlerts(project.value.id)
+
+    // Disparar evento para refrescar el historial
+    window.dispatchEvent(new CustomEvent('history:changed', {
+      detail: { projectId: project.value.id, alertId: alert.id }
+    }))
+
+    // Mostrar notificación de éxito
+    toast.add({
+      severity: 'success',
+      summary: action === 'accept' ? 'Alerta aceptada' : 'Alerta rechazada',
+      life: 2000
+    })
+
+  } catch (error) {
+    console.error(`Error ${action}ing alert:`, error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: `No se pudo ${action === 'accept' ? 'aceptar' : 'rechazar'} la alerta`,
+      life: 3000
+    })
   }
 }
 
@@ -1627,6 +1688,7 @@ const handleSettingsChange = async () => {
 
 onMounted(() => {
   window.addEventListener('settings-changed', handleSettingsChange)
+  window.addEventListener('chapter:navigate', handleChapterNavigate)
 
   // Idle-prefetch: pre-cargar tabs en background para que estén listos
   // cuando el usuario cambie de pestaña (sin flash de carga)
@@ -1654,7 +1716,22 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('settings-changed', handleSettingsChange)
+  window.removeEventListener('chapter:navigate', handleChapterNavigate)
 })
+
+// Manejar navegación a capítulo desde ResumenTab
+function handleChapterNavigate(event: Event) {
+  const customEvent = event as CustomEvent<{ chapterId: number }>
+  const chapterId = customEvent.detail?.chapterId
+  if (chapterId) {
+    // Encontrar el capítulo
+    const chapter = chapters.value.find(c => c.id === chapterId)
+    if (chapter) {
+      // Navegar al capítulo usando el handler existente
+      handleChapterSelect(chapter.id)
+    }
+  }
+}
 
 const onDocumentTypeChanged = async (_type: string, _subtype: string | null) => {
   // Recargar el proyecto para obtener el nuevo perfil de features

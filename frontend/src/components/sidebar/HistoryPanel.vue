@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useGlobalUndo } from '@/composables/useGlobalUndo'
 import type { HistoryEntry } from '@/composables/useGlobalUndo'
 import { useListKeyboardNav } from '@/composables/useListKeyboardNav'
+import { apiUrl } from '@/config/api'
 import SelectButton from 'primevue/selectbutton'
 
 /**
@@ -78,6 +79,57 @@ async function handleUndo(entry: HistoryEntry) {
   await loadHistory()
 }
 
+const restoringAll = ref(false)
+
+async function handleRestoreAll() {
+  const undoableEntries = entries.value.filter(e => e.isUndoable && !e.isUndone)
+
+  if (undoableEntries.length === 0) {
+    return
+  }
+
+  // Confirmación
+  const confirmed = confirm(
+    `⚠️ ¿Restaurar todo?\n\n` +
+    `Se deshará todo el trabajo realizado:\n` +
+    `• ${undoableEntries.length} acciones se revertirán\n` +
+    `• Todas las alertas resueltas/descartadas volverán a estar activas\n` +
+    `• Todas las fusiones de entidades se separarán\n` +
+    `• Todos los cambios manuales se eliminarán\n\n` +
+    `Esta acción NO se puede deshacer.`
+  )
+
+  if (!confirmed) return
+
+  restoringAll.value = true
+  try {
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/undo-all`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+
+    const json = await response.json()
+
+    if (json.success) {
+      await loadHistory()
+
+      // Notificar al resto de la app
+      window.dispatchEvent(new CustomEvent('history:undo-complete', {
+        detail: { projectId: props.projectId, restoreAll: true }
+      }))
+
+      alert(`✅ ${json.data?.count || 0} acciones deshecha(s) correctamente`)
+    } else {
+      alert(`❌ Error: ${json.error}`)
+    }
+  } catch (error) {
+    console.error('Error restaurando todo:', error)
+    alert('❌ Error de conexión al restaurar')
+  } finally {
+    restoringAll.value = false
+  }
+}
+
 function getActionIcon(actionType: string): string {
   const icons: Record<string, string> = {
     entity_merged: 'pi pi-link',
@@ -135,18 +187,20 @@ function formatTime(dateStr: string): string {
   }
 }
 
-// Recargar cuando se deshace algo
-function handleUndoComplete() {
+// Recargar cuando se deshace algo o hay cambios en el historial
+function handleHistoryChange() {
   loadHistory()
 }
 
 onMounted(() => {
   loadHistory()
-  window.addEventListener('history:undo-complete', handleUndoComplete)
+  window.addEventListener('history:undo-complete', handleHistoryChange)
+  window.addEventListener('history:changed', handleHistoryChange)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('history:undo-complete', handleUndoComplete)
+  window.removeEventListener('history:undo-complete', handleHistoryChange)
+  window.removeEventListener('history:changed', handleHistoryChange)
 })
 
 // Recargar si cambia el proyecto
@@ -158,8 +212,22 @@ watch(() => props.projectId, () => {
 <template>
   <div class="history-panel">
     <div class="panel-header">
-      <span class="panel-title">Historial</span>
-      <span v-if="undoableCount > 0" class="panel-count">{{ undoableCount }}</span>
+      <div class="header-left">
+        <span class="panel-title">Historial</span>
+        <span v-if="undoableCount > 0" class="panel-count">{{ undoableCount }}</span>
+      </div>
+      <button
+        v-if="undoableCount > 0"
+        type="button"
+        class="restore-all-btn"
+        :disabled="restoringAll"
+        title="Restaurar todo - deshacer todas las acciones"
+        @click="handleRestoreAll"
+      >
+        <i class="pi pi-history" v-if="!restoringAll"></i>
+        <i class="pi pi-spin pi-spinner" v-else></i>
+        <span class="btn-text">Restaurar</span>
+      </button>
     </div>
 
     <!-- Filtros por categoría -->
@@ -260,6 +328,12 @@ watch(() => props.projectId, () => {
   border-bottom: 1px solid var(--surface-border);
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .panel-title {
   font-weight: 600;
   font-size: 0.875rem;
@@ -274,6 +348,52 @@ watch(() => props.projectId, () => {
   padding: 0.125rem 0.5rem;
   min-width: 1.25rem;
   text-align: center;
+}
+
+.restore-all-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.375rem 0.75rem;
+  background: var(--orange-50);
+  color: var(--orange-600);
+  border: 1px solid var(--orange-200);
+  border-radius: var(--app-radius);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.restore-all-btn:hover:not(:disabled) {
+  background: var(--orange-100);
+  border-color: var(--orange-300);
+  color: var(--orange-700);
+}
+
+.restore-all-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.restore-all-btn i {
+  font-size: 0.75rem;
+}
+
+.btn-text {
+  font-size: 0.75rem;
+}
+
+.dark .restore-all-btn {
+  background: var(--orange-900);
+  color: var(--orange-300);
+  border-color: var(--orange-700);
+}
+
+.dark .restore-all-btn:hover:not(:disabled) {
+  background: var(--orange-800);
+  border-color: var(--orange-600);
+  color: var(--orange-200);
 }
 
 /* Filtros */

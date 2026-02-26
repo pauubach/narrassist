@@ -116,7 +116,7 @@ const menus = computed<Menu[]>(() => {
       { label: 'Cronología', action: 'viewTimeline', icon: 'clock', shortcut: 'Ctrl+5' },
       { label: 'Escritura', action: 'viewStyle', icon: 'pencil', shortcut: 'Ctrl+6' },
       { label: 'Glosario', action: 'viewGlossary', icon: 'book', shortcut: 'Ctrl+7' },
-      { label: 'Resumen', action: 'viewSummary', icon: 'chart-bar', shortcut: 'Ctrl+8' },
+      { label: 'Estadísticas', action: 'viewSummary', icon: 'chart-bar', shortcut: 'Ctrl+8' },
       { divider: true, label: '' },
       { label: 'Sidebar', action: 'toggleSidebar', icon: 'th-large', shortcut: 'Ctrl+B' },
       { label: 'Inspector', action: 'toggleInspector', icon: 'sliders-h', shortcut: 'Ctrl+Shift+I' },

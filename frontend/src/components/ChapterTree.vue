@@ -86,17 +86,8 @@
         </div>
 
         <!-- Stats del capítulo -->
-        <div class="chapter-stats">
+        <div v-if="chapter.alertsCount" class="chapter-stats">
           <div
-            v-if="chapter.entitiesCount"
-            v-tooltip.bottom="'Entidades mencionadas'"
-            class="stat-item"
-          >
-            <i class="pi pi-users"></i>
-            <span>{{ chapter.entitiesCount }}</span>
-          </div>
-          <div
-            v-if="chapter.alertsCount"
             v-tooltip.bottom="'Alertas detectadas'"
             class="stat-item stat-alerts"
           >
@@ -200,7 +191,6 @@ const selectSection = (chapterId: number, sectionId: number, startChar: number) 
 
 .chapter-item {
   padding: 0.75rem;
-  margin-bottom: 0.5rem;
   border-radius: var(--app-radius);
   cursor: pointer;
   transition: all 0.2s;

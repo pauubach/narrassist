@@ -183,7 +183,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     { id: 'timeline' as WorkspaceTab, label: 'Cronología', icon: 'pi pi-clock' },
     { id: 'style' as WorkspaceTab, label: 'Escritura', icon: 'pi pi-pencil' },
     { id: 'glossary' as WorkspaceTab, label: 'Glosario', icon: 'pi pi-book' },
-    { id: 'summary' as WorkspaceTab, label: 'Resumen', icon: 'pi pi-chart-bar' }
+    { id: 'summary' as WorkspaceTab, label: 'Estadísticas', icon: 'pi pi-chart-bar' }
   ])
 
   // ============================================================================

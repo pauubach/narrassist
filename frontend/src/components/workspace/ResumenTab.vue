@@ -1,24 +1,19 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import Card from 'primevue/card'
+import { computed, ref } from 'vue'
 import Button from 'primevue/button'
-// import DsBadge from '@/components/ds/DsBadge.vue'  // Reserved
-import VersionSparkline from '@/components/project/VersionSparkline.vue'
-import VersionHistory from '@/components/project/VersionHistory.vue'
-import DsBarChart, { type BarChartItem } from '@/components/ds/DsBarChart.vue'
-// EventDensityStrip removed from ResumenTab (redundant with alerts-per-chapter)
+import DsProgressRing from '../design-system/DsProgressRing.vue'
 import type { Project, Entity, Alert, Chapter } from '@/types'
-import { useEntityUtils } from '@/composables/useEntityUtils'
+import { useWorkspaceStore } from '../../stores/workspace'
+import { useSelectionStore } from '../../stores/selection'
 
 /**
- * ResumenTab - Pestaña de resumen y estadísticas
+ * ResumenTab - Dashboard MVP con diseño híbrido
  *
- * Dashboard con:
- * - Información del proyecto
- * - Estadísticas de análisis
- * - Distribución de alertas
- * - Top entidades
- * - Acciones de exportación
+ * Propuesta de los 3 comités:
+ * - Hero section con progreso radial
+ * - 3 CTAs contextuales (Continuar/Priorizar/Elegir)
+ * - Estadísticas colapsables (progressive disclosure)
+ * - Click-to-action en todas las métricas
  */
 
 interface Props {
@@ -28,14 +23,13 @@ interface Props {
   entities: Entity[]
   /** Alertas del proyecto */
   alerts: Alert[]
-  /** Capítulos del proyecto (para mostrar nombres) */
+  /** Capítulos del proyecto */
   chapters?: Chapter[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
   chapters: () => []
 })
-
 
 const emit = defineEmits<{
   'export': []
@@ -44,9 +38,13 @@ const emit = defineEmits<{
   're-analyze': []
 }>()
 
-const { getEntityIcon, getEntityLabel } = useEntityUtils()
+const workspaceStore = useWorkspaceStore()
+const selectionStore = useSelectionStore()
 
-// Estadísticas computadas
+// Estado local
+const showAdvancedStats = ref(false)
+
+// ── Estadísticas computadas ──
 const stats = computed(() => ({
   words: props.project.wordCount,
   chapters: props.project.chapterCount,
@@ -66,8 +64,32 @@ const reviewStats = computed(() => {
   return { total, resolved, dismissed, reviewed, pending, percent }
 })
 
+// ── Lógica de priorización inteligente ──
+
+// Próxima alerta sugerida (basada en severidad + posición)
+const nextAlert = computed(() => {
+  const active = props.alerts.filter(a => a.status === 'active')
+  if (active.length === 0) return null
+
+  // Priorizar: critical > high > medium > low > info
+  // Dentro de cada severidad, ordenar por posición
+  const severityOrder = { critical: 0, high: 1, medium: 2, low: 3, info: 4 }
+  const sorted = active.sort((a, b) => {
+    const sevDiff = severityOrder[a.severity] - severityOrder[b.severity]
+    if (sevDiff !== 0) return sevDiff
+    return (a.spanStart ?? 0) - (b.spanStart ?? 0)
+  })
+
+  return sorted[0]
+})
+
+// Alertas críticas pendientes
+const criticalAlerts = computed(() =>
+  props.alerts.filter(a => a.status === 'active' && a.severity === 'critical')
+)
+
 // Distribución de alertas por severidad
-const alertDistribution = computed(() => {
+const alertsBySeverity = computed(() => {
   const dist = { critical: 0, high: 0, medium: 0, low: 0, info: 0 }
   for (const alert of props.alerts) {
     if (alert.status === 'active') {
@@ -77,158 +99,90 @@ const alertDistribution = computed(() => {
   return dist
 })
 
-// Distribución de entidades por tipo
+// Capítulo con más alertas
+const hottestChapter = computed(() => {
+  if (props.chapters.length === 0) return null
+
+  const byChapter: Record<number, number> = {}
+  for (const alert of props.alerts) {
+    if (alert.status === 'active' && alert.chapter != null) {
+      byChapter[alert.chapter] = (byChapter[alert.chapter] || 0) + 1
+    }
+  }
+
+  const entries = Object.entries(byChapter).map(([ch, count]) => ({ chapter: parseInt(ch), count }))
+  if (entries.length === 0) return null
+
+  entries.sort((a, b) => b.count - a.count)
+  const hottest = entries[0]
+  const chapter = props.chapters.find(c => c.chapterNumber === hottest.chapter)
+  return chapter ? { chapter, count: hottest.count } : null
+})
+
+// ── Acciones CTA ──
+
+// [▶ CONTINUAR] - Ir a la próxima alerta sugerida
+function handleContinue() {
+  if (!nextAlert.value) return
+
+  // Cambiar a tab de alertas
+  workspaceStore.setActiveTab('alerts')
+
+  // Seleccionar la alerta
+  setTimeout(() => {
+    selectionStore.selectAlert(nextAlert.value!)
+    // Navegar al documento
+    window.dispatchEvent(new CustomEvent('alert:navigate', {
+      detail: { alertId: nextAlert.value!.id }
+    }))
+  }, 100)
+}
+
+// [🔥 PRIORIZAR] - Filtrar solo críticas
+function handlePrioritize() {
+  workspaceStore.setActiveTab('alerts')
+  // Enviar evento para filtrar por críticas
+  setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('alerts:filter', {
+      detail: { severity: 'critical' }
+    }))
+  }, 100)
+}
+
+// [📍 ELEGIR CAPÍTULO] - Ir al capítulo con más alertas
+function handleChooseChapter() {
+  if (!hottestChapter.value) return
+
+  // Cambiar a tab de texto (para ver el documento)
+  workspaceStore.setActiveTab('text')
+
+  // Emitir evento para navegar al capítulo
+  setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('chapter:navigate', {
+      detail: { chapterId: hottestChapter.value!.chapter.id }
+    }))
+  }, 100)
+}
+
+// ── Estadísticas avanzadas (colapsables) ──
+
+// Entidades por tipo
 const entityDistribution = computed(() => {
   const dist: Record<string, number> = {}
   for (const entity of props.entities) {
     dist[entity.type] = (dist[entity.type] || 0) + 1
   }
-  // Ordenar por cantidad
   return Object.entries(dist)
     .sort((a, b) => b[1] - a[1])
-    .map(([type, count]) => ({
-      type,
-      count,
-      icon: getEntityIcon(type as any),
-      label: getEntityLabel(type as any)
-    }))
+    .slice(0, 5)
 })
 
-// Transformar entityDistribution a formato BarChartItem
-const entityBarItems = computed((): BarChartItem[] => {
-  const maxCount = Math.max(...entityDistribution.value.map(e => e.count), 1)
-  return entityDistribution.value.map(item => ({
-    label: item.label,
-    value: item.count,
-    max: maxCount,
-    // No especificar color - usa automáticamente el color primario del tema
-    tooltip: `${item.label}: ${item.count} entidades`
-  }))
-})
-
-// Top personajes por menciones
+// Top personajes
 const topCharacters = computed(() => {
   return props.entities
     .filter(e => e.type === 'character')
     .sort((a, b) => (b.mentionCount || 0) - (a.mentionCount || 0))
-    .slice(0, 5)
-})
-
-// Mapa de número de capítulo a nombre
-const chapterNameMap = computed(() => {
-  const map: Record<number, string> = {}
-  for (const ch of props.chapters) {
-    map[ch.chapterNumber] = ch.title || `Capítulo ${ch.chapterNumber}`
-  }
-  return map
-})
-
-// Densidad de alertas por capítulo
-const chapterDensity = computed(() => {
-  // Agrupar alertas por capítulo
-  const byChapter: Record<number, { count: number; bySeverity: Record<string, number> }> = {}
-
-  for (const alert of props.alerts) {
-    if (alert.status !== 'active') continue
-    const chapter = alert.chapter ?? 0
-
-    if (!byChapter[chapter]) {
-      byChapter[chapter] = { count: 0, bySeverity: { critical: 0, high: 0, medium: 0, low: 0, info: 0 } }
-    }
-    byChapter[chapter].count++
-    byChapter[chapter].bySeverity[alert.severity]++
-  }
-
-  // Convertir a array ordenado
-  const chapters = Object.entries(byChapter)
-    .map(([chapterNum, data]) => {
-      const num = parseInt(chapterNum)
-      return {
-        chapter: num,
-        // Usar el nombre del capítulo si existe, si no "Sin capítulo" para 0
-        name: num === 0 ? 'Sin capítulo' : (chapterNameMap.value[num] || `Capítulo ${num}`),
-        count: data.count,
-        bySeverity: data.bySeverity,
-      }
-    })
-    .sort((a, b) => a.chapter - b.chapter)
-
-  // Calcular el máximo para normalizar barras
-  const maxCount = Math.max(...chapters.map(c => c.count), 1)
-
-  return { chapters, maxCount }
-})
-
-// Tendencia de errores (mejorando o empeorando)
-const errorTrend = computed(() => {
-  const chapters = chapterDensity.value.chapters
-  if (chapters.length < 3) return null
-
-  // Comparar primera mitad con segunda mitad
-  const mid = Math.floor(chapters.length / 2)
-  const firstHalf = chapters.slice(0, mid)
-  const secondHalf = chapters.slice(mid)
-
-  const avgFirst = firstHalf.reduce((sum, c) => sum + c.count, 0) / firstHalf.length
-  const avgSecond = secondHalf.reduce((sum, c) => sum + c.count, 0) / secondHalf.length
-
-  const percentChange = ((avgSecond - avgFirst) / Math.max(avgFirst, 1)) * 100
-
-  if (percentChange < -15) return { direction: 'improving', percent: Math.abs(percentChange) }
-  if (percentChange > 15) return { direction: 'worsening', percent: percentChange }
-  return { direction: 'stable', percent: Math.abs(percentChange) }
-})
-
-// Severity colors for donut
-const severityColors: Record<string, string> = {
-  critical: 'var(--ds-color-danger, #ef4444)',
-  high: 'var(--orange-500)',
-  medium: 'var(--yellow-500)',
-  low: 'var(--blue-500)',
-  info: 'var(--gray-400)',
-}
-
-// Donut segments computed from alert distribution
-const donutSegments = computed(() => {
-  const total = stats.value.activeAlerts
-  if (total === 0) return []
-
-  const circumference = 2 * Math.PI * 48 // r=48
-  const severities = ['critical', 'high', 'medium', 'low', 'info'] as const
-  const segments: Array<{ color: string; dashArray: string; dashOffset: number }> = []
-  let cumulativeOffset = 0
-
-  for (const sev of severities) {
-    const count = alertDistribution.value[sev]
-    if (count === 0) continue
-    const fraction = count / total
-    const segLength = fraction * circumference
-    segments.push({
-      color: severityColors[sev],
-      dashArray: `${segLength} ${circumference - segLength}`,
-      dashOffset: -cumulativeOffset + circumference * 0.25, // start at top
-    })
-    cumulativeOffset += segLength
-  }
-  return segments
-})
-
-// Legend items for alert donut
-const alertLegendItems = computed(() => {
-  const items = [
-    { key: 'critical', label: 'Críticas', count: alertDistribution.value.critical, color: severityColors.critical },
-    { key: 'high', label: 'Altas', count: alertDistribution.value.high, color: severityColors.high },
-    { key: 'medium', label: 'Medias', count: alertDistribution.value.medium, color: severityColors.medium },
-    { key: 'low', label: 'Bajas', count: alertDistribution.value.low, color: severityColors.low },
-    { key: 'info', label: 'Info', count: alertDistribution.value.info, color: severityColors.info },
-  ]
-  return items.filter(i => i.count > 0)
-})
-
-// Verificar si el documento es Word (para exportar con Track Changes)
-const isWordDocument = computed(() => {
-  const path = props.project.documentPath || props.project.source_path || ''
-  return path.toLowerCase().endsWith('.docx')
+    .slice(0, 3)
 })
 
 // Formato de fecha
@@ -236,369 +190,251 @@ function formatDate(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date
   return d.toLocaleDateString('es-ES', {
     day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
+    month: 'short',
+    year: 'numeric'
   })
 }
 
-// Extraer nombre original del documento (sin hash ni ruta)
-const originalDocumentName = computed(() => {
-  if (!props.project.documentPath) return null
-  // Soportar tanto / como \ (Windows)
-  const filename = props.project.documentPath.split(/[/\\]/).pop() || props.project.documentPath
-  // Eliminar el hash MD5 del inicio (32 caracteres hex + _)
-  const match = filename.match(/^[a-f0-9]{32}_(.+)$/)
-  return match ? match[1] : filename
-})
+// Severity labels
+const severityLabels: Record<string, string> = {
+  critical: 'Críticas',
+  high: 'Altas',
+  medium: 'Medias',
+  low: 'Bajas',
+  info: 'Info'
+}
 </script>
 
 <template>
   <div class="resumen-tab">
     <div class="resumen-content">
-      <!-- Row 1: Stat cards across the top -->
-      <div class="stats-row">
-        <div class="stat-card stat-words">
-          <div class="stat-icon-bg">
-            <i class="pi pi-file-edit"></i>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value">{{ stats.words.toLocaleString() }}</span>
-            <span class="stat-label">Palabras</span>
-          </div>
+      <!-- ══════════════════════════════════════════════════════════════
+           HERO SECTION - Progreso + CTAs
+           ══════════════════════════════════════════════════════════════ -->
+      <div class="hero-section">
+        <div class="hero-left">
+          <DsProgressRing
+            :value="reviewStats.percent"
+            size="large"
+            label="REVISADO"
+            color="auto"
+          />
         </div>
 
-        <div class="stat-card stat-chapters">
-          <div class="stat-icon-bg">
-            <i class="pi pi-book"></i>
+        <div class="hero-right">
+          <div class="hero-title">
+            <h2>{{ reviewStats.pending === 0 ? '¡Revisión completa!' : 'Continúa donde lo dejaste' }}</h2>
+            <p class="hero-subtitle">
+              <template v-if="reviewStats.pending === 0">
+                Has revisado todas las alertas del documento
+              </template>
+              <template v-else>
+                {{ reviewStats.pending }} alerta{{ reviewStats.pending === 1 ? '' : 's' }} pendiente{{ reviewStats.pending === 1 ? '' : 's' }}
+                <template v-if="criticalAlerts.length > 0">
+                  · <span class="critical-badge">{{ criticalAlerts.length }} crítica{{ criticalAlerts.length === 1 ? '' : 's' }}</span>
+                </template>
+              </template>
+            </p>
           </div>
-          <div class="stat-info">
-            <span class="stat-value">{{ stats.chapters }}</span>
-            <span class="stat-label">Capítulos</span>
-          </div>
-        </div>
 
-        <div class="stat-card stat-entities">
-          <div class="stat-icon-bg">
-            <i class="pi pi-users"></i>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value">{{ stats.entities }}</span>
-            <span class="stat-label">Entidades</span>
-          </div>
-        </div>
-
-        <div class="stat-card stat-alerts">
-          <div class="stat-icon-bg">
-            <i class="pi pi-exclamation-triangle"></i>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value">{{ stats.activeAlerts }}</span>
-            <span class="stat-label">Alertas activas</span>
-          </div>
-        </div>
-
-        <div class="stat-card stat-trend">
-          <div class="stat-icon-bg">
-            <i class="pi pi-chart-line"></i>
-          </div>
-          <div class="stat-info">
-            <span class="stat-label">Tendencia</span>
-            <VersionSparkline :project-id="project.id" :width="100" :height="28" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Review Progress (solo si hay alertas) -->
-      <Card v-if="reviewStats.total > 0" class="chart-card review-progress-card">
-        <template #title>
-          <i class="pi pi-check-square"></i>
-          Progreso de Revisión
-        </template>
-        <template #content>
-          <div class="review-progress-content">
-            <div class="review-progress-header">
-              <span class="review-percent">{{ reviewStats.percent }}%</span>
-              <span class="review-fraction">{{ reviewStats.reviewed }} / {{ reviewStats.total }}</span>
-            </div>
-            <div class="review-bar-track">
-              <div class="review-bar-fill" :style="{ width: reviewStats.percent + '%' }"></div>
-            </div>
-            <div class="review-breakdown">
-              <div class="review-breakdown-item">
-                <span class="breakdown-dot breakdown-resolved"></span>
-                <span class="breakdown-label">Resueltas</span>
-                <span class="breakdown-count">{{ reviewStats.resolved }}</span>
-              </div>
-              <div class="review-breakdown-item">
-                <span class="breakdown-dot breakdown-dismissed"></span>
-                <span class="breakdown-label">Descartadas</span>
-                <span class="breakdown-count">{{ reviewStats.dismissed }}</span>
-              </div>
-              <div class="review-breakdown-item">
-                <span class="breakdown-dot breakdown-pending"></span>
-                <span class="breakdown-label">Pendientes</span>
-                <span class="breakdown-count">{{ reviewStats.pending }}</span>
-              </div>
-            </div>
-          </div>
-        </template>
-      </Card>
-
-      <!-- Row 2: Two-column grid for charts -->
-      <div class="charts-row">
-        <!-- Left: Alert distribution (donut-like visual) -->
-        <Card class="chart-card distribution-card">
-          <template #title>
-            <i class="pi pi-chart-pie"></i>
-            Distribución de Alertas
-          </template>
-          <template #content>
-            <!-- Donut chart visualization -->
-            <div v-if="stats.activeAlerts > 0" class="donut-container">
-              <svg viewBox="0 0 120 120" class="donut-chart">
-                <circle
-                  v-for="(seg, i) in donutSegments"
-                  :key="i"
-                  cx="60" cy="60" r="48"
-                  fill="none"
-                  :stroke="seg.color"
-                  stroke-width="18"
-                  :stroke-dasharray="seg.dashArray"
-                  :stroke-dashoffset="seg.dashOffset"
-                  :class="'donut-segment'"
-                />
-                <text x="60" y="56" text-anchor="middle" class="donut-total">{{ stats.activeAlerts }}</text>
-                <text x="60" y="72" text-anchor="middle" class="donut-label">alertas</text>
-              </svg>
-            </div>
-            <div v-else class="empty-donut">
-              <i class="pi pi-check-circle"></i>
-              <span>Sin alertas activas</span>
-            </div>
-            <!-- Legend below donut -->
-            <div class="alert-legend">
-              <div v-for="item in alertLegendItems" :key="item.key" class="alert-legend-item">
-                <span class="legend-dot" :style="{ background: item.color }"></span>
-                <span class="legend-label">{{ item.label }}</span>
-                <span class="legend-count">{{ item.count }}</span>
-              </div>
-            </div>
-          </template>
-        </Card>
-
-        <!-- Right: Entity distribution (horizontal bars with theme color) -->
-        <Card class="chart-card entities-card">
-          <template #title>
-            <i class="pi pi-tags"></i>
-            Entidades por Tipo
-          </template>
-          <template #content>
-            <DsBarChart :items="entityBarItems" size="normal" />
-          </template>
-        </Card>
-      </div>
-
-      <!-- Row 3: Alerts per chapter (full width) -->
-      <Card v-if="chapterDensity.chapters.length > 0" class="chart-card density-card">
-        <template #title>
-          <i class="pi pi-chart-bar"></i>
-          Alertas por Capítulo
-          <span
-            v-if="errorTrend"
-            class="trend-badge"
-            :class="'trend-' + errorTrend.direction"
-            :title="errorTrend.direction === 'improving'
-              ? 'Menos alertas en la segunda mitad del documento'
-              : errorTrend.direction === 'worsening'
-                ? 'Más alertas en la segunda mitad del documento'
-                : 'Distribución uniforme de alertas'"
-          >
-            <i :class="errorTrend.direction === 'improving' ? 'pi pi-arrow-down' : errorTrend.direction === 'worsening' ? 'pi pi-arrow-up' : 'pi pi-minus'"></i>
-            {{ errorTrend.direction === 'improving' ? 'Menos al final' : errorTrend.direction === 'worsening' ? 'Más al final' : 'Uniforme' }}
-          </span>
-        </template>
-        <template #content>
-          <div class="density-chart">
-            <div
-              v-for="item in chapterDensity.chapters"
-              :key="item.chapter"
-              class="density-row"
+          <!-- 3 CTAs contextuales -->
+          <div class="hero-ctas">
+            <!-- CTA 1: Continuar (próxima alerta sugerida) -->
+            <Button
+              v-if="nextAlert"
+              label="Continuar"
+              icon="pi pi-play"
+              class="cta-primary"
+              @click="handleContinue"
             >
-              <span class="density-label" :title="item.name">{{ item.name }}</span>
-              <div class="density-bar-container">
-                <div class="density-bar-stack">
-                  <div
-                    v-if="item.bySeverity.critical > 0"
-                    class="density-segment density-critical"
-                    :style="{ width: (item.bySeverity.critical / chapterDensity.maxCount) * 100 + '%' }"
-                    :title="`${item.bySeverity.critical} críticas`"
-                  ></div>
-                  <div
-                    v-if="item.bySeverity.high > 0"
-                    class="density-segment density-high"
-                    :style="{ width: (item.bySeverity.high / chapterDensity.maxCount) * 100 + '%' }"
-                    :title="`${item.bySeverity.high} altas`"
-                  ></div>
-                  <div
-                    v-if="item.bySeverity.medium > 0"
-                    class="density-segment density-medium"
-                    :style="{ width: (item.bySeverity.medium / chapterDensity.maxCount) * 100 + '%' }"
-                    :title="`${item.bySeverity.medium} medias`"
-                  ></div>
-                  <div
-                    v-if="item.bySeverity.low > 0"
-                    class="density-segment density-low"
-                    :style="{ width: (item.bySeverity.low / chapterDensity.maxCount) * 100 + '%' }"
-                    :title="`${item.bySeverity.low} bajas`"
-                  ></div>
-                  <div
-                    v-if="item.bySeverity.info > 0"
-                    class="density-segment density-info"
-                    :style="{ width: (item.bySeverity.info / chapterDensity.maxCount) * 100 + '%' }"
-                    :title="`${item.bySeverity.info} info`"
-                  ></div>
-                </div>
-              </div>
-              <span class="density-count">{{ item.count }}</span>
+              <template #default>
+                <i class="pi pi-play"></i>
+                <span class="cta-label">Continuar</span>
+                <span class="cta-hint">{{ severityLabels[nextAlert.severity] }} · Cap. {{ nextAlert.chapter || '?' }}</span>
+              </template>
+            </Button>
+
+            <!-- CTA 2: Priorizar (solo críticas) -->
+            <Button
+              v-if="criticalAlerts.length > 0"
+              label="Priorizar Críticas"
+              icon="pi pi-bolt"
+              severity="danger"
+              outlined
+              class="cta-secondary"
+              @click="handlePrioritize"
+            >
+              <template #default>
+                <i class="pi pi-bolt"></i>
+                <span class="cta-label">Priorizar Críticas</span>
+                <span class="cta-hint">{{ criticalAlerts.length }} alerta{{ criticalAlerts.length === 1 ? '' : 's' }}</span>
+              </template>
+            </Button>
+
+            <!-- CTA 3: Elegir capítulo (más alertas) -->
+            <Button
+              v-if="hottestChapter"
+              label="Elegir Capítulo"
+              icon="pi pi-map-marker"
+              severity="secondary"
+              outlined
+              class="cta-tertiary"
+              @click="handleChooseChapter"
+            >
+              <template #default>
+                <i class="pi pi-map-marker"></i>
+                <span class="cta-label">Capítulo {{ hottestChapter.chapter.chapterNumber }}</span>
+                <span class="cta-hint">{{ hottestChapter.count }} alerta{{ hottestChapter.count === 1 ? '' : 's' }}</span>
+              </template>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════════
+           ESTADÍSTICAS RÁPIDAS (Siempre visibles)
+           ══════════════════════════════════════════════════════════════ -->
+      <div class="quick-stats">
+        <div class="quick-stat">
+          <i class="pi pi-file-edit stat-icon"></i>
+          <span class="stat-value">{{ stats.words.toLocaleString() }}</span>
+          <span class="stat-label">palabras</span>
+        </div>
+        <div class="quick-stat">
+          <i class="pi pi-book stat-icon"></i>
+          <span class="stat-value">{{ stats.chapters }}</span>
+          <span class="stat-label">capítulos</span>
+        </div>
+        <div class="quick-stat">
+          <i class="pi pi-users stat-icon"></i>
+          <span class="stat-value">{{ stats.entities }}</span>
+          <span class="stat-label">entidades</span>
+        </div>
+        <div class="quick-stat">
+          <i class="pi pi-exclamation-triangle stat-icon"></i>
+          <span class="stat-value">{{ stats.activeAlerts }}</span>
+          <span class="stat-label">alertas activas</span>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════════
+           ESTADÍSTICAS AVANZADAS (Progressive Disclosure)
+           ══════════════════════════════════════════════════════════════ -->
+      <div class="advanced-stats-toggle">
+        <Button
+          :label="showAdvancedStats ? 'Ocultar estadísticas avanzadas' : 'Mostrar estadísticas avanzadas'"
+          :icon="showAdvancedStats ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+          text
+          size="small"
+          class="toggle-btn"
+          @click="showAdvancedStats = !showAdvancedStats"
+        />
+      </div>
+
+      <div v-if="showAdvancedStats" class="advanced-stats">
+        <!-- Distribución por severidad -->
+        <div class="advanced-card">
+          <h3 class="advanced-title">
+            <i class="pi pi-chart-pie"></i>
+            Distribución por Severidad
+          </h3>
+          <div class="severity-grid">
+            <div
+              v-for="[sev, count] in Object.entries(alertsBySeverity).filter(([,c]) => c > 0)"
+              :key="sev"
+              class="severity-item"
+              :class="`severity-${sev}`"
+            >
+              <span class="severity-count">{{ count }}</span>
+              <span class="severity-label">{{ severityLabels[sev] }}</span>
             </div>
           </div>
-          <div class="density-legend">
-            <span class="legend-item"><span class="legend-dot legend-critical"></span> Crítica</span>
-            <span class="legend-item"><span class="legend-dot legend-high"></span> Alta</span>
-            <span class="legend-item"><span class="legend-dot legend-medium"></span> Media</span>
-            <span class="legend-item"><span class="legend-dot legend-low"></span> Baja</span>
-            <span class="legend-item"><span class="legend-dot legend-info"></span> Info</span>
+        </div>
+
+        <!-- Top entidades -->
+        <div v-if="entityDistribution.length > 0" class="advanced-card">
+          <h3 class="advanced-title">
+            <i class="pi pi-tags"></i>
+            Entidades Detectadas
+          </h3>
+          <div class="entity-list">
+            <div v-for="[type, count] in entityDistribution" :key="type" class="entity-item">
+              <span class="entity-type">{{ type }}</span>
+              <span class="entity-count">{{ count }}</span>
+            </div>
           </div>
-        </template>
-      </Card>
+        </div>
 
-      <!-- Event density removed: redundant with "Alertas por Capítulo" above.
-           EventDensityStrip is still available in ChapterProgressTab (Estilo → Progreso). -->
-
-      <!-- Row 3c: Version History -->
-      <Card v-if="project" class="chart-card version-history-card">
-        <template #title><i class="pi pi-history"></i> Historial de Versiones</template>
-        <template #content>
-          <VersionHistory :project-id="project.id" />
-        </template>
-      </Card>
-
-      <!-- Row 4: Top characters + Info + Actions (three columns) -->
-      <div class="bottom-row">
-        <!-- Top characters -->
-        <Card v-if="topCharacters.length > 0" class="chart-card top-characters-card">
-          <template #title>
+        <!-- Top personajes -->
+        <div v-if="topCharacters.length > 0" class="advanced-card">
+          <h3 class="advanced-title">
             <i class="pi pi-star"></i>
             Personajes Principales
-          </template>
-          <template #content>
-            <div class="top-characters-list">
-              <div
-                v-for="(char, index) in topCharacters"
-                :key="char.id"
-                class="character-item"
-              >
-                <span class="character-rank" :class="'rank-' + (index + 1)">{{ index + 1 }}</span>
-                <div class="character-info">
-                  <span class="character-name">{{ char.name }}</span>
-                  <div class="character-bar-track">
-                    <div
-                      class="character-bar-fill"
-                      :style="{ width: ((char.mentionCount || 0) / Math.max(topCharacters[0]?.mentionCount || 1, 1)) * 100 + '%' }"
-                    ></div>
-                  </div>
-                </div>
-                <span class="character-mentions">{{ char.mentionCount || 0 }}</span>
-              </div>
+          </h3>
+          <div class="character-list">
+            <div v-for="char in topCharacters" :key="char.id" class="character-item">
+              <span class="character-name">{{ char.name }}</span>
+              <span class="character-mentions">{{ char.mentionCount || 0 }} menciones</span>
             </div>
-          </template>
-        </Card>
+          </div>
+        </div>
 
-        <!-- Project info -->
-        <Card class="chart-card info-card">
-          <template #title>
+        <!-- Info del proyecto -->
+        <div class="advanced-card">
+          <h3 class="advanced-title">
             <i class="pi pi-info-circle"></i>
             Proyecto
-          </template>
-          <template #content>
-            <div class="info-list">
-              <div class="info-row">
-                <i class="pi pi-tag info-row-icon"></i>
-                <div class="info-row-content">
-                  <span class="info-row-label">Nombre</span>
-                  <span class="info-row-value">{{ project.name }}</span>
-                </div>
-              </div>
-              <div v-if="originalDocumentName" class="info-row">
-                <i class="pi pi-file info-row-icon"></i>
-                <div class="info-row-content">
-                  <span class="info-row-label">Documento</span>
-                  <span class="info-row-value">{{ originalDocumentName }}</span>
-                </div>
-              </div>
-              <div v-if="project.description" class="info-row">
-                <i class="pi pi-align-left info-row-icon"></i>
-                <div class="info-row-content">
-                  <span class="info-row-label">Descripción</span>
-                  <span class="info-row-value">{{ project.description }}</span>
-                </div>
-              </div>
-              <div class="info-row">
-                <i class="pi pi-calendar info-row-icon"></i>
-                <div class="info-row-content">
-                  <span class="info-row-label">Última modificación</span>
-                  <span class="info-row-value">{{ formatDate(project.lastModified) }}</span>
-                </div>
-              </div>
+          </h3>
+          <div class="info-list">
+            <div class="info-row">
+              <span class="info-label">Nombre</span>
+              <span class="info-value">{{ project.name }}</span>
             </div>
-          </template>
-        </Card>
+            <div v-if="project.description" class="info-row">
+              <span class="info-label">Descripción</span>
+              <span class="info-value">{{ project.description }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Última modificación</span>
+              <span class="info-value">{{ formatDate(project.lastModified) }}</span>
+            </div>
+          </div>
+        </div>
 
-        <!-- Actions -->
-        <Card class="chart-card actions-card">
-          <template #title>
+        <!-- Acciones de exportación -->
+        <div class="advanced-card actions-card">
+          <h3 class="advanced-title">
             <i class="pi pi-download"></i>
-            Acciones
-          </template>
-          <template #content>
-            <div class="actions-stack">
-              <Button
-                label="Exportar Informe"
-                icon="pi pi-download"
-                outlined
-                class="action-btn"
-                @click="emit('export')"
-              />
-              <Button
-                v-if="isWordDocument"
-                v-tooltip.top="'Exporta el documento Word con las correcciones como revisiones (Track Changes)'"
-                label="Con Correcciones"
-                icon="pi pi-file-edit"
-                outlined
-                severity="help"
-                class="action-btn"
-                @click="emit('export-corrected')"
-              />
-              <Button
-                label="Guía de Estilo"
-                icon="pi pi-book"
-                outlined
-                class="action-btn"
-                @click="emit('export-style-guide')"
-              />
-              <Button
-                label="Re-analizar"
-                icon="pi pi-refresh"
-                outlined
-                severity="secondary"
-                class="action-btn"
-                @click="emit('re-analyze')"
-              />
-            </div>
-          </template>
-        </Card>
+            Exportar
+          </h3>
+          <div class="actions-stack">
+            <Button
+              label="Informe de Análisis"
+              icon="pi pi-file-pdf"
+              outlined
+              size="small"
+              class="action-btn"
+              @click="emit('export')"
+            />
+            <Button
+              label="Guía de Estilo"
+              icon="pi pi-book"
+              outlined
+              size="small"
+              class="action-btn"
+              @click="emit('export-style-guide')"
+            />
+            <Button
+              label="Re-analizar Documento"
+              icon="pi pi-refresh"
+              outlined
+              severity="secondary"
+              size="small"
+              class="action-btn"
+              @click="emit('re-analyze')"
+            />
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -611,543 +447,463 @@ const originalDocumentName = computed(() => {
 }
 
 .resumen-content {
-  padding: 1.5rem;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 2rem;
 }
 
-/* ── Row 1: Stat cards ── */
-.stats-row {
+/* ══════════════════════════════════════════════════════════════
+   HERO SECTION
+   ══════════════════════════════════════════════════════════════ */
+.hero-section {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 1rem;
-}
-
-.stat-card {
-  display: flex;
+  grid-template-columns: auto 1fr;
+  gap: 2.5rem;
   align-items: center;
-  gap: 1rem;
-  padding: 1.25rem;
+  padding: 2rem;
+  background: var(--surface-card);
   border-radius: var(--app-radius-lg);
   border: 1px solid var(--surface-200);
-  background: var(--surface-card);
-  transition: box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-.stat-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-.stat-icon-bg {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--app-radius-lg);
+.hero-left {
   display: flex;
-  align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  align-items: center;
 }
 
-.stat-icon-bg i {
-  font-size: 1.25rem;
-}
-
-.stat-words .stat-icon-bg { background: var(--blue-50); }
-.stat-words .stat-icon-bg i { color: var(--blue-600); }
-.stat-chapters .stat-icon-bg { background: var(--teal-50); }
-.stat-chapters .stat-icon-bg i { color: var(--teal-600); }
-.stat-entities .stat-icon-bg { background: var(--purple-50); }
-.stat-entities .stat-icon-bg i { color: var(--purple-600); }
-.stat-alerts .stat-icon-bg { background: var(--orange-50); }
-.stat-alerts .stat-icon-bg i { color: var(--orange-600); }
-.stat-trend .stat-icon-bg { background: var(--cyan-50); }
-.stat-trend .stat-icon-bg i { color: var(--cyan-600); }
-
-.stat-info {
+.hero-right {
   display: flex;
   flex-direction: column;
+  gap: 1.5rem;
   min-width: 0;
 }
 
-.stat-value {
-  font-size: 1.5rem;
+.hero-title h2 {
+  margin: 0;
+  font-size: 1.75rem;
   font-weight: 700;
   color: var(--text-color);
   line-height: 1.2;
 }
 
+.hero-subtitle {
+  margin: 0.5rem 0 0;
+  font-size: 1rem;
+  color: var(--text-color-secondary);
+  line-height: 1.4;
+}
+
+.critical-badge {
+  color: var(--red-600);
+  font-weight: 600;
+}
+
+/* ── CTAs ── */
+.hero-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.hero-ctas :deep(.p-button) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 1rem 1.25rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  height: auto;
+}
+
+.hero-ctas :deep(.p-button-label) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.cta-label {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.cta-hint {
+  font-size: 0.75rem;
+  font-weight: 400;
+  opacity: 0.8;
+  line-height: 1.2;
+}
+
+.cta-primary :deep(.p-button-label) i {
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   QUICK STATS
+   ══════════════════════════════════════════════════════════════ */
+.quick-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.quick-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.25rem;
+  background: var(--surface-card);
+  border-radius: var(--app-radius);
+  border: 1px solid var(--surface-200);
+  transition: all 0.2s;
+}
+
+.quick-stat:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.stat-icon {
+  font-size: 1.5rem;
+  color: var(--primary-color);
+  margin-bottom: 0.5rem;
+}
+
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-color);
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
 .stat-label {
   font-size: 0.8125rem;
   color: var(--text-color-secondary);
-  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-
-/* ── Review Progress ── */
-.review-progress-content {
+/* ══════════════════════════════════════════════════════════════
+   ADVANCED STATS (Progressive Disclosure)
+   ══════════════════════════════════════════════════════════════ */
+.advanced-stats-toggle {
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  justify-content: center;
+  padding: 0.5rem 0;
 }
 
-.review-progress-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
-.review-percent {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--ds-color-success, #16a34a);
-  line-height: 1;
-}
-
-.review-fraction {
-  font-size: 0.875rem;
+.toggle-btn {
   color: var(--text-color-secondary);
 }
 
-.review-bar-track {
-  height: 10px;
-  background: var(--surface-200);
-  border-radius: 5px;
-  overflow: hidden;
+.advanced-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  animation: fadeIn 0.3s ease;
 }
 
-.review-bar-fill {
-  height: 100%;
-  background: var(--green-500);
-  border-radius: 5px;
-  transition: width 0.3s ease;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.review-breakdown {
-  display: flex;
-  gap: 1.5rem;
-  margin-top: 0.25rem;
+.advanced-card {
+  padding: 1.5rem;
+  background: var(--surface-card);
+  border-radius: var(--app-radius);
+  border: 1px solid var(--surface-200);
 }
 
-.review-breakdown-item {
+.advanced-title {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  font-size: 0.8125rem;
-}
-
-.breakdown-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.breakdown-resolved { background: var(--green-500); }
-.breakdown-dismissed { background: var(--surface-400); }
-.breakdown-pending { background: var(--orange-400); }
-
-.breakdown-label {
-  color: var(--text-color-secondary);
-}
-
-.breakdown-count {
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text-color);
 }
 
-/* ── Row 2: Charts row (two columns) ── */
-.charts-row {
+.advanced-title i {
+  color: var(--primary-color);
+}
+
+/* ── Severity grid ── */
+.severity-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 0.75rem;
 }
 
-.chart-card :deep(.p-card-title) {
+.severity-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 1rem;
-  flex-wrap: wrap;
+  padding: 1rem 0.75rem;
+  border-radius: var(--app-radius);
+  border: 2px solid transparent;
+  transition: all 0.2s;
 }
 
-.chart-card :deep(.p-card-body) {
-  height: 100%;
+.severity-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-/* ── Donut chart ── */
-.donut-container {
-  display: flex;
-  justify-content: center;
-  padding: 0.5rem 0 1rem;
+.severity-critical {
+  background: var(--red-50);
+  border-color: var(--red-200);
 }
 
-.donut-chart {
-  width: 160px;
-  height: 160px;
+.severity-high {
+  background: var(--orange-50);
+  border-color: var(--orange-200);
 }
 
-.donut-segment {
-  transition: opacity 0.2s;
+.severity-medium {
+  background: var(--yellow-50);
+  border-color: var(--yellow-200);
 }
 
-.donut-segment:hover {
-  opacity: 0.8;
+.severity-low {
+  background: var(--blue-50);
+  border-color: var(--blue-200);
 }
 
-.donut-total {
+.severity-info {
+  background: var(--gray-50);
+  border-color: var(--gray-200);
+}
+
+.severity-count {
   font-size: 1.5rem;
   font-weight: 700;
-  fill: var(--text-color);
+  line-height: 1;
+  margin-bottom: 0.25rem;
 }
 
-.donut-label {
-  font-size: 0.6875rem;
-  fill: var(--text-color-secondary);
+.severity-critical .severity-count {
+  color: var(--red-700);
 }
 
-.empty-donut {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 2rem 0;
-  color: var(--ds-color-success, #16a34a);
+.severity-high .severity-count {
+  color: var(--orange-700);
 }
 
-.empty-donut i {
-  font-size: 2rem;
+.severity-medium .severity-count {
+  color: var(--yellow-700);
 }
 
-/* Alert legend */
-.alert-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  justify-content: center;
+.severity-low .severity-count {
+  color: var(--blue-700);
 }
 
-.alert-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: 0.8125rem;
+.severity-info .severity-count {
+  color: var(--gray-700);
 }
 
-.alert-legend-item .legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.alert-legend-item .legend-label {
-  color: var(--text-color-secondary);
-}
-
-.alert-legend-item .legend-count {
-  font-weight: 600;
-  color: var(--text-color);
-}
-
-/* ── Density chart (alerts per chapter) ── */
-.density-card :deep(.p-card-title) {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1rem;
-  flex-wrap: wrap;
-}
-
-.trend-badge {
-  margin-left: auto;
+.severity-label {
   font-size: 0.75rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: var(--app-radius-lg);
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
   font-weight: 500;
-}
-
-.trend-improving { background: var(--green-100); color: var(--green-700); }
-.trend-worsening { background: var(--red-100); color: var(--red-700); }
-.trend-stable { background: var(--gray-100); color: var(--gray-700); }
-
-.density-chart {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.density-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.density-label {
-  width: 140px;
-  min-width: 140px;
-  max-width: 140px;
-  font-size: 0.8125rem;
-  color: var(--text-color-secondary);
-  flex-shrink: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.density-bar-container {
-  flex: 1;
-  height: 16px;
-  background: var(--surface-100);
-  border-radius: var(--app-radius);
-  overflow: hidden;
-}
-
-.density-bar-stack {
-  display: flex;
-  height: 100%;
-}
-
-.density-segment {
-  height: 100%;
-  transition: width 0.3s ease;
-}
-
-.density-critical { background: var(--ds-color-danger, #ef4444); }
-.density-high { background: var(--orange-500); }
-.density-medium { background: var(--yellow-500); }
-.density-low { background: var(--blue-500); }
-.density-info { background: var(--gray-400); }
-
-.density-count {
-  width: 35px;
-  text-align: right;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--text-color);
-}
-
-.density-legend {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  justify-content: center;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--surface-100);
-}
-
-.density-legend .legend-item {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.75rem;
-  color: var(--text-color-secondary);
-}
-
-.density-legend .legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-}
-
-.legend-critical { background: var(--ds-color-danger, #ef4444); }
-.legend-high { background: var(--orange-500); }
-.legend-medium { background: var(--yellow-500); }
-.legend-low { background: var(--blue-500); }
-.legend-info { background: var(--gray-400); }
-
-/* ── Bottom row: 3 columns ── */
-.bottom-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 1.25rem;
-}
-
-/* ── Top characters ── */
-.top-characters-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
-}
-
-.character-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.character-rank {
-  width: 1.75rem;
-  height: 1.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  font-size: 0.75rem;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-/* Escala basada en color primary con diferentes saturaciones */
-.character-rank.rank-1 { background: var(--p-primary-600); color: white; font-weight: 700; }
-.character-rank.rank-2 { background: var(--p-primary-500); color: white; font-weight: 600; }
-.character-rank.rank-3 { background: var(--p-primary-400); color: white; font-weight: 600; }
-.character-rank.rank-4 { background: var(--p-primary-200); color: var(--p-primary-700); }
-.character-rank.rank-5 { background: var(--p-primary-100); color: var(--p-primary-700); }
-
-.character-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.character-name {
-  font-weight: 500;
-  font-size: 0.875rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.character-bar-track {
-  height: 6px;
-  background: var(--surface-100);
-  border-radius: var(--app-radius-sm);
-  overflow: hidden;
-}
-
-.character-bar-fill {
-  height: 100%;
-  background: var(--primary-color);
-  border-radius: var(--app-radius-sm);
-  transition: width 0.4s ease;
-  min-width: 4px;
-  opacity: 0.6;
-}
-
-.character-mentions {
-  font-size: 0.8125rem;
-  color: var(--text-color-secondary);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-/* ── Info card ── */
-.info-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.875rem;
-}
-
-.info-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-}
-
-.info-row-icon {
-  color: var(--text-color-secondary);
-  margin-top: 0.125rem;
-  flex-shrink: 0;
-  font-size: 0.875rem;
-}
-
-.info-row-content {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.info-row-label {
-  font-size: 0.6875rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-color-secondary);
 }
 
-.info-row-value {
+/* ── Entity list ── */
+.entity-list,
+.character-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.entity-item,
+.character-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--app-radius-sm);
+  background: var(--surface-100);
+  font-size: 0.875rem;
+}
+
+.entity-type,
+.character-name {
+  font-weight: 500;
+  color: var(--text-color);
+  text-transform: capitalize;
+}
+
+.entity-count,
+.character-mentions {
+  font-weight: 600;
+  color: var(--text-color-secondary);
+}
+
+/* ── Info list ── */
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.info-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.info-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-color-secondary);
+}
+
+.info-value {
   font-size: 0.875rem;
   color: var(--text-color);
   word-break: break-word;
 }
 
 /* ── Actions ── */
+.actions-card {
+  grid-column: 1 / -1;
+}
+
 .actions-stack {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
 .action-btn {
-  width: 100%;
-  justify-content: flex-start;
+  flex: 1 1 auto;
+  min-width: 180px;
 }
 
-/* ── Responsive ── */
-@media (max-width: 1200px) {
-  .stats-row {
-    grid-template-columns: repeat(2, 1fr);
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .hero-section {
+    grid-template-columns: 1fr;
+    text-align: center;
   }
 
-  .bottom-row {
-    grid-template-columns: 1fr 1fr;
+  .hero-right {
+    align-items: center;
   }
 
-  .actions-card {
-    grid-column: 1 / -1;
+  .hero-ctas {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .advanced-stats {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 768px) {
-  .stats-row {
-    grid-template-columns: 1fr;
+  .resumen-content {
+    padding: 1rem;
   }
 
-  .charts-row {
-    grid-template-columns: 1fr;
+  .hero-section {
+    padding: 1.5rem;
   }
 
-  .bottom-row {
-    grid-template-columns: 1fr;
+  .quick-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .hero-ctas :deep(.p-button) {
+    width: 100%;
   }
 }
 
-/* ── Dark mode ── */
-:deep(.dark) .stat-words .stat-icon-bg { background: var(--blue-900); }
-:deep(.dark) .stat-chapters .stat-icon-bg { background: var(--teal-900); }
-:deep(.dark) .stat-entities .stat-icon-bg { background: var(--purple-900); }
-:deep(.dark) .stat-alerts .stat-icon-bg { background: var(--orange-900); }
+/* ══════════════════════════════════════════════════════════════
+   DARK MODE
+   ══════════════════════════════════════════════════════════════ */
+@media (prefers-color-scheme: dark) {
+  .hero-section,
+  .quick-stat,
+  .advanced-card {
+    border-color: var(--surface-600);
+  }
 
-:deep(.dark) .stat-card {
-  border-color: var(--surface-600);
+  .severity-critical {
+    background: var(--red-900);
+    border-color: var(--red-700);
+  }
+
+  .severity-critical .severity-count {
+    color: var(--red-300);
+  }
+
+  .severity-high {
+    background: var(--orange-900);
+    border-color: var(--orange-700);
+  }
+
+  .severity-high .severity-count {
+    color: var(--orange-300);
+  }
+
+  .severity-medium {
+    background: var(--yellow-900);
+    border-color: var(--yellow-700);
+  }
+
+  .severity-medium .severity-count {
+    color: var(--yellow-300);
+  }
+
+  .severity-low {
+    background: var(--blue-900);
+    border-color: var(--blue-700);
+  }
+
+  .severity-low .severity-count {
+    color: var(--blue-300);
+  }
+
+  .severity-info {
+    background: var(--gray-800);
+    border-color: var(--gray-600);
+  }
+
+  .severity-info .severity-count {
+    color: var(--gray-300);
+  }
+
+  .entity-item,
+  .character-item {
+    background: var(--surface-700);
+  }
+
+  .critical-badge {
+    color: var(--red-400);
+  }
 }
-
-:deep(.dark) .character-bar-track {
-  background: var(--surface-700);
-}
-
-/* Dark mode - escala primary adaptada */
-:deep(.dark) .character-rank.rank-1 { background: var(--p-primary-500); color: white; font-weight: 700; }
-:deep(.dark) .character-rank.rank-2 { background: var(--p-primary-600); color: white; font-weight: 600; }
-:deep(.dark) .character-rank.rank-3 { background: var(--p-primary-700); color: white; font-weight: 600; }
-:deep(.dark) .character-rank.rank-4 { background: var(--p-primary-800); color: var(--p-primary-200); }
-:deep(.dark) .character-rank.rank-5 { background: var(--p-primary-900); color: var(--p-primary-300); }
-
-:deep(.dark) .density-bar-container {
-  background: var(--surface-700);
-}
-
-:deep(.dark) .density-legend {
-  border-top-color: var(--surface-600);
-}
-
-:deep(.dark) .trend-improving { background: var(--green-900); color: var(--green-300); }
-:deep(.dark) .trend-worsening { background: var(--red-900); color: var(--red-300); }
-:deep(.dark) .trend-stable { background: var(--gray-800); color: var(--gray-300); }
 </style>

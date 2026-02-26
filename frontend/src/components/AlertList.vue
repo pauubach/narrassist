@@ -128,7 +128,7 @@
             <div class="alert-header">
               <Tag :severity="getSeverityColor(alert.severity)" class="severity-tag">
                 <i :class="getSeverityIcon(alert.severity)"></i>
-                {{ alert.severity.toUpperCase() }}
+                {{ getSeverityLabel(alert.severity) }}
               </Tag>
               <Tag severity="secondary" class="category-tag">
                 {{ getCategoryLabel(alert.category) }}
@@ -254,7 +254,7 @@
           <div class="alert-header">
             <Tag :severity="getSeverityColor(alert.severity)" class="severity-tag">
               <i :class="getSeverityIcon(alert.severity)"></i>
-              {{ alert.severity.toUpperCase() }}
+              {{ getSeverityLabel(alert.severity) }}
             </Tag>
             <Tag severity="secondary" class="category-tag">
               {{ getCategoryLabel(alert.category) }}

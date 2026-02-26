@@ -18,6 +18,9 @@ import type { ComparisonDetail, ComparisonAlertDiff } from '@/types/domain/alert
 import type { ApiComparisonDetail } from '@/types/api/alerts'
 import { transformComparisonDetail } from '@/types/transformers/alerts'
 import AlertDiffViewer from './AlertDiffViewer.vue'
+import { useAlertUtils } from '@/composables/useAlertUtils'
+
+const { getSeverityLabel } = useAlertUtils()
 
 const props = defineProps<{
   projectId: number
@@ -182,7 +185,7 @@ watch(() => props.projectId, loadDetail)
                 <div class="diff-item-meta">
                   <span v-if="alert.chapter" class="meta-chapter">Cap. {{ alert.chapter }}</span>
                   <span class="meta-type">{{ alert.alertType }}</span>
-                  <span class="meta-severity">{{ alert.severity }}</span>
+                  <span class="meta-severity">{{ getSeverityLabel(alert.severity) }}</span>
                 </div>
               </div>
             </div>
@@ -205,7 +208,7 @@ watch(() => props.projectId, loadDetail)
                 <div class="diff-item-meta">
                   <span v-if="alert.chapter" class="meta-chapter">Cap. {{ alert.chapter }}</span>
                   <span class="meta-type">{{ alert.alertType }}</span>
-                  <span class="meta-severity">{{ alert.severity }}</span>
+                  <span class="meta-severity">{{ getSeverityLabel(alert.severity) }}</span>
                 </div>
               </div>
             </div>

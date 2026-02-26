@@ -1,23 +1,15 @@
 <script setup lang="ts">
 /**
- * ProjectSummary - Resumen del proyecto para el inspector.
+ * ProjectSummary - Resumen optimizado del proyecto para el inspector.
  *
  * Se muestra cuando no hay ningún elemento seleccionado.
- * Proporciona una vista rápida de las estadísticas del proyecto.
+ * Enfocado en trabajo diario: progreso, siguiente alerta, acciones rápidas.
  */
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import type { Alert } from '@/types'
 
 const props = withDefaults(defineProps<{
-  /** Número total de palabras */
-  wordCount: number
-  /** Número de capítulos */
-  chapterCount: number
-  /** Número de entidades */
-  entityCount: number
-  /** Número de alertas */
-  alertCount: number
   /** Alertas cargadas para mostrar progreso detallado */
   alerts?: Alert[]
   /** Resumen global del manuscrito */
@@ -28,11 +20,29 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  /** Cuando se hace click en una estadística */
-  (e: 'stat-click', stat: 'words' | 'chapters' | 'entities' | 'alerts'): void
+  /** Navegar a alerta específica */
+  (e: 'navigate-to-alert', alert: Alert): void
+  /** Ver todas las alertas */
+  (e: 'view-alerts'): void
+  /** Filtrar alertas por categoría */
+  (e: 'filter-alerts', category: Alert['category']): void
+  /** Ejecutar acción sobre alerta (accept/reject) */
+  (e: 'alert-action', alert: Alert, action: 'accept' | 'reject'): void
 }>()
 
-const { getCategoryLabel } = useAlertUtils()
+const { getCategoryLabel, getSeverityLabel } = useAlertUtils()
+
+// Sinopsis colapsable
+const synopsisExpanded = ref(false)
+
+onMounted(() => {
+  // Mostrar sinopsis solo en primera visita
+  const visited = localStorage.getItem('project-summary-visited')
+  if (!visited) {
+    synopsisExpanded.value = true
+    localStorage.setItem('project-summary-visited', 'true')
+  }
+})
 
 const hasDetailedAlerts = computed(() => props.alerts.length > 0)
 
@@ -55,21 +65,6 @@ const resolvedCount = computed(() => alertStatusCounts.value.resolved)
 const dismissedCount = computed(() => alertStatusCounts.value.dismissed)
 const activeCount = computed(() => alertStatusCounts.value.active)
 const reviewedCount = computed(() => resolvedCount.value + dismissedCount.value)
-
-const resolvedRate = computed(() => {
-  if (!totalDetailedAlerts.value) return 0
-  return Math.round((resolvedCount.value / totalDetailedAlerts.value) * 100)
-})
-
-const dismissedRate = computed(() => {
-  if (!totalDetailedAlerts.value) return 0
-  return Math.round((dismissedCount.value / totalDetailedAlerts.value) * 100)
-})
-
-const activeRate = computed(() => {
-  if (!totalDetailedAlerts.value) return 0
-  return Math.round((activeCount.value / totalDetailedAlerts.value) * 100)
-})
 
 const reviewRate = computed(() => {
   if (!totalDetailedAlerts.value) return 0
@@ -102,150 +97,198 @@ const categoryOverview = computed(() => {
     .sort((a, b) => b.totalCount - a.totalCount)
     .slice(0, 5)
 })
+
+// Siguiente alerta pendiente (por severidad y luego posición)
+const nextPendingAlert = computed(() => {
+  const pending = props.alerts.filter(a => a.status === 'active')
+  if (!pending.length) return null
+
+  // Ordenar por severidad (critical > high > medium > low > info) y luego por posición
+  const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 }
+  return pending.sort((a, b) => {
+    const severityDiff = (severityOrder[a.severity] ?? 99) - (severityOrder[b.severity] ?? 99)
+    if (severityDiff !== 0) return severityDiff
+    return (a.spanStart ?? 0) - (b.spanStart ?? 0)
+  })[0]
+})
+
+// Estimación de tiempo para completar alertas pendientes
+const estimatedTimeRemaining = computed(() => {
+  if (!activeCount.value) return null
+
+  // Estimación conservadora: 30 segundos por alerta
+  const minutes = Math.ceil((activeCount.value * 0.5))
+  if (minutes < 1) return '< 1 min'
+  if (minutes < 60) return `~${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  return mins > 0 ? `~${hours}h ${mins}m` : `~${hours}h`
+})
+
+function handleAlertAction(alert: Alert, action: 'accept' | 'reject') {
+  // Emitir acción al padre para que la ejecute
+  emit('alert-action', alert, action)
+}
 </script>
 
 <template>
   <div class="project-summary">
-    <!-- Stats en grid 2x2 para aprovechar mejor el espacio -->
-    <div class="summary-stats">
-      <button
-        type="button"
-        class="stat-card"
-        @click="emit('stat-click', 'words')"
-      >
-        <i class="pi pi-file-edit stat-icon"></i>
-        <div class="stat-content">
-          <span class="stat-value">{{ wordCount.toLocaleString() }}</span>
-          <span class="stat-label">palabras</span>
-        </div>
-      </button>
-
-      <button
-        type="button"
-        class="stat-card"
-        @click="emit('stat-click', 'chapters')"
-      >
-        <i class="pi pi-book stat-icon"></i>
-        <div class="stat-content">
-          <span class="stat-value">{{ chapterCount }}</span>
-          <span class="stat-label">capítulos</span>
-        </div>
-      </button>
-
-      <button
-        type="button"
-        class="stat-card"
-        @click="emit('stat-click', 'entities')"
-      >
-        <i class="pi pi-users stat-icon"></i>
-        <div class="stat-content">
-          <span class="stat-value">{{ entityCount }}</span>
-          <span class="stat-label">entidades</span>
-        </div>
-      </button>
-
-      <button
-        type="button"
-        class="stat-card"
-        :class="{ 'stat-card--alert': alertCount > 0 }"
-        @click="emit('stat-click', 'alerts')"
-      >
-        <i class="pi pi-exclamation-triangle stat-icon"></i>
-        <div class="stat-content">
-          <span class="stat-value">{{ alertCount }}</span>
-          <span class="stat-label">alertas</span>
-        </div>
-      </button>
-    </div>
-
-    <!-- Resumen global del manuscrito -->
+    <!-- Sinopsis colapsable (default: cerrada) -->
     <div v-if="globalSummary" class="summary-section synopsis-section">
-      <div class="section-title">
-        <i class="pi pi-book"></i>
-        <span>Sinopsis</span>
-      </div>
-      <p class="synopsis-text">{{ globalSummary }}</p>
+      <button
+        type="button"
+        class="section-header section-header--collapsible"
+        @click="synopsisExpanded = !synopsisExpanded"
+      >
+        <div class="section-title">
+          <i class="pi pi-book"></i>
+          <span>Sinopsis</span>
+        </div>
+        <i
+          class="pi collapse-icon"
+          :class="synopsisExpanded ? 'pi-chevron-up' : 'pi-chevron-down'"
+        ></i>
+      </button>
+      <p v-if="synopsisExpanded" class="synopsis-text">{{ globalSummary }}</p>
     </div>
 
+    <!-- Preview de siguiente alerta pendiente -->
+    <div v-if="nextPendingAlert" class="summary-section next-alert-section">
+      <div class="section-header">
+        <div class="section-title">
+          <i class="pi pi-arrow-right"></i>
+          <span>Siguiente alerta</span>
+        </div>
+        <span class="alert-severity-badge" :class="`severity-${nextPendingAlert.severity}`">
+          {{ getSeverityLabel(nextPendingAlert.severity) }}
+        </span>
+      </div>
+
+      <div class="next-alert-preview">
+        <div class="alert-category">{{ getCategoryLabel(nextPendingAlert.category) }}</div>
+        <div class="alert-message">{{ nextPendingAlert.description }}</div>
+
+        <div class="alert-actions">
+          <button
+            type="button"
+            class="action-btn action-btn--accept"
+            @click="handleAlertAction(nextPendingAlert, 'accept')"
+            title="Aceptar sugerencia"
+          >
+            <i class="pi pi-check"></i>
+            Aceptar
+          </button>
+          <button
+            type="button"
+            class="action-btn action-btn--reject"
+            @click="handleAlertAction(nextPendingAlert, 'reject')"
+            title="Rechazar alerta"
+          >
+            <i class="pi pi-times"></i>
+            Rechazar
+          </button>
+          <button
+            type="button"
+            class="action-btn action-btn--view"
+            @click="emit('navigate-to-alert', nextPendingAlert)"
+            title="Ver en contexto"
+          >
+            <i class="pi pi-eye"></i>
+            Ver
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Progreso simplificado -->
     <div v-if="hasDetailedAlerts" class="summary-section">
       <div class="section-header">
-        <span class="section-title">Progreso de alertas</span>
+        <span class="section-title">Progreso</span>
         <button
           type="button"
           class="section-link"
-          @click="emit('stat-click', 'alerts')"
+          @click="emit('view-alerts')"
         >
-          Ver alertas
+          Ver todas
         </button>
       </div>
 
-      <p class="progress-caption">
-        <span class="progress-main">
+      <div class="progress-summary">
+        <div class="progress-text">
           <strong>{{ reviewRate }}%</strong> revisadas
-        </span>
-        <span class="progress-detail">({{ reviewedCount }} de {{ totalDetailedAlerts }})</span>
-      </p>
+          <span class="progress-meta">{{ reviewedCount }}/{{ totalDetailedAlerts }}</span>
+        </div>
+        <div v-if="estimatedTimeRemaining" class="progress-time">
+          {{ estimatedTimeRemaining }} restantes
+        </div>
+      </div>
 
       <div class="progress-track">
         <div class="progress-fill" :style="{ width: `${reviewRate}%` }"></div>
       </div>
 
-      <div class="status-grid">
-        <div class="status-chip status-chip--active">
-          <span>Pendientes</span>
-          <strong>{{ activeCount }}</strong>
-          <small>{{ activeRate }}%</small>
-        </div>
-        <div class="status-chip status-chip--resolved">
-          <span>Aceptadas</span>
-          <strong>{{ resolvedCount }}</strong>
-          <small>{{ resolvedRate }}%</small>
-        </div>
-        <div class="status-chip status-chip--dismissed">
-          <span>Rechazadas</span>
-          <strong>{{ dismissedCount }}</strong>
-          <small>{{ dismissedRate }}%</small>
-        </div>
+      <div class="compact-stats">
+        <span class="compact-stat compact-stat--pending">
+          <i class="pi pi-circle-fill"></i>
+          {{ activeCount }} pendientes
+        </span>
+        <span class="compact-stat compact-stat--resolved">
+          <i class="pi pi-check-circle"></i>
+          {{ resolvedCount }} aceptadas
+        </span>
+        <span class="compact-stat compact-stat--dismissed">
+          <i class="pi pi-times-circle"></i>
+          {{ dismissedCount }} rechazadas
+        </span>
       </div>
     </div>
 
+    <!-- Distribución por tipo (top 5) -->
     <div v-if="categoryOverview.length > 0" class="summary-section">
-      <div class="section-title">Distribución y pendientes por tipo</div>
+      <div class="section-title">Top alertas por tipo</div>
 
-      <div class="category-legend">
-        <span class="legend-item">
-          <i class="legend-dot legend-dot--total"></i>
-          Total
-        </span>
-        <span class="legend-item">
-          <i class="legend-dot legend-dot--pending"></i>
-          Pendiente
-        </span>
-      </div>
-
-      <div class="category-list category-list--compact">
-        <div
+      <div class="category-list">
+        <button
           v-for="item in categoryOverview"
           :key="item.category"
-          class="category-overview-row"
+          type="button"
+          class="category-item"
+          @click="emit('filter-alerts', item.category)"
         >
-          <div class="category-row">
+          <div class="category-header">
             <span class="category-name">{{ item.label }}</span>
-            <span class="category-meta">{{ item.totalCount }} · {{ item.totalPercentage }}%</span>
+            <span class="category-counts">
+              <strong>{{ item.totalCount }}</strong>
+              <span v-if="item.pendingCount > 0" class="pending-badge">
+                {{ item.pendingCount }}
+              </span>
+            </span>
           </div>
-          <div class="category-row category-row--pending">
-            <span class="category-pending">{{ item.pendingCount }} pendientes</span>
-            <span class="category-meta">{{ item.pendingWithinType }}%</span>
+
+          <!-- Barra de progreso dual: completadas (verde) + pendientes (naranja) -->
+          <div class="dual-progress-bar">
+            <div
+              class="dual-progress-completed"
+              :style="{
+                width: `${item.totalPercentage - item.pendingWithinType * item.totalPercentage / 100}%`
+              }"
+            ></div>
+            <div
+              v-if="item.pendingCount > 0"
+              class="dual-progress-pending"
+              :style="{
+                width: `${item.pendingWithinType * item.totalPercentage / 100}%`
+              }"
+            ></div>
           </div>
-          <div class="dual-track">
-            <div class="dual-track-line dual-track-line--total">
-              <div class="dual-track-fill dual-track-fill--total" :style="{ width: `${item.totalPercentage}%` }"></div>
-            </div>
-            <div class="dual-track-line dual-track-line--pending">
-              <div class="dual-track-fill dual-track-fill--pending" :style="{ width: `${item.pendingPercentageOfAll}%` }"></div>
-            </div>
+
+          <div class="category-footer">
+            <span class="category-meta">{{ item.totalPercentage }}% del total</span>
+            <span v-if="item.pendingCount > 0" class="category-pending-meta">
+              {{ item.pendingWithinType }}% pendiente
+            </span>
           </div>
-        </div>
+        </button>
       </div>
     </div>
 
@@ -265,81 +308,11 @@ const categoryOverview = computed(() => {
 .project-summary {
   display: flex;
   flex-direction: column;
-  gap: var(--ds-space-3);
+  gap: var(--ds-space-2-5);
   padding: var(--ds-space-3);
   width: 100%;
   min-width: 0;
   overflow: hidden;
-}
-
-.summary-stats {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--ds-space-2);
-}
-
-.stat-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--ds-space-2);
-  padding: var(--ds-space-3);
-  background: var(--ds-surface-ground);
-  border: var(--ds-border-1) solid var(--ds-surface-border);
-  border-radius: var(--ds-radius-lg);
-  cursor: pointer;
-  transition: all var(--ds-transition-fast);
-  text-align: center;
-  min-height: calc(var(--ds-space-10) * 2);
-}
-
-.stat-card:hover {
-  background: var(--ds-surface-hover);
-  border-color: var(--ds-color-primary-light);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease-in-out;
-}
-
-.stat-card:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-}
-
-.stat-card--alert {
-  border-color: var(--ds-color-warning-light);
-}
-
-.stat-card--alert:hover {
-  border-color: var(--ds-color-warning);
-}
-
-.stat-icon {
-  font-size: var(--ds-font-xl);
-  color: var(--ds-color-text-secondary);
-}
-
-.stat-card--alert .stat-icon {
-  color: var(--ds-color-warning);
-}
-
-.stat-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.stat-value {
-  font-size: var(--ds-font-size-lg);
-  font-weight: var(--ds-font-weight-bold);
-  color: var(--ds-color-text);
-  line-height: var(--ds-leading-tight);
-}
-
-.stat-label {
-  font-size: var(--ds-font-size-xs);
-  color: var(--ds-color-text-secondary);
 }
 
 .summary-tip {
@@ -378,6 +351,26 @@ const categoryOverview = computed(() => {
   min-width: 0;
 }
 
+.section-header--collapsible {
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: opacity var(--ds-transition-fast);
+}
+
+.section-header--collapsible:hover {
+  opacity: 0.8;
+}
+
+.collapse-icon {
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-text-secondary);
+  flex-shrink: 0;
+}
+
 .section-title {
   font-size: var(--ds-font-size-sm);
   font-weight: var(--ds-font-weight-semibold);
@@ -394,6 +387,7 @@ const categoryOverview = computed(() => {
 .section-title i {
   color: var(--ds-color-primary);
   font-size: var(--ds-font-size-sm);
+  flex-shrink: 0;
 }
 
 .synopsis-section {
@@ -409,40 +403,177 @@ const categoryOverview = computed(() => {
   text-align: justify;
 }
 
+/* Preview de siguiente alerta */
+.next-alert-section {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--ds-color-primary) 5%, var(--ds-surface-ground)),
+    var(--ds-surface-ground)
+  );
+  border-color: var(--ds-color-primary-light);
+}
+
+.alert-severity-badge {
+  font-size: var(--ds-font-size-xs);
+  font-weight: var(--ds-font-weight-semibold);
+  padding: var(--ds-space-0-5) var(--ds-space-1-5);
+  border-radius: var(--ds-radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.severity-critical {
+  background: var(--ds-alert-critical);
+  color: white;
+}
+
+.severity-high {
+  background: var(--ds-alert-high);
+  color: white;
+}
+
+.severity-medium {
+  background: var(--ds-alert-medium);
+  color: var(--ds-color-text);
+}
+
+.severity-low,
+.severity-info {
+  background: var(--ds-alert-low);
+  color: var(--ds-color-text);
+}
+
+.next-alert-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+}
+
+.alert-category {
+  font-size: var(--ds-font-size-xs);
+  font-weight: var(--ds-font-weight-semibold);
+  color: var(--ds-color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.alert-message {
+  font-size: var(--ds-font-size-sm);
+  line-height: var(--ds-leading-relaxed);
+  color: var(--ds-color-text);
+}
+
+.alert-actions {
+  display: flex;
+  gap: var(--ds-space-1-5);
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+  padding: var(--ds-space-1) var(--ds-space-2);
+  border-radius: var(--ds-radius-md);
+  border: var(--ds-border-1) solid var(--ds-surface-border);
+  background: var(--ds-surface-ground);
+  font-size: var(--ds-font-size-xs);
+  font-weight: var(--ds-font-weight-medium);
+  cursor: pointer;
+  transition: all var(--ds-transition-fast);
+  flex: 1;
+  justify-content: center;
+  min-width: 0;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn i {
+  font-size: var(--ds-font-size-xs);
+}
+
+.action-btn--accept {
+  border-color: var(--ds-color-success);
+  color: var(--ds-color-success);
+}
+
+.action-btn--accept:hover {
+  background: var(--ds-color-success);
+  color: white;
+}
+
+.action-btn--reject {
+  border-color: var(--ds-color-danger);
+  color: var(--ds-color-danger);
+}
+
+.action-btn--reject:hover {
+  background: var(--ds-color-danger);
+  color: white;
+}
+
+.action-btn--view {
+  border-color: var(--ds-color-primary);
+  color: var(--ds-color-primary);
+}
+
+.action-btn--view:hover {
+  background: var(--ds-color-primary);
+  color: white;
+}
+
 .section-link {
   border: none;
   background: transparent;
   color: var(--ds-color-primary);
   font-size: var(--ds-font-size-xs);
+  font-weight: var(--ds-font-weight-medium);
   cursor: pointer;
   padding: 0;
   white-space: nowrap;
   flex-shrink: 0;
+  transition: opacity var(--ds-transition-fast);
 }
 
 .section-link:hover {
+  opacity: 0.8;
   text-decoration: underline;
 }
 
-.progress-caption {
-  margin: 0;
+/* Progreso simplificado */
+.progress-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+}
+
+.progress-text {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ds-space-1-5);
+  font-size: var(--ds-font-size-sm);
+  color: var(--ds-color-text);
+}
+
+.progress-text strong {
+  font-size: var(--ds-font-size-lg);
+  font-weight: var(--ds-font-weight-bold);
+}
+
+.progress-meta {
   font-size: var(--ds-font-size-xs);
   color: var(--ds-color-text-secondary);
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ds-space-1);
-  align-items: baseline;
-  min-width: 0;
 }
 
-.progress-caption strong {
-  color: var(--ds-color-text);
-  margin-right: var(--ds-space-1);
-}
-
-.progress-main,
-.progress-detail {
-  min-width: 0;
+.progress-time {
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-primary);
+  font-weight: var(--ds-font-weight-medium);
+  white-space: nowrap;
 }
 
 .progress-track {
@@ -463,160 +594,90 @@ const categoryOverview = computed(() => {
   transition: width var(--ds-transition-fast);
 }
 
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(calc(var(--ds-space-10) * 2.2), 1fr));
-  gap: var(--ds-space-2);
-  min-width: 0;
-}
-
-.status-chip {
+/* Stats compactas */
+.compact-stats {
   display: flex;
-  flex-direction: column;
-  gap: var(--ds-space-0-5);
-  padding: var(--ds-space-1-5);
-  border-radius: var(--ds-radius-md);
-  border: var(--ds-border-1) solid var(--ds-surface-border);
-  background: var(--ds-surface-section);
-  min-width: 0;
-}
-
-.status-chip span {
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
   font-size: var(--ds-font-size-xs);
-  color: var(--ds-color-text-secondary);
-  overflow-wrap: anywhere;
-  line-height: var(--ds-leading-tight);
 }
 
-.status-chip strong {
-  font-size: var(--ds-font-size-sm);
-  color: var(--ds-color-text);
-}
-
-.status-chip small {
-  font-size: var(--ds-font-xs);
+.compact-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-1);
   color: var(--ds-color-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
-.status-chip--active {
-  border-color: var(--ds-alert-high, var(--orange-500));
-  background: color-mix(in srgb, var(--ds-alert-high, var(--orange-500)) 8%, var(--ds-surface-ground));
-}
-
-.status-chip--resolved {
-  border-color: var(--ds-color-success);
-  background: color-mix(in srgb, var(--ds-color-success) 8%, var(--ds-surface-ground));
-}
-
-.status-chip--dismissed {
-  border-color: var(--ds-color-text-muted, var(--ds-surface-border-strong, var(--ds-surface-border)));
-}
-
-.category-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ds-space-2);
-  min-width: 0;
-}
-
-.category-list--compact {
-  gap: var(--ds-space-1-5);
-}
-
-.category-overview-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ds-space-1);
-  min-width: 0;
-}
-
-.category-legend {
-  display: flex;
-  gap: var(--ds-space-3);
-  font-size: var(--ds-font-size-xs);
-  color: var(--ds-color-text-secondary);
-  flex-wrap: wrap;
-}
-
-.legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ds-space-1);
-}
-
-.legend-dot {
-  width: var(--ds-space-1-5);
-  height: var(--ds-space-1-5);
-  border-radius: var(--ds-radius-full);
-  display: inline-block;
-}
-
-.legend-dot--total {
-  background: var(--ds-color-primary, var(--primary-500));
-}
-
-.legend-dot--pending {
-  background: var(--ds-alert-high, var(--orange-500));
-}
-
-.category-row--pending {
+.compact-stat i {
   font-size: var(--ds-font-size-xs);
 }
 
-.category-pending {
+.compact-stat--pending {
   color: var(--ds-alert-high, var(--orange-500));
 }
 
-.dual-track {
+.compact-stat--pending i {
+  color: var(--ds-alert-high, var(--orange-500));
+}
+
+.compact-stat--resolved {
+  color: var(--ds-color-success);
+}
+
+.compact-stat--resolved i {
+  color: var(--ds-color-success);
+}
+
+.compact-stat--dismissed {
+  color: var(--ds-color-text-muted, var(--ds-color-text-secondary));
+}
+
+.compact-stat--dismissed i {
+  color: var(--ds-color-text-muted, var(--ds-color-text-secondary));
+}
+
+/* Categorías con barras compuestas */
+.category-list {
   display: flex;
   flex-direction: column;
-  gap: var(--ds-space-0-5);
+  gap: var(--ds-space-1-5);
+  min-width: 0;
 }
 
-.dual-track-line {
+.category-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+  padding: var(--ds-space-2);
+  border: var(--ds-border-1) solid var(--ds-surface-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-ground);
+  cursor: pointer;
+  transition: all var(--ds-transition-fast);
+  text-align: left;
   width: 100%;
-  height: var(--ds-space-1);
-  border-radius: var(--ds-radius-full);
-  background: var(--ds-surface-section);
-  overflow: hidden;
+  min-width: 0;
 }
 
-.dual-track-line--pending {
-  height: var(--ds-space-0-5);
+.category-item:hover {
+  border-color: var(--ds-color-primary-light);
+  background: var(--ds-surface-hover);
+  transform: translateX(2px);
 }
 
-.dual-track-fill {
-  height: 100%;
-  border-radius: inherit;
-}
-
-.dual-track-fill--total {
-  background: linear-gradient(
-    90deg,
-    var(--ds-color-primary, var(--primary-500)) 0%,
-    var(--ds-color-primary-light, var(--primary-300)) 100%
-  );
-}
-
-.dual-track-fill--pending {
-  background: linear-gradient(
-    90deg,
-    var(--ds-alert-high, var(--orange-500)) 0%,
-    color-mix(in srgb, var(--ds-alert-high, var(--orange-500)) 65%, white) 100%
-  );
-}
-
-.category-row {
+.category-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--ds-space-2);
-  font-size: var(--ds-font-size-xs);
   min-width: 0;
 }
 
 .category-name {
+  font-size: var(--ds-font-size-xs);
+  font-weight: var(--ds-font-weight-medium);
   color: var(--ds-color-text);
   min-width: 0;
   overflow: hidden;
@@ -624,10 +685,74 @@ const categoryOverview = computed(() => {
   white-space: nowrap;
 }
 
-.category-meta {
-  color: var(--ds-color-text-secondary);
+.category-counts {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+  font-size: var(--ds-font-size-xs);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
-  white-space: nowrap;
+}
+
+.category-counts strong {
+  color: var(--ds-color-text);
+}
+
+.pending-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--ds-space-4);
+  padding: 0 var(--ds-space-1);
+  height: var(--ds-space-3);
+  background: var(--ds-alert-high, var(--orange-500));
+  color: white;
+  border-radius: var(--ds-radius-full);
+  font-size: var(--ds-font-xs);
+  font-weight: var(--ds-font-weight-bold);
+}
+
+/* Barra de progreso dual: usa color primario con opacidades */
+.dual-progress-bar {
+  display: flex;
+  width: 100%;
+  height: var(--ds-space-1-5);
+  background: var(--ds-surface-section);
+  border-radius: var(--ds-radius-full);
+  overflow: hidden;
+}
+
+.dual-progress-completed {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--ds-color-primary, var(--primary-500)) 0%,
+    color-mix(in srgb, var(--ds-color-primary, var(--primary-500)) 85%, white) 100%
+  );
+  transition: width var(--ds-transition-fast);
+}
+
+.dual-progress-pending {
+  height: 100%;
+  background: color-mix(
+    in srgb,
+    var(--ds-color-primary, var(--primary-500)) 25%,
+    var(--ds-surface-section)
+  );
+  transition: width var(--ds-transition-fast);
+}
+
+.category-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-2);
+  font-size: var(--ds-font-xs);
+  color: var(--ds-color-text-secondary);
+}
+
+.category-pending-meta {
+  color: var(--ds-alert-high, var(--orange-500));
+  font-weight: var(--ds-font-weight-medium);
 }
 </style>

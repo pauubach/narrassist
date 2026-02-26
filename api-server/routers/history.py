@@ -178,3 +178,62 @@ def undo_batch(project_id: int, batch_id: str):
     except Exception as e:
         logger.error(f"Error undoing batch {batch_id}: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error deshaciendo operación")
+
+
+@router.post("/api/projects/{project_id}/undo-all", response_model=ApiResponse)
+def undo_all(project_id: int):
+    """
+    Restaura todo - deshace TODAS las acciones pendientes del proyecto.
+
+    ADVERTENCIA: Esta acción eliminará todo el trabajo realizado:
+    - Todas las alertas resueltas/descartadas volverán a estar activas
+    - Todas las fusiones de entidades se separarán
+    - Todos los cambios manuales se eliminarán
+
+    Esta acción NO se puede deshacer.
+    """
+    try:
+        from narrative_assistant.persistence.history import HistoryManager
+        history = HistoryManager(project_id)
+
+        # Obtener todas las acciones que se pueden deshacer
+        undoable_entries = history.get_history(limit=1000, undoable_only=True)
+
+        if not undoable_entries:
+            return ApiResponse(
+                success=True,
+                message="No hay acciones para deshacer",
+                data={"count": 0}
+            )
+
+        # Deshacer todas las acciones en orden inverso (más reciente primero)
+        count = 0
+        errors = []
+
+        for entry in reversed(undoable_entries):
+            try:
+                result = history.undo(entry.id)
+                if result.success:
+                    count += 1
+                else:
+                    errors.append(f"Entrada {entry.id}: {result.message}")
+            except Exception as e:
+                errors.append(f"Entrada {entry.id}: {str(e)}")
+                logger.error(f"Error undoing entry {entry.id}: {e}", exc_info=True)
+
+        if errors:
+            return ApiResponse(
+                success=False,
+                error=f"Se deshicieron {count} acciones, pero {len(errors)} fallaron",
+                data={"count": count, "errors": errors[:10]}  # Limitar a 10 errores
+            )
+
+        return ApiResponse(
+            success=True,
+            message=f"Se deshicieron {count} acciones correctamente",
+            data={"count": count}
+        )
+
+    except Exception as e:
+        logger.error(f"Error in undo_all: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error al restaurar todo")

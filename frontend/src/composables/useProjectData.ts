@@ -110,7 +110,8 @@ export function useProjectData() {
 
     loadingAlerts.value = true
     try {
-      const data = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${projectId}/alerts?status=open`)
+      // Cargar TODAS las alertas (activas + resueltas + descartadas) para mantener el progreso
+      const data = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${projectId}/alerts`)
       if (data.success) {
         alerts.value = transformAlerts(data.data || [])
         alertsLoaded.value = true
