@@ -1042,7 +1042,14 @@ const scrollToChapter = async (chapterId: number) => {
   await nextTick()
 
   // Dar tiempo adicional para renderizado
-  await new Promise(resolve => setTimeout(resolve, 50))
+  // Fix #2: Trackear timer para cleanup
+  await new Promise<void>(resolve => {
+    const timer = setTimeout(() => {
+      activeScrollTimers.delete(timer)
+      resolve()
+    }, 50)
+    activeScrollTimers.add(timer)
+  })
 
   const element = viewerContainer.value?.querySelector(`[data-chapter-id="${chapterId}"]`)
   if (element) {
@@ -1056,6 +1063,9 @@ const highlightDurationMs = 3000
 
 // CSS Custom Highlight API — resalta sin tocar el DOM
 let highlightTimer: ReturnType<typeof setTimeout> | null = null
+// Tracking de timers activos para cleanup (Fix #2: memory leak prevention)
+const activeScrollTimers = new Set<ReturnType<typeof setTimeout>>()
+let scrollAbortController: AbortController | null = null
 
 const clearTemporaryMentionHighlights = () => {
   if (highlightTimer) {
@@ -1067,6 +1077,16 @@ const clearTemporaryMentionHighlights = () => {
   selectedElements?.forEach(el => {
     el.classList.remove(temporarySelectedClass)
   })
+}
+
+// Cleanup de timers activos cuando se cancela un scroll
+const cleanupScrollTimers = () => {
+  activeScrollTimers.forEach(timer => clearTimeout(timer))
+  activeScrollTimers.clear()
+  if (scrollAbortController) {
+    scrollAbortController.abort()
+    scrollAbortController = null
+  }
 }
 
 const applyHighlightFromRange = (range: Range) => {
@@ -1094,9 +1114,11 @@ const applyHighlightFromRange = (range: Range) => {
 const applyTemporaryHighlightElement = (element: Element) => {
   element.classList.add(temporarySelectedClass)
   element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  setTimeout(() => {
+  const timer = setTimeout(() => {
     element.classList.remove(temporarySelectedClass)
+    activeScrollTimers.delete(timer)
   }, highlightDurationMs)
+  activeScrollTimers.add(timer)
 }
 
 const findDialogueHighlightElement = (
@@ -1183,7 +1205,14 @@ const highlightRangeInChapter = (chapterElement: Element, start: number, end: nu
 
 // Scroll a una mención específica dentro del documento
 const scrollToMention = async (target: ScrollTarget) => {
+  // Fix #2: Limpiar timers anteriores para evitar memory leaks
+  cleanupScrollTimers()
   clearTemporaryMentionHighlights()
+
+  // Crear nuevo abort controller para esta operación
+  scrollAbortController = new AbortController()
+  const signal = scrollAbortController.signal
+
   const isDialogueTarget = target.endPosition !== undefined && !!target.text
 
   console.log('scrollToMention called:', {
@@ -1226,12 +1255,33 @@ const scrollToMention = async (target: ScrollTarget) => {
   // Esperar a que Vue actualice el DOM con todos los capítulos cargados
   await nextTick()
 
+  // Check si la operación fue abortada
+  if (signal.aborted) return
+
   // Dar tiempo adicional para que el contenido HTML se renderice completamente
   // (especialmente importante para capítulos con mucho contenido)
-  await new Promise(resolve => setTimeout(resolve, 200))
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      activeScrollTimers.delete(timer)
+      if (signal.aborted) reject(new Error('Aborted'))
+      else resolve()
+    }, 200)
+    activeScrollTimers.add(timer)
+    signal.addEventListener('abort', () => {
+      clearTimeout(timer)
+      activeScrollTimers.delete(timer)
+      reject(new Error('Aborted'))
+    })
+  }).catch(() => {
+    // Operación abortada, salir silenciosamente
+    return
+  })
 
   // Segunda espera para asegurar que v-html se haya procesado
   await nextTick()
+
+  // Check si la operación fue abortada
+  if (signal.aborted) return
 
   const chapterElement = viewerContainer.value?.querySelector(`[data-chapter-id="${target.chapterId}"]`)
   if (!chapterElement) {
@@ -1363,7 +1413,14 @@ const highlightTextInChapter = async (chapterElement: Element, text: string, pos
   const hasContent = contentElement.textContent && contentElement.textContent.trim().length > 0
   if (!hasContent && retryCount < MAX_RETRIES) {
     console.log(`Content not ready yet, retry ${retryCount + 1}/${MAX_RETRIES}...`)
-    await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+    // Fix #2: Trackear timer para cleanup
+    await new Promise<void>(resolve => {
+      const timer = setTimeout(() => {
+        activeScrollTimers.delete(timer)
+        resolve()
+      }, RETRY_DELAY)
+      activeScrollTimers.add(timer)
+    })
     await nextTick()
     return highlightTextInChapter(chapterElement, text, position, retryCount + 1)
   }
@@ -1408,7 +1465,14 @@ const highlightTextInChapter = async (chapterElement: Element, text: string, pos
     // (a veces v-html necesita más tiempo para procesar)
     if (retryCount < MAX_RETRIES) {
       console.log(`Text not found, retry ${retryCount + 1}/${MAX_RETRIES}...`)
-      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+      // Fix #2: Trackear timer para cleanup
+      await new Promise<void>(resolve => {
+        const timer = setTimeout(() => {
+          activeScrollTimers.delete(timer)
+          resolve()
+        }, RETRY_DELAY)
+        activeScrollTimers.add(timer)
+      })
       await nextTick()
       return highlightTextInChapter(chapterElement, text, position, retryCount + 1)
     }
@@ -1801,6 +1865,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  // Fix #2: Limpiar timers activos para evitar memory leaks
+  cleanupScrollTimers()
+  clearTemporaryMentionHighlights()
+
   // Limpiar observer
   if (intersectionObserver) {
     intersectionObserver.disconnect()
