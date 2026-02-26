@@ -66,8 +66,8 @@ function formatDate(date: Date): string {
 
 function healthSeverity(score: number | null): 'success' | 'warn' | 'danger' | 'info' {
   if (score === null) return 'info'
-  if (score >= 0.7) return 'success'
-  if (score >= 0.4) return 'warn'
+  if (score >= 70) return 'success'
+  if (score >= 40) return 'warn'
   return 'danger'
 }
 
