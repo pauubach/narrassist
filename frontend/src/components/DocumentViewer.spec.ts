@@ -213,6 +213,7 @@ describe('DocumentViewer', () => {
       const emptyChapter: Chapter[] = [
         {
           id: 1,
+          projectId: 1,
           chapterNumber: 1,
           title: 'Capítulo Vacío',
           content: '',
@@ -242,6 +243,7 @@ describe('DocumentViewer', () => {
       const longChapters: Chapter[] = [
         {
           id: 1,
+          projectId: 1,
           chapterNumber: 1,
           title: 'Capítulo Largo',
           content: longContent,
@@ -269,6 +271,7 @@ describe('DocumentViewer', () => {
       const specialChars: Chapter[] = [
         {
           id: 1,
+          projectId: 1,
           chapterNumber: 1,
           title: 'Caracteres Especiales',
           content: '¿Cómo está? ¡Muy bien! — "Hola" <test> & más',
@@ -298,6 +301,7 @@ describe('DocumentViewer', () => {
     it('no renderiza todos los capítulos inmediatamente con lazy loading', async () => {
       const manyChapters: Chapter[] = Array.from({ length: 100 }, (_, i) => ({
         id: i + 1,
+        projectId: 1,
         chapterNumber: i + 1,
         title: `Capítulo ${i + 1}`,
         content: `Contenido del capítulo ${i + 1}`,

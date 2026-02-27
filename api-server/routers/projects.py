@@ -10,7 +10,6 @@ from deps import ApiResponse, ProjectResponse, _get_project_stats, logger
 from fastapi import APIRouter, Body, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 
-
 from narrative_assistant.persistence.document_fingerprint import generate_fingerprint
 from narrative_assistant.persistence.manuscript_identity import (
     IDENTITY_DIFFERENT_DOCUMENT,

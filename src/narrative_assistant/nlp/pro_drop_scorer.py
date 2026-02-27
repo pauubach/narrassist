@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from .coreference_resolver import Gender, Mention, MentionType, Number
 from .sentence_utils import (
     detect_continuity_signal as _detect_continuity_signal,
+)
+from .sentence_utils import (
     normalize_sentence_breaks as _normalize_sentence_breaks,
 )
 

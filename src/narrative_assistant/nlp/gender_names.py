@@ -50,18 +50,18 @@ FEMININE_NAMES: frozenset[str] = frozenset({
     "mary", "sarah", "jane", "elizabeth", "alice", "margaret",
     "emily", "charlotte", "emma", "olivia", "sophia", "hannah",
     "catherine", "katherine", "anne", "helen", "lucy", "grace",
-    "victoria", "rose", "rachel", "rebecca", "julia", "claire",
+    "rose", "rachel", "rebecca", "claire",
     # Franceses
     "marie", "jeanne", "sophie", "colette", "marguerite",
     # Italianos
-    "giulia", "francesca", "chiara", "anna", "lucia",
+    "giulia", "francesca", "chiara",
     # Alemanes
     "greta", "hanna", "lena", "elsa",
     # Portugueses
-    "joana", "mariana", "beatriz", "carolina",
+    "joana", "mariana", "carolina",
     # Catalanes / Vascos / Gallegos
-    "anna", "meritxell", "montserrat", "neus", "gemma", "mireia",
-    "iria", "nerea", "uxía", "uxia", "ainara", "leire", "itziar",
+    "meritxell", "montserrat", "neus", "gemma", "mireia",
+    "iria", "uxía", "uxia", "ainara", "leire", "itziar",
     # Árabes frecuentes en narrativa
     "fátima", "fatima", "aisha", "leila", "nadia", "soraya",
     "amina", "yasmin", "zahra", "layla", "hanan",
@@ -92,7 +92,7 @@ MASCULINE_NAMES: frozenset[str] = frozenset({
     "izan", "eric", "marc", "pol", "pau", "arnau", "iker",
     "aitor", "unai", "asier", "mikel", "gorka",
     # Hispanoamérica
-    "sebastián", "matías", "matias", "joaquín", "joaquin",
+    "matías", "matias", "joaquín", "joaquin",
     "facundo", "bautista", "benito", "ernesto", "germán", "german",
     # Literarios clásicos
     "sancho", "alonso", "lázaro", "lazaro", "quijote",
@@ -108,12 +108,12 @@ MASCULINE_NAMES: frozenset[str] = frozenset({
     # Alemanes
     "hans", "karl", "otto", "fritz", "heinrich",
     # Portugueses
-    "joão", "joao", "pedro", "paulo", "tiago",
+    "joão", "joao", "paulo", "tiago",
     # Rusos (frecuentes en literatura)
-    "iván", "dimitri", "nikolai", "sergei", "boris", "vladimir",
+    "dimitri", "nikolai", "sergei", "boris", "vladimir",
     # Catalanes / Vascos / Gallegos
-    "pau", "jordi", "oriol", "arnau", "pol", "biel", "sergi",
-    "iker", "aitor", "unai", "mikel", "gorka", "eneko",
+    "jordi", "oriol", "biel", "sergi",
+    "eneko",
     "brais", "xoel", "xoán", "xoan",
     # Árabes frecuentes en narrativa
     "mohammed", "mohamed", "ahmed", "ali", "omar", "hassan",

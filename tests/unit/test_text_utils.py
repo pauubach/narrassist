@@ -17,7 +17,6 @@ from narrative_assistant.core.text_utils import (
     token_jaccard,
 )
 
-
 # ============================================================================
 # strip_accents
 # ============================================================================
@@ -37,7 +36,7 @@ class TestStripAccents:
         assert strip_accents("niño") == "niño"
         assert strip_accents("España") == "España"
 
-    def test_preserve_Ñ_uppercase(self):
+    def test_preserve_ene_uppercase(self):
         assert strip_accents("NIÑO") == "NIÑO"
 
     def test_no_preserve_ñ(self):

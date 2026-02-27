@@ -12,10 +12,13 @@ import pytest
 
 from narrative_assistant.nlp.sentence_utils import (
     CROSS_SENTENCE_BASE_PENALTY,
+)
+from narrative_assistant.nlp.sentence_utils import (
     detect_continuity_signal as _detect_continuity_signal,
+)
+from narrative_assistant.nlp.sentence_utils import (
     normalize_sentence_breaks as _normalize_sentence_breaks,
 )
-
 
 # ============================================================================
 # T1: Normalización de breaks

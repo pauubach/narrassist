@@ -363,7 +363,6 @@ def get_glossary_suggestions(
         result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
-        project = result.value
 
         # Obtener términos existentes en el glosario para excluirlos
         from narrative_assistant.analysis.glossary_extractor import GlossaryExtractor

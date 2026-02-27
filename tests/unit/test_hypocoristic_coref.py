@@ -17,7 +17,6 @@ from narrative_assistant.nlp.coreference_resolver import (
     Number,
 )
 
-
 # ============================================================================
 # Utilidades para crear menciones de prueba
 # ============================================================================

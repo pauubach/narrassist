@@ -1598,7 +1598,7 @@ class CoreferenceVotingResolver(
             return 0
 
         # Lookup de menciones por posición
-        mention_by_pos: dict[tuple[int, int], "Mention"] = {
+        mention_by_pos: dict[tuple[int, int], Mention] = {
             (m.start_char, m.end_char): m for m in all_mentions
         }
 

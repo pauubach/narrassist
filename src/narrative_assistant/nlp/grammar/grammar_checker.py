@@ -34,6 +34,8 @@ from ...core.errors import ErrorSeverity, NarrativeError, NLPError
 from ...core.result import Result
 from ..sentence_utils import (
     extract_sentence_context,
+)
+from ..sentence_utils import (
     split_sentences as _canonical_split_sentences,
 )
 from .base import (

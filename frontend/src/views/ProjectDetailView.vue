@@ -621,7 +621,7 @@ const { undoableCount } = useGlobalUndo(() => project.value?.id ?? null)
 const project = computed(() => projectsStore.currentProject)
 
 const { entities, alerts, chapters, relationships, chapterSummaries, globalSummary, entitiesCount, alertsCount,
-        loadingEntities, loadingAlerts, loadingRelationships, loadingSummaries,
+        loadingEntities, loadingAlerts, loadingRelationships,
         loadEntities, loadAlerts, loadChapters, loadRelationships, loadChapterSummaries } = useProjectData()
 
 // Wrapper para loadChapters que coincide con la firma esperada por useAnalysisPolling
@@ -667,7 +667,7 @@ const reanalyzing = ref(false)
 const exportingStyleGuide = ref(false)
 
 // Estados de carga individuales vienen de useProjectData()
-// loadingEntities, loadingAlerts, loadingRelationships, loadingSummaries
+// loadingEntities, loadingAlerts, loadingRelationships
 
 // Refs to tab components (for Ctrl+F routing)
 const textTabRef = ref<InstanceType<typeof TextTab> | null>(null)
@@ -1194,7 +1194,7 @@ const onAlertClickFromText = (alert: Alert) => {
   // Seleccionar la alerta en el store
   selectionStore.selectAlert(alert)
   // Asegurar que el inspector derecho esté abierto
-  rightInspectorTab.value = 'inspector'
+  rightInspectorTab.value = 'contextual'
 }
 
 /**
@@ -1400,7 +1400,7 @@ const onAlertClick = (alert: Alert) => {
   selectionStore.selectAlert(alert)
   // Asegurar que estamos en la pestaña de texto y en el inspector derecho
   workspaceStore.setActiveTab('text')
-  rightInspectorTab.value = 'inspector'
+  rightInspectorTab.value = 'contextual'
 }
 
 const handleAlertAction = async (alert: Alert, action: 'accept' | 'reject') => {

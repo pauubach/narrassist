@@ -61,42 +61,58 @@ describe('EntityInspector', () => {
     name: 'Juan Pérez',
     type: 'character',
     aliases: ['Juan', 'Juanito'],
+    importance: 'main',
     mentionCount: 15,
     firstMentionChapter: 1,
-    firstMentionPosition: 100,
-    entityIds: [],
+    isActive: true,
+    mergedFromIds: [],
   }
 
   const mockAlerts: Alert[] = [
     {
       id: 1,
+      projectId: 1,
       category: 'attribute',
       status: 'active',
       severity: 'high',
+      alertType: 'test',
       title: 'Inconsistencia de atributo',
+      description: 'Test',
       spanStart: 0,
       spanEnd: 10,
       entityIds: [1],
+      confidence: 0.9,
+      createdAt: new Date(),
     },
     {
       id: 2,
-      category: 'consistency',
+      projectId: 1,
+      category: 'other',
       status: 'active',
       severity: 'medium',
+      alertType: 'test',
       title: 'Inconsistencia de nombre',
+      description: 'Test',
       spanStart: 20,
       spanEnd: 30,
       entityIds: [1],
+      confidence: 0.9,
+      createdAt: new Date(),
     },
     {
       id: 3,
-      category: 'consistency',
+      projectId: 1,
+      category: 'other',
       status: 'resolved',
       severity: 'low',
+      alertType: 'test',
       title: 'Ya resuelta',
+      description: 'Test',
       spanStart: 40,
       spanEnd: 50,
       entityIds: [1],
+      confidence: 0.9,
+      createdAt: new Date(),
     },
   ]
 
@@ -156,7 +172,7 @@ describe('EntityInspector', () => {
         },
       })
       // Verificar que el tipo de entidad se computa correctamente
-      expect(wrapper.vm.entityTypeLabel).toBe('Personaje')
+      expect((wrapper.vm as any).entityTypeLabel).toBe('Personaje')
     })
   })
 
@@ -178,7 +194,7 @@ describe('EntityInspector', () => {
         },
       })
 
-      const hasAliases = wrapper.vm.hasAliases
+      const hasAliases = (wrapper.vm as any).hasAliases
       expect(hasAliases).toBe(true)
     })
 
@@ -204,7 +220,7 @@ describe('EntityInspector', () => {
         },
       })
 
-      const hasAliases = wrapper.vm.hasAliases
+      const hasAliases = (wrapper.vm as any).hasAliases
       expect(hasAliases).toBe(false)
     })
   })
@@ -232,14 +248,14 @@ describe('EntityInspector', () => {
         },
       })
 
-      const isMerged = wrapper.vm.isMerged
+      const isMerged = (wrapper.vm as any).isMerged
       expect(isMerged).toBe(true)
     })
 
     it('no detecta fusión cuando no tiene mergedFromIds', () => {
       const entityWithoutMerge: Entity = {
         ...mockEntity,
-        mergedFromIds: undefined,
+        mergedFromIds: [],
       }
 
       const wrapper = mount(EntityInspector, {
@@ -258,7 +274,7 @@ describe('EntityInspector', () => {
         },
       })
 
-      const isMerged = wrapper.vm.isMerged
+      const isMerged = (wrapper.vm as any).isMerged
       // isMerged es falsy cuando no hay mergedFromIds
       expect(isMerged).toBeFalsy()
     })
@@ -283,7 +299,7 @@ describe('EntityInspector', () => {
         },
       })
 
-      const relatedAlerts = wrapper.vm.relatedAlerts
+      const relatedAlerts = (wrapper.vm as any).relatedAlerts
       // Solo alertas activas (2 de 3)
       expect(relatedAlerts.length).toBe(2)
       expect(relatedAlerts.every((a: Alert) => a.entityIds.includes(1))).toBe(true)
@@ -308,8 +324,8 @@ describe('EntityInspector', () => {
         },
       })
 
-      const attributeAlerts = wrapper.vm.attributeAlerts
-      const otherAlerts = wrapper.vm.otherAlerts
+      const attributeAlerts = (wrapper.vm as any).attributeAlerts
+      const otherAlerts = (wrapper.vm as any).otherAlerts
 
       expect(attributeAlerts.length).toBe(1)
       expect(attributeAlerts[0].category).toBe('attribute')
@@ -335,7 +351,7 @@ describe('EntityInspector', () => {
         },
       })
 
-      const relatedAlerts = wrapper.vm.relatedAlerts
+      const relatedAlerts = (wrapper.vm as any).relatedAlerts
       expect(relatedAlerts).toEqual([])
     })
   })
@@ -344,7 +360,7 @@ describe('EntityInspector', () => {
     it('maneja entidad sin aliases definidos', () => {
       const entityWithoutAliases: Entity = {
         ...mockEntity,
-        aliases: undefined,
+        aliases: [],
       }
 
       const wrapper = mount(EntityInspector, {
@@ -364,19 +380,24 @@ describe('EntityInspector', () => {
       })
 
       // hasAliases es falsy cuando no hay aliases
-      expect(wrapper.vm.hasAliases).toBeFalsy()
+      expect((wrapper.vm as any).hasAliases).toBeFalsy()
     })
 
     it('limita el número de alertas relacionadas a 5', () => {
       const manyAlerts: Alert[] = Array.from({ length: 10 }, (_, i) => ({
         id: i + 1,
-        category: 'consistency',
-        status: 'active',
-        severity: 'medium',
+        projectId: 1,
+        category: 'attribute' as const,
+        status: 'active' as const,
+        severity: 'medium' as const,
+        alertType: 'test' as const,
         title: `Alert ${i + 1}`,
+        description: 'Test',
         spanStart: i * 10,
         spanEnd: (i + 1) * 10,
         entityIds: [1],
+        confidence: 0.9,
+        createdAt: new Date(),
       }))
 
       const wrapper = mount(EntityInspector, {
@@ -396,7 +417,7 @@ describe('EntityInspector', () => {
         },
       })
 
-      const relatedAlerts = wrapper.vm.relatedAlerts
+      const relatedAlerts = (wrapper.vm as any).relatedAlerts
       expect(relatedAlerts.length).toBe(5)
     })
   })

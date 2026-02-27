@@ -18,7 +18,6 @@ from narrative_assistant.entities.semantic_fusion import (
     strip_interior_particles,
 )
 
-
 # ============================================================================
 # are_hypocoristic_match — directos
 # ============================================================================
@@ -187,7 +186,7 @@ class TestStripAccentsFusion:
     def test_preserves_ñ(self):
         assert strip_accents("niño") == "niño"
 
-    def test_preserves_Ñ(self):
+    def test_preserves_ene(self):
         assert strip_accents("Ñoño") == "Ñoño"
 
     def test_empty(self):

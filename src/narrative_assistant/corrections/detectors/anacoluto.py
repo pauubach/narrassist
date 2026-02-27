@@ -157,8 +157,6 @@ class AnacolutoDetector(BaseDetector):
         """Usa la implementación canónica de sentence_utils."""
         return split_sentences(text, min_length=20)
 
-        return sentences
-
     def _check_nominativus_pendens(
         self,
         sentence: str,

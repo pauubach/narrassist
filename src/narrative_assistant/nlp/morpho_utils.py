@@ -242,7 +242,6 @@ from narrative_assistant.core.text_utils import (  # noqa: E402
     normalize_name,
 )
 
-
 # =========================================================================
 # Análisis de contexto para reclasificación de entidades
 # =========================================================================

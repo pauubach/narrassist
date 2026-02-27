@@ -10,11 +10,11 @@ Verifica que:
 import pytest
 
 from narrative_assistant.entities.clustering import (
-    cluster_entities_by_name_similarity,
-    compute_reduced_pairs_from_clusters,
     _fast_name_similarity,
     _name_fingerprint,
     _ngram_similarity,
+    cluster_entities_by_name_similarity,
+    compute_reduced_pairs_from_clusters,
 )
 from narrative_assistant.entities.models import Entity, EntityType
 

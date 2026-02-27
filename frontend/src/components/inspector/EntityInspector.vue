@@ -505,7 +505,7 @@ function onChapterClick(chapterNumber: number) {
       </div>
 
       <!-- Loading state mientras se cargan menciones -->
-      <div v-if="mentionNav.isLoading.value" class="mention-nav-loading">
+      <div v-if="mentionNav.state.value.loading" class="mention-nav-loading">
         <i class="pi pi-spin pi-spinner"></i>
         <span>Cargando menciones...</span>
       </div>

@@ -4,9 +4,9 @@ from pathlib import Path
 
 from narrative_assistant.entities.models import EntityImportance, EntityType
 from narrative_assistant.nlp.coreference_resolver import (
+    CoreferenceChain,
     CorefMethod,
     CorefResult,
-    CoreferenceChain,
     Gender,
     Mention,
     MentionType,

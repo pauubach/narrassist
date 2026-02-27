@@ -17,7 +17,6 @@ from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
 from ..core.text_utils import normalize_name as _normalize_key
 
-
 logger = logging.getLogger(__name__)
 
 

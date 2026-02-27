@@ -15,7 +15,6 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from typing import Any
 
 from ..entities.models import Entity, EntityType
 from ..entities.semantic_fusion import normalize_for_comparison, strip_accents

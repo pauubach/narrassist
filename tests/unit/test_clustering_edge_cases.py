@@ -12,10 +12,9 @@ import pytest
 
 from narrative_assistant.entities.clustering import (
     _fast_name_similarity,
-    _ngram_similarity,
     _name_fingerprint,
+    _ngram_similarity,
 )
-
 
 # ============================================================================
 # Word-level containment (P3a fix verification)

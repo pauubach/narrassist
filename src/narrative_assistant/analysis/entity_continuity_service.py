@@ -14,7 +14,11 @@ from typing import Any
 
 from narrative_assistant.core.text_utils import (
     normalize_name as _shared_normalize,
+)
+from narrative_assistant.core.text_utils import (
     strip_accents as _shared_strip_accents,
+)
+from narrative_assistant.core.text_utils import (
     token_jaccard as _shared_token_jaccard,
 )
 

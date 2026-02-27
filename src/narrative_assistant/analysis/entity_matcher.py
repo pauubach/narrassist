@@ -11,8 +11,14 @@ from dataclasses import dataclass
 
 from narrative_assistant.core.text_utils import (
     char_ngrams as _char_ngrams,
+)
+from narrative_assistant.core.text_utils import (
     jaccard_similarity,
+)
+from narrative_assistant.core.text_utils import (
     names_match as exact_match,
+)
+from narrative_assistant.core.text_utils import (
     normalize_name as _normalize_name,
 )
 

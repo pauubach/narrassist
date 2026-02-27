@@ -164,7 +164,7 @@ def _is_valid_profession_context(
                 return False
 
             # Rechazar verbos (salvo participios que pueden ser profes: "es graduado")
-            if token.pos_ == "VERB" and not token.morph.get("VerbForm") == ["Part"]:
+            if token.pos_ == "VERB" and token.morph.get("VerbForm") != ["Part"]:
                 return False
 
             # ADJ: permitir solo si está en predicado nominal (después de cop)

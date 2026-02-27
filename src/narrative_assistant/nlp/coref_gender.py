@@ -15,7 +15,8 @@ from .coreference_resolver import (
     MentionType,
     Number,
 )
-from .gender_names import FEMININE_NAMES as _SHARED_FEM, MASCULINE_NAMES as _SHARED_MASC
+from .gender_names import FEMININE_NAMES as _SHARED_FEM
+from .gender_names import MASCULINE_NAMES as _SHARED_MASC
 
 logger = logging.getLogger(__name__)
 

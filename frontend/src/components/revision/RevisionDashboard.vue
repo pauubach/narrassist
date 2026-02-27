@@ -14,13 +14,14 @@ import TabPanel from 'primevue/tabpanel'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import { api } from '@/services/apiClient'
-import type { ComparisonDetail, ComparisonAlertDiff } from '@/types/domain/alerts'
+import type { ComparisonDetail, ComparisonAlertDiff, AlertSeverity } from '@/types/domain/alerts'
 import type { ApiComparisonDetail } from '@/types/api/alerts'
 import { transformComparisonDetail } from '@/types/transformers/alerts'
 import AlertDiffViewer from './AlertDiffViewer.vue'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 
-const { getSeverityLabel } = useAlertUtils()
+const { getSeverityLabel: _getSeverityLabel } = useAlertUtils()
+const getSeverityLabel = (s: string) => _getSeverityLabel(s as AlertSeverity)
 
 const props = defineProps<{
   projectId: number

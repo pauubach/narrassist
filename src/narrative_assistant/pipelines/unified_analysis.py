@@ -41,7 +41,6 @@ FASE 6 - CONSISTENCIA Y ALERTAS:
 
 import logging
 import threading
-
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -53,14 +52,13 @@ from typing import Any
 from ..core.errors import ErrorSeverity, NarrativeError, PhaseError, PhasePreconditionError
 from ..core.memory_monitor import MemoryMonitor
 from ..core.result import Result
+from ..core.text_utils import normalize_name as _normalize_key
 from .ua_alerts import PipelineAlertsMixin
 from .ua_consistency import PipelineConsistencyMixin
 from .ua_deep_extraction import PipelineDeepExtractionMixin
 from .ua_ner import PipelineNERMixin
 from .ua_quality import PipelineQualityMixin
 from .ua_resolution import PipelineResolutionMixin
-
-from ..core.text_utils import normalize_name as _normalize_key
 
 logger = logging.getLogger(__name__)
 

@@ -47,6 +47,7 @@ vi.mock('@/services/events', () => ({
 describe('ChapterInspector', () => {
   const mockChapter: Chapter = {
     id: 1,
+    projectId: 1,
     chapterNumber: 1,
     title: 'Capítulo 1',
     content: 'Contenido del capítulo',
@@ -61,55 +62,74 @@ describe('ChapterInspector', () => {
       projectId: 1,
       name: 'Juan',
       type: 'character',
+      aliases: [],
+      importance: 'main',
       mentionCount: 10,
       firstMentionChapter: 1,
-      firstMentionPosition: 10,
-      entityIds: [],
+      isActive: true,
+      mergedFromIds: [],
     },
     {
       id: 2,
       projectId: 1,
       name: 'María',
       type: 'character',
+      aliases: [],
+      importance: 'main',
       mentionCount: 8,
       firstMentionChapter: 1,
-      firstMentionPosition: 50,
-      entityIds: [],
+      isActive: true,
+      mergedFromIds: [],
     },
   ]
 
   const mockAlerts: Alert[] = [
     {
       id: 1,
-      category: 'consistency',
+      projectId: 1,
+      category: 'attribute',
       status: 'active',
       severity: 'high',
+      alertType: 'test',
       title: 'Alert alta',
+      description: 'Test',
       spanStart: 10,
       spanEnd: 20,
       entityIds: [],
-      chapter: 1,  // usa 'chapter' no 'chapterId'
+      confidence: 0.9,
+      createdAt: new Date(),
+      chapter: 1,
     },
     {
       id: 2,
+      projectId: 1,
       category: 'grammar',
       status: 'active',
       severity: 'medium',
+      alertType: 'test',
       title: 'Alert media',
+      description: 'Test',
       spanStart: 30,
       spanEnd: 40,
       entityIds: [],
+      confidence: 0.9,
+      createdAt: new Date(),
       chapter: 1,
     },
     {
       id: 3,
+      projectId: 1,
       category: 'style',
       status: 'active',
       severity: 'low',
+      alertType: 'test',
       title: 'Alert baja',
+      description: 'Test',
       spanStart: 50,
       spanEnd: 60,
       entityIds: [],
+      confidence: 0.9,
+      createdAt: new Date(),
       chapter: 2,
     },
   ]
@@ -208,7 +228,7 @@ describe('ChapterInspector', () => {
         },
       })
 
-      const chapterAlerts = wrapper.vm.chapterAlerts
+      const chapterAlerts = (wrapper.vm as any).chapterAlerts
       // Solo las 2 primeras alertas son del capítulo 1
       expect(chapterAlerts.length).toBe(2)
       expect(chapterAlerts.every((a: Alert) => a.chapter === 1)).toBe(true)
@@ -235,7 +255,7 @@ describe('ChapterInspector', () => {
         },
       })
 
-      const chapterAlerts = wrapper.vm.chapterAlerts
+      const chapterAlerts = (wrapper.vm as any).chapterAlerts
       expect(chapterAlerts).toEqual([])
     })
 
@@ -261,7 +281,7 @@ describe('ChapterInspector', () => {
         },
       })
 
-      const alertCounts = wrapper.vm.alertCounts
+      const alertCounts = (wrapper.vm as any).alertCounts
       expect(alertCounts.high).toBe(1)
       expect(alertCounts.medium).toBe(1)
       expect(alertCounts.low).toBe(0) // La alerta baja es del capítulo 2

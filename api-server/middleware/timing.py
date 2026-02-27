@@ -4,9 +4,10 @@ Timing middleware para medir performance de endpoints.
 Agrega headers HTTP con tiempo de respuesta y logging para endpoints lentos.
 """
 
-import time
 import logging
+import time
 from typing import Callable
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 

@@ -17,6 +17,7 @@ from typing import Any
 
 import deps
 from deps import generate_person_aliases, logger
+
 from narrative_assistant.entities.clustering import compute_reduced_pairs_from_clusters
 
 
@@ -345,9 +346,9 @@ def _serialize_coref_result_for_cache(coref_result) -> str:
 def _restore_coref_result_from_cache(chains_json: str):
     """Restaura CorefResult desde JSON de cache."""
     from narrative_assistant.nlp.coreference_resolver import (
+        CoreferenceChain,
         CorefMethod,
         CorefResult,
-        CoreferenceChain,
         Gender,
         Mention,
         MentionType,
@@ -4441,10 +4442,10 @@ def _emit_consistency_alerts(ctx: dict, tracker: ProgressTracker):
     if inconsistencies:
         for inc in inconsistencies:
             try:
-                def _inc_field(field_name: str, default: Any = None) -> Any:
-                    if isinstance(inc, dict):
-                        return inc.get(field_name, default)
-                    return getattr(inc, field_name, default)
+                def _inc_field(field_name: str, default: Any = None, _inc: Any = inc) -> Any:
+                    if isinstance(_inc, dict):
+                        return _inc.get(field_name, default)
+                    return getattr(_inc, field_name, default)
 
                 sources: list[dict[str, Any]] = []
 

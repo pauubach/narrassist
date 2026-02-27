@@ -481,7 +481,7 @@ class TestSchemaVersionInvalidation:
         import os
         import sys
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
-        from routers._enrichment_cache import get_stale_enrichment_phases, get_schema_version
+        from routers._enrichment_cache import get_schema_version, get_stale_enrichment_phases
 
         conn = _create_test_db()
         db = _mock_db_session(conn)

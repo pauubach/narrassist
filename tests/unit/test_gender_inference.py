@@ -17,7 +17,6 @@ from narrative_assistant.nlp.gender_names import (
     infer_gender_from_name,
 )
 
-
 # ============================================================================
 # Tier 2: Gazetteer (sin doc)
 # ============================================================================

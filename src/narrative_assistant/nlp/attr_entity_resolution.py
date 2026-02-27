@@ -17,7 +17,11 @@ from typing import TYPE_CHECKING
 from .gender_names import FEMININE_NAMES, MASCULINE_NAMES, infer_gender_from_name
 from .sentence_utils import (
     CROSS_SENTENCE_BASE_PENALTY,
+)
+from .sentence_utils import (
     detect_continuity_signal as _detect_continuity_signal,
+)
+from .sentence_utils import (
     normalize_sentence_breaks as _normalize_sentence_breaks,
 )
 

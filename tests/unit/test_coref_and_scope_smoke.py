@@ -9,9 +9,9 @@ import pytest
 
 from narrative_assistant.nlp.coreference_resolver import (
     CorefConfig,
-    CorefMethod,
     CoreferenceChain,
     CoreferenceVotingResolver,
+    CorefMethod,
     Gender,
     HeuristicsCorefMethod,
     Mention,
@@ -20,7 +20,6 @@ from narrative_assistant.nlp.coreference_resolver import (
     Number,
 )
 from narrative_assistant.nlp.scope_resolver import ScopeResolver
-
 
 # ============================================================================
 # Smoke Tests — Imports y Estructura Básica

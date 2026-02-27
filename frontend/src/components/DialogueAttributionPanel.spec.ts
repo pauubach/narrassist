@@ -98,7 +98,7 @@ describe('DialogueAttributionPanel', () => {
           initialChapter: 2,
         },
       })
-      expect(wrapper.vm.selectedChapter).toBe(2)
+      expect((wrapper.vm as any).selectedChapter).toBe(2)
     })
   })
 
@@ -112,7 +112,7 @@ describe('DialogueAttributionPanel', () => {
         },
       })
 
-      const speakerOptions = wrapper.vm.speakerOptions
+      const speakerOptions = (wrapper.vm as any).speakerOptions
       expect(speakerOptions.length).toBeGreaterThan(0)
       expect(speakerOptions.some((opt: any) => opt.label === 'Juan')).toBe(true)
       expect(speakerOptions.some((opt: any) => opt.label === 'María')).toBe(true)
@@ -127,7 +127,7 @@ describe('DialogueAttributionPanel', () => {
         },
       })
 
-      const speakerOptions = wrapper.vm.speakerOptions
+      const speakerOptions = (wrapper.vm as any).speakerOptions
       expect(speakerOptions.some((opt: any) => opt.label === 'El perro')).toBe(true)
     })
 
@@ -140,7 +140,7 @@ describe('DialogueAttributionPanel', () => {
         },
       })
 
-      const speakerOptions = wrapper.vm.speakerOptions
+      const speakerOptions = (wrapper.vm as any).speakerOptions
       expect(speakerOptions.some((opt: any) => opt.label === 'Desconocido')).toBe(true)
     })
 
@@ -153,7 +153,7 @@ describe('DialogueAttributionPanel', () => {
         },
       })
 
-      const speakerOptions = wrapper.vm.speakerOptions
+      const speakerOptions = (wrapper.vm as any).speakerOptions
       expect(speakerOptions.length).toBe(0)
     })
   })
@@ -178,7 +178,7 @@ describe('DialogueAttributionPanel', () => {
         },
       })
 
-      const speakerOptions = wrapper.vm.speakerOptions
+      const speakerOptions = (wrapper.vm as any).speakerOptions
       expect(speakerOptions).toEqual([])
     })
 
@@ -197,7 +197,7 @@ describe('DialogueAttributionPanel', () => {
         },
       })
 
-      const speakerOptions = wrapper.vm.speakerOptions
+      const speakerOptions = (wrapper.vm as any).speakerOptions
       expect(speakerOptions.some((opt: any) => opt.label === 'Juan')).toBe(true)
       expect(speakerOptions.some((opt: any) => opt.label === 'Madrid')).toBe(false)
       expect(speakerOptions.some((opt: any) => opt.label === 'Espada')).toBe(false)
@@ -218,7 +218,7 @@ describe('DialogueAttributionPanel', () => {
         },
       })
 
-      const speakerOptions = wrapper.vm.speakerOptions
+      const speakerOptions = (wrapper.vm as any).speakerOptions
       expect(speakerOptions.some((opt: any) => opt.label === 'Juan')).toBe(true)
       expect(speakerOptions.some((opt: any) => opt.label === 'María García')).toBe(true)
       expect(speakerOptions.some((opt: any) => opt.label === 'Pedro')).toBe(true)
