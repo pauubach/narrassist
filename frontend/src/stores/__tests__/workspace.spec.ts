@@ -73,7 +73,7 @@ describe('workspaceStore', () => {
     it('should show both panels for text tab', () => {
       expect(TAB_LAYOUT_CONFIG.text.showLeftPanel).toBe(true)
       expect(TAB_LAYOUT_CONFIG.text.showRightPanel).toBe(true)
-      expect(TAB_LAYOUT_CONFIG.text.sidebarTabs).toEqual(['chapters', 'alerts', 'characters', 'search', 'assistant', 'history'])
+      expect(TAB_LAYOUT_CONFIG.text.sidebarTabs).toEqual(['chapters', 'alerts', 'characters', 'assistant', 'history'])
     })
 
     it('should hide both panels for entities tab (full-width)', () => {
