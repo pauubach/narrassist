@@ -556,7 +556,7 @@ class AttributeEntityResolutionMixin:
     )
 
     def _find_narrator_entity(
-        self, person_candidates: list[tuple], text: str
+        self, person_candidates: list[tuple[str, int, int, float]], text: str
     ) -> str | None:
         """
         T5: Identifica al narrador en primera persona.

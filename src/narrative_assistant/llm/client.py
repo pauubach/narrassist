@@ -885,7 +885,8 @@ class LocalLLMClient:
         try:
             from ..core.device import detect_capacity
 
-            return detect_capacity().effective_budget_gb
+            result: float | None = detect_capacity().effective_budget_gb
+            return result
         except Exception:
             return None
 
