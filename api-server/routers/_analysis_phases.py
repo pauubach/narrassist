@@ -2816,8 +2816,9 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             subphase_progress=0.0,
         )
 
-        # Buscar menciones adicionales
+        # Buscar menciones adicionales (entidad por entidad para progreso granular)
         try:
+            from narrative_assistant.entities.models import EntityMention as EntityMentionModel
             from narrative_assistant.nlp.mention_finder import get_mention_finder
 
             mention_finder = get_mention_finder()
@@ -2829,64 +2830,67 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                 subphase_progress=0.0,
             )
 
-            entity_names = [e.canonical_name for e in entities if e.canonical_name]
-            aliases_dict = {}
+            aliases_dict: dict[str, list[str]] = {}
             for e in entities:
                 if e.canonical_name and e.aliases:
                     aliases_dict[e.canonical_name] = e.aliases
 
-            existing_positions = set()
+            existing_positions: set[tuple[int, int]] = set()
             for entity in entities:
                 mentions_db = entity_repo.get_mentions_by_entity(entity.id)
                 for m in mentions_db:
                     existing_positions.add((m.start_char, m.end_char))
 
-            additional_mentions = mention_finder.find_all_mentions(
-                text=full_text,
-                entity_names=entity_names,
-                aliases=aliases_dict,
-                existing_positions=existing_positions,
-            )
-
-            from narrative_assistant.entities.models import EntityMention as EntityMentionModel
-
-            mentions_by_entity: dict[str, list] = {}
-            for am in additional_mentions:
-                if am.entity_name not in mentions_by_entity:
-                    mentions_by_entity[am.entity_name] = []
-                mentions_by_entity[am.entity_name].append(am)
-
             additional_count = 0
+            found_positions: set[tuple[int, int]] = set()
             total_entities_for_mentions = len(entities)
             mention_update_every = (
                 max(1, total_entities_for_mentions // 20) if total_entities_for_mentions else 1
             )
+
             for idx, entity in enumerate(entities, start=1):
                 name = entity.canonical_name
-                if name in mentions_by_entity:
-                    new_mentions = mentions_by_entity[name]
-                    for am in new_mentions:
-                        ch_id = find_chapter_id_for_position(am.start_char)
-                        mention = EntityMentionModel(  # type: ignore[assignment]
-                            entity_id=entity.id,
-                            surface_form=am.surface_form,
-                            start_char=am.start_char,
-                            end_char=am.end_char,
-                            chapter_id=ch_id,
-                            confidence=am.confidence,
-                            source="mention_finder",
-                        )
-                        try:
-                            entity_repo.create_mention(mention)  # type: ignore[arg-type]
-                            additional_count += 1
-                        except Exception:
-                            pass
+                if not name:
+                    continue
 
+                # Nombres a buscar: canónico + aliases
+                search_names = [name]
+                if name in aliases_dict:
+                    search_names.extend(aliases_dict[name])
+
+                # Buscar menciones de ESTA entidad
+                entity_mentions = mention_finder.find_mentions_for_entity(
+                    text=full_text,
+                    canonical_name=name,
+                    search_names=search_names,
+                    existing_positions=existing_positions,
+                    found_positions=found_positions,
+                )
+
+                # Almacenar en DB
+                for am in entity_mentions:
+                    ch_id = find_chapter_id_for_position(am.start_char)
+                    mention = EntityMentionModel(  # type: ignore[assignment]
+                        entity_id=entity.id,
+                        surface_form=am.surface_form,
+                        start_char=am.start_char,
+                        end_char=am.end_char,
+                        chapter_id=ch_id,
+                        confidence=am.confidence,
+                        source="mention_finder",
+                    )
+                    try:
+                        entity_repo.create_mention(mention)  # type: ignore[arg-type]
+                        additional_count += 1
+                    except Exception:
+                        pass
+
+                # Progreso granular
                 if idx % mention_update_every == 0 or idx == total_entities_for_mentions:
                     mention_fraction = idx / total_entities_for_mentions
                     _update_fusion_progress(
                         0.94 + mention_fraction * 0.02,
-                        f"Buscando menciones adicionales ({idx}/{total_entities_for_mentions})",
+                        f"Buscando menciones ({idx}/{total_entities_for_mentions})...",
                         subphase_id="mentions",
                         subphase_label="Buscando menciones adicionales",
                         subphase_progress=mention_fraction,

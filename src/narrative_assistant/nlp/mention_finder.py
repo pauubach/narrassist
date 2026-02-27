@@ -160,6 +160,48 @@ class MentionFinder:
 
         return mentions
 
+    def find_mentions_for_entity(
+        self,
+        text: str,
+        canonical_name: str,
+        search_names: list[str],
+        existing_positions: set[tuple[int, int]],
+        found_positions: set[tuple[int, int]],
+    ) -> list[FoundMention]:
+        """
+        Busca menciones adicionales de una sola entidad.
+
+        Args:
+            text: Texto donde buscar
+            canonical_name: Nombre canónico de la entidad
+            search_names: Lista de nombres a buscar (canónico + aliases)
+            existing_positions: Posiciones ya detectadas por NER
+            found_positions: Posiciones encontradas por búsquedas previas (se muta)
+
+        Returns:
+            Lista de menciones encontradas para esta entidad
+        """
+        mentions: list[FoundMention] = []
+
+        # Ordenar por longitud (más largos primero) para evitar solapamientos
+        sorted_names = sorted(search_names, key=len, reverse=True)
+
+        for name in sorted_names:
+            if len(name) < self.min_name_length:
+                continue
+            if name.lower() in self.SKIP_PATTERNS:
+                continue
+
+            new_mentions = self._find_name_occurrences(
+                text, name, canonical_name, existing_positions, found_positions
+            )
+
+            for mention in new_mentions:
+                found_positions.add((mention.start_char, mention.end_char))
+                mentions.append(mention)
+
+        return mentions
+
     def _find_name_occurrences(
         self,
         text: str,
