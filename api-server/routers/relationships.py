@@ -1735,16 +1735,15 @@ def get_character_archetypes(
 
         result_data = report.to_dict()
 
-        # Guardar en caché (solo si no hay filtros opcionales activos)
-        if mode == "basic" and llm_model == "llama3.2":
-            from routers._enrichment_phases import _cache_result
-            _cache_result(
-                db_session=deps.get_database(),
-                project_id=project_id,
-                enrichment_type="character_archetypes",
-                result=result_data,
-                phase=10,  # Phase 10 = Relationships
-            )
+        # Guardar en caché
+        from routers._enrichment_phases import _cache_result
+        _cache_result(
+            db_session=deps.get_database(),
+            project_id=project_id,
+            enrichment_type="character_archetypes",
+            result=result_data,
+            phase=10,  # Phase 10 = Relationships
+        )
 
         return ApiResponse(success=True, data=result_data)
 

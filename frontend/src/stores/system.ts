@@ -580,6 +580,8 @@ export const useSystemStore = defineStore('system', () => {
       }
 
       // 3. Verificar readiness LLM y descargar modelos faltantes
+      // Nota: las descargas son asíncronas (fire-and-forget desde aquí).
+      // El ModelSetupDialog usa su propio flujo con polling para esperar.
       const updatedCaps = systemCapabilities.value
       if (updatedCaps?.ollama?.available) {
         try {
@@ -590,17 +592,17 @@ export const useSystemStore = defineStore('system', () => {
             for (const model of data.missing_models) {
               try {
                 await api.postRaw(`/api/ollama/pull/${model}`)
-                // Esperar brevemente entre descargas para evitar contención
-                await new Promise(r => setTimeout(r, 1000))
               } catch {
                 // Continuar con el siguiente modelo
               }
             }
-            llmDownloadingModels.value = []
-            await refreshCapabilities()
+            // No limpiar llmDownloadingModels aquí — la descarga es async.
+            // Se limpiará cuando ModelSetupDialog termine o en refreshCapabilities.
           }
         } catch {
           // Silencioso — el usuario puede configurarlo desde Settings
+        } finally {
+          llmDownloadingModels.value = []
         }
       }
     } catch {

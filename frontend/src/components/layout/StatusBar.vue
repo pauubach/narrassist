@@ -246,6 +246,13 @@ const analysisStatus = computed(() => {
     return { icon: 'pi-times-circle', text: detail, class: 'status-error' }
   }
 
+  // Si hay warning de capacidad reducida
+  if (analysisStore.warning) {
+    if (props.hasAnalysis) {
+      return { icon: 'pi-exclamation-triangle', text: 'Análisis completado con capacidad reducida', class: 'status-warning' }
+    }
+  }
+
   // Si hay análisis completado
   if (props.hasAnalysis) {
     return { icon: 'pi-check-circle', text: 'Análisis completado', class: 'status-completed' }

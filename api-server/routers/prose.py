@@ -151,7 +151,7 @@ def get_narrative_templates(
         report = analyze_chapter_progress(
             project_id=project_id,
             mode=mode,
-            llm_model=llm_model or "llama3.2",
+            llm_model=llm_model,
         )
 
         # Convertir capítulos a formato para el analizador
@@ -225,7 +225,7 @@ def get_narrative_health(
         report = analyze_chapter_progress(
             project_id=project_id,
             mode=mode,
-            llm_model=llm_model or "llama3.2",
+            llm_model=llm_model,
         )
 
         # Convertir a formato para el checker

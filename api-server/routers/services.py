@@ -16,14 +16,12 @@ from deps import (
 )
 from fastapi import APIRouter, HTTPException
 
+from routers._llm_helpers import normalize_model_name
+
 router = APIRouter()
 
 _MODEL_SPEED_ORDER = ["llama3.2", "hermes3", "deepseek-r1", "qwen2.5", "qwen3", "gpt-oss", "mistral", "gemma2"]
 _MODEL_QUALITY_ORDER = ["qwen3", "gpt-oss", "hermes3", "deepseek-r1", "qwen2.5", "gemma2", "mistral", "llama3.2"]
-
-
-def _normalize_model_name(model_name: str) -> str:
-    return (model_name or "").split(":")[0].strip().lower()
 
 
 def _sorted_models(
@@ -33,7 +31,7 @@ def _sorted_models(
     ranking = _MODEL_SPEED_ORDER if prioritize_speed else _MODEL_QUALITY_ORDER
     order_map = {name: idx for idx, name in enumerate(ranking)}
     return sorted(
-        {_normalize_model_name(m) for m in models if m},
+        {normalize_model_name(m) for m in models if m},
         key=lambda m: order_map.get(m, len(order_map)),
     )
 
@@ -361,6 +359,13 @@ def pull_ollama_model(model_name: str):
             except Exception:
                 pass  # Si falla la detección, permitir (el usuario decide)
 
+        # Limpiar caché de modelos 404 para que se reintente tras la descarga
+        try:
+            from narrative_assistant.llm.client import clear_missing_models
+            clear_missing_models()
+        except Exception:
+            pass
+
         # Iniciar descarga en segundo plano
         started = manager.start_download_async(model_name)
 
@@ -391,7 +396,7 @@ def delete_ollama_model(model_name: str):
         from narrative_assistant.llm.ollama_manager import get_ollama_manager
 
         manager = get_ollama_manager()
-        normalized = _normalize_model_name(model_name)
+        normalized = normalize_model_name(model_name)
 
         if not manager.is_installed:
             return ApiResponse(success=False, error="El asistente de IA no está instalado")
@@ -400,7 +405,7 @@ def delete_ollama_model(model_name: str):
         if not success:
             return ApiResponse(success=False, error=f"No se pudo iniciar el asistente de IA: {message}")
 
-        downloaded = {_normalize_model_name(m) for m in manager.downloaded_models}
+        downloaded = {normalize_model_name(m) for m in manager.downloaded_models}
         if normalized not in downloaded:
             return ApiResponse(success=False, error=f"El modelo '{normalized}' no está instalado")
 
@@ -419,7 +424,7 @@ def delete_ollama_model(model_name: str):
             success=True,
             data={
                 "message": message,
-                "remaining_models": sorted({_normalize_model_name(m) for m in manager.downloaded_models}),
+                "remaining_models": sorted({normalize_model_name(m) for m in manager.downloaded_models}),
             },
         )
     except Exception as e:
@@ -854,7 +859,7 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
         selected_models = []
         if isinstance(selected_models_raw, list):
             selected_models = [
-                _normalize_model_name(str(m))
+                normalize_model_name(str(m))
                 for m in selected_models_raw
                 if isinstance(m, str) and m.strip()
             ]
@@ -863,14 +868,14 @@ def chat_with_assistant(project_id: int, request: ChatRequest):
         try:
             from narrative_assistant.llm.ollama_manager import get_ollama_manager
             manager = get_ollama_manager()
-            installed_models = [_normalize_model_name(m) for m in manager.downloaded_models]
+            installed_models = [normalize_model_name(m) for m in manager.downloaded_models]
         except Exception:
             installed_models = []
 
         selected_installed = [
             m for m in selected_models if m in set(installed_models)
         ]
-        default_model = _normalize_model_name(llm_client.model_name)
+        default_model = normalize_model_name(llm_client.model_name)
         if selected_installed:
             candidate_models = _sorted_models(selected_installed, prioritize_speed)
         else:

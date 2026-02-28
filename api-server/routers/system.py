@@ -1018,14 +1018,14 @@ def system_capabilities():
             },
         }
 
-        # Modelos Ollama recomendados según hardware
+        # Modelos Ollama recomendados según hardware (sincronizado con LEVEL_MODELS)
         ollama_recommendations = []
         if has_high_vram:
-            ollama_recommendations = ["qwen2.5", "mistral", "llama3.2"]
+            ollama_recommendations = ["qwen3", "hermes3", "deepseek-r1"]
         elif has_gpu:
-            ollama_recommendations = ["llama3.2", "qwen2.5"]
+            ollama_recommendations = ["qwen3", "hermes3"]
         else:
-            ollama_recommendations = ["llama3.2"]  # 3B funciona en CPU
+            ollama_recommendations = ["qwen3"]  # Funciona en CPU
 
         # Verificar si el modelo de embeddings está disponible localmente
         embeddings_available = False

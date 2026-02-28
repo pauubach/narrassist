@@ -132,7 +132,7 @@ const llmModelNames: Record<string, string> = {
 }
 
 function llmModelDisplayName(model: string): string {
-  return llmModelNames[model] || `Motor ${model}`
+  return llmModelNames[model] || 'Motor de análisis adicional'
 }
 
 // Texto del modelo actual basado en progreso real
@@ -253,21 +253,31 @@ async function startLLMDownloadIfNeeded() {
     }
 
     llmCurrentModel.value = null
-    finishSetup()
+    const allOk = llmModelsDownloaded.value.length === readiness.missing_models.length
+    finishSetup(allOk)
   } catch {
     // LLM download es best-effort — no bloquear
-    finishSetup()
+    finishSetup(false)
   }
 }
 
-function finishSetup() {
+function finishSetup(llmComplete: boolean = true) {
   downloadPhase.value = 'completed'
-  showNotification({
-    title: 'Instalación completada',
-    body: 'Narrative Assistant está listo para usar.',
-    severity: 'success',
-    playSound: true,
-  })
+  if (llmComplete) {
+    showNotification({
+      title: 'Instalación completada',
+      body: 'Narrative Assistant está listo para usar.',
+      severity: 'success',
+      playSound: true,
+    })
+  } else {
+    showNotification({
+      title: 'Instalación parcial',
+      body: 'Los modelos lingüísticos están listos. Algunos motores de análisis avanzado no se pudieron instalar — puedes reintentarlo desde Configuración.',
+      severity: 'warning',
+      playSound: true,
+    })
+  }
   setTimeout(() => {
     visible.value = false
   }, 2000)

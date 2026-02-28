@@ -194,6 +194,10 @@ class LocalLLMClient:
         )
         self._backend = "none"
 
+    def clear_missing_models(self) -> None:
+        """Limpia la caché de modelos 404 (llamar tras descargar un nuevo modelo)."""
+        self._missing_models.clear()
+
     def _try_init_ollama(self) -> bool:
         """
         Intenta inicializar Ollama.
@@ -1070,6 +1074,12 @@ def reset_client() -> None:
     global _client
     with _client_lock:
         _client = None
+
+
+def clear_missing_models() -> None:
+    """Limpia la caché de modelos 404 del cliente singleton."""
+    if _client is not None:
+        _client.clear_missing_models()
 
 
 # Alias para compatibilidad

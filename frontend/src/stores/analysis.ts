@@ -229,6 +229,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const error = computed<string | null>(() =>
     _activeProjectId.value != null ? (_errors.value[_activeProjectId.value] ?? null) : null
   )
+  const warning = computed<string | null>(() =>
+    _activeProjectId.value != null ? (_warnings.value[_activeProjectId.value] ?? null) : null
+  )
 
   // Getters
   const hasActiveAnalysis = computed(() => isAnalyzing.value && currentAnalysis.value !== null)
@@ -269,25 +272,26 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
     // Pre-flight: verificar que los motores de análisis están listos
     try {
-      const readiness = await api.get<{
+      type ReadinessResult = {
         ready: boolean
         ollama_running: boolean
         has_any_model: boolean
         missing_models: string[]
-      }>('/api/services/llm/readiness')
+      }
+      let readiness = await api.get<ReadinessResult>('/api/services/llm/readiness')
 
       if (!readiness.ollama_running) {
-        // Intentar auto-iniciar el analizador
+        // Intentar auto-iniciar el analizador (best-effort)
         try {
           await api.postRaw('/api/ollama/start')
           await new Promise(r => setTimeout(r, 2000))
+          readiness = await api.get<ReadinessResult>('/api/services/llm/readiness')
         } catch {
           // Continuar — el backend degradará a modo básico
         }
       }
 
       if (readiness.ollama_running && !readiness.has_any_model) {
-        // Ollama activo pero sin modelos — avisar al usuario
         _warnings.value[projectId] = 'Los motores de análisis avanzado no están instalados. El análisis se realizará con capacidad reducida. Configúralos desde Configuración.'
       } else if (readiness.missing_models?.length > 0) {
         _warnings.value[projectId] = 'Algunos motores de análisis no están disponibles. El análisis se realizará con capacidad reducida.'
@@ -601,6 +605,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     currentAnalysis,
     isAnalyzing,
     error,
+    warning,
     executedPhases,
     runningPhases,
     // Internal maps (para uso avanzado/testing)

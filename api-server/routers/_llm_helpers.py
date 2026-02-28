@@ -9,6 +9,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def normalize_model_name(raw: str) -> str:
+    """Normaliza nombre de modelo: 'qwen3:8b-q4_K_M' → 'qwen3'."""
+    return (raw or "").split(":")[0].strip().lower()
+
+
 def get_configured_level() -> str:
     """Retorna el nivel de calidad configurado en DB (o 'rapida' por defecto)."""
     try:
@@ -45,9 +50,10 @@ def get_default_llm_model() -> str | None:
         from narrative_assistant.llm.ollama_manager import get_ollama_manager
 
         manager = get_ollama_manager()
-        installed = {m.split(":")[0].strip().lower() for m in manager.downloaded_models}
+        installed = {normalize_model_name(m) for m in manager.downloaded_models}
 
         if not installed:
+            logger.info("No hay modelos LLM instalados en Ollama")
             return None
 
         # Nivel configurado
@@ -60,15 +66,29 @@ def get_default_llm_model() -> str | None:
         # 1. Buscar en modelos core del nivel
         for model in LEVEL_MODELS.get(level, []):
             if model in installed:
+                logger.debug(
+                    f"Modelo LLM seleccionado: '{model}' "
+                    f"(core del nivel '{level_str}')"
+                )
                 return model
 
         # 2. Buscar en fallbacks del nivel
         for model in LEVEL_FALLBACK_MODELS.get(level, []):
             if model in installed:
+                logger.info(
+                    f"Modelo LLM seleccionado: '{model}' "
+                    f"(fallback del nivel '{level_str}', "
+                    f"core no disponible)"
+                )
                 return model
 
         # 3. Cualquier modelo instalado (último recurso)
-        return next(iter(installed))
+        fallback = next(iter(installed))
+        logger.info(
+            f"Modelo LLM seleccionado: '{fallback}' "
+            f"(último recurso, nivel '{level_str}' sin core ni fallback)"
+        )
+        return fallback
 
     except Exception as e:
         logger.debug(f"Error resolviendo modelo LLM por defecto: {e}")
@@ -106,7 +126,7 @@ def check_llm_readiness() -> dict:
         if not result["ollama_running"]:
             return result
 
-        installed = {m.split(":")[0].strip().lower() for m in manager.downloaded_models}
+        installed = {normalize_model_name(m) for m in manager.downloaded_models}
         result["available_models"] = sorted(installed)
         result["has_any_model"] = len(installed) > 0
 
@@ -132,14 +152,8 @@ def check_llm_readiness() -> dict:
         if missing:
             fallbacks = LEVEL_FALLBACK_MODELS.get(level, [])
             has_usable_fallback = any(f in installed for f in fallbacks)
-            # Solo reportar como faltantes los que NO tienen fallback
-            if has_usable_fallback:
-                # Hay al menos un fallback — el sistema puede funcionar
-                result["missing_models"] = sorted(missing)
-                result["ready"] = True
-            else:
-                result["missing_models"] = sorted(missing)
-                result["ready"] = False
+            result["missing_models"] = sorted(missing)
+            result["ready"] = has_usable_fallback
         else:
             result["ready"] = True
 
