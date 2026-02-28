@@ -692,14 +692,14 @@ describe('checkAnalysisStatus', () => {
     expect(store.isProjectAnalyzing(1)).toBe(false)
   })
 
-  it('should not clear if startAnalysis is in-flight', async () => {
+  it('should clear stale state when backend says idle', async () => {
     const store = useAnalysisStore()
-    // Simulate startAnalysis setting _analyzing before checkAnalysisStatus returns
+    // Simulate stale state from a previous session
     store.setAnalyzing(1, true)
 
     mockApiClient.get.mockResolvedValueOnce({
       project_id: 1,
-      status: 'idle', // Backend says idle, but startAnalysis is in-flight
+      status: 'idle', // Backend explicitly says no analysis running
       progress: 0,
       current_phase: '',
       phases: [],
@@ -707,9 +707,9 @@ describe('checkAnalysisStatus', () => {
 
     const isActive = await store.checkAnalysisStatus(1)
 
-    // Should NOT clear because _analyzing was already true
-    expect(isActive).toBe(true)
-    expect(store.isProjectAnalyzing(1)).toBe(true)
+    // Backend is authoritative — stale state must be cleared
+    expect(isActive).toBe(false)
+    expect(store.isProjectAnalyzing(1)).toBe(false)
   })
 
   it('should handle network error gracefully', async () => {

@@ -24,21 +24,21 @@
           <span class="order-number">{{ index + 1 }}</span>
           <div class="order-buttons">
             <Button
+              v-tooltip="'Subir'"
               icon="pi pi-chevron-up"
               text
               rounded
               size="small"
               :disabled="index === 0"
-              v-tooltip="'Subir'"
               @click="moveProject(project.id, index - 1)"
             />
             <Button
+              v-tooltip="'Bajar'"
               icon="pi pi-chevron-down"
               text
               rounded
               size="small"
               :disabled="index === collection.projects.length - 1"
-              v-tooltip="'Bajar'"
               @click="moveProject(project.id, index + 1)"
             />
           </div>
@@ -56,12 +56,12 @@
         </div>
 
         <Button
+          v-tooltip="'Quitar de la colección'"
           icon="pi pi-times"
           text
           rounded
           severity="danger"
           size="small"
-          v-tooltip="'Quitar de la colección'"
           @click="confirmRemove(project)"
         />
       </div>

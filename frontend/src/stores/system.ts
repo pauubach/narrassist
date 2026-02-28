@@ -92,6 +92,16 @@ export interface SystemCapabilities {
   }
 }
 
+export interface LLMReadiness {
+  ready: boolean
+  ollama_installed: boolean
+  ollama_running: boolean
+  configured_level: string
+  missing_models: string[]
+  available_models: string[]
+  has_any_model: boolean
+}
+
 export interface NLPMethod {
   name: string
   description: string
@@ -127,6 +137,9 @@ export const useSystemStore = defineStore('system', () => {
     transformer_ner: 500 * 1024 * 1024,
     total: 1510 * 1024 * 1024,
   })
+
+  // LLM readiness (auto-download tracking)
+  const llmDownloadingModels = ref<string[]>([])
 
   // System capabilities (cached - loaded once at startup)
   const systemCapabilities = ref<SystemCapabilities | null>(null)
@@ -566,14 +579,28 @@ export const useSystemStore = defineStore('system', () => {
         }
       }
 
-      // 3. Descargar modelo por defecto si Ollama está listo pero sin modelos
+      // 3. Verificar readiness LLM y descargar modelos faltantes
       const updatedCaps = systemCapabilities.value
-      if (updatedCaps?.ollama?.available && updatedCaps.ollama.models.length === 0) {
+      if (updatedCaps?.ollama?.available) {
         try {
-          await api.postRaw('/api/ollama/pull/llama3.2')
-          // No polling aquí — la descarga corre en background en el servidor
+          const readiness = await api.getRaw<{ data: LLMReadiness }>('/api/services/llm/readiness')
+          const data = readiness?.data
+          if (data && !data.ready && data.missing_models?.length > 0) {
+            llmDownloadingModels.value = data.missing_models
+            for (const model of data.missing_models) {
+              try {
+                await api.postRaw(`/api/ollama/pull/${model}`)
+                // Esperar brevemente entre descargas para evitar contención
+                await new Promise(r => setTimeout(r, 1000))
+              } catch {
+                // Continuar con el siguiente modelo
+              }
+            }
+            llmDownloadingModels.value = []
+            await refreshCapabilities()
+          }
         } catch {
-          // Silencioso
+          // Silencioso — el usuario puede configurarlo desde Settings
         }
       }
     } catch {
@@ -649,6 +676,9 @@ export const useSystemStore = defineStore('system', () => {
     installLanguageTool,
     startLanguageTool,
     stopLTPolling,
+
+    // LLM readiness
+    llmDownloadingModels,
 
     // Auto-config
     autoConfigOnStartup,

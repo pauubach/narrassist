@@ -7,16 +7,16 @@
           label="Analizar atributos"
           icon="pi pi-play"
           :loading="analyzingAttributes"
-          @click="runAttributeAnalysis"
           size="small"
+          @click="runAttributeAnalysis"
         />
         <Button
           label="Analizar eventos"
           icon="pi pi-bolt"
           :loading="analyzingEvents"
-          @click="runEventAnalysis"
           size="small"
           severity="secondary"
+          @click="runEventAnalysis"
         />
       </div>
     </div>

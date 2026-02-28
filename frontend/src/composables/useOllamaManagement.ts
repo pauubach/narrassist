@@ -58,7 +58,7 @@ export function useOllamaManagement() {
         action: startOllama,
       },
       no_models: {
-        label: 'Descargar modelo',
+        label: 'Instalar motor',
         icon: 'pi pi-download',
         severity: 'info',
         action: downloadDefaultModel,
@@ -76,11 +76,11 @@ export function useOllamaManagement() {
   const ollamaStatusMessage = computed(() => {
     const messages: Record<OllamaState, string> = {
       not_installed: 'Necesitas instalar el analizador semántico',
-      not_running: 'El analizador est\u00E1 instalado pero no se ha iniciado',
-      no_models: 'El analizador est\u00E1 listo, pero necesitas descargar un modelo',
+      not_running: 'El analizador está instalado pero no se ha iniciado',
+      no_models: 'El analizador está listo, pero necesitas instalar un motor de análisis',
       ready: (() => {
         const count = systemCapabilities.value?.ollama.models.length || 0
-        return count === 1 ? '1 modelo disponible' : `${count} modelos disponibles`
+        return count === 1 ? '1 motor disponible' : `${count} motores disponibles`
       })(),
     }
     return messages[ollamaState.value]
@@ -163,6 +163,20 @@ export function useOllamaManagement() {
   // ── Download model ──────────────────────────────────────
 
   async function downloadDefaultModel() {
+    // Descargar los modelos que faltan según el nivel configurado
+    try {
+      const result = await api.getRaw<{ data: { missing_models: string[]; ready: boolean } }>('/api/services/llm/readiness')
+      const missing = result?.data?.missing_models || []
+      if (missing.length > 0) {
+        let success = false
+        for (const model of missing) {
+          success = await downloadModel(model)
+        }
+        return success
+      }
+    } catch {
+      // Fallback: descargar al menos un modelo básico
+    }
     return downloadModel('llama3.2')
   }
 
@@ -186,8 +200,8 @@ export function useOllamaManagement() {
     ollamaDownloadProgress.value = null
     toast.add({
       severity: 'info',
-      summary: 'Descargando modelo',
-      detail: `Descargando ${normalized}. Esto puede tardar varios minutos...`,
+      summary: 'Descargando motor de análisis',
+      detail: 'Esto puede tardar varios minutos...',
       life: 5000,
     })
 
@@ -222,14 +236,14 @@ export function useOllamaManagement() {
             if (dp?.status === 'complete' || (!statusResult.data?.is_downloading && downloadedModels.includes(normalized))) {
               stopOllamaDownloadPolling()
               await reloadCapabilities()
-              toast.add({ severity: 'success', summary: 'Modelo descargado', detail: `${normalized} disponible`, life: 3000 })
+              toast.add({ severity: 'success', summary: 'Motor instalado', detail: 'Motor de análisis disponible', life: 3000 })
               resolve(true)
               return
             }
 
             if (dp?.status === 'error') {
               stopOllamaDownloadPolling()
-              toast.add({ severity: 'error', summary: 'Error', detail: dp.error || 'Error descargando modelo', life: 5000 })
+              toast.add({ severity: 'error', summary: 'Error', detail: dp.error || 'Error descargando motor de análisis', life: 5000 })
               resolve(false)
               return
             }
@@ -244,7 +258,7 @@ export function useOllamaManagement() {
       delete modelOperations.value[normalized]
       return ok
     } catch {
-      toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo descargar el modelo de IA', life: 3000 })
+      toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo descargar el motor de análisis', life: 3000 })
       modelDownloading.value = false
       delete modelOperations.value[normalized]
       return false
@@ -273,8 +287,8 @@ export function useOllamaManagement() {
       await reloadCapabilities()
       toast.add({
         severity: 'success',
-        summary: 'Modelo desinstalado',
-        detail: `${normalized} eliminado correctamente`,
+        summary: 'Motor desinstalado',
+        detail: 'Motor de análisis eliminado correctamente',
         life: 3000,
       })
       return true
@@ -299,8 +313,8 @@ export function useOllamaManagement() {
   function getModelOperationLabel(modelName: string): string | null {
     const normalized = modelName.split(':')[0]
     const operation = modelOperations.value[normalized]
-    if (operation === 'installing') return 'Instalando...'
-    if (operation === 'uninstalling') return 'Desinstalando...'
+    if (operation === 'installing') return 'Instalando motor...'
+    if (operation === 'uninstalling') return 'Desinstalando motor...'
     return null
   }
 

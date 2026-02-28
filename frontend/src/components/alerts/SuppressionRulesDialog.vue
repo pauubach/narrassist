@@ -149,11 +149,11 @@ watch(() => props.visible, (v) => {
 <template>
   <Dialog
     :visible="props.visible"
-    @update:visible="emit('update:visible', $event)"
     header="Reglas de supresión"
     :modal="true"
     :style="{ width: '700px' }"
     :closable="true"
+    @update:visible="emit('update:visible', $event)"
   >
     <!-- Create form -->
     <div class="sr-form">

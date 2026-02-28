@@ -12,14 +12,14 @@
           <Button
             label="Reintentar"
             icon="pi pi-refresh"
-            @click="retry"
             severity="secondary"
+            @click="retry"
           />
           <Button
             label="Volver al inicio"
             icon="pi pi-home"
-            @click="goHome"
             outlined
+            @click="goHome"
           />
         </div>
         <details v-if="errorDetails" class="error-boundary__details">

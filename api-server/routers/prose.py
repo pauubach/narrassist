@@ -14,7 +14,7 @@ router = APIRouter()
 def get_chapter_progress(
     project_id: int,
     mode: str = "standard",  # standard, deep
-    llm_model: str = "llama3.2",
+    llm_model: Optional[str] = None,
 ):
     """
     Obtiene el resumen de avance narrativo por capítulo.
@@ -28,13 +28,13 @@ def get_chapter_progress(
     - Resúmenes narrativos coherentes con eventos de alto impacto
 
     Modos:
-    - standard: Análisis LLM con llama3.2 (resúmenes narrativos coherentes)
+    - standard: Análisis LLM (resúmenes narrativos coherentes)
     - deep: Análisis multi-modelo con votación (más preciso, más lento)
 
     Args:
         project_id: ID del proyecto
         mode: Modo de análisis (standard/deep)
-        llm_model: Modelo LLM a usar (llama3.2, qwen2.5, mistral)
+        llm_model: Modelo LLM a usar (None = auto-detectar según config)
 
     Returns:
         ChapterProgressReport con resúmenes de todos los capítulos
@@ -46,13 +46,39 @@ def get_chapter_progress(
         if cached:
             return ApiResponse(success=True, data=cached)
 
+    # Resolver modelo dinámicamente si no se especificó
+    if not llm_model:
+        from routers._llm_helpers import get_default_llm_model
+        llm_model = get_default_llm_model()
+
+    # Degradar a basic si Ollama/modelo no disponible
+    if mode in ("standard", "deep"):
+        if not llm_model:
+            logger.info(
+                f"No hay modelo LLM disponible, degradando chapter-progress "
+                f"de '{mode}' a 'basic'"
+            )
+            mode = "basic"
+        else:
+            try:
+                from narrative_assistant.llm.ollama_manager import is_ollama_available
+
+                if not is_ollama_available():
+                    logger.info(
+                        f"Ollama no disponible, degradando chapter-progress "
+                        f"de '{mode}' a 'basic'"
+                    )
+                    mode = "basic"
+            except ImportError:
+                mode = "basic"
+
     try:
         from narrative_assistant.analysis.chapter_summary import (
             analyze_chapter_progress,
         )
 
         # Validar modo
-        valid_modes = ["standard", "deep"]
+        valid_modes = ["basic", "standard", "deep"]
         if mode not in valid_modes:
             return ApiResponse(
                 success=False,
@@ -94,7 +120,7 @@ def get_chapter_progress(
 def get_narrative_templates(
     project_id: int,
     mode: str = "basic",
-    llm_model: str = "llama3.2",
+    llm_model: Optional[str] = None,
 ):
     """
     Analiza qué plantillas narrativas encajan con el manuscrito.
@@ -108,6 +134,11 @@ def get_narrative_templates(
     if cached:
         return ApiResponse(success=True, data=cached)
 
+    # Resolver modelo dinámicamente
+    if not llm_model:
+        from routers._llm_helpers import get_default_llm_model
+        llm_model = get_default_llm_model()
+
     try:
         from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
         from narrative_assistant.analysis.narrative_templates import NarrativeTemplateAnalyzer
@@ -120,7 +151,7 @@ def get_narrative_templates(
         report = analyze_chapter_progress(
             project_id=project_id,
             mode=mode,
-            llm_model=llm_model,
+            llm_model=llm_model or "llama3.2",
         )
 
         # Convertir capítulos a formato para el analizador
@@ -162,7 +193,7 @@ def get_narrative_templates(
 def get_narrative_health(
     project_id: int,
     mode: str = "basic",
-    llm_model: str = "llama3.2",
+    llm_model: Optional[str] = None,
 ):
     """
     Chequeo de salud narrativa del manuscrito.
@@ -177,6 +208,11 @@ def get_narrative_health(
     if cached:
         return ApiResponse(success=True, data=cached)
 
+    # Resolver modelo dinámicamente
+    if not llm_model:
+        from routers._llm_helpers import get_default_llm_model
+        llm_model = get_default_llm_model()
+
     try:
         from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
         from narrative_assistant.analysis.narrative_health import NarrativeHealthChecker
@@ -189,7 +225,7 @@ def get_narrative_health(
         report = analyze_chapter_progress(
             project_id=project_id,
             mode=mode,
-            llm_model=llm_model,
+            llm_model=llm_model or "llama3.2",
         )
 
         # Convertir a formato para el checker

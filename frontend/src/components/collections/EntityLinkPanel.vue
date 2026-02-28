@@ -69,21 +69,21 @@
             <template #body="{ data }">
               <div class="action-buttons">
                 <Button
+                  v-tooltip="'Aceptar enlace'"
                   icon="pi pi-check"
                   text
                   rounded
                   severity="success"
                   size="small"
-                  v-tooltip="'Aceptar enlace'"
                   @click="acceptSuggestion(data)"
                 />
                 <Button
+                  v-tooltip="'Descartar'"
                   icon="pi pi-times"
                   text
                   rounded
                   severity="danger"
                   size="small"
-                  v-tooltip="'Descartar'"
                   @click="dismissSuggestion(data)"
                 />
               </div>
@@ -137,12 +137,12 @@
           <Column header="" style="width: 60px">
             <template #body="{ data }">
               <Button
+                v-tooltip="'Eliminar enlace'"
                 icon="pi pi-trash"
                 text
                 rounded
                 severity="danger"
                 size="small"
-                v-tooltip="'Eliminar enlace'"
                 @click="deleteLink(data.id)"
               />
             </template>

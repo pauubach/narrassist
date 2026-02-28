@@ -172,8 +172,8 @@ function handleAlertAction(alert: Alert, action: 'accept' | 'reject') {
           <button
             type="button"
             class="action-btn action-btn--accept"
-            @click="handleAlertAction(nextPendingAlert, 'accept')"
             title="Aceptar sugerencia"
+            @click="handleAlertAction(nextPendingAlert, 'accept')"
           >
             <i class="pi pi-check"></i>
             Aceptar
@@ -181,8 +181,8 @@ function handleAlertAction(alert: Alert, action: 'accept' | 'reject') {
           <button
             type="button"
             class="action-btn action-btn--reject"
-            @click="handleAlertAction(nextPendingAlert, 'reject')"
             title="Rechazar alerta"
+            @click="handleAlertAction(nextPendingAlert, 'reject')"
           >
             <i class="pi pi-times"></i>
             Rechazar
@@ -190,8 +190,8 @@ function handleAlertAction(alert: Alert, action: 'accept' | 'reject') {
           <button
             type="button"
             class="action-btn action-btn--view"
-            @click="emit('navigate-to-alert', nextPendingAlert)"
             title="Ver en contexto"
+            @click="emit('navigate-to-alert', nextPendingAlert)"
           >
             <i class="pi pi-eye"></i>
             Ver

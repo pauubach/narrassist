@@ -202,6 +202,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const _analyses = ref<Record<number, AnalysisProgress>>({})
   const _analyzing = ref<Record<number, boolean>>({})
   const _errors = ref<Record<number, string | null>>({})
+  const _warnings = ref<Record<number, string | null>>({})
   const _activeProjectId = ref<number | null>(null)
 
   /**
@@ -265,6 +266,35 @@ export const useAnalysisStore = defineStore('analysis', () => {
   async function startAnalysis(projectId: number, file?: File) {
     // Guard: prevent duplicate concurrent requests for the same project
     if (_analyzing.value[projectId]) return false
+
+    // Pre-flight: verificar que los motores de análisis están listos
+    try {
+      const readiness = await api.get<{
+        ready: boolean
+        ollama_running: boolean
+        has_any_model: boolean
+        missing_models: string[]
+      }>('/api/services/llm/readiness')
+
+      if (!readiness.ollama_running) {
+        // Intentar auto-iniciar el analizador
+        try {
+          await api.postRaw('/api/ollama/start')
+          await new Promise(r => setTimeout(r, 2000))
+        } catch {
+          // Continuar — el backend degradará a modo básico
+        }
+      }
+
+      if (readiness.ollama_running && !readiness.has_any_model) {
+        // Ollama activo pero sin modelos — avisar al usuario
+        _warnings.value[projectId] = 'Los motores de análisis avanzado no están instalados. El análisis se realizará con capacidad reducida. Configúralos desde Configuración.'
+      } else if (readiness.missing_models?.length > 0) {
+        _warnings.value[projectId] = 'Algunos motores de análisis no están disponibles. El análisis se realizará con capacidad reducida.'
+      }
+    } catch {
+      // Best-effort: si falla la verificación, el análisis seguirá en modo básico
+    }
 
     _analyzing.value[projectId] = true
     delete _errors.value[projectId]
@@ -388,10 +418,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
    */
   async function checkAnalysisStatus(projectId: number): Promise<boolean> {
     try {
-      // If already marked as analyzing (e.g., startAnalysis was called concurrently),
-      // don't clear — just query backend to update progress data
-      const alreadyActive = _analyzing.value[projectId] === true
-
       const progressData = await api.get<AnalysisProgress>(`/api/projects/${projectId}/analysis/progress`, { retries: 2 })
       const status = progressData.status
       if (status === 'running' || status === 'pending' || status === 'queued' || status === 'queued_for_heavy') {
@@ -400,11 +426,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
         return true
       }
 
-      // Backend says idle — but if startAnalysis is in-flight, don't clear
-      if (alreadyActive) {
-        return true
-      }
-
+      // Backend explicitly says no analysis running — clear stale state.
+      // This handles the case where the backend was restarted and the
+      // frontend still has _analyzing=true from a previous session.
       clearAnalysis(projectId)
       return false
     } catch {
@@ -583,6 +607,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     _analyses,
     _analyzing,
     _errors,
+    _warnings,
     _activeProjectId,
     // Getters
     hasActiveAnalysis,

@@ -224,8 +224,8 @@ watch(() => props.projectId, () => {
         title="Restaurar todo - deshacer todas las acciones"
         @click="handleRestoreAll"
       >
-        <i class="pi pi-history" v-if="!restoringAll"></i>
-        <i class="pi pi-spin pi-spinner" v-else></i>
+        <i v-if="!restoringAll" class="pi pi-history"></i>
+        <i v-else class="pi pi-spin pi-spinner"></i>
         <span class="btn-text">Restaurar</span>
       </button>
     </div>

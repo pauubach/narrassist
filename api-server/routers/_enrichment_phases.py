@@ -1445,8 +1445,9 @@ def run_health_enrichment(ctx: dict, tracker) -> None:
         def compute_chapter_progress():
             nonlocal progress_data
             from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
-
-            result = analyze_chapter_progress(project_id, mode="standard", llm_model="qwen2.5")
+            from routers._llm_helpers import get_default_llm_model
+            _model = get_default_llm_model() or "llama3.2"
+            result = analyze_chapter_progress(project_id, mode="standard", llm_model=_model)
             if hasattr(result, "is_failure") and result.is_failure:
                 raise RuntimeError(f"Chapter progress failed: {result.error}")
             data = result.value if hasattr(result, "value") else result

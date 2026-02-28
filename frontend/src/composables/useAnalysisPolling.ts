@@ -101,9 +101,13 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
       // Ajustar rate de polling según progreso (adaptive polling)
       adjustPollingRate()
 
-      // Idle — no active analysis
-      if (progressData.status === 'idle') {
+      // Idle or pending — no active analysis in backend
+      // IMPORTANT: must clear store state, otherwise cached progress persists
+      if (progressData.status === 'idle' || progressData.status === 'pending') {
         stopPolling()
+        if (project.value) {
+          analysisStore.setAnalyzing(project.value.id, false)
+        }
         return
       }
 

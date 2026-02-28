@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useSystemStore } from '@/stores/system'
-import type { DownloadProgressInfo, ModelStatus } from '@/stores/system'
+import type { DownloadProgressInfo, LLMReadiness, ModelStatus } from '@/stores/system'
 import { useNotifications } from '@/composables/useNotifications'
+import { useOllamaManagement } from '@/composables/useOllamaManagement'
+import { api } from '@/services/apiClient'
 import Dialog from 'primevue/dialog'
 import DsDownloadProgress from '@/components/ds/DsDownloadProgress.vue'
 
@@ -15,12 +17,19 @@ const props = withDefaults(defineProps<{
 
 const systemStore = useSystemStore()
 const { showNotification } = useNotifications()
+const { downloadModel, ollamaDownloadProgress } = useOllamaManagement()
+
+// LLM download tracking
+const llmModelsToDownload = ref<string[]>([])
+const llmModelsDownloaded = ref<string[]>([])
+const llmCurrentModel = ref<string | null>(null)
 
 type DownloadPhase =
   | 'starting'
   | 'checking'
   | 'installing-deps'
   | 'downloading'
+  | 'downloading-llm'
   | 'completed'
   | 'error'
   | 'python-missing'
@@ -103,11 +112,27 @@ const displayProgress = computed(() => {
   return null // null = indeterminado
 })
 
-// Mapa de nombres funcionales por tipo de modelo
+// Mapa de nombres funcionales por tipo de modelo NLP
 const modelDisplayNames: Record<string, string> = {
   spacy: 'Análisis gramatical y lingüístico',
   embeddings: 'Análisis de similitud y contexto',
   transformer_ner: 'Reconocimiento de personajes y lugares',
+}
+
+// Mapa de nombres funcionales por modelo LLM (lenguaje no técnico)
+const llmModelNames: Record<string, string> = {
+  qwen3: 'Motor de análisis principal',
+  hermes3: 'Motor de verificación',
+  'deepseek-r1': 'Motor de razonamiento',
+  'qwen2.5': 'Motor de análisis de texto',
+  'llama3.2': 'Motor básico',
+  mistral: 'Motor de comprensión',
+  'gpt-oss': 'Motor avanzado',
+  gemma2: 'Motor de análisis general',
+}
+
+function llmModelDisplayName(model: string): string {
+  return llmModelNames[model] || `Motor ${model}`
 }
 
 // Texto del modelo actual basado en progreso real
@@ -191,23 +216,62 @@ onMounted(async () => {
   }
 })
 
-// Watch for model status changes
+// Watch for model status changes — cuando NLP está listo, verificar LLM
 watch(() => systemStore.modelsReady, (ready) => {
-  if (ready && visible.value) {
-    downloadPhase.value = 'completed'
-    // Auto-config hardware en background (Ollama, settings recomendados)
-    systemStore.autoConfigOnStartup()
-    showNotification({
-      title: 'Modelos instalados',
-      body: 'Narrative Assistant está listo para usar.',
-      severity: 'success',
-      playSound: true,
-    })
-    setTimeout(() => {
-      visible.value = false
-    }, 2000)
+  if (ready && visible.value && downloadPhase.value !== 'downloading-llm') {
+    // NLP listo — verificar si necesitamos descargar motores de análisis (LLM)
+    startLLMDownloadIfNeeded()
   }
 })
+
+/** Verifica si hay modelos LLM pendientes y los descarga, o cierra el diálogo. */
+async function startLLMDownloadIfNeeded() {
+  try {
+    // Auto-config hardware primero (inicia Ollama si necesario)
+    await systemStore.autoConfigOnStartup()
+
+    // Consultar readiness
+    const result = await api.getRaw<{ data: LLMReadiness }>('/api/services/llm/readiness')
+    const readiness = result?.data
+    if (!readiness || readiness.ready || !readiness.ollama_running || readiness.missing_models.length === 0) {
+      // LLM listo o no disponible — completar
+      finishSetup()
+      return
+    }
+
+    // Hay modelos LLM por descargar
+    downloadPhase.value = 'downloading-llm'
+    llmModelsToDownload.value = readiness.missing_models
+    llmModelsDownloaded.value = []
+
+    for (const model of readiness.missing_models) {
+      llmCurrentModel.value = model
+      const ok = await downloadModel(model)
+      if (ok) {
+        llmModelsDownloaded.value = [...llmModelsDownloaded.value, model]
+      }
+    }
+
+    llmCurrentModel.value = null
+    finishSetup()
+  } catch {
+    // LLM download es best-effort — no bloquear
+    finishSetup()
+  }
+}
+
+function finishSetup() {
+  downloadPhase.value = 'completed'
+  showNotification({
+    title: 'Instalación completada',
+    body: 'Narrative Assistant está listo para usar.',
+    severity: 'success',
+    playSound: true,
+  })
+  setTimeout(() => {
+    visible.value = false
+  }, 2000)
+}
 
 watch(() => systemStore.modelsError, (error) => {
   if (error) {
@@ -478,6 +542,51 @@ async function recheckPython() {
           <p class="download-note">
             <i class="pi pi-info-circle"></i>
             Esta descarga solo se realiza una vez. Tamaño total: ~{{ totalDownloadSize }} MB
+          </p>
+        </div>
+      </template>
+
+      <!-- Downloading LLM models state -->
+      <template v-else-if="downloadPhase === 'downloading-llm'">
+        <div class="download-progress" role="status" aria-live="polite">
+          <div class="download-header">
+            <i class="pi pi-download download-icon"></i>
+            <div>
+              <h3>Preparando motores de análisis</h3>
+              <p class="subtitle">Estos motores permiten análisis más profundos de tu manuscrito</p>
+            </div>
+          </div>
+
+          <DsDownloadProgress
+            :label="llmCurrentModel ? llmModelDisplayName(llmCurrentModel) : 'Preparando...'"
+            :percentage="ollamaDownloadProgress?.percentage ?? null"
+            class="progress-section"
+          />
+
+          <div class="models-list">
+            <div v-for="model in llmModelsToDownload" :key="model" class="model-item">
+              <i
+                class="pi"
+                :class="
+                  llmModelsDownloaded.includes(model)
+                    ? 'pi-check-circle text-green'
+                    : llmCurrentModel === model
+                      ? 'pi-spin pi-spinner text-blue'
+                      : 'pi-clock text-muted'
+                "
+              ></i>
+              <span class="model-name">{{ llmModelDisplayName(model) }}</span>
+              <span class="model-size">
+                <template v-if="llmModelsDownloaded.includes(model)">Instalado</template>
+                <template v-else-if="llmCurrentModel === model">Descargando...</template>
+                <template v-else>En cola</template>
+              </span>
+            </div>
+          </div>
+
+          <p class="download-note">
+            <i class="pi pi-info-circle"></i>
+            Esta descarga solo se realiza una vez. Puedes saltar este paso desde Configuración.
           </p>
         </div>
       </template>

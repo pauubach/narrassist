@@ -17,10 +17,10 @@
       <div class="detail-header">
         <div class="header-left">
           <Button
+            v-tooltip="'Volver a colecciones'"
             icon="pi pi-arrow-left"
             text
             rounded
-            v-tooltip="'Volver a colecciones'"
             @click="router.push('/collections')"
           />
           <div class="header-info">
@@ -33,8 +33,8 @@
           </div>
         </div>
         <div class="header-actions">
-          <Button icon="pi pi-pencil" text rounded v-tooltip="'Editar'" @click="showEditDialog = true" />
-          <Button icon="pi pi-trash" text rounded severity="danger" v-tooltip="'Eliminar'" @click="handleDelete" />
+          <Button v-tooltip="'Editar'" icon="pi pi-pencil" text rounded @click="showEditDialog = true" />
+          <Button v-tooltip="'Eliminar'" icon="pi pi-trash" text rounded severity="danger" @click="handleDelete" />
         </div>
       </div>
 

@@ -1214,6 +1214,30 @@ async def update_llm_config(request: dict):
         return ApiResponse(success=False, error=str(e))
 
 
+@router.get("/api/services/llm/readiness")
+async def get_llm_readiness():
+    """Verifica si el sistema LLM está listo para análisis."""
+    try:
+        from routers._llm_helpers import check_llm_readiness
+
+        readiness = check_llm_readiness()
+        return ApiResponse(success=True, data=readiness)
+    except Exception as e:
+        logger.error(f"Error checking LLM readiness: {e}", exc_info=True)
+        return ApiResponse(
+            success=True,
+            data={
+                "ready": False,
+                "ollama_installed": False,
+                "ollama_running": False,
+                "configured_level": "rapida",
+                "missing_models": [],
+                "available_models": [],
+                "has_any_model": False,
+            },
+        )
+
+
 @router.get("/api/services/llm/models")
 async def get_llm_models():
     """Lista modelos con estado (installed, available, legacy, canRun)."""

@@ -1,124 +1,124 @@
 <template>
   <ErrorBoundary>
     <div class="home-view">
-    <!-- Top Actions Bar -->
-    <div class="top-actions">
-      <Button
-        v-tooltip.bottom="'Cambiar tema'"
-        :icon="appStore.isDark ? 'pi pi-sun' : 'pi pi-moon'"
-        text
-        rounded
-        @click="appStore.toggleTheme"
-      />
-      <Button
-        v-tooltip.bottom="'Configuración'"
-        icon="pi pi-cog"
-        text
-        rounded
-        @click="goToSettings"
-      />
-    </div>
-
-    <div class="welcome-container">
-      <div class="welcome-header">
-        <h1>Narrative Assistant</h1>
-        <p class="subtitle">Asistente de corrección con IA para escritores, editores y correctores profesionales</p>
-        <p class="privacy-note">
-          <i class="pi pi-shield"></i>
-          <span>IA 100% local · Tu manuscrito nunca se sube a internet</span>
-        </p>
+      <!-- Top Actions Bar -->
+      <div class="top-actions">
+        <Button
+          v-tooltip.bottom="'Cambiar tema'"
+          :icon="appStore.isDark ? 'pi pi-sun' : 'pi pi-moon'"
+          text
+          rounded
+          @click="appStore.toggleTheme"
+        />
+        <Button
+          v-tooltip.bottom="'Configuración'"
+          icon="pi pi-cog"
+          text
+          rounded
+          @click="goToSettings"
+        />
       </div>
 
-      <div class="status-card">
-        <h2><i class="pi pi-check-circle"></i> Estado del Sistema</h2>
-        <div class="status-grid">
-          <div class="status-item">
-            <span class="status-label">Motor interno:</span>
-            <span
-              class="status-value"
-              :class="{ 'status-ok': backendStatus || systemStore.backendStarting, 'status-error': showBackendDisconnected }"
-            >
-              {{ systemStore.backendStarting ? 'Iniciando...' : (backendStatus ? 'Activo' : 'Inactivo') }}
-            </span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">Base de datos:</span>
-            <span class="status-value status-ok">SQLite Ready</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">Modelos NLP:</span>
-            <span class="status-value status-ok">Offline (Local)</span>
-          </div>
-        </div>
-
-        <!-- Error message and retry when backend disconnected -->
-        <div v-if="showBackendDisconnected" class="backend-error-container">
-          <p class="backend-error-message">
-            <i class="pi pi-exclamation-triangle"></i>
-            {{ backendError || 'El motor de análisis no responde. Reintentando...' }}
+      <div class="welcome-container">
+        <div class="welcome-header">
+          <h1>Narrative Assistant</h1>
+          <p class="subtitle">Asistente de corrección con IA para escritores, editores y correctores profesionales</p>
+          <p class="privacy-note">
+            <i class="pi pi-shield"></i>
+            <span>IA 100% local · Tu manuscrito nunca se sube a internet</span>
           </p>
-          <Button
-            label="Reintentar"
-            icon="pi pi-refresh"
-            severity="warning"
-            size="small"
-            :loading="isRetrying"
-            @click="retryConnection"
-          />
         </div>
-      </div>
 
-      <!-- Métricas globales (solo si hay datos cacheados) -->
-      <div v-if="globalMetrics.manuscripts > 0" class="global-stats">
-        <h2><i class="pi pi-chart-bar"></i> Tu actividad</h2>
-        <div class="stats-grid">
-          <div class="stat-card stat-manuscripts">
-            <div class="stat-icon-bg">
-              <i class="pi pi-book"></i>
+        <div class="status-card">
+          <h2><i class="pi pi-check-circle"></i> Estado del Sistema</h2>
+          <div class="status-grid">
+            <div class="status-item">
+              <span class="status-label">Motor interno:</span>
+              <span
+                class="status-value"
+                :class="{ 'status-ok': backendStatus || systemStore.backendStarting, 'status-error': showBackendDisconnected }"
+              >
+                {{ systemStore.backendStarting ? 'Iniciando...' : (backendStatus ? 'Activo' : 'Inactivo') }}
+              </span>
             </div>
-            <div class="stat-info">
-              <span class="stat-value">{{ globalMetrics.manuscripts }}</span>
-              <span class="stat-label">Manuscritos analizados</span>
+            <div class="status-item">
+              <span class="status-label">Base de datos:</span>
+              <span class="status-value status-ok">SQLite Ready</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Modelos NLP:</span>
+              <span class="status-value status-ok">Offline (Local)</span>
             </div>
           </div>
 
-          <div class="stat-card stat-reviewed">
-            <div class="stat-icon-bg">
-              <i class="pi pi-check-square"></i>
-            </div>
-            <div class="stat-info">
-              <span class="stat-value">{{ globalMetrics.reviewed }}</span>
-              <span class="stat-label">Alertas revisadas</span>
-            </div>
-          </div>
-
-          <div class="stat-card stat-time">
-            <div class="stat-icon-bg">
-              <i class="pi pi-clock"></i>
-            </div>
-            <div class="stat-info">
-              <span class="stat-value">{{ globalMetrics.timeSavedFormatted }}</span>
-              <span class="stat-label">Tiempo estimado ahorrado</span>
-            </div>
-          </div>
-
-          <div class="stat-card stat-rate">
-            <div class="stat-icon-bg">
-              <i class="pi pi-percentage"></i>
-            </div>
-            <div class="stat-info">
-              <span class="stat-value">{{ globalMetrics.reviewRate }}%</span>
-              <span class="stat-label">Tasa de revisión</span>
-            </div>
+          <!-- Error message and retry when backend disconnected -->
+          <div v-if="showBackendDisconnected" class="backend-error-container">
+            <p class="backend-error-message">
+              <i class="pi pi-exclamation-triangle"></i>
+              {{ backendError || 'El motor de análisis no responde. Reintentando...' }}
+            </p>
+            <Button
+              label="Reintentar"
+              icon="pi pi-refresh"
+              severity="warning"
+              size="small"
+              :loading="isRetrying"
+              @click="retryConnection"
+            />
           </div>
         </div>
-      </div>
 
-      <div class="actions">
-        <Button label="Ver Proyectos" icon="pi pi-folder" size="large" @click="goToProjects" />
-        <Button label="Nuevo Proyecto" icon="pi pi-plus" severity="secondary" size="large" outlined @click="goToProjects" />
+        <!-- Métricas globales (solo si hay datos cacheados) -->
+        <div v-if="globalMetrics.manuscripts > 0" class="global-stats">
+          <h2><i class="pi pi-chart-bar"></i> Tu actividad</h2>
+          <div class="stats-grid">
+            <div class="stat-card stat-manuscripts">
+              <div class="stat-icon-bg">
+                <i class="pi pi-book"></i>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value">{{ globalMetrics.manuscripts }}</span>
+                <span class="stat-label">Manuscritos analizados</span>
+              </div>
+            </div>
+
+            <div class="stat-card stat-reviewed">
+              <div class="stat-icon-bg">
+                <i class="pi pi-check-square"></i>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value">{{ globalMetrics.reviewed }}</span>
+                <span class="stat-label">Alertas revisadas</span>
+              </div>
+            </div>
+
+            <div class="stat-card stat-time">
+              <div class="stat-icon-bg">
+                <i class="pi pi-clock"></i>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value">{{ globalMetrics.timeSavedFormatted }}</span>
+                <span class="stat-label">Tiempo estimado ahorrado</span>
+              </div>
+            </div>
+
+            <div class="stat-card stat-rate">
+              <div class="stat-icon-bg">
+                <i class="pi pi-percentage"></i>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value">{{ globalMetrics.reviewRate }}%</span>
+                <span class="stat-label">Tasa de revisión</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <Button label="Ver Proyectos" icon="pi pi-folder" size="large" @click="goToProjects" />
+          <Button label="Nuevo Proyecto" icon="pi pi-plus" severity="secondary" size="large" outlined @click="goToProjects" />
+        </div>
       </div>
-    </div>
     </div>
   </ErrorBoundary>
 </template>

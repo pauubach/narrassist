@@ -1563,7 +1563,7 @@ def get_character_locations(project_id: int):
 def get_character_archetypes(
     project_id: int,
     mode: str = "basic",
-    llm_model: str = "llama3.2",
+    llm_model: Optional[str] = None,
 ):
     """
     Detecta arquetipos de personaje (Jung/Campbell) en el manuscrito.
@@ -1577,6 +1577,32 @@ def get_character_archetypes(
     cached = get_cached_enrichment(deps.get_database(), project_id, "character_archetypes", allow_stale=True)
     if cached:
         return ApiResponse(success=True, data=cached)
+
+    # Resolver modelo dinámicamente
+    if not llm_model:
+        from routers._llm_helpers import get_default_llm_model
+        llm_model = get_default_llm_model()
+
+    # Degradar a basic si Ollama/modelo no disponible
+    if mode in ("standard", "deep"):
+        if not llm_model:
+            logger.info(
+                f"No hay modelo LLM disponible, degradando archetypes "
+                f"de '{mode}' a 'basic'"
+            )
+            mode = "basic"
+        else:
+            try:
+                from narrative_assistant.llm.ollama_manager import is_ollama_available
+
+                if not is_ollama_available():
+                    logger.info(
+                        f"Ollama no disponible, degradando archetypes "
+                        f"de '{mode}' a 'basic'"
+                    )
+                    mode = "basic"
+            except ImportError:
+                mode = "basic"
 
     try:
         from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress

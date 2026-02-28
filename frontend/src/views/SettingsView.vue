@@ -318,7 +318,7 @@
                 <!-- Barra de progreso de descarga de modelo -->
                 <DsDownloadProgress
                   v-if="modelDownloading"
-                  label="Descargando modelo de IA..."
+                  label="Descargando motor de análisis..."
                   :percentage="ollamaDownloadProgress?.percentage ?? null"
                   class="ollama-progress-wrapper"
                 />
@@ -971,12 +971,12 @@
                     </span>
                   </div>
                   <Button
+                    v-tooltip.left="'Restaurar: volver a detectar esta entidad'"
                     icon="pi pi-undo"
                     severity="secondary"
                     text
                     rounded
                     size="small"
-                    v-tooltip.left="'Restaurar: volver a detectar esta entidad'"
                     @click="removeRejection(rejection)"
                   />
                 </div>
@@ -1028,7 +1028,7 @@
                   :value="licenseStore.quotaWarningLevel === 'none' ? 'OK' : licenseStore.quotaWarningLevel"
                   :severity="licenseStore.quotaWarningLevel === 'none' ? 'success'
                     : licenseStore.quotaWarningLevel === 'warning' ? 'warn'
-                    : 'danger'"
+                      : 'danger'"
                 />
               </div>
             </div>

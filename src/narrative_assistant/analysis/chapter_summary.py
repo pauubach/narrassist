@@ -629,6 +629,15 @@ class ChapterSummaryAnalyzer:
         prev_llm_summary: str | None = None
         genre_hints: list[str] = []  # Para consenso LLM
 
+        # Guard: verificar LLM disponible antes de iterar capítulos
+        if self.mode != AnalysisMode.BASIC:
+            if not self.ollama_client or not self.ollama_client.is_available:
+                logger.warning(
+                    f"LLM no disponible para mode={self.mode.value}, "
+                    f"degradando a BASIC"
+                )
+                self.mode = AnalysisMode.BASIC
+
         # Procesar cada capítulo
         for idx, chapter in enumerate(chapters, 1):
             logger.info(

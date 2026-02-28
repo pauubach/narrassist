@@ -174,6 +174,7 @@ class LocalLLMClient:
         self._lock = threading.Lock()
         self._warned_unavailable = False  # Para evitar warnings repetidos
         self._ollama_num_gpu: int | None = None  # None = Ollama decide, 0 = CPU
+        self._missing_models: set[str] = set()  # Modelos que devolvieron 404
         self._initialize_backend()
 
     def _initialize_backend(self) -> None:
@@ -568,6 +569,11 @@ class LocalLLMClient:
         model_name: str | None = None,
     ) -> str | None:
         """Genera respuesta usando Ollama con fallback a CPU si hay crash de VRAM."""
+        # Fail-fast: no reintentar modelos que ya sabemos que no existen
+        effective_model = model_name or self._config.ollama_model
+        if effective_model in self._missing_models:
+            return None
+
         try:
             import httpx
         except ImportError:
@@ -620,8 +626,16 @@ class LocalLLMClient:
                 logger.info("Ollama respondió en modo CPU. Futuras llamadas usarán CPU.")
                 return content
 
+        # Detectar modelo no encontrado (404) — cachear para no reintentar
         if status is not None and status != 200:
-            logger.error(f"Error de Ollama: {status} - {(content or '')[:200]}")
+            if status == 404 or (content and "not found" in (content or "").lower()):
+                self._missing_models.add(effective_model)
+                logger.error(
+                    f"Modelo '{effective_model}' no encontrado en Ollama. "
+                    f"Ejecuta 'ollama pull {effective_model}' para descargarlo."
+                )
+            else:
+                logger.error(f"Error de Ollama: {status} - {(content or '')[:200]}")
         return None
 
     def _complete_transformers(
