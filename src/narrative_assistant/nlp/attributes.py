@@ -1956,6 +1956,7 @@ REGLAS:
 - Categorías válidas: physical, psychological, social, ability, geographic, architectural, material, appearance, function, state
 - hair_modification valores: natural, teñido, decolorado, mechas, reflejos (detectar "rubia de bote" = teñido)
 - IMPORTANTE: Si el atributo se refiere a un pronombre (Él, Ella, él, ella), resuelve el pronombre al nombre del personaje más cercano mencionado antes. Ejemplo: "Juan entró. Él era carpintero" -> entity="Juan", key="profession", value="carpintero"
+- PROFESIONES: Solo asigna 'profession' si el texto dice EXPLÍCITAMENTE que esa entidad ejerce esa profesión (ej: "X era médico", "X trabaja como Y"). Si aparece "El médico determinó que María..." el médico NO es María — no le asignes esa profesión. No confundas el sujeto de una oración con una entidad mencionada como objeto o complemento.
 
 RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de las entidades tal como aparecen en ENTIDADES:
 {{"attributes":[{{"entity":"María Sánchez","key":"eye_color","value":"azules","evidence":"ojos azules brillaban"}}]}}"""
@@ -2055,6 +2056,20 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                     start_char = text.find(evidence) if evidence else 0
                     end_char = start_char + len(evidence) if start_char >= 0 else 0
 
+                    # Guard: rechazar profesiones mal atribuidas por el LLM.
+                    # Ej: "El médico forense determinó que Isabel..." → LLM dice
+                    # Isabel.profession=médico, pero "El médico" es otro personaje.
+                    if key == AttributeKey.PROFESSION and entity_name:
+                        value_str = attr_data.get("value", "")
+                        if self._is_llm_profession_misattributed(
+                            text, entity_name, value_str, entity_mentions
+                        ):
+                            logger.debug(
+                                f"LLM profesión rechazada: '{value_str}' no es de "
+                                f"'{entity_name}' (sujeto diferente en el texto)"
+                            )
+                            continue
+
                     # Calcular sentence_idx aproximado para CESP
                     sentence_idx = max(0, start_char) // 500
 
@@ -2082,6 +2097,76 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
             logger.warning(f"Error en extracción LLM: {e}")
 
         return attributes
+
+    @staticmethod
+    def _is_llm_profession_misattributed(
+        text: str,
+        entity_name: str,
+        profession_value: str,
+        entity_mentions: list[tuple] | None,
+    ) -> bool:
+        """
+        Detecta si el LLM atribuyó erróneamente una profesión a una entidad.
+
+        Caso típico: "El médico forense determinó que Isabel había muerto..."
+        El LLM dice Isabel.profession=médico, pero "El médico" es el sujeto
+        de la oración principal — un personaje diferente.
+
+        Heurística: si la profesión aparece en el texto ANTES de la entidad,
+        introducida por un artículo definido (El/La), y hay un verbo conjugado
+        entre la profesión y la entidad, la profesión es probablemente del
+        sujeto de otra cláusula.
+        """
+        if not profession_value or not entity_name:
+            return False
+
+        text_lower = text.lower()
+        prof_lower = profession_value.lower().split()[0]  # Primera palabra: "médico" de "médico forense"
+        entity_lower = entity_name.lower()
+
+        # Buscar la profesión en el texto
+        prof_pos = text_lower.find(prof_lower)
+        if prof_pos < 0:
+            return False
+
+        # Buscar la entidad en el texto
+        entity_pos = text_lower.find(entity_lower)
+        if entity_pos < 0:
+            return False
+
+        # Solo aplicar si la profesión aparece ANTES de la entidad
+        if prof_pos >= entity_pos:
+            return False
+
+        # Verificar que la profesión está precedida por un artículo definido/indefinido
+        # indicando que es un sujeto diferente ("El médico", "La doctora", "Un detective")
+        before_prof = text[:prof_pos].rstrip()
+        if not before_prof:
+            return False
+
+        last_word = before_prof.split()[-1].lower() if before_prof.split() else ""
+        if last_word not in ("el", "la", "un", "una", "los", "las", "del"):
+            return False
+
+        # Verificar que entre la profesión y la entidad hay texto sustancial
+        # (un verbo conjugado o una cláusula subordinante)
+        between = text[prof_pos + len(prof_lower):entity_pos].strip().lower()
+        if len(between) < 5:
+            # Muy poco texto entre ambos → podrían ser aposición ("el médico Isabel")
+            return False
+
+        # Si hay "que" entre medias, típicamente indica cláusula subordinada
+        # "El médico determinó QUE Isabel..." → claramente distintos
+        if " que " in between:
+            return True
+
+        # Si hay palabras suficientes entre medias (verbo + complementos),
+        # la profesión es probablemente del sujeto
+        word_count = len(between.split())
+        if word_count >= 2:
+            return True
+
+        return False
 
     def _extract_by_embeddings(
         self,
