@@ -273,10 +273,10 @@ def validate_file_path(
     # (prevención de path traversal)
     config = get_config()
     safe_dirs = [
-        Path.cwd(),
-        Path.home(),
-        config.data_dir,
-        Path(tempfile.gettempdir()),  # Permitir archivos en directorio temporal del sistema
+        Path.cwd().resolve(),
+        Path.home().resolve(),
+        config.data_dir.resolve(),
+        Path(tempfile.gettempdir()).resolve(),  # macOS: /var → /private/var
     ]
 
     # Añadir directorios adicionales configurados por el usuario

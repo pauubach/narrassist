@@ -999,8 +999,19 @@ class OllamaManager:
                         env=env,
                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                     )
+                elif self._platform == InstallationPlatform.MACOS and ".app/" in ollama_exe:
+                    # macOS app bundle: el binario interno no tiene +x,
+                    # usar 'open -a' que arranca la app (incluye el server)
+                    app_path = ollama_exe.split(".app/")[0] + ".app"
+                    logger.info(f"Usando 'open -a' para lanzar {app_path}")
+                    subprocess.Popen(
+                        ["open", "-a", app_path],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        env=env,
+                    )
                 else:
-                    # Linux/macOS: iniciar en nueva sesion
+                    # Linux / macOS con CLI en PATH: iniciar en nueva sesion
                     subprocess.Popen(
                         [ollama_exe, "serve"],
                         stdout=subprocess.DEVNULL,
