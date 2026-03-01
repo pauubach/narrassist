@@ -465,7 +465,30 @@ try:
             from narrative_assistant.llm.client import (
                 mark_ollama_init_done,
                 mark_ollama_init_started,
+                set_ollama_init_status,
             )
+
+            # Quick pre-check: if Ollama is already running with models,
+            # skip heavy init and don't flash "configuring" banner to the user
+            try:
+                from narrative_assistant.llm.ollama_manager import get_ollama_manager
+                manager = get_ollama_manager()
+                if manager.is_running and manager.downloaded_models:
+                    # Server running + models available → fast path
+                    from narrative_assistant.llm import get_llm_client
+                    client = get_llm_client()
+                    if client and client.is_available:
+                        set_ollama_init_status("ready")
+                        logger.info(
+                            f"Startup: Ollama ya disponible "
+                            f"(modelo: {client._config.ollama_model})"
+                        )
+                        return
+                    # Running but client init failed → fall through to heavy init
+            except Exception as e:
+                logger.debug(f"Quick Ollama check failed: {e}")
+
+            # Heavy init needed (install / start / download model)
             mark_ollama_init_started()
             try:
                 logger.info("Startup: iniciando auto-configuración de Ollama en background...")

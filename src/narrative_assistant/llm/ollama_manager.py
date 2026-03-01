@@ -345,14 +345,20 @@ class OllamaManager:
     def _get_windows_common_paths(self) -> list[Path]:
         """Rutas comunes de instalación de Ollama en Windows (A-04: centralizado)."""
         paths: list[Path] = []
-        for env_var in ("LOCALAPPDATA", "PROGRAMFILES"):
+        # LOCALAPPDATA → AppData\Local\Programs\Ollama\ (instalación estándar sin admin)
+        localappdata = os.environ.get("LOCALAPPDATA", "")
+        if localappdata:
+            base = Path(localappdata)
+            if base.is_absolute() and base.is_dir():
+                paths.append(base / "Programs" / "Ollama" / "ollama.exe")
+        # PROGRAMFILES → C:\Program Files\Ollama\ (instalación con admin, rara)
+        for env_var in ("PROGRAMFILES", "PROGRAMFILES(X86)"):
             raw = os.environ.get(env_var, "")
             if not raw:
                 continue
-            # Validar que el directorio base existe antes de construir la ruta
             base = Path(raw)
             if base.is_absolute() and base.is_dir():
-                paths.append(base / "Programs" / "Ollama" / "ollama.exe")
+                paths.append(base / "Ollama" / "ollama.exe")
         return paths
 
     def _get_macos_common_paths(self) -> list[Path]:
@@ -628,7 +634,11 @@ class OllamaManager:
         progress_callback: Callable[[DownloadProgress], None] | None,
         silent: bool,
     ) -> tuple[bool, str]:
-        """Instala Ollama en Windows."""
+        """Instala Ollama en Windows.
+
+        El instalador NSIS auto-lanza la app de bandeja que inicia el servidor.
+        Esperamos a que el servidor arranque (similar al flujo de macOS).
+        """
         # Descargar instalador
         installer_path = Path(tempfile.gettempdir()) / "OllamaSetup.exe"
 
@@ -641,7 +651,7 @@ class OllamaManager:
         # Ejecutar instalador
         try:
             if silent:
-                # Intentar instalacion silenciosa
+                # Instalacion silenciosa (no abre ventana)
                 result = subprocess.run(
                     [str(installer_path), "/S"],
                     capture_output=True,
@@ -649,23 +659,49 @@ class OllamaManager:
                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
                 if result.returncode != 0:
-                    # Fallback a instalacion interactiva
-                    subprocess.run([str(installer_path)], check=True)
+                    stderr = ""
+                    if result.stderr:
+                        stderr = (
+                            result.stderr.decode("utf-8", errors="replace")
+                            if isinstance(result.stderr, bytes)
+                            else str(result.stderr)
+                        )
+                    logger.warning(
+                        f"Instalación silenciosa falló (rc={result.returncode}): "
+                        f"{stderr[:200]}"
+                    )
+                    return (
+                        False,
+                        "Instalación silenciosa falló. "
+                        "Descarga Ollama manualmente desde ollama.com/download",
+                    )
             else:
                 subprocess.run([str(installer_path)], check=True)
 
-            # Esperar a que se registre en PATH
+            # Dar un momento al sistema de archivos
             time.sleep(2)
 
-            # Verificar instalacion
-            if self.is_installed:
-                logger.info("Ollama instalado correctamente")
-                return True, "Ollama instalado correctamente"
-            else:
+            # Verificar que el binario existe
+            if not self.is_installed:
                 return (
                     False,
-                    "Instalacion completa pero 'ollama' no esta en PATH. Reinicia la terminal.",
+                    "Ollama no encontrado tras instalación. "
+                    "Reinicia la aplicación o instálalo manualmente desde ollama.com/download",
                 )
+
+            logger.info("Ollama binario detectado tras instalación")
+
+            # Esperar a que el servidor arranque (el instalador auto-lanza la app de bandeja)
+            for i in range(15):
+                time.sleep(2)
+                if self.is_running:
+                    logger.info(f"Servidor Ollama arrancado tras {(i+1)*2}s post-instalación")
+                    return True, "Ollama instalado y arrancado correctamente"
+
+            # Binario instalado pero servidor no auto-arrancó
+            # start_service() lo arrancará después
+            logger.info("Ollama instalado (servidor pendiente de arrancar)")
+            return True, "Ollama instalado correctamente"
 
         except subprocess.TimeoutExpired:
             return False, "Timeout durante la instalacion"
