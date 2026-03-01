@@ -1251,7 +1251,7 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
                 sections_data.append(
                     {
                         "title": sec.title,
-                        "level": sec.level,  # type: ignore[union-attr]
+                        "level": sec.heading_level,
                         "start_char": sec.start_char,
                         "end_char": sec.end_char,
                     }

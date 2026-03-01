@@ -432,9 +432,9 @@ onBeforeUnmount(() => {
               <div v-if="step.status === 'in_progress'" class="step-progress-bar">
                 <div class="step-progress-fill" :style="{ width: `${step.progress}%` }"></div>
               </div>
-              <!-- Subproceso inline: detalle de lo que se está haciendo dentro de esta fase -->
+              <!-- Subproceso inline: solo bajo la fase activa actual (evita duplicar en múltiples steps) -->
               <div
-                v-if="step.status === 'in_progress' && (currentSubphase || currentAction)"
+                v-if="step.status === 'in_progress' && step.id === currentStep && (currentSubphase || currentAction)"
                 class="step-subphase"
               >
                 <div class="step-subphase-header">
