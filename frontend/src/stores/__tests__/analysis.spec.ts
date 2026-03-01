@@ -16,6 +16,7 @@ vi.mock('@/services/apiClient', () => ({
     postForm: vi.fn(),
     postRaw: vi.fn(),
   },
+  backendDown: { value: false },
 }))
 
 import { api } from '@/services/apiClient'

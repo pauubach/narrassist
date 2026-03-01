@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { api } from '@/services/apiClient'
+import { api, backendDown } from '@/services/apiClient'
 import type { WorkspaceTab } from '@/types'
 
 export interface AnalysisProgress {
@@ -271,7 +271,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
     if (_analyzing.value[projectId]) return false
 
     // Pre-flight: verificar que los motores de análisis están listos
-    try {
+    // Solo si el backend está conectado — evita 404 ruidosos en consola
+    if (!backendDown.value) try {
       type ReadinessResult = {
         ready: boolean
         ollama_running: boolean

@@ -174,10 +174,12 @@ export function useOllamaManagement() {
         }
         return success
       }
+      // Si no faltan modelos, ya estamos listos
+      return true
     } catch {
-      // Fallback: descargar al menos un modelo básico
+      // Si el endpoint no está disponible, descargar el modelo core por defecto
+      return downloadModel('qwen3')
     }
-    return downloadModel('llama3.2')
   }
 
   async function downloadModel(modelName: string): Promise<boolean> {
