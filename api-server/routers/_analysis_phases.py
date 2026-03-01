@@ -2824,7 +2824,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             mention_finder = get_mention_finder()
             _update_fusion_progress(
                 0.94,
-                "Buscando menciones adicionales...",
+                "Preparando búsqueda de menciones...",
                 subphase_id="mentions",
                 subphase_label="Buscando menciones adicionales",
                 subphase_progress=0.0,
@@ -2834,6 +2834,14 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             for e in entities:
                 if e.canonical_name and e.aliases:
                     aliases_dict[e.canonical_name] = e.aliases
+
+            _update_fusion_progress(
+                0.94,
+                "Recopilando posiciones conocidas...",
+                subphase_id="mentions",
+                subphase_label="Buscando menciones adicionales",
+                subphase_progress=0.02,
+            )
 
             existing_positions: set[tuple[int, int]] = set()
             for entity in entities:
@@ -2885,12 +2893,24 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                     except Exception:
                         pass
 
-                # Progreso granular
+                # Progreso granular con información de entidad y menciones encontradas
                 if idx % mention_update_every == 0 or idx == total_entities_for_mentions:
                     mention_fraction = idx / total_entities_for_mentions
+                    # Mensaje descriptivo: qué entidad + cuántas menciones lleva
+                    if additional_count > 0:
+                        action_msg = (
+                            f"Buscando «{name}» "
+                            f"({idx}/{total_entities_for_mentions}) — "
+                            f"{additional_count} encontradas"
+                        )
+                    else:
+                        action_msg = (
+                            f"Buscando «{name}» "
+                            f"({idx}/{total_entities_for_mentions})..."
+                        )
                     _update_fusion_progress(
                         0.94 + mention_fraction * 0.02,
-                        f"Buscando menciones ({idx}/{total_entities_for_mentions})...",
+                        action_msg,
                         subphase_id="mentions",
                         subphase_label="Buscando menciones adicionales",
                         subphase_progress=mention_fraction,
@@ -2902,9 +2922,17 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                 logger.info(f"MentionFinder: Added {additional_count} additional mentions")
                 _update_fusion_progress(
                     0.96,
-                    f"Encontradas {additional_count} menciones adicionales",
+                    f"{additional_count} menciones adicionales encontradas",
                     subphase_id="mentions",
-                    subphase_label="Buscando menciones adicionales",
+                    subphase_label="Menciones adicionales completadas",
+                    subphase_progress=1.0,
+                )
+            else:
+                _update_fusion_progress(
+                    0.96,
+                    "No se encontraron menciones adicionales",
+                    subphase_id="mentions",
+                    subphase_label="Menciones adicionales completadas",
                     subphase_progress=1.0,
                 )
 
