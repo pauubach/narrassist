@@ -219,7 +219,8 @@ export function useProjectData() {
     loadingSummaries.value = true
     try {
       const data = await api.getRaw<{ success: boolean; data?: { chapters?: ChapterSummaryData[]; global_summary?: string } }>(
-        `/api/projects/${projectId}/chapter-progress?mode=standard`
+        `/api/projects/${projectId}/chapter-progress?mode=standard`,
+        { timeout: 120000 }  // 2 min: chapter-progress puede hacer llamadas LLM
       )
       if (data.success && data.data) {
         if (data.data.chapters) {

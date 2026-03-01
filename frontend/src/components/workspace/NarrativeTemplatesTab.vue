@@ -75,7 +75,8 @@ async function analyze() {
   errorMsg.value = null
   try {
     const data = await api.getRaw<{ success: boolean; data: TemplateReport; error?: string }>(
-      `/api/projects/${props.projectId}/narrative-templates`
+      `/api/projects/${props.projectId}/narrative-templates`,
+      { timeout: 120000 }
     )
     if (data.success) {
       report.value = data.data

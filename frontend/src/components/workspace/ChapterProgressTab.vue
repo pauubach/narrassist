@@ -553,7 +553,8 @@ async function loadReport() {
 
   try {
     const data = await api.getRaw<{ success: boolean; data: ChapterProgressReport; error?: string }>(
-      `/api/projects/${props.projectId}/chapter-progress?mode=${selectedMode.value}`
+      `/api/projects/${props.projectId}/chapter-progress?mode=${selectedMode.value}`,
+      { timeout: 120000 }  // 2 min: chapter-progress puede hacer llamadas LLM
     )
 
     if (data.success) {
