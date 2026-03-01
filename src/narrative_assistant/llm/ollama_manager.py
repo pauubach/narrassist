@@ -355,6 +355,15 @@ class OllamaManager:
                 paths.append(base / "Programs" / "Ollama" / "ollama.exe")
         return paths
 
+    def _get_macos_common_paths(self) -> list[Path]:
+        """Rutas comunes de instalación de Ollama en macOS."""
+        return [
+            Path("/usr/local/bin/ollama"),
+            Path("/opt/homebrew/bin/ollama"),
+            Path("/Applications/Ollama.app/Contents/Resources/ollama"),
+            Path.home() / ".ollama" / "ollama",
+        ]
+
     @property
     def is_installed(self) -> bool:
         """Verifica si Ollama esta instalado."""
@@ -365,6 +374,12 @@ class OllamaManager:
         # En Windows, verificar rutas comunes de instalacion
         if self._platform == InstallationPlatform.WINDOWS:
             for path in self._get_windows_common_paths():
+                if path.exists():
+                    return True
+
+        # En macOS, verificar rutas comunes (Homebrew, app bundle)
+        if self._platform == InstallationPlatform.MACOS:
+            for path in self._get_macos_common_paths():
                 if path.exists():
                     return True
 
@@ -380,6 +395,12 @@ class OllamaManager:
         # En Windows, buscar en rutas comunes (A-04: reutiliza método centralizado)
         if self._platform == InstallationPlatform.WINDOWS:
             for path in self._get_windows_common_paths():
+                if path.exists():
+                    return str(path)
+
+        # En macOS, buscar en rutas comunes
+        if self._platform == InstallationPlatform.MACOS:
+            for path in self._get_macos_common_paths():
                 if path.exists():
                     return str(path)
 
@@ -660,10 +681,10 @@ class OllamaManager:
         progress_callback: Callable[[DownloadProgress], None] | None,
     ) -> tuple[bool, str]:
         """Instala Ollama en macOS."""
-        # Intentar con Homebrew primero
+        # Intentar con Homebrew primero (más limpio, gestiona PATH)
         if shutil.which("brew"):
             try:
-                logger.info("Instalando via Homebrew...")
+                logger.info("Instalando Ollama via Homebrew...")
                 result = subprocess.run(
                     ["brew", "install", "ollama"],
                     capture_output=True,
@@ -673,36 +694,81 @@ class OllamaManager:
                     timeout=600.0,  # 10 minutos
                 )
                 if result.returncode == 0:
+                    logger.info("Ollama instalado via Homebrew correctamente")
                     return True, "Ollama instalado via Homebrew"
+                else:
+                    logger.warning(f"Homebrew install falló (rc={result.returncode}): {result.stderr[:200]}")
             except Exception as e:
-                logger.debug(f"Homebrew fallo: {e}")
+                logger.warning(f"Homebrew install falló: {e}")
 
-        # Fallback: descarga directa
+        # Fallback: descarga directa del .app bundle
         download_url = OLLAMA_DOWNLOAD_URLS[InstallationPlatform.MACOS]
         zip_path = Path(tempfile.gettempdir()) / "Ollama-darwin.zip"
 
+        logger.info(f"Descargando Ollama desde {download_url}...")
         success = self._download_file(download_url, zip_path, progress_callback)
         if not success:
-            return False, "Error descargando Ollama"
+            return False, "Error descargando Ollama desde ollama.com"
 
         try:
-            # Extraer y mover a Applications
             import zipfile
 
             with zipfile.ZipFile(zip_path, "r") as zip_ref:
                 zip_ref.extractall(tempfile.gettempdir())
 
-            # Mover a /Applications
             app_source = Path(tempfile.gettempdir()) / "Ollama.app"
-            app_dest = Path("/Applications/Ollama.app")
 
-            if app_dest.exists():
-                shutil.rmtree(app_dest)
-            shutil.move(str(app_source), str(app_dest))
+            # Intentar /Applications primero, fallback a ~/Applications
+            app_dest = None
+            for dest_dir in [Path("/Applications"), Path.home() / "Applications"]:
+                try:
+                    dest_dir.mkdir(parents=True, exist_ok=True)
+                    candidate = dest_dir / "Ollama.app"
+                    if candidate.exists():
+                        shutil.rmtree(candidate)
+                    shutil.move(str(app_source), str(candidate))
+                    app_dest = candidate
+                    logger.info(f"Ollama.app instalado en {app_dest}")
+                    break
+                except PermissionError:
+                    logger.warning(f"Sin permisos para escribir en {dest_dir}, probando alternativa...")
+                    continue
 
-            return True, "Ollama instalado en /Applications. Ejecuta la app para completar."
+            if not app_dest:
+                return False, "Sin permisos para instalar en /Applications ni ~/Applications"
+
+            # Abrir Ollama.app para registrar el CLI y arrancar el servicio
+            logger.info("Abriendo Ollama.app para completar la instalación...")
+            try:
+                subprocess.run(
+                    ["open", "-a", str(app_dest)],
+                    capture_output=True, timeout=10,
+                )
+                # Esperar a que registre el CLI y arranque el servicio
+                for i in range(20):
+                    time.sleep(2)
+                    if self.is_running:
+                        logger.info(f"Ollama.app arrancado tras {(i+1)*2}s")
+                        return True, f"Ollama instalado en {app_dest}"
+                    if self.is_installed:
+                        logger.info(f"Ollama CLI detectado tras {(i+1)*2}s (servicio aún arrancando)")
+
+                # Timeout pero puede que se haya instalado sin arrancar aún
+                if self.is_installed:
+                    return True, f"Ollama instalado en {app_dest} (servicio pendiente de arrancar)"
+
+                logger.warning("Ollama.app no registró CLI tras 40s")
+            except Exception as e:
+                logger.warning(f"No se pudo abrir Ollama.app: {e}")
+
+            # Verificar si al menos el binario es accesible
+            if self.is_installed:
+                return True, f"Ollama instalado en {app_dest}"
+
+            return False, f"Ollama extraído en {app_dest} pero CLI no encontrado en PATH"
 
         except Exception as e:
+            logger.error(f"Error instalando Ollama en macOS: {e}", exc_info=True)
             return False, f"Error instalando: {e}"
         finally:
             with contextlib.suppress(Exception):

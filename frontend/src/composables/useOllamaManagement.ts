@@ -1,8 +1,10 @@
 /**
  * Composable: Ollama lifecycle management (install, start, download model).
  *
- * Encapsulates the Ollama state machine (not_installed → not_running → no_models → ready)
- * and all related API calls, download polling, and toast notifications.
+ * Encapsulates the Ollama state machine:
+ *   configuring → not_installed → not_running → no_models → ready
+ *
+ * "configuring" es el estado de auto-setup en primera ejecución (invisible al usuario).
  */
 
 import { ref, computed } from 'vue'
@@ -12,7 +14,10 @@ import { useSystemStore } from '@/stores/system'
 
 // ── Types ──────────────────────────────────────────────────
 
-export type OllamaState = 'not_installed' | 'not_running' | 'no_models' | 'ready'
+export type OllamaState = 'configuring' | 'not_installed' | 'not_running' | 'no_models' | 'ready'
+
+// Estados del init_status que indican configuración en curso
+const CONFIGURING_STATUSES = new Set(['installing', 'starting', 'downloading_model'])
 
 // ── Composable ─────────────────────────────────────────────
 
@@ -34,10 +39,22 @@ export function useOllamaManagement() {
 
   // ── State machine ───────────────────────────────────────
 
+  const ollamaInitStatus = computed(() => {
+    return systemCapabilities.value?.ollama?.init_status || 'not_needed'
+  })
+
   const ollamaState = computed<OllamaState>(() => {
-    if (!systemCapabilities.value) return 'not_installed'
+    if (!systemCapabilities.value) return 'configuring'
     const ollama = systemCapabilities.value.ollama
-    if (!ollama.installed) return 'not_installed'
+    const initStatus = ollama.init_status || 'not_needed'
+
+    // Si el backend está auto-configurando → configuring
+    if (CONFIGURING_STATUSES.has(initStatus)) return 'configuring'
+
+    if (!ollama.installed) {
+      // Si falló el auto-setup, mostrar not_installed
+      return 'not_installed'
+    }
     if (!ollama.available) return 'not_running'
     if (ollama.models.length === 0) return 'no_models'
     return 'ready'
@@ -45,6 +62,12 @@ export function useOllamaManagement() {
 
   const ollamaActionConfig = computed(() => {
     const configs: Record<OllamaState, { label: string; icon: string; severity: string; action: () => void }> = {
+      configuring: {
+        label: 'Configurando...',
+        icon: 'pi pi-spin pi-spinner',
+        severity: 'info',
+        action: () => {},
+      },
       not_installed: {
         label: 'Instalar analizador',
         icon: 'pi pi-download',
@@ -74,10 +97,16 @@ export function useOllamaManagement() {
   })
 
   const ollamaStatusMessage = computed(() => {
+    const initStatus = ollamaInitStatus.value
     const messages: Record<OllamaState, string> = {
-      not_installed: 'Necesitas instalar el analizador semántico',
-      not_running: 'El analizador está instalado pero no se ha iniciado',
-      no_models: 'El analizador está listo, pero necesitas instalar un motor de análisis',
+      configuring: (() => {
+        if (initStatus === 'downloading_model') return 'Descargando motor de análisis inteligente (~2 GB)...'
+        if (initStatus === 'starting') return 'Iniciando análisis inteligente...'
+        return 'Configurando análisis inteligente...'
+      })(),
+      not_installed: 'El análisis inteligente no está disponible',
+      not_running: 'El análisis inteligente está instalado pero no se ha iniciado',
+      no_models: 'Falta instalar un motor de análisis',
       ready: (() => {
         const count = systemCapabilities.value?.ollama.models.length || 0
         return count === 1 ? '1 motor disponible' : `${count} motores disponibles`
@@ -85,6 +114,9 @@ export function useOllamaManagement() {
     }
     return messages[ollamaState.value]
   })
+
+  /** True cuando el auto-setup está en curso → polling más rápido */
+  const isConfiguring = computed(() => ollamaState.value === 'configuring')
 
   // ── Helpers ─────────────────────────────────────────────
 
@@ -106,11 +138,11 @@ export function useOllamaManagement() {
     try {
       const result = await api.postRaw<{ success: boolean }>('/api/ollama/install')
       if (result.success) {
-        toast.add({ severity: 'info', summary: 'Instalando analizador', detail: 'Descargando e instalando...', life: 5000 })
+        toast.add({ severity: 'info', summary: 'Instalando', detail: 'Descargando e instalando el analizador...', life: 5000 })
         await new Promise(resolve => setTimeout(resolve, 5000))
         await reloadCapabilities()
         if (systemCapabilities.value?.ollama?.installed) {
-          toast.add({ severity: 'success', summary: 'Analizador instalado', detail: 'Ahora puedes iniciar el analizador', life: 3000 })
+          toast.add({ severity: 'success', summary: 'Instalado', detail: 'El analizador se ha instalado correctamente', life: 3000 })
         }
       } else {
         openOllamaDownload()
@@ -134,20 +166,20 @@ export function useOllamaManagement() {
         await reloadCapabilities()
 
         if (systemCapabilities.value?.ollama?.available) {
-          toast.add({ severity: 'success', summary: 'Analizador iniciado', detail: 'El analizador sem\u00E1ntico est\u00E1 ahora disponible', life: 3000 })
+          toast.add({ severity: 'success', summary: 'Analizador iniciado', detail: 'El análisis inteligente está disponible', life: 3000 })
         } else {
-          toast.add({ severity: 'warn', summary: 'Estado incierto', detail: 'El analizador puede estar iniciando. Recarga la p\u00E1gina en unos segundos.', life: 5000 })
+          toast.add({ severity: 'warn', summary: 'Iniciando...', detail: 'Puede tardar unos segundos. Recarga la página en un momento.', life: 5000 })
         }
       } else {
         if (result.data?.action_required === 'install') {
-          toast.add({ severity: 'warn', summary: 'Analizador no instalado', detail: 'Necesitas instalar el analizador sem\u00E1ntico primero', life: 5000 })
+          toast.add({ severity: 'warn', summary: 'No instalado', detail: 'Necesitas instalar el analizador primero', life: 5000 })
         } else {
           toast.add({ severity: 'error', summary: 'Error al iniciar', detail: result.error || 'No se pudo iniciar el analizador', life: 5000 })
         }
       }
     } catch (error) {
       console.error('Error starting Ollama:', error)
-      toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo iniciar el analizador semántico', life: 3000 })
+      toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo iniciar el analizador', life: 3000 })
     } finally {
       ollamaStarting.value = false
     }
@@ -157,7 +189,7 @@ export function useOllamaManagement() {
 
   function openOllamaDownload() {
     window.open('https://ollama.com/download', '_blank')
-    toast.add({ severity: 'info', summary: 'Configuraci\u00F3n del analizador', detail: 'Despu\u00E9s de instalar, vuelve aqu\u00ED y haz clic en "Iniciar analizador"', life: 5000 })
+    toast.add({ severity: 'info', summary: 'Instalación manual', detail: 'Después de instalar, vuelve aquí y haz clic en "Iniciar"', life: 5000 })
   }
 
   // ── Download model ──────────────────────────────────────
@@ -222,7 +254,7 @@ export function useOllamaManagement() {
           pollCount++
           if (pollCount > 900) {
             stopOllamaDownloadPolling()
-            toast.add({ severity: 'error', summary: 'Timeout', detail: 'La descarga tard\u00F3 demasiado', life: 5000 })
+            toast.add({ severity: 'error', summary: 'Timeout', detail: 'La descarga tardó demasiado', life: 5000 })
             resolve(false)
             return
           }
@@ -328,12 +360,14 @@ export function useOllamaManagement() {
 
   return {
     ollamaState,
+    ollamaInitStatus,
     ollamaActionConfig,
     ollamaStatusMessage,
     ollamaStarting,
     modelDownloading,
     ollamaDownloadProgress,
     modelOperations,
+    isConfiguring,
     isModelBusy,
     getModelOperationLabel,
     installOllama,

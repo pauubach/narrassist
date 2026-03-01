@@ -31,6 +31,13 @@ logger = logging.getLogger(__name__)
 _client_lock = threading.Lock()
 _client: Optional["LocalLLMClient"] = None
 
+# Señal global para esperar a que la auto-configuración de Ollama termine.
+# Se usa en el healthcheck del pipeline de análisis para esperar antes de decidir use_llm.
+_ollama_init_event = threading.Event()
+_ollama_init_started = False
+# Estado granular del init para reportar al frontend
+_ollama_init_status: str = "not_needed"  # not_needed|installing|starting|downloading_model|ready|failed
+
 LLMBackend = Literal["ollama", "transformers", "none"]
 
 
@@ -135,10 +142,10 @@ class LocalLLMConfig:
     # Parámetros de generación
     max_tokens: int = 2048
     temperature: float = 0.3  # Bajo para análisis consistente
-    timeout: int = 600  # 10 minutos - modelos locales en CPU son MUY lentos
+    timeout: int = 120  # 2 minutos por llamada - suficiente incluso en CPU
 
     # Instalación bajo demanda
-    auto_install_ollama: bool = False  # Si True, instala Ollama automáticamente
+    auto_install_ollama: bool = True  # Instala Ollama automáticamente si no está
     auto_start_service: bool = True  # Si True, inicia el servicio automáticamente
     force_cpu: bool = False  # Si True, fuerza modo CPU para Ollama
 
@@ -207,6 +214,7 @@ class LocalLLMClient:
         2. Si no está instalado y hay callback de instalación, lo invoca
         3. Si está instalado pero no corriendo, intenta iniciarlo
         4. Verifica que el modelo esté disponible
+        5. Si no hay modelos, descarga uno automáticamente
         """
         from .ollama_manager import OllamaStatus, get_ollama_manager
 
@@ -216,10 +224,12 @@ class LocalLLMClient:
         # Caso 1: Ollama no instalado
         if status == OllamaStatus.NOT_INSTALLED:
             if self._config.auto_install_ollama:
+                set_ollama_init_status("installing")
                 logger.info("Instalando Ollama automáticamente...")
                 success, msg = manager.install_ollama(silent=True)
                 if not success:
                     logger.warning(f"No se pudo instalar Ollama: {msg}")
+                    set_ollama_init_status("failed")
                     return False
             elif _installation_prompt_callback:
                 # Preguntar al usuario si quiere instalar
@@ -227,6 +237,7 @@ class LocalLLMClient:
                     success, msg = manager.install_ollama()
                     if not success:
                         logger.warning(f"No se pudo instalar Ollama: {msg}")
+                        set_ollama_init_status("failed")
                         return False
                 else:
                     logger.info("Usuario rechazó la instalación de Ollama")
@@ -238,10 +249,12 @@ class LocalLLMClient:
         # Caso 2: Ollama instalado pero no corriendo
         if not manager.is_running:
             if self._config.auto_start_service:
+                set_ollama_init_status("starting")
                 logger.info("Iniciando servicio Ollama...")
                 success, msg = manager.start_service(force_cpu=self._config.force_cpu)
                 if not success:
                     logger.warning(f"No se pudo iniciar Ollama: {msg}")
+                    set_ollama_init_status("failed")
                     return False
             else:
                 logger.debug("Ollama no está corriendo, inicio automático deshabilitado")
@@ -251,7 +264,26 @@ class LocalLLMClient:
         result = self._verify_ollama_model(manager)
         if result:
             self._ollama_num_gpu = self._determine_ollama_num_gpu()
-        return result
+            set_ollama_init_status("ready")
+            return True
+
+        # Caso 4: Ollama corriendo pero sin modelos → descargar automáticamente
+        if self._config.auto_install_ollama:
+            set_ollama_init_status("downloading_model")
+            model_to_download = self._config.ollama_model
+            logger.info(f"Descargando modelo {model_to_download} automáticamente...")
+            success, msg = manager.download_model(model_to_download)
+            if success:
+                logger.info(f"Modelo {model_to_download} descargado: {msg}")
+                result = self._verify_ollama_model(manager)
+                if result:
+                    self._ollama_num_gpu = self._determine_ollama_num_gpu()
+                    set_ollama_init_status("ready")
+                return result
+            else:
+                logger.warning(f"No se pudo descargar modelo {model_to_download}: {msg}")
+
+        return False
 
     def _determine_ollama_num_gpu(self) -> int | None:
         """
@@ -1080,6 +1112,60 @@ def clear_missing_models() -> None:
     """Limpia la caché de modelos 404 del cliente singleton."""
     if _client is not None:
         _client.clear_missing_models()
+
+
+def mark_ollama_init_started() -> None:
+    """Marca que la auto-configuración de Ollama ha comenzado."""
+    global _ollama_init_started, _ollama_init_status
+    _ollama_init_started = True
+    _ollama_init_status = "installing"
+    _ollama_init_event.clear()
+
+
+def set_ollama_init_status(status: str) -> None:
+    """Actualiza el estado granular del init (installing|starting|downloading_model|ready|failed)."""
+    global _ollama_init_status
+    _ollama_init_status = status
+
+
+def get_ollama_init_status() -> str:
+    """Retorna el estado actual del init de Ollama."""
+    return _ollama_init_status
+
+
+def mark_ollama_init_done() -> None:
+    """Marca que la auto-configuración de Ollama ha terminado."""
+    global _ollama_init_status
+    if _ollama_init_status not in ("ready", "failed"):
+        _ollama_init_status = "ready" if is_llm_available() else "failed"
+    _ollama_init_event.set()
+
+
+def wait_for_ollama_init(timeout: float = 300) -> bool:
+    """
+    Espera a que la auto-configuración de Ollama termine.
+
+    Si no se ha iniciado ningún proceso de auto-configuración, retorna
+    inmediatamente con el estado actual de disponibilidad.
+
+    Args:
+        timeout: Tiempo máximo de espera en segundos (default: 5 min)
+
+    Returns:
+        True si Ollama está disponible tras la espera
+    """
+    if not _ollama_init_started:
+        # No hay auto-configuración en curso, verificar estado actual
+        return is_llm_available()
+
+    if _ollama_init_event.is_set():
+        # Ya terminó
+        return is_llm_available()
+
+    # Esperar a que termine
+    logger.info(f"Esperando auto-configuración de Ollama (max {timeout}s)...")
+    _ollama_init_event.wait(timeout)
+    return is_llm_available()
 
 
 # Alias para compatibilidad

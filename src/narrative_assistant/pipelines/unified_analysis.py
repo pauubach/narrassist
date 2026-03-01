@@ -260,7 +260,11 @@ class UnifiedConfig:
 
     @classmethod
     def standard(cls) -> "UnifiedConfig":
-        """Perfil Estándar: NER + correferencias + calidad + estilo."""
+        """Perfil Estándar: NER + correferencias + calidad + estilo.
+
+        use_llm=True por defecto — el healthcheck lo desactiva automáticamente
+        si Ollama no está disponible, permitiendo degradación transparente.
+        """
         return cls(
             run_structure=True,
             run_dialogue_detection=True,
@@ -285,7 +289,7 @@ class UnifiedConfig:
             run_pacing=True,
             run_consistency=True,
             run_temporal_consistency=False,
-            use_llm=False,
+            use_llm=True,
         )
 
     @classmethod

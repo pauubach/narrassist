@@ -70,6 +70,7 @@ export interface SystemCapabilities {
     available: boolean
     models: Array<{ name: string; size: number; modified: string }>
     recommended_models: string[]
+    init_status?: string
   }
   languagetool?: {
     installed: boolean

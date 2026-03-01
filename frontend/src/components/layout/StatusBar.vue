@@ -368,7 +368,7 @@ onBeforeUnmount(() => {
 
     <!-- Progreso cuando SÍ está analizando -->
     <div v-if="isAnalyzing && !isQueued" ref="analysisTriggerRef" class="status-section status-progress" @click="toggleDetails">
-      <span class="progress-step">{{ currentStepLabel }}</span>
+      <span class="progress-step" :title="currentAction || currentStepLabel">{{ currentAction || currentStepLabel }}</span>
       <ProgressBar
         :value="progress"
         :show-value="false"

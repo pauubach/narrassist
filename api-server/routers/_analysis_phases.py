@@ -1490,20 +1490,37 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
 
 
 def run_ollama_healthcheck(ctx: dict, tracker: ProgressTracker):
-    """S7c-04: Health check de Ollama antes de fases pesadas."""
+    """S7c-04: Health check de Ollama antes de fases pesadas.
+
+    Si hay una auto-configuración de Ollama en curso (install/start/download),
+    espera a que termine antes de decidir si usar LLM.
+    """
     analysis_config = ctx["analysis_config"]
-    if not analysis_config.use_llm:
-        return
 
     try:
-        from narrative_assistant.llm.ollama_manager import is_ollama_available
+        from narrative_assistant.llm.client import (
+            _ollama_init_started,
+            is_llm_available,
+            wait_for_ollama_init,
+        )
 
-        ollama_available = is_ollama_available()
-        if not ollama_available:
-            logger.warning("Ollama no disponible, continuando sin LLM")
+        if _ollama_init_started:
+            # Hay auto-configuración en curso → esperar con feedback
+            tracker.update_action("Preparando análisis semántico (configurando Ollama)...")
+            logger.info("Ollama health check: esperando auto-configuración en background...")
+            available = wait_for_ollama_init(timeout=300)
+        else:
+            available = is_llm_available()
+
+        if available:
+            analysis_config.use_llm = True
+            logger.info("Ollama disponible — análisis con LLM habilitado")
+        else:
             analysis_config.use_llm = False
+            logger.info("Ollama no disponible — análisis sin LLM (calidad reducida)")
     except ImportError:
         logger.debug("Ollama manager not available")
+        analysis_config.use_llm = False
     except Exception as e:
         logger.warning(f"Ollama health check failed: {e}")
         analysis_config.use_llm = False
@@ -2824,7 +2841,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             mention_finder = get_mention_finder()
             _update_fusion_progress(
                 0.94,
-                "Preparando búsqueda de menciones...",
+                "Buscando menciones adicionales...",
                 subphase_id="mentions",
                 subphase_label="Buscando menciones adicionales",
                 subphase_progress=0.0,
@@ -2834,14 +2851,6 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             for e in entities:
                 if e.canonical_name and e.aliases:
                     aliases_dict[e.canonical_name] = e.aliases
-
-            _update_fusion_progress(
-                0.94,
-                "Recopilando posiciones conocidas...",
-                subphase_id="mentions",
-                subphase_label="Buscando menciones adicionales",
-                subphase_progress=0.02,
-            )
 
             existing_positions: set[tuple[int, int]] = set()
             for entity in entities:
@@ -2893,21 +2902,15 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                     except Exception:
                         pass
 
-                # Progreso granular con información de entidad y menciones encontradas
+                # Progreso granular con contador genérico
                 if idx % mention_update_every == 0 or idx == total_entities_for_mentions:
                     mention_fraction = idx / total_entities_for_mentions
-                    # Mensaje descriptivo: qué entidad + cuántas menciones lleva
+                    action_msg = (
+                        f"Buscando menciones adicionales "
+                        f"({idx}/{total_entities_for_mentions})"
+                    )
                     if additional_count > 0:
-                        action_msg = (
-                            f"Buscando «{name}» "
-                            f"({idx}/{total_entities_for_mentions}) — "
-                            f"{additional_count} encontradas"
-                        )
-                    else:
-                        action_msg = (
-                            f"Buscando «{name}» "
-                            f"({idx}/{total_entities_for_mentions})..."
-                        )
+                        action_msg += f" — {additional_count} encontradas"
                     _update_fusion_progress(
                         0.94 + mention_fraction * 0.02,
                         action_msg,

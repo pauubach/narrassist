@@ -66,20 +66,28 @@ const activeSelectionPreview = computed(() => {
   return sel.text.length > 50 ? sel.text.substring(0, 50) + '...' : sel.text
 })
 
-// --- Ollama status: adaptive polling (up: 15s, down: 5s) ---
+// --- Ollama status: adaptive polling ---
 const ollamaAvailable = computed(() => systemStore.systemCapabilities?.ollama?.available ?? false)
 const ollamaHasModels = computed(() => (systemStore.systemCapabilities?.ollama?.models?.length ?? 0) > 0)
 const ollamaReady = computed(() => ollamaAvailable.value && ollamaHasModels.value)
+const ollamaInitStatus = computed(() => systemStore.systemCapabilities?.ollama?.init_status || 'not_needed')
+const ollamaConfiguring = computed(() => ['installing', 'starting', 'downloading_model'].includes(ollamaInitStatus.value))
 
 let ollamaTimer: ReturnType<typeof setInterval> | null = null
 
 function startOllamaPolling() {
   stopOllamaPolling()
-  const interval = ollamaReady.value ? 15000 : 5000
+  // Polling más rápido durante auto-setup (5s), normal cuando ready (30s), intermedio si down (15s)
+  const interval = ollamaConfiguring.value ? 5000 : ollamaReady.value ? 30000 : 15000
   ollamaTimer = setInterval(async () => {
     await systemStore.refreshCapabilities()
-    // Adapt interval if state changed
-    const newInterval = ollamaReady.value ? 15000 : 5000
+    // Re-adaptar intervalo si el estado cambió
+    const newConfiguring = ['installing', 'starting', 'downloading_model'].includes(
+      systemStore.systemCapabilities?.ollama?.init_status || 'not_needed'
+    )
+    const newReady = (systemStore.systemCapabilities?.ollama?.available ?? false) &&
+      ((systemStore.systemCapabilities?.ollama?.models?.length ?? 0) > 0)
+    const newInterval = newConfiguring ? 5000 : newReady ? 30000 : 15000
     if (ollamaTimer && newInterval !== interval) {
       startOllamaPolling()
     }
@@ -240,9 +248,9 @@ function clearSelectionContext() {
       </span>
       <div class="header-actions">
         <span
-          v-tooltip.left="ollamaReady ? 'IA lista' : ollamaAvailable ? 'Sin modelos LLM' : 'Ollama no disponible'"
+          v-tooltip.left="ollamaReady ? 'Análisis inteligente activo' : ollamaConfiguring ? 'Configurando análisis inteligente...' : 'Análisis inteligente no disponible'"
           class="ollama-status-dot"
-          :class="ollamaReady ? 'status-ok' : 'status-down'"
+          :class="ollamaReady ? 'status-ok' : ollamaConfiguring ? 'status-configuring' : 'status-down'"
         />
         <Button
           v-tooltip.left="'Limpiar historial'"
@@ -257,11 +265,16 @@ function clearSelectionContext() {
       </div>
     </div>
 
-    <!-- Ollama warning banner -->
-    <div v-if="!ollamaReady" class="ollama-warning">
-      <i class="pi pi-exclamation-triangle"></i>
-      <span v-if="!ollamaAvailable">Ollama no está arrancado. Inícialo desde Configuración.</span>
-      <span v-else>No hay modelos LLM. Descarga uno desde Configuración.</span>
+    <!-- Ollama status banner -->
+    <div v-if="ollamaConfiguring" class="ollama-warning ollama-configuring">
+      <i class="pi pi-spin pi-spinner"></i>
+      <span v-if="ollamaInitStatus === 'downloading_model'">Descargando motor de análisis inteligente...</span>
+      <span v-else-if="ollamaInitStatus === 'starting'">Iniciando análisis inteligente...</span>
+      <span v-else>Configurando análisis inteligente...</span>
+    </div>
+    <div v-else-if="!ollamaReady" class="ollama-warning">
+      <i class="pi pi-info-circle"></i>
+      <span>Análisis inteligente no disponible. Configúralo desde Ajustes.</span>
     </div>
 
     <!-- Messages area -->
@@ -489,6 +502,16 @@ function clearSelectionContext() {
   box-shadow: 0 0 4px var(--ds-color-warning, #f59e0b);
 }
 
+.ollama-status-dot.status-configuring {
+  background: var(--ds-color-info, #3b82f6);
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 4px var(--ds-color-info, #3b82f6); opacity: 1; }
+  50% { box-shadow: 0 0 8px var(--ds-color-info, #3b82f6); opacity: 0.6; }
+}
+
 .ollama-warning {
   display: flex;
   align-items: center;
@@ -499,6 +522,12 @@ function clearSelectionContext() {
   font-size: var(--ds-font-size-xs);
   color: var(--ds-color-warning, #f59e0b);
   flex-shrink: 0;
+}
+
+.ollama-warning.ollama-configuring {
+  background: var(--ds-color-info-subtle, rgba(59, 130, 246, 0.1));
+  border-bottom-color: var(--ds-color-info, #3b82f6);
+  color: var(--ds-color-info, #3b82f6);
 }
 
 .ollama-warning i {

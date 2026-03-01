@@ -458,6 +458,32 @@ try:
         else:
             _early_logger.info("Startup: modules already loaded")
 
+        # Inicializar Ollama en background (instalar + arrancar + descargar modelo)
+        import threading
+
+        def _background_ollama_init():
+            from narrative_assistant.llm.client import (
+                mark_ollama_init_done,
+                mark_ollama_init_started,
+            )
+            mark_ollama_init_started()
+            try:
+                logger.info("Startup: iniciando auto-configuración de Ollama en background...")
+                from narrative_assistant.llm import get_llm_client
+                client = get_llm_client()
+                if client and client.is_available:
+                    logger.info(f"Startup: Ollama listo (modelo: {client._config.ollama_model})")
+                else:
+                    logger.warning("Startup: Ollama no disponible tras auto-configuración")
+            except Exception as e:
+                logger.warning(f"Startup: error auto-configurando Ollama: {e}", exc_info=True)
+            finally:
+                mark_ollama_init_done()
+
+        threading.Thread(
+            target=_background_ollama_init, name="ollama-init", daemon=True
+        ).start()
+
         yield
 
     app = FastAPI(

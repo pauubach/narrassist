@@ -335,12 +335,17 @@ CREATE TABLE IF NOT EXISTS review_history (
     old_value_json TEXT,
     new_value_json TEXT,
     note TEXT,
+    batch_id TEXT,
+    depends_on_ids TEXT DEFAULT '[]',
+    schema_version INTEGER DEFAULT 25,
+    undone_at TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_history_project ON review_history(project_id);
 CREATE INDEX IF NOT EXISTS idx_history_action ON review_history(action_type);
+CREATE INDEX IF NOT EXISTS idx_history_batch ON review_history(batch_id);
 
 -- Sesiones de trabajo
 CREATE TABLE IF NOT EXISTS sessions (
@@ -2070,6 +2075,11 @@ class Database:
                             )
                 finally:
                     verify_conn.close()
+
+            # Aplicar migraciones de columnas (necesario porque SCHEMA_SQL no siempre
+            # incluye columnas añadidas en versiones posteriores)
+            with self.connection() as conn:
+                self._apply_column_migrations(conn)
 
             logger.info(f"[SCHEMA] Schema inicializado y verificado en {self.db_path}")
 

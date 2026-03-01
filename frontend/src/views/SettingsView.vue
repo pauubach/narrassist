@@ -289,8 +289,20 @@
                 <span class="category-desc">Motor de análisis avanzado del significado y contexto</span>
               </div>
 
-              <!-- Banner de acción cuando el analizador NO está listo -->
-              <div v-if="systemCapabilities && ollamaState !== 'ready'" class="ollama-action-card" :class="'ollama-state-' + ollamaState">
+              <!-- Banner durante auto-configuración -->
+              <div v-if="systemCapabilities && ollamaState === 'configuring'" class="ollama-action-card ollama-state-configuring">
+                <div class="ollama-action-content">
+                  <i class="pi pi-spin pi-spinner"></i>
+                  <div class="ollama-action-text">
+                    <strong>Configurando análisis inteligente</strong>
+                    <span>{{ ollamaStatusMessage }}</span>
+                    <span class="ollama-hint">Esto solo ocurre la primera vez</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Banner de acción cuando el analizador NO está listo (y no está configurando) -->
+              <div v-else-if="systemCapabilities && ollamaState !== 'ready'" class="ollama-action-card" :class="'ollama-state-' + ollamaState">
                 <div class="ollama-action-content">
                   <i
                     :class="[
@@ -299,9 +311,9 @@
                   ></i>
                   <div class="ollama-action-text">
                     <strong>{{
-                      ollamaState === 'not_installed' ? 'Analizador no disponible' :
-                      ollamaState === 'not_running' ? 'Analizador no iniciado' :
-                      'Sin modelos de análisis'
+                      ollamaState === 'not_installed' ? 'Análisis inteligente no disponible' :
+                      ollamaState === 'not_running' ? 'Análisis inteligente no iniciado' :
+                      'Sin motores de análisis'
                     }}</strong>
                     <span>{{ ollamaStatusMessage }}</span>
                   </div>
@@ -2463,6 +2475,21 @@ const handleScroll = () => {
   border-color: var(--blue-200);
 }
 
+.ollama-action-card.ollama-state-configuring {
+  background: var(--blue-50);
+  border-color: var(--blue-200);
+}
+
+.ollama-action-card.ollama-state-configuring .ollama-action-content > i {
+  color: var(--ds-text-info, #3b82f6);
+}
+
+.ollama-hint {
+  font-size: 0.7rem;
+  opacity: 0.7;
+  font-style: italic;
+}
+
 .ollama-action-content {
   display: flex;
   align-items: center;
@@ -2529,7 +2556,8 @@ const handleScroll = () => {
   border-color: var(--yellow-800);
 }
 
-:global(.dark) .ollama-action-card.ollama-state-no_models {
+:global(.dark) .ollama-action-card.ollama-state-no_models,
+:global(.dark) .ollama-action-card.ollama-state-configuring {
   background: color-mix(in srgb, var(--p-primary-color, #3B82F6) 10%, transparent);
   border-color: var(--p-primary-800, #1e40af);
 }
@@ -2538,7 +2566,8 @@ const handleScroll = () => {
   color: var(--yellow-400);
 }
 
-:global(.dark) .ollama-action-card.ollama-state-no_models .ollama-action-content > i {
+:global(.dark) .ollama-action-card.ollama-state-no_models .ollama-action-content > i,
+:global(.dark) .ollama-action-card.ollama-state-configuring .ollama-action-content > i {
   color: var(--blue-400);
 }
 

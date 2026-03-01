@@ -85,12 +85,36 @@ def get_chapter_progress(
                 error=f"Modo inválido. Opciones: {', '.join(valid_modes)}"
             )
 
-        # Analizar
-        report = analyze_chapter_progress(
-            project_id=project_id,
-            mode=mode,
-            llm_model=llm_model,
-        )
+        # Timeout endpoint-level: si el LLM no responde en 90s, degradar a basic
+        import concurrent.futures
+
+        if mode in ("standard", "deep"):
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(
+                    analyze_chapter_progress,
+                    project_id=project_id,
+                    mode=mode,
+                    llm_model=llm_model,
+                )
+                try:
+                    report = future.result(timeout=90)
+                except concurrent.futures.TimeoutError:
+                    logger.warning(
+                        f"chapter-progress en modo '{mode}' excedió 90s, "
+                        f"degradando a 'basic'"
+                    )
+                    future.cancel()
+                    report = analyze_chapter_progress(
+                        project_id=project_id,
+                        mode="basic",
+                        llm_model=None,
+                    )
+        else:
+            report = analyze_chapter_progress(
+                project_id=project_id,
+                mode=mode,
+                llm_model=llm_model,
+            )
 
         # Guardar en caché para evitar recalcular (solo en mode=standard)
         if mode == "standard":
@@ -140,6 +164,8 @@ def get_narrative_templates(
         llm_model = get_default_llm_model()
 
     try:
+        import concurrent.futures
+
         from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
         from narrative_assistant.analysis.narrative_templates import NarrativeTemplateAnalyzer
 
@@ -147,12 +173,27 @@ def get_narrative_templates(
         if proj_result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
-        # Obtener datos de capítulos (reusar chapter_progress)
-        report = analyze_chapter_progress(
-            project_id=project_id,
-            mode=mode,
-            llm_model=llm_model,
-        )
+        # Obtener datos de capítulos con timeout (reusar chapter_progress)
+        if mode in ("standard", "deep"):
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(
+                    analyze_chapter_progress,
+                    project_id=project_id,
+                    mode=mode,
+                    llm_model=llm_model,
+                )
+                try:
+                    report = future.result(timeout=90)
+                except concurrent.futures.TimeoutError:
+                    logger.warning("narrative-templates: LLM excedió 90s, degradando a basic")
+                    future.cancel()
+                    report = analyze_chapter_progress(project_id=project_id, mode="basic")
+        else:
+            report = analyze_chapter_progress(
+                project_id=project_id,
+                mode=mode,
+                llm_model=llm_model,
+            )
 
         # Convertir capítulos a formato para el analizador
         chapters_data = []
@@ -214,6 +255,8 @@ def get_narrative_health(
         llm_model = get_default_llm_model()
 
     try:
+        import concurrent.futures
+
         from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
         from narrative_assistant.analysis.narrative_health import NarrativeHealthChecker
 
@@ -221,12 +264,27 @@ def get_narrative_health(
         if proj_result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
-        # Obtener datos de capítulos
-        report = analyze_chapter_progress(
-            project_id=project_id,
-            mode=mode,
-            llm_model=llm_model,
-        )
+        # Obtener datos de capítulos con timeout
+        if mode in ("standard", "deep"):
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(
+                    analyze_chapter_progress,
+                    project_id=project_id,
+                    mode=mode,
+                    llm_model=llm_model,
+                )
+                try:
+                    report = future.result(timeout=90)
+                except concurrent.futures.TimeoutError:
+                    logger.warning("narrative-health: LLM excedió 90s, degradando a basic")
+                    future.cancel()
+                    report = analyze_chapter_progress(project_id=project_id, mode="basic")
+        else:
+            report = analyze_chapter_progress(
+                project_id=project_id,
+                mode=mode,
+                llm_model=llm_model,
+            )
 
         # Convertir a formato para el checker
         chapters_data = [ch.to_dict() for ch in report.chapters]

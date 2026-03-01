@@ -560,7 +560,11 @@ def download_models(request: DownloadModelsRequest):
     try:
         import threading
 
-        from narrative_assistant.core.model_manager import ModelType, get_model_manager
+        from narrative_assistant.core.model_manager import (
+            KNOWN_MODELS,
+            ModelType,
+            get_model_manager,
+        )
 
         manager = get_model_manager()
 
@@ -590,8 +594,13 @@ def download_models(request: DownloadModelsRequest):
             # Sin esto, el frontend ve solo los modelos activos (max_workers=2),
             # concluye que "todo terminó" cuando los 2 primeros acaban y deja
             # de hacer polling antes de que el tercero empiece.
+            # IMPORTANTE: incluir bytes_total estimado para que la barra de
+            # progreso cuente TODOS los modelos, no solo los activos.
             for _name, mt in models_to_download:
-                _update_download_progress(mt, phase="queued")
+                estimated_bytes = KNOWN_MODELS[mt].size_mb * 1024 * 1024
+                _update_download_progress(
+                    mt, phase="queued", bytes_total=estimated_bytes,
+                )
 
             # Descargas paralelas: spaCy (GitHub CDN) + HF model en paralelo
             # Máximo 2 workers para no saturar red ni RAM
@@ -618,10 +627,18 @@ def download_models(request: DownloadModelsRequest):
 
             with ThreadPoolExecutor(max_workers=2) as pool:
                 futures = {pool.submit(_download_one, item): item[0] for item in models_to_download}
-                for future in as_completed(futures):
+                for future in as_completed(futures, timeout=600):  # 10 min max total
                     model_name = futures[future]
                     try:
-                        future.result()
+                        future.result(timeout=300)  # 5 min max per model
+                    except TimeoutError:
+                        logger.error(f"Download timeout for {model_name} (>5 min)")
+                        mt = MODEL_TYPE_MAP.get(model_name)
+                        if mt:
+                            _update_download_progress(
+                                mt, phase="error",
+                                error_message="Descarga excedió el tiempo límite (5 min). Reintenta desde Configuración.",
+                            )
                     except Exception as e:
                         logger.error(f"Download thread error for {model_name}: {e}")
 
@@ -715,6 +732,15 @@ def download_progress():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _get_ollama_init_status() -> str:
+    """Obtiene el estado del auto-setup de Ollama."""
+    try:
+        from narrative_assistant.llm.client import get_ollama_init_status
+        return get_ollama_init_status()
+    except Exception:
+        return "not_needed"
+
+
 @router.get("/api/system/capabilities")
 def system_capabilities():
     """
@@ -730,6 +756,8 @@ def system_capabilities():
         ApiResponse con capacidades detalladas del sistema
     """
     try:
+        import concurrent.futures
+
         from narrative_assistant.core.device import (
             get_blocked_gpu_info,
             get_device_detector,
@@ -737,14 +765,32 @@ def system_capabilities():
 
         detector = get_device_detector()
 
-        # Detectar dispositivos disponibles
-        cuda_device = detector.detect_cuda()
-        mps_device = detector.detect_mps()
-        cpu_device = detector.get_cpu_info()
-        has_cupy = detector.detect_cupy() if cuda_device else False
+        # Detectar dispositivos con timeout (CUDA init puede ser lento)
+        cuda_device = None
+        mps_device = None
+        cpu_device = None
+        has_cupy = False
+        blocked_gpu = None
 
-        # Info de GPU bloqueada por CC < 6.0 (prevención de BSOD)
-        blocked_gpu = get_blocked_gpu_info()
+        def _detect_hardware():
+            nonlocal cuda_device, mps_device, cpu_device, has_cupy, blocked_gpu
+            cuda_device = detector.detect_cuda()
+            mps_device = detector.detect_mps()
+            cpu_device = detector.get_cpu_info()
+            has_cupy = detector.detect_cupy() if cuda_device else False
+            blocked_gpu = get_blocked_gpu_info()
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_detect_hardware)
+            try:
+                future.result(timeout=10)
+            except concurrent.futures.TimeoutError:
+                logger.warning("Hardware detection timed out after 10s")
+                # Fallback: al menos CPU info
+                try:
+                    cpu_device = detector.get_cpu_info()
+                except Exception:
+                    pass
 
         # Determinar GPU principal
         gpu_info = None
@@ -787,29 +833,33 @@ def system_capabilities():
         import json as json_module
         import urllib.error
         import urllib.request
-        try:
-            ollama_host = "http://localhost:11434"
-            logger.info(f"Verificando Ollama en {ollama_host}/api/tags...")
-            req = urllib.request.Request(f"{ollama_host}/api/tags")
-            with urllib.request.urlopen(req, timeout=3.0) as response:  # Reduced from 10s
-                if response.status == 200:
-                    ollama_available = True
-                    data = json_module.loads(response.read().decode('utf-8'))
-                    ollama_models = [
-                        {
-                            "name": model.get("name", "").split(":")[0],
-                            "size": model.get("size", 0),
-                            "modified": model.get("modified_at", ""),
-                        }
-                        for model in data.get("models", [])
-                    ]
-                    logger.info(f"Ollama detectado: {len(ollama_models)} modelo(s)")
-        except urllib.error.URLError as e:
-            logger.info(f"Ollama no disponible (conexión): {e.reason}")
-        except TimeoutError:
-            logger.info("Ollama no disponible (timeout)")
-        except Exception as e:
-            logger.info(f"Ollama no disponible ({type(e).__name__}): {e}")
+
+        if not ollama_installed:
+            logger.info("Ollama no instalado — instálalo desde Configuración o https://ollama.com/download")
+        else:
+            try:
+                ollama_host = "http://localhost:11434"
+                logger.debug(f"Verificando Ollama en {ollama_host}/api/tags...")
+                req = urllib.request.Request(f"{ollama_host}/api/tags")
+                with urllib.request.urlopen(req, timeout=3.0) as response:  # Reduced from 10s
+                    if response.status == 200:
+                        ollama_available = True
+                        data = json_module.loads(response.read().decode('utf-8'))
+                        ollama_models = [
+                            {
+                                "name": model.get("name", "").split(":")[0],
+                                "size": model.get("size", 0),
+                                "modified": model.get("modified_at", ""),
+                            }
+                            for model in data.get("models", [])
+                        ]
+                        logger.info(f"Ollama detectado: {len(ollama_models)} modelo(s)")
+            except urllib.error.URLError:
+                logger.info("Ollama instalado pero no iniciado — inícialo desde Configuración")
+            except TimeoutError:
+                logger.info("Ollama instalado pero no responde (timeout)")
+            except Exception as e:
+                logger.info(f"Ollama instalado pero error de conexión: {type(e).__name__}")
 
         # Verificar LanguageTool (puede intentar iniciarlo si está instalado)
         lt_available = _check_languagetool_available()
@@ -1047,7 +1097,7 @@ def system_capabilities():
                     "has_cupy": has_cupy,
                     "gpu_blocked": blocked_gpu,  # None o {name, compute_capability, min_required}
                     "cpu": {
-                        "name": cpu_device.device_name,
+                        "name": cpu_device.device_name if cpu_device else "Unknown",
                     },
                 },
                 "embeddings_available": embeddings_available,
@@ -1056,6 +1106,7 @@ def system_capabilities():
                     "available": ollama_available,
                     "models": ollama_models,
                     "recommended_models": ollama_recommendations,
+                    "init_status": _get_ollama_init_status(),
                 },
                 "languagetool": {
                     "installed": lt_installed,
