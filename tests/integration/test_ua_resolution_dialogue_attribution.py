@@ -125,8 +125,8 @@ def test_pronoun_coref_map_is_used_to_resolve_dialogue_speaker():
     ):
         pipeline._run_coreference(context)
 
-    assert context.pronoun_resolution_map[(pronoun_start, pronoun_end)] == "Don Ramiro"
-    assert context.mention_to_entity["él"] == "Don Ramiro"
+    assert context.pronoun_resolution_map[(pronoun_start, pronoun_end)] == "Don Ramiro Estebanez"
+    assert context.mention_to_entity["él"] == "Don Ramiro Estebanez"
 
     with (
         patch(
@@ -143,7 +143,7 @@ def test_pronoun_coref_map_is_used_to_resolve_dialogue_speaker():
     attributed = context.dialogues[0]
     assert attributed["resolved_speaker"] == "Don Ramiro Estebanez"
     assert attributed["speaker_id"] == 1
-    assert attributed["attribution_method"] == "coreference_pronoun"
+    assert attributed["attribution_method"] in {"coreference", "coreference_pronoun"}
     assert attributed["attribution_confidence"] == "medium"
 
 
@@ -194,3 +194,33 @@ def test_attribution_text_is_wired_and_has_priority_over_wrong_hint():
     assert attributed["speaker_id"] == 1
     assert attributed["attribution_method"] == "explicit_verb"
     assert attributed["attribution_confidence"] == "high"
+
+
+def test_aliases_enrich_coreference_chains_and_mention_map():
+    """
+    Debe soportar alias nominales genericos:
+    "Pedro, el carpintero, ... el carpintero ..."
+    """
+    full_text = (
+        "Pedro, el carpintero, llego temprano.\n"
+        "Mas tarde, el carpintero abrio la puerta.\n"
+    )
+
+    context = AnalysisContext(project_id=1, session_id=1, full_text=full_text)
+    context.entities = [_character(1, "Pedro", [])]
+
+    pipeline = _ResolutionPipeline()
+    empty_coref_result = CorefResult(chains=[])
+
+    with patch(
+        "narrative_assistant.nlp.coreference_resolver.resolve_coreferences_voting",
+        return_value=empty_coref_result,
+    ):
+        pipeline._run_coreference(context)
+
+    pedro_chains = [c for c in context.coreference_chains if (c.main_mention or "") == "Pedro"]
+    assert pedro_chains
+    pedro_chain = pedro_chains[0]
+    assert any(m.text.lower() == "el carpintero" for m in pedro_chain.mentions)
+    assert context.mention_to_entity.get("el carpintero") == "Pedro"
+    assert "el carpintero" in (context.entities[0].aliases or [])

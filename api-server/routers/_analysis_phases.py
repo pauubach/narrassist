@@ -2553,13 +2553,15 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
         )
 
         try:
+            from narrative_assistant.core.text_utils import normalize_name as _normalize_name_shared
+            from narrative_assistant.nlp.alias_resolver import detect_and_resolve_aliases
             from narrative_assistant.nlp.coreference_resolver import (
                 CorefConfig,
+                CoreferenceChain,
                 CorefMethod,
-                resolve_coreferences_voting,
-            )
-            from narrative_assistant.nlp.coreference_resolver import (
+                Mention as CorefMention,
                 MentionType as CorefMentionType,
+                resolve_coreferences_voting,
             )
 
             coref_config = CorefConfig(
@@ -2751,6 +2753,87 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             except Exception as _coref_cache_err:
                 logger.warning(f"[COREF_CACHE] Write failed (continuing): {_coref_cache_err}")
 
+            # Enriquecer cadenas con alias nominales: apodos, roles, parentescos,
+            # descriptores físicos ("el manco"), etc.
+            try:
+                character_entities = [e for e in entities if e.entity_type == EntityType.CHARACTER]
+                alias_result = detect_and_resolve_aliases(
+                    full_text,
+                    known_entities=character_entities,
+                )
+                if alias_result.clusters:
+                    entity_lookup: dict[str, Any] = {}
+                    for ent in character_entities:
+                        canonical = (ent.canonical_name or "").strip()
+                        canonical_norm = _normalize_name_shared(canonical)
+                        if canonical_norm:
+                            entity_lookup[canonical_norm] = ent
+                        for alias in ent.aliases or []:
+                            alias_norm = _normalize_name_shared(alias)
+                            if alias_norm and alias_norm not in entity_lookup:
+                                entity_lookup[alias_norm] = ent
+
+                    chain_lookup: dict[str, Any] = {}
+                    for chain in coref_result.chains:
+                        chain_main_norm = _normalize_name_shared(chain.main_mention or "")
+                        if chain_main_norm:
+                            chain_lookup[chain_main_norm] = chain
+
+                    alias_mentions_added = 0
+                    for cluster in alias_result.clusters:
+                        resolved_raw = (cluster.canonical_name or "").strip()
+                        if not resolved_raw:
+                            continue
+                        resolved_norm = _normalize_name_shared(resolved_raw)
+                        matching_entity = entity_lookup.get(resolved_norm)
+                        if not matching_entity and len(resolved_norm) >= 4:
+                            for key, ent in entity_lookup.items():
+                                if resolved_norm in key or key in resolved_norm:
+                                    matching_entity = ent
+                                    break
+
+                        resolved_name = (
+                            matching_entity.canonical_name if matching_entity else resolved_raw
+                        )
+                        resolved_name_norm = _normalize_name_shared(resolved_name)
+                        chain = chain_lookup.get(resolved_name_norm)
+                        if chain is None:
+                            chain = CoreferenceChain(main_mention=resolved_name, mentions=[])
+                            coref_result.chains.append(chain)
+                            chain_lookup[resolved_name_norm] = chain
+
+                        for alias in cluster.aliases:
+                            mention = CorefMention(
+                                text=alias.text,
+                                start_char=alias.start_char,
+                                end_char=alias.end_char,
+                                mention_type=CorefMentionType.DEFINITE_NP,
+                            )
+                            before = len(chain.mentions)
+                            chain.add_mention(mention)
+                            if len(chain.mentions) > before:
+                                alias_mentions_added += 1
+
+                            if matching_entity:
+                                if matching_entity.aliases is None:
+                                    matching_entity.aliases = []
+                                if (
+                                    alias.text.lower() != matching_entity.canonical_name.lower()
+                                    and alias.text not in matching_entity.aliases
+                                ):
+                                    matching_entity.aliases.append(alias.text)
+
+                        # Preservar mención principal canónica para el matching posterior.
+                        chain.main_mention = resolved_name
+
+                    if alias_mentions_added:
+                        logger.info(
+                            f"Alias enrichment: +{alias_mentions_added} menciones nominales "
+                            f"({len(alias_result.clusters)} clusters)"
+                        )
+            except Exception as alias_err:
+                logger.debug(f"Alias enrichment skipped: {alias_err}")
+
             # Vincular cadenas con entidades
             character_entities = [e for e in entities if e.entity_type == EntityType.CHARACTER]
             total_chains = len(coref_result.chains)
@@ -2829,7 +2912,12 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                     new_aliases = []
                     for mention in chain.mentions:
                         if (
-                            mention.mention_type == CorefMentionType.PROPER_NOUN
+                            mention.mention_type
+                            in (
+                                CorefMentionType.PROPER_NOUN,
+                                CorefMentionType.DEFINITE_NP,
+                                CorefMentionType.POSSESSIVE,
+                            )
                             and mention.text.lower() != matching_entity.canonical_name.lower()
                         ):
                             if matching_entity.aliases is None:

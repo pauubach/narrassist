@@ -67,8 +67,12 @@ class PipelineResolutionMixin:
     def _run_coreference(self, context: AnalysisContext) -> None:
         """Ejecutar resolución de correferencias."""
         try:
+            from ..nlp.alias_resolver import detect_and_resolve_aliases
             from ..nlp.coreference_resolver import (
                 CorefConfig,
+                CoreferenceChain,
+                Mention,
+                MentionType,
                 build_pronoun_resolution_map,
                 resolve_coreferences_voting,
             )
@@ -95,18 +99,23 @@ class PipelineResolutionMixin:
                 chapters=chapters_data,
                 config=coref_config,
             )
+            entity_lookup = self._build_entity_name_lookup(context.entities)
 
             if result.chains:
                 context.coreference_chains = result.chains
 
                 # Crear mapa de menciones a entidades
                 for chain in result.chains:
-                    entity_name = chain.main_mention
+                    entity_name = self._resolve_to_known_entity(chain.main_mention, entity_lookup)
                     for mention in chain.mentions:
-                        context.mention_to_entity[mention.text.lower()] = entity_name
+                        self._register_mention_mapping(context, mention.text, entity_name)
 
                 # Reusar mapa de pronombres por posición para desambiguación contextual.
-                context.pronoun_resolution_map = build_pronoun_resolution_map(result)
+                raw_pronoun_map = build_pronoun_resolution_map(result)
+                context.pronoun_resolution_map = {
+                    span: self._resolve_to_known_entity(entity_name, entity_lookup)
+                    for span, entity_name in raw_pronoun_map.items()
+                }
 
                 context.stats["coreference_chains"] = len(result.chains)
 
@@ -114,8 +123,144 @@ class PipelineResolutionMixin:
                 if hasattr(result, "voting_details") and result.voting_details:
                     context.coref_voting_details = result.voting_details
 
+            # Enriquecer con alias nominales (apodos, roles, parentescos, rasgos).
+            alias_result = detect_and_resolve_aliases(
+                context.full_text,
+                known_entities=context.entities,
+            )
+            if alias_result.clusters:
+                chain_index: dict[str, CoreferenceChain] = {}
+                for chain in context.coreference_chains:
+                    resolved_main = self._resolve_to_known_entity(chain.main_mention, entity_lookup)
+                    if resolved_main:
+                        chain_index[_normalize_name_shared(resolved_main)] = chain
+
+                alias_mentions_added = 0
+                for cluster in alias_result.clusters:
+                    resolved_name = self._resolve_to_known_entity(
+                        cluster.canonical_name,
+                        entity_lookup,
+                    )
+                    if not resolved_name:
+                        continue
+
+                    chain_key = _normalize_name_shared(resolved_name)
+                    chain = chain_index.get(chain_key)
+                    if chain is None:
+                        chain = CoreferenceChain(main_mention=resolved_name, mentions=[])
+                        context.coreference_chains.append(chain)
+                        chain_index[chain_key] = chain
+
+                    for alias in cluster.aliases:
+                        mention = Mention(
+                            text=alias.text,
+                            start_char=alias.start_char,
+                            end_char=alias.end_char,
+                            mention_type=MentionType.DEFINITE_NP,
+                        )
+                        prev_len = len(chain.mentions)
+                        chain.add_mention(mention)
+                        if len(chain.mentions) > prev_len:
+                            alias_mentions_added += 1
+
+                        self._register_mention_mapping(context, alias.text, resolved_name)
+                        self._add_alias_to_entity(context.entities, resolved_name, alias.text)
+
+                    # Mantener ancla canónica aunque la cadena contenga solo NPs descriptivos.
+                    chain.main_mention = resolved_name
+
+                if alias_mentions_added:
+                    context.stats["alias_mentions_resolved"] = alias_mentions_added
+                    context.stats["coreference_chains"] = len(context.coreference_chains)
+
         except Exception as e:
             logger.warning(f"Coreference resolution failed: {e}")
+
+    def _build_entity_name_lookup(self, entities: list) -> dict[str, str]:
+        """Índice normalized_name -> canonical_name."""
+        lookup: dict[str, str] = {}
+        for entity in entities or []:
+            canonical_name = (
+                getattr(entity, "canonical_name", None) or getattr(entity, "name", "")
+            ).strip()
+            if not canonical_name:
+                continue
+            canonical_norm = _normalize_name_shared(canonical_name)
+            if canonical_norm:
+                lookup[canonical_norm] = canonical_name
+
+            for alias in getattr(entity, "aliases", []) or []:
+                alias_norm = _normalize_name_shared(alias)
+                if alias_norm and alias_norm not in lookup:
+                    lookup[alias_norm] = canonical_name
+        return lookup
+
+    def _resolve_to_known_entity(self, name: str | None, lookup: dict[str, str]) -> str:
+        """Resuelve un nombre a canónico conocido si hay match exacto o casi exacto."""
+        candidate = (name or "").strip()
+        if not candidate:
+            return ""
+        normalized = _normalize_name_shared(candidate)
+        if not normalized:
+            return candidate
+
+        direct = lookup.get(normalized)
+        if direct:
+            return direct
+
+        # Fallback tolerante para casos parciales tipo "Don Ramiro" vs "Ramiro Estébanez".
+        if len(normalized) >= 4:
+            for key, canonical in lookup.items():
+                if normalized in key or key in normalized:
+                    return canonical
+        return candidate
+
+    def _register_mention_mapping(
+        self,
+        context: AnalysisContext,
+        mention_text: str | None,
+        entity_name: str | None,
+    ) -> None:
+        """Registra mappings raw+normalizado para robustez en lookup posterior."""
+        mention = (mention_text or "").strip()
+        target = (entity_name or "").strip()
+        if not mention or not target:
+            return
+
+        context.mention_to_entity[mention.lower()] = target
+        mention_norm = _normalize_name_shared(mention)
+        if mention_norm:
+            context.mention_to_entity[mention_norm] = target
+
+    def _add_alias_to_entity(
+        self,
+        entities: list,
+        canonical_name: str,
+        alias_text: str,
+    ) -> None:
+        """Añade alias textual a la entidad en memoria para fases posteriores."""
+        alias_clean = (alias_text or "").strip()
+        canonical_clean = (canonical_name or "").strip()
+        if not alias_clean or not canonical_clean:
+            return
+        if _normalize_name_shared(alias_clean) == _normalize_name_shared(canonical_clean):
+            return
+
+        target_norm = _normalize_name_shared(canonical_clean)
+        for entity in entities or []:
+            entity_name = (
+                getattr(entity, "canonical_name", None) or getattr(entity, "name", "")
+            ).strip()
+            if not entity_name:
+                continue
+            if _normalize_name_shared(entity_name) != target_norm:
+                continue
+
+            if getattr(entity, "aliases", None) is None:
+                entity.aliases = []
+            if alias_clean not in entity.aliases:
+                entity.aliases.append(alias_clean)
+            return
 
     def _persist_coref_voting_details(self, context: AnalysisContext) -> None:
         """Persiste los detalles de votación de correferencia como menciones con metadata."""
