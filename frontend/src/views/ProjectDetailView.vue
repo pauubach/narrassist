@@ -99,6 +99,14 @@
           <i class="pi pi-info-circle"></i>
           {{ hasBeenAnalyzed ? 'Se volverá a analizar el documento original.' : 'Se analizará el documento para detectar inconsistencias.' }}
         </p>
+        <div class="analysis-mode-selector">
+          <label class="analysis-mode-label">Modo de análisis</label>
+          <select v-model="selectedAnalysisMode" class="analysis-mode-select">
+            <option v-for="opt in analysisModeOptions" :key="opt.value" :value="opt.value">
+              {{ opt.label }} — {{ opt.description }}
+            </option>
+          </select>
+        </div>
         <template #footer>
           <Button label="Cancelar" icon="pi pi-times" text @click="showReanalyzeDialog = false" />
           <Button
@@ -664,6 +672,14 @@ const replaceDocumentInputRef = ref<HTMLInputElement | null>(null)
 const showReanalyzeDialog = ref(false)
 const correctionConfigModalRef = ref<InstanceType<typeof CorrectionConfigModal> | null>(null)
 const reanalyzing = ref(false)
+const selectedAnalysisMode = ref('auto')
+const analysisModeOptions = [
+  { label: 'Auto', value: 'auto', description: 'Ajusta según tamaño del documento' },
+  { label: 'Express', value: 'express', description: 'Solo gramática y ortografía' },
+  { label: 'Ligero', value: 'light', description: 'Personajes + gramática (sin análisis profundo)' },
+  { label: 'Estándar', value: 'standard', description: 'Análisis completo' },
+  { label: 'Profundo', value: 'deep', description: 'Todo incluido (requiere más recursos)' },
+]
 const exportingStyleGuide = ref(false)
 
 // Estados de carga individuales vienen de useProjectData()
@@ -1747,7 +1763,8 @@ const startReanalysis = async () => {
   stopAnalysisPolling()
 
   try {
-    const data = await api.postRaw<{ success: boolean; error?: string }>(`/api/projects/${project.value.id}/reanalyze`)
+    const modeParam = selectedAnalysisMode.value !== 'auto' ? `?mode=${selectedAnalysisMode.value}` : ''
+    const data = await api.postRaw<{ success: boolean; error?: string }>(`/api/projects/${project.value.id}/reanalyze${modeParam}`)
 
     if (data.success) {
       // Backend ya creó el nuevo storage con status "running" →
@@ -2357,6 +2374,34 @@ const onReplaceDocumentSelected = async (event: Event) => {
 
 .reanalyze-info i {
   font-size: var(--ds-font-xl);
+}
+
+.analysis-mode-selector {
+  margin-top: var(--ds-space-4);
+}
+
+.analysis-mode-label {
+  display: block;
+  font-size: var(--ds-font-sm);
+  font-weight: 600;
+  margin-bottom: var(--ds-space-2);
+  color: var(--text-color);
+}
+
+.analysis-mode-select {
+  width: 100%;
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius);
+  background: var(--surface-ground);
+  color: var(--text-color);
+  font-size: var(--ds-font-sm);
+  cursor: pointer;
+}
+
+.analysis-mode-select:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: -1px;
 }
 
 /* Dark mode */

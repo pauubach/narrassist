@@ -21,6 +21,8 @@ export interface AnalysisProgress {
     entities_found?: number
     word_count?: number
     alerts_generated?: number
+    effective_mode?: string
+    mode_reason?: string
   }
   estimated_seconds_remaining?: number
   subphase?: {
@@ -266,7 +268,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
   // Actions
   // ============================================================================
 
-  async function startAnalysis(projectId: number, file?: File) {
+  async function startAnalysis(projectId: number, file?: File, mode?: string) {
     // Guard: prevent duplicate concurrent requests for the same project
     if (_analyzing.value[projectId]) return false
 
@@ -310,6 +312,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
       const formData = new FormData()
       if (file) {
         formData.append('file', file)
+      }
+      if (mode) {
+        formData.append('mode', mode)
       }
 
       const response = await api.postForm<{ project_id: number; status: string }>(`/api/projects/${projectId}/analyze`, formData)
@@ -414,6 +419,10 @@ export const useAnalysisStore = defineStore('analysis', () => {
     } else {
       delete _analyses.value[projectId]
     }
+  }
+
+  function setWarning(projectId: number, message: string) {
+    _warnings.value[projectId] = message
   }
 
   /**
@@ -626,6 +635,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     getProgress,
     clearAnalysis,
     setAnalyzing,
+    setWarning,
     checkAnalysisStatus,
     // Per-project queries
     isProjectAnalyzing,

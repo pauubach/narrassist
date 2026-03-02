@@ -6,7 +6,7 @@ from typing import Optional
 
 import deps
 from deps import ApiResponse, logger
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from routers._partial_analysis import PHASE_WEIGHTS, PartialAnalysisRequest
 
@@ -235,7 +235,7 @@ def _start_queued_analysis(queued_entry: dict):
 
 
 @router.post("/api/projects/{project_id}/reanalyze", response_model=ApiResponse)
-async def reanalyze_project(project_id: int):
+async def reanalyze_project(project_id: int, mode: Optional[str] = None):
     """
     Re-analiza un proyecto existente usando el documento original.
 
@@ -283,7 +283,7 @@ async def reanalyze_project(project_id: int):
 
         # Llamar al endpoint de análisis que tiene el progreso en background
         # El documento ya está guardado en project.document_path
-        return await start_analysis(project_id, file=None)
+        return await start_analysis(project_id, file=None, mode=mode)
 
     except HTTPException:
         raise
@@ -293,13 +293,18 @@ async def reanalyze_project(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/analyze", response_model=ApiResponse)
-async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None)):  # noqa: B008
+async def start_analysis(
+    project_id: int,
+    file: Optional[UploadFile] = File(None),  # noqa: B008
+    mode: Optional[str] = Form(None),  # noqa: B008  "auto"|"express"|"light"|"standard"|"deep"
+):
     """
     Inicia el análisis asíncrono de un proyecto.
 
     Args:
         project_id: ID del proyecto
         file: Archivo del manuscrito (opcional si el proyecto ya tiene document_path)
+        mode: Modo de análisis (auto=degrada según tamaño, express/light/standard/deep)
 
     Returns:
         ApiResponse confirmando inicio de análisis
@@ -581,6 +586,11 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
             )
 
             # Build shared context dict
+            # Normalizar modo de análisis
+            analysis_mode = (mode or "auto").strip().lower()
+            if analysis_mode not in ("auto", "express", "light", "standard", "deep", "complete"):
+                analysis_mode = "auto"
+
             ctx = {
                 "project_id": project_id,
                 "project": project,
@@ -594,6 +604,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 "previous_document_fingerprint": getattr(project, "document_fingerprint", "") or "",
                 "fast_path_same_document": False,
                 "_run_id": analysis_run_id,
+                "analysis_mode": analysis_mode,
             }
 
             # Log inicio con timestamp claro
@@ -840,23 +851,41 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                     proj_manager.update(project)
                     return  # Will be resumed when heavy slot frees
 
-                # Ollama health check before heavy phases
-                _t0 = time.time()
-                run_ollama_healthcheck(ctx, tracker)
-                logger.info(f"[TIMING] run_ollama_healthcheck: {time.time() - _t0:.2f}s")
+                # Obtener config de análisis para gating de fases
+                _acfg = ctx.get("analysis_config")
+
+                # Ollama health check: solo si LLM habilitado
+                if _acfg and _acfg.use_llm:
+                    _t0 = time.time()
+                    run_ollama_healthcheck(ctx, tracker)
+                    logger.info(f"[TIMING] run_ollama_healthcheck: {time.time() - _t0:.2f}s")
 
                 # Tier 2: Heavy phases (exclusive — one project at a time)
-                # NER → LLM validation → Fusion → Timeline (sequential)
-                _t0 = time.time()
-                run_ner(ctx, tracker)
-                logger.info(f"[TIMING] run_ner: {time.time() - _t0:.2f}s")
-                _t0 = time.time()
-                run_llm_entity_validation(ctx, tracker)
-                logger.info(f"[TIMING] run_llm_entity_validation: {time.time() - _t0:.2f}s")
 
-                _t0 = time.time()
-                run_fusion(ctx, tracker)
-                logger.info(f"[TIMING] run_fusion: {time.time() - _t0:.2f}s")
+                def _skip_phase(phase_key, phase_index, reason):
+                    """Marca una fase como omitida en el tracker."""
+                    tracker.start_phase(phase_key, phase_index, reason)
+                    tracker.set_action("Omitida por modo de análisis.")
+                    tracker.end_phase(phase_key, phase_index)
+
+                # NER → LLM validation → Fusion → Timeline (sequential)
+                if not _acfg or _acfg.run_ner:
+                    _t0 = time.time()
+                    run_ner(ctx, tracker)
+                    logger.info(f"[TIMING] run_ner: {time.time() - _t0:.2f}s")
+                    _t0 = time.time()
+                    run_llm_entity_validation(ctx, tracker)
+                    logger.info(f"[TIMING] run_llm_entity_validation: {time.time() - _t0:.2f}s")
+                else:
+                    _skip_phase("ner", 3, "NER omitido (modo express).")
+                    ctx.setdefault("entities", [])
+
+                if not _acfg or _acfg.run_entity_fusion:
+                    _t0 = time.time()
+                    run_fusion(ctx, tracker)
+                    logger.info(f"[TIMING] run_fusion: {time.time() - _t0:.2f}s")
+                else:
+                    _skip_phase("fusion", 4, "Fusión omitida (modo ligero).")
 
                 _t0 = time.time()
                 run_timeline(ctx, tracker)
@@ -870,8 +899,14 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                     _emit_grammar_alerts(ctx, tracker)
 
                 def _run_attrs_consistency_pipeline():
-                    run_attributes(ctx, tracker)
-                    run_consistency(ctx, tracker)
+                    if not _acfg or _acfg.run_attributes:
+                        run_attributes(ctx, tracker)
+                    else:
+                        _skip_phase("attributes", 5, "Atributos omitidos.")
+                    if not _acfg or _acfg.run_consistency:
+                        run_consistency(ctx, tracker)
+                    else:
+                        _skip_phase("consistency", 6, "Consistencia omitida.")
 
                 with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
                     future_grammar = pool.submit(_run_grammar_pipeline)

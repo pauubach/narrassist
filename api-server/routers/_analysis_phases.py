@@ -544,30 +544,38 @@ class ProgressTracker:
         self.current_phase_key = phase_key
         self.phase_start_times[phase_key] = time.time()
         pct_start, _ = self.get_phase_progress_range(phase_key)
-        self.phases[phase_index]["current"] = True
-        # Limpiar current_action de la fase anterior para que no se muestre
-        # texto estancado (ej: "Limpiando datos" durante NER)
-        self._write(
-            progress=pct_start,
-            current_phase=message,
-            current_action="",
-            subphase=None,
-        )
+        # Actualizar fase y storage atómicamente dentro del lock.
+        # current_phase = phase_key (no el mensaje) para que el frontend
+        # pueda emparejar step.id === currentStep y mostrar subphase info.
+        with deps._progress_lock:
+            self.phases[phase_index]["current"] = True
+            storage = deps.analysis_progress_storage.get(self.project_id)
+            if storage and storage.get("_run_id", "") == self.run_id:
+                storage["progress"] = pct_start
+                storage["current_phase"] = phase_key
+                storage["current_action"] = message
+                storage["subphase"] = None
 
     def end_phase(self, phase_key: str, phase_index: int):
         """Marca el fin de una fase."""
         _, pct_end = self.get_phase_progress_range(phase_key)
         self.phase_durations[phase_key] = time.time() - self.phase_start_times[phase_key]
-        self._write(progress=pct_end, subphase=None)
-        self.phases[phase_index]["completed"] = True
-        self.phases[phase_index]["current"] = False
-        self.phases[phase_index]["duration"] = round(self.phase_durations[phase_key], 1)
-        # Pre-activar la siguiente fase para que el spinner no desaparezca
-        # entre end_phase() y el siguiente start_phase() (evita que parezca
-        # que el análisis se ha colgado durante el gap de transición)
-        next_index = phase_index + 1
-        if next_index < len(self.phases):
-            self.phases[next_index]["current"] = True
+        duration = round(self.phase_durations[phase_key], 1)
+        # Actualizar progreso Y fases atómicamente dentro del lock
+        # para evitar que un poll vea la fase anterior como current=True al 100%
+        with deps._progress_lock:
+            storage = deps.analysis_progress_storage.get(self.project_id)
+            if storage and storage.get("_run_id", "") == self.run_id:
+                storage["progress"] = pct_end
+                storage["subphase"] = None
+            self.phases[phase_index]["completed"] = True
+            self.phases[phase_index]["current"] = False
+            self.phases[phase_index]["duration"] = duration
+            # Pre-activar la siguiente fase para que el spinner no desaparezca
+            # entre end_phase() y el siguiente start_phase()
+            next_index = phase_index + 1
+            if next_index < len(self.phases):
+                self.phases[next_index]["current"] = True
         self.check_cancelled()
         self.update_time_remaining()
         self.persist_progress()
@@ -639,8 +647,8 @@ class ProgressTracker:
         self._write(progress=pct)
 
     def set_message(self, message: str):
-        """Establece el mensaje de fase actual."""
-        self._write(current_phase=message)
+        """Establece el mensaje de acción actual (visible en la barra compacta)."""
+        self._write(current_action=message)
 
     def set_action(self, action: str):
         """Establece la acción actual (sub-tarea)."""
@@ -890,8 +898,7 @@ def run_snapshot(ctx: dict, tracker: ProgressTracker):
     """Captura snapshot pre-reanálisis (BK-05)."""
     _update_storage(
         ctx["project_id"],
-        current_phase="Preparando re-análisis...",
-        current_action="Guardando snapshot del análisis anterior",
+        current_action="Preparando re-análisis — guardando snapshot",
     )
     try:
         from narrative_assistant.persistence.snapshot import SnapshotRepository
@@ -911,8 +918,7 @@ def run_cleanup(ctx: dict, tracker: ProgressTracker):
     db_session = ctx["db_session"]
     _update_storage(
         project_id,
-        current_phase="Preparando re-análisis...",
-        current_action="Limpiando datos del análisis anterior",
+        current_action="Preparando re-análisis — limpiando datos anteriores",
     )
     logger.info(f"Clearing existing data for project {project_id}")
     try:
@@ -1029,7 +1035,48 @@ def apply_license_and_settings(ctx: dict, tracker: ProgressTracker):
     from narrative_assistant.licensing.gating import apply_license_gating, is_licensing_enabled
     from narrative_assistant.pipelines.unified_analysis import UnifiedConfig
 
-    analysis_config = UnifiedConfig.standard()
+    # Selección de modo: manual (del endpoint) o auto-degradación por word count
+    requested_mode = ctx.get("analysis_mode", "auto")
+    word_count = ctx.get("word_count", 0)
+
+    _MODE_FACTORIES = {
+        "express": UnifiedConfig.express,
+        "light": UnifiedConfig.light,
+        "standard": UnifiedConfig.standard,
+        "deep": UnifiedConfig.deep,
+        "complete": UnifiedConfig.complete,
+    }
+
+    if requested_mode in _MODE_FACTORIES:
+        analysis_config = _MODE_FACTORIES[requested_mode]()
+        logger.info(f"Modo de análisis seleccionado: {requested_mode}")
+    else:
+        # Auto: degradar según word count
+        if word_count > 100_000:
+            analysis_config = UnifiedConfig.express()
+            effective_mode = "express"
+            logger.info(
+                f"Auto-degradación: {word_count:,} palabras → modo EXPRESS "
+                f"(>100k palabras)"
+            )
+        elif word_count > 50_000:
+            analysis_config = UnifiedConfig.light()
+            effective_mode = "light"
+            logger.info(
+                f"Auto-degradación: {word_count:,} palabras → modo LIGHT "
+                f"(>50k palabras)"
+            )
+        else:
+            analysis_config = UnifiedConfig.standard()
+            effective_mode = "standard"
+
+        tracker.set_metric("effective_mode", effective_mode)
+        if effective_mode != "standard":
+            tracker.set_metric(
+                "mode_reason",
+                f"Documento de {word_count:,} palabras — modo {effective_mode} "
+                f"para evitar sobrecarga de recursos",
+            )
     if is_licensing_enabled():
         try:
             from narrative_assistant.licensing.verification import get_cached_license
@@ -1638,8 +1685,7 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
         if not manager.get_model_path(ModelType.TRANSFORMER_NER):
             _update_storage(
                 project_id,
-                current_phase="Descargando modelo NER (~500 MB, solo la primera vez)...",
-                current_action="Esto puede tardar unos minutos...",
+                current_action="Descargando modelo NER (~500 MB, solo la primera vez)...",
             )
     except Exception:
         pass
@@ -2010,7 +2056,6 @@ def run_llm_entity_validation(ctx: dict, tracker: ProgressTracker):
     _update_storage(
         project_id,
         current_action="Verificando personajes detectados con modelo de lenguaje...",
-        current_phase="Verificando personajes detectados...",
     )
     try:
         from narrative_assistant.llm.client import get_llm_client
@@ -2497,7 +2542,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
         # 2. Resolución de correferencias
         _update_storage(
             project_id,
-            current_phase="Identificando referencias cruzadas entre personajes...",
+            current_action="Identificando referencias cruzadas entre personajes...",
         )
         _update_fusion_progress(
             0.30,

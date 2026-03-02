@@ -98,6 +98,12 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
         loadAlerts(project.value!.id)
       }
 
+      // Mostrar aviso si el backend auto-degradó el modo de análisis
+      const modeReason = progressData.metrics?.mode_reason
+      if (modeReason && project.value) {
+        analysisStore.setWarning(project.value.id, modeReason)
+      }
+
       // Ajustar rate de polling según progreso (adaptive polling)
       adjustPollingRate()
 

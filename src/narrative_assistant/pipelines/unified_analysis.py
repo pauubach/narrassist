@@ -259,6 +259,45 @@ class UnifiedConfig:
         )
 
     @classmethod
+    def light(cls) -> "UnifiedConfig":
+        """Perfil Ligero: NER + gramática + consistencia básica, sin FUSION ni LLM.
+
+        Ideal para manuscritos grandes (>50k palabras) o máquinas con recursos
+        limitados. Detecta personajes y errores gramaticales pero no hace
+        deduplicación de entidades (FUSION) ni análisis semántico con LLM.
+        """
+        return cls(
+            run_structure=True,
+            run_dialogue_detection=True,
+            run_ner=True,
+            run_coreference=False,
+            run_entity_fusion=False,
+            run_attributes=True,
+            run_relationships=False,
+            run_knowledge=False,
+            run_voice_profiles=False,
+            run_spelling=True,
+            run_grammar=True,
+            run_lexical_repetitions=True,
+            run_semantic_repetitions=False,
+            run_coherence=False,
+            run_register_analysis=False,
+            run_sticky_sentences=True,
+            run_sentence_energy=True,
+            run_temporal=False,
+            run_focalization=False,
+            run_voice_deviations=False,
+            run_emotional=False,
+            run_sentiment=False,
+            run_pacing=False,
+            run_consistency=True,
+            run_temporal_consistency=False,
+            use_llm=False,
+            parallel_extraction=True,
+            max_workers=2,
+        )
+
+    @classmethod
     def standard(cls) -> "UnifiedConfig":
         """Perfil Estándar: NER + correferencias + calidad + estilo.
 
