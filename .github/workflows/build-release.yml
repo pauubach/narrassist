@@ -9,7 +9,35 @@ permissions:
   contents: write  # Needed to create releases
 
 jobs:
+  release-gate:
+    name: Release Gate (Backend Regression)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install -r api-server/requirements.txt
+
+      - name: Run critical backend regression suite
+        run: |
+          pytest -q \
+            tests/api/test_events_stats.py \
+            tests/api/test_events_export.py \
+            tests/nlp/orthography/test_semantic_integration.py
+
   build-windows:
+    needs: release-gate
     runs-on: windows-latest
     
     steps:
@@ -117,6 +145,7 @@ jobs:
           path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
   
   build-macos:
+    needs: release-gate
     runs-on: macos-latest
     
     steps:

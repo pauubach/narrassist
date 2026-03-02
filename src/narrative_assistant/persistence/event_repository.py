@@ -13,13 +13,30 @@ from datetime import datetime
 
 from ..core.errors import DatabaseError
 from ..core.result import Result
-from .database import get_database
+from .database import Database, get_database
 
 logger = logging.getLogger(__name__)
 
 # Lock para thread-safety en singleton
 _repository_lock = threading.Lock()
 _event_repository: "EventRepository | None" = None
+
+
+def _db_identity(db: Database | None) -> tuple[str, str]:
+    """
+    Retorna una identidad estable para comparar instancias de DB.
+
+    Prioriza `db_path` (misma ruta -> misma base lógica). Si no existe,
+    usa `id(db)` para evitar matches espurios entre objetos distintos.
+    """
+    if db is None:
+        return ("none", "")
+
+    db_path = getattr(db, "db_path", None)
+    if db_path:
+        return ("path", str(db_path))
+
+    return ("object", str(id(db)))
 
 
 @dataclass
@@ -51,9 +68,9 @@ class EventRepository:
     - Filtrar por tipo de evento o entidad
     """
 
-    def __init__(self):
+    def __init__(self, db: Database | None = None):
         """Inicializa el repositorio."""
-        self.db = get_database()
+        self.db = db or get_database()
 
     # =========================================================================
     # CRUD Operations
@@ -280,7 +297,7 @@ class EventRepository:
 # Singleton
 # =============================================================================
 
-def get_event_repository() -> EventRepository:
+def get_event_repository(db: Database | None = None) -> EventRepository:
     """
     Obtiene instancia singleton del repositorio de eventos.
 
@@ -289,9 +306,24 @@ def get_event_repository() -> EventRepository:
     """
     global _event_repository
 
+    if db is not None:
+        # En contextos de testing o multi-DB, no reutilizar singleton global.
+        return EventRepository(db)
+
+    current_db = get_database()
+    current_db_identity = _db_identity(current_db)
+
     if _event_repository is None:
         with _repository_lock:
             if _event_repository is None:
-                _event_repository = EventRepository()
+                _event_repository = EventRepository(current_db)
+    else:
+        repo_db_identity = _db_identity(getattr(_event_repository, "db", None))
+        if repo_db_identity != current_db_identity:
+            # Si cambió la DB activa (ej. tests con BD temporal), refrescar singleton.
+            with _repository_lock:
+                repo_db_identity = _db_identity(getattr(_event_repository, "db", None))
+                if repo_db_identity != current_db_identity:
+                    _event_repository = EventRepository(current_db)
 
     return _event_repository

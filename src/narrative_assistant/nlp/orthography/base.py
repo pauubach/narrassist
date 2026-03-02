@@ -157,7 +157,22 @@ class SpellingReport:
         unique: dict[str, SpellingIssue] = {}
         for issue in self.issues:
             key = issue.context_hash
-            if key not in unique or issue.confidence > unique[key].confidence:
+            current = unique.get(key)
+            if current is None:
+                unique[key] = issue
+                continue
+
+            if issue.confidence > current.confidence:
+                unique[key] = issue
+                continue
+
+            # En empate, priorizar detección semántica frente a misspelling
+            # para no perder errores de contexto relevantes.
+            if (
+                issue.confidence == current.confidence
+                and issue.error_type == SpellingErrorType.SEMANTIC
+                and current.error_type != SpellingErrorType.SEMANTIC
+            ):
                 unique[key] = issue
         return unique
 

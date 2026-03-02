@@ -517,6 +517,10 @@ COMMON_SPANISH_WORDS = {
     "menor",
 }
 
+# Artículos y conectores para detectar frases descriptivas (no nombres propios)
+_DETERMINERS = {"el", "la", "los", "las", "un", "una", "unos", "unas"}
+_DESCRIPTIVE_CONNECTORS = {"de", "del", "y", "e", "en"}
+
 # Patrones que indican que NO es una entidad
 NOT_ENTITY_PATTERNS = [
     # Preguntas
@@ -816,6 +820,17 @@ class EntityValidator:
                 rejection_reason="Rechazada por el usuario anteriormente",
             )
 
+        # Filtrar frases descriptivas tipo "el carpintero" que suelen colarse
+        # como PER desde LLM, pero no son nombres propios.
+        if self._is_descriptive_person_phrase(entity):
+            return EntityScore(
+                text=text,
+                total_score=0.0,
+                is_valid=False,
+                validation_method="pattern_rejected",
+                rejection_reason="Frase descriptiva con artículo (rol/profesión), no nombre propio",
+            )
+
         # ===== NUEVO: Verificar si está en zona no-narrativa =====
         # Obtener la línea donde aparece la entidad
         line, is_line_start = get_line_for_position(full_text, entity.start_char)
@@ -941,6 +956,39 @@ class EntityValidator:
                 scores.rejection_reason = f"Score bajo ({scores.total_score:.2f})"
 
         return scores
+
+    def _is_descriptive_person_phrase(self, entity) -> bool:
+        """Detecta frases nominales descriptivas que no son nombres propios."""
+        label = getattr(entity, "label", None)
+        label_value = getattr(label, "value", str(label)).upper() if label is not None else ""
+        if label_value != "PER":
+            return False
+
+        text = getattr(entity, "text", "") or ""
+        words = text.strip().split()
+        if len(words) < 2:
+            return False
+
+        if words[0].lower() not in _DETERMINERS:
+            return False
+
+        tail = words[1:]
+
+        # Si hay mayúsculas internas, probablemente es nombre propio ("El Cid").
+        if any(word and word[0].isupper() for word in tail):
+            return False
+
+        for word in tail:
+            cleaned = word.strip(".,;:!?¡¿\"'()[]{}")
+            if not cleaned:
+                continue
+            lowered = cleaned.lower()
+            if lowered in _DESCRIPTIVE_CONNECTORS:
+                continue
+            if not re.fullmatch(r"[a-záéíóúüñ]+", lowered):
+                return False
+
+        return True
 
     def _check_zone_distribution(self, entity_text: str, full_text: str) -> float:
         """

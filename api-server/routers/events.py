@@ -31,6 +31,35 @@ router = APIRouter()
 # Helper: obtener eventos de un proyecto (DB → fallback on-the-fly)
 # ============================================================================
 
+def _get_request_event_repository():
+    """Obtiene repositorio de eventos acoplado a la DB activa del request."""
+    from narrative_assistant.persistence.event_repository import get_event_repository
+
+    request_db = None
+    get_db = getattr(deps, "get_database", None)
+    if callable(get_db):
+        try:
+            request_db = get_db()
+        except Exception as e:
+            logger.debug(f"No se pudo obtener DB desde deps.get_database(): {e}")
+
+    return get_event_repository(request_db)
+
+
+def _get_request_chapter_repository():
+    """Obtiene repositorio de capítulos acoplado a la DB activa del request."""
+    from narrative_assistant.persistence.chapter import ChapterRepository
+
+    get_db = getattr(deps, "get_database", None)
+    if callable(get_db):
+        try:
+            return ChapterRepository(get_db())
+        except Exception as e:
+            logger.debug(f"No se pudo obtener ChapterRepository por request DB: {e}")
+
+    return getattr(deps, "chapter_repository", None)
+
+
 def _get_all_project_events(project_id: int, chapters) -> dict[int, list]:
     """
     Obtiene eventos de todos los capítulos, priorizando datos persistidos.
@@ -40,9 +69,7 @@ def _get_all_project_events(project_id: int, chapters) -> dict[int, list]:
     """
     from narrative_assistant.analysis.event_detection import DetectedEvent, detect_events_in_chapter
     from narrative_assistant.analysis.event_types import EventType
-    from narrative_assistant.persistence.event_repository import get_event_repository
-
-    event_repo = get_event_repository()
+    event_repo = _get_request_event_repository()
     persisted = event_repo.get_by_project(project_id)
 
     if persisted.is_success and persisted.value:
@@ -122,20 +149,20 @@ def get_chapter_events(project_id: int, chapter_number: int):
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
-        if not deps.chapter_repository:
+        chapter_repo = _get_request_chapter_repository()
+        if not chapter_repo:
             return ApiResponse(success=False, error="Chapter repository not initialized")
 
-        chapters = deps.chapter_repository.get_by_project(project_id)
+        chapters = chapter_repo.get_by_project(project_id)
         chapter = next((ch for ch in chapters if ch.chapter_number == chapter_number), None)
 
         if not chapter:
             raise HTTPException(status_code=404, detail=f"Capítulo {chapter_number} no encontrado")
 
         from narrative_assistant.analysis.event_types import EVENT_TIER_MAP, EventTier
-        from narrative_assistant.persistence.event_repository import get_event_repository
 
         # Intentar leer de tabla narrative_events primero
-        event_repo = get_event_repository()
+        event_repo = _get_request_event_repository()
         persisted = event_repo.get_by_chapter(project_id, chapter_number)
 
         events = []
@@ -254,10 +281,11 @@ def export_events(
         project = result.value
 
         # Obtener capítulos
-        if not deps.chapter_repository:
+        chapter_repo = _get_request_chapter_repository()
+        if not chapter_repo:
             raise HTTPException(status_code=500, detail="Chapter repository not initialized")
 
-        chapters = deps.chapter_repository.get_by_project(project_id)
+        chapters = chapter_repo.get_by_project(project_id)
 
         # Filtrar por rango de capítulos
         if chapter_start is not None or chapter_end is not None:
@@ -475,10 +503,11 @@ def get_event_stats(project_id: int):
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
         # Obtener capítulos
-        if not deps.chapter_repository:
+        chapter_repo = _get_request_chapter_repository()
+        if not chapter_repo:
             return ApiResponse(success=False, error="Chapter repository not initialized")
 
-        chapters = deps.chapter_repository.get_by_project(project_id)
+        chapters = chapter_repo.get_by_project(project_id)
 
         if not chapters:
             return ApiResponse(success=True, data={
