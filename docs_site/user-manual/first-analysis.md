@@ -85,8 +85,12 @@ Guía paso a paso para tu primer análisis de manuscrito.
 ### 3.2 Iniciar Análisis
 
 1. Haz clic en **"Analizar"**
-2. Confirma configuración
-3. **Espera** (2-10 minutos según tamaño)
+2. Selecciona el **modo de análisis**: Auto (recomendado), Express, Ligero, Estándar o Profundo
+3. Confirma configuración
+4. **Espera** (2-10 minutos según tamaño)
+
+> **Modo Auto**: Si tu manuscrito tiene >50k palabras, se usa modo Ligero automáticamente.
+> Puedes forzar un modo superior si tu equipo lo soporta.
 
 **Fases del análisis**:
 

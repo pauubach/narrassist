@@ -91,6 +91,26 @@ Analiza **múltiples libros** de una saga y detecta inconsistencias entre ellos:
 - **GPU**: NVIDIA CUDA o Apple Silicon (acelera procesamiento)
 - **SSD**: Mejora tiempos de carga
 
+### Capacidades según tu equipo
+
+No todos los ordenadores ofrecen las mismas capacidades. La aplicación se adapta automáticamente:
+
+| Tu equipo | Qué puedes esperar |
+|-----------|-------------------|
+| **8 GB RAM, sin GPU dedicada** | Gramática, ortografía y detección de personajes. Para manuscritos >50k palabras el análisis se simplifica automáticamente. LLM (análisis semántico) no recomendado. |
+| **16 GB RAM, GPU integrada** | Análisis completo para manuscritos hasta ~80k palabras. LLM funciona en modo CPU (más lento pero funcional). |
+| **16+ GB RAM, GPU dedicada (4+ GB VRAM)** | Todas las funciones a máxima velocidad. Análisis completo incluso en manuscritos de 100k+ palabras. |
+
+**Modos de análisis disponibles:**
+
+- **Auto** (por defecto): Ajusta la profundidad según el tamaño del documento
+- **Express**: Solo gramática y ortografía (funciona en cualquier equipo)
+- **Ligero**: Personajes + gramática, sin deduplicación profunda
+- **Estándar**: Análisis completo (recomendado para <50k palabras)
+- **Profundo**: Todo incluido (requiere más recursos)
+
+Puedes seleccionar el modo manualmente desde el diálogo de re-análisis.
+
 ---
 
 ## Filosofía: Asistencia, No Automatización

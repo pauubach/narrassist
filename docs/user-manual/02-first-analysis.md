@@ -74,8 +74,18 @@ Antes de analizar, puedes configurar el preset según el tipo de manuscrito:
 ### 3.2 Iniciar Análisis
 
 1. En la vista del proyecto, haz clic en **"Analizar"** (botón principal)
-2. Confirma la configuración en el diálogo
-3. **Espera** mientras se ejecuta el análisis (puede tardar 2-10 minutos)
+2. Selecciona el **modo de análisis** en el diálogo de confirmación:
+   - **Auto** (recomendado): Se ajusta según el tamaño del documento
+   - **Express**: Solo gramática y ortografía (rápido, cualquier PC)
+   - **Ligero**: Personajes + gramática (sin análisis profundo)
+   - **Estándar**: Análisis completo (ideal para <50k palabras)
+   - **Profundo**: Todo incluido (requiere más recursos)
+3. Haz clic en **"Analizar"**
+4. **Espera** mientras se ejecuta el análisis (puede tardar 2-10 minutos)
+
+> **Nota**: En modo **Auto**, si tu manuscrito tiene más de 50.000 palabras, la aplicación
+> usará automáticamente el modo Ligero para evitar problemas de rendimiento.
+> Puedes forzar un modo superior si tu equipo lo soporta.
 
 **Fases del análisis**:
 

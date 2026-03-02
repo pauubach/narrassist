@@ -128,8 +128,38 @@ Cada alerta incluye:
 |------------|--------|-------------|
 | RAM | 8 GB | 16 GB |
 | Disco | 3 GB | 6 GB (con modelos LLM) |
-| GPU | No necesaria | NVIDIA con 4+ GB VRAM |
+| GPU | No necesaria | NVIDIA con 4+ GB VRAM / Apple Silicon |
 | Sistema | Windows 10, macOS 11, Ubuntu 20.04 | |
+
+### Capacidades según Hardware
+
+La profundidad del análisis se adapta automáticamente a los recursos disponibles.
+No todos los ordenadores pueden ejecutar todas las funciones a la misma velocidad.
+
+| Capacidad | PC Básico | PC Medio | PC Alto |
+|-----------|-----------|----------|---------|
+| | 8 GB RAM, sin GPU | 16 GB RAM, GPU integrada | 16+ GB, GPU dedicada |
+| Gramática y ortografía | Si | Si | Si |
+| Detección de personajes (NER) | Si (lento en >50k palabras) | Si | Si |
+| Deduplicación de entidades | Limitado (>50k se omite) | Si | Si |
+| Análisis LLM (Ollama) | No recomendado | Si (CPU, lento) | Si (GPU, rápido) |
+| Relaciones y perfiles | No | Si | Si |
+| Manuscritos <30k palabras | Análisis completo (~3 min) | Completo (~1 min) | Completo (<30s) |
+| Manuscritos 50-100k palabras | Modo Ligero (~5 min) | Completo (~5 min) | Completo (~2 min) |
+| Manuscritos >100k palabras | Modo Express (~2 min) | Modo Ligero (~8 min) | Completo (~5 min) |
+
+**Modos de análisis** (seleccionable al re-analizar):
+
+| Modo | Qué incluye | Ideal para |
+|------|-------------|------------|
+| **Express** | Gramática y ortografía | Revisión rápida, cualquier PC |
+| **Ligero** | Express + detección de personajes + consistencia | Manuscritos grandes, PCs modestos |
+| **Estándar** | Ligero + deduplicación + análisis LLM | Uso habitual (<50k palabras) |
+| **Profundo** | Estándar + relaciones + conocimiento | Análisis exhaustivo con buenos recursos |
+| **Auto** | Se ajusta según tamaño del documento | Recomendado (por defecto) |
+
+> En modo **Auto**, la aplicación selecciona automáticamente el modo más adecuado
+> según el tamaño del documento: >50k palabras usa Ligero, >100k usa Express.
 
 ---
 
