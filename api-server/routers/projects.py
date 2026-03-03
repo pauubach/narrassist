@@ -684,93 +684,128 @@ def get_analysis_status(project_id: int):
 
         project = result.value
 
-        # Obtener estadísticas para determinar qué está ejecutado
         db = deps.get_database()
-        stats = _get_project_stats(project_id, db)
-        _ = project.settings or {}  # settings reserved for future per-project config
 
-        # Determinar qué fases están ejecutadas basándose en datos disponibles
-        # Esto es una aproximación - idealmente tendríamos un registro de fases ejecutadas
-        has_chapters = (stats.get("chapter_count") or 0) > 0
-        has_entities = (stats.get("entity_count") or 0) > 0
-        has_alerts = (stats.get("open_alerts_count") or 0) > 0
+        # Fuente primaria: run ledger (registro real de fases ejecutadas)
+        ledger_phases: dict[str, bool] = {}
+        try:
+            from narrative_assistant.persistence.analysis import AnalysisRepository
 
-        # Verificar si hay relaciones (puede ser en 'relationships' o 'entity_relationships')
-        relationship_count = 0
-        has_temporal = False
-        with db.connection() as conn:
-            # Intentar primero la tabla 'relationships' (schema principal)
-            try:
-                cursor = conn.execute(
-                    "SELECT COUNT(*) FROM relationships WHERE project_id = ?", (project_id,)
-                )
-                relationship_count = cursor.fetchone()[0]
-            except Exception:
-                # Si no existe, intentar 'entity_relationships' (módulo relationships)
+            analysis_repo = AnalysisRepository(db)
+            ledger_phases = analysis_repo.get_executed_phases(project_id)
+        except Exception:
+            pass
+
+        # Mapeo de fases backend (run_*) → claves frontend para el endpoint
+        _BACKEND_TO_FRONTEND: dict[str, list[str]] = {
+            "parsing": ["parsing"],
+            "structure": ["structure"],
+            "classification": ["structure"],
+            "ner": ["entities"],
+            "llm_validation": ["entities"],
+            "fusion": ["coreference"],
+            "timeline": ["timeline", "temporal"],
+            "attributes": ["attributes"],
+            "consistency": ["coherence"],
+            "grammar": ["grammar", "grammar_alerts", "spelling", "register"],
+            "alerts": ["alerts"],
+            "events": ["pacing"],
+        }
+
+        if ledger_phases:
+            # Usar registro real: construir executed a partir del ledger
+            executed: dict[str, bool] = {}
+            for backend_phase, frontend_keys in _BACKEND_TO_FRONTEND.items():
+                phase_ran = ledger_phases.get(backend_phase, False)
+                for fk in frontend_keys:
+                    if phase_ran:
+                        executed[fk] = True
+                    else:
+                        executed.setdefault(fk, False)
+
+            # Enrichment/derivados: verificar datos existentes en DB
+            stats = _get_project_stats(project_id, db)
+            has_entities = (stats.get("entity_count") or 0) > 0
+            has_chapters = (stats.get("chapter_count") or 0) > 0
+
+            # Claves que dependen de enrichment (no están en run ledger)
+            if has_entities and has_chapters:
+                for fk in [
+                    "voice_profiles", "voice_deviations",
+                    "narrative_health", "character_archetypes", "speaker_attribution",
+                ]:
+                    executed.setdefault(fk, True)
+            if has_chapters:
+                for fk in [
+                    "tension_curve", "sensory_report", "sentence_energy",
+                    "narrative_templates", "register_analysis",
+                ]:
+                    executed.setdefault(fk, True)
+            if has_entities:
+                executed.setdefault("story_bible", True)
+
+            # Verificar relaciones desde DB
+            with db.connection() as conn:
                 try:
                     cursor = conn.execute(
-                        "SELECT COUNT(*) FROM entity_relationships WHERE project_id = ?",
-                        (project_id,),
+                        "SELECT COUNT(*) FROM relationships WHERE project_id = ?", (project_id,)
                     )
-                    relationship_count = cursor.fetchone()[0]
+                    executed["relationships"] = cursor.fetchone()[0] > 0
                 except Exception:
-                    # Ninguna tabla existe, 0 relaciones
-                    relationship_count = 0
+                    executed.setdefault("relationships", False)
 
-            # Verificar si hay datos temporales (simplificado - verificar si existen marcadores)
-            try:
-                cursor = conn.execute(
-                    """SELECT COUNT(*) FROM alerts
-                       WHERE project_id = ? AND category = 'temporal'""",
-                    (project_id,),
-                )
-                has_temporal = cursor.fetchone()[0] > 0
-            except Exception:
-                has_temporal = False
-
-            # Verificar si hay timeline construida (verificar eventos temporales)
+            # Defaults para fases no implementadas
+            for fk in ["interactions", "emotional", "sentiment", "focalization"]:
+                executed.setdefault(fk, False)
+        else:
+            # Fallback: heurísticas legacy (proyectos analizados antes del run ledger)
+            stats = _get_project_stats(project_id, db)
+            has_chapters = (stats.get("chapter_count") or 0) > 0
+            has_entities = (stats.get("entity_count") or 0) > 0
+            has_alerts = (stats.get("open_alerts_count") or 0) > 0
             has_timeline = False
-            try:
-                cursor = conn.execute(
-                    "SELECT COUNT(*) FROM timeline_events WHERE project_id = ?", (project_id,)
-                )
-                has_timeline = cursor.fetchone()[0] > 0
-            except Exception:
-                has_timeline = False
 
-        # Construir estado de fases ejecutadas
-        executed = {
-            "parsing": has_chapters,  # Si hay capítulos, el parsing se ejecutó
-            "structure": has_chapters,
-            "entities": has_entities,
-            "coreference": has_entities,  # Asumimos que si hay entidades, hay correferencias
-            "attributes": has_entities,
-            "relationships": relationship_count > 0,
-            "interactions": False,  # Por implementar
-            "alerts": has_alerts,
-            "grammar_alerts": has_alerts,  # Alertas de gramática (parcial)
-            "spelling": has_alerts,  # Si hay alertas, asumimos que se ejecutó
-            "grammar": has_alerts,
-            "register": has_alerts,
-            "pacing": has_chapters,
-            "coherence": has_entities and has_chapters,
-            "temporal": has_temporal,
-            "timeline": has_timeline,  # Timeline construida durante análisis
-            "emotional": False,  # Por implementar
-            "sentiment": False,  # Por implementar
-            "focalization": False,  # Por implementar
-            "voice_profiles": has_entities and has_chapters,  # Perfiles de voz disponibles
-            "voice_deviations": has_entities and has_chapters,  # Desviaciones de voz
-            "register_analysis": has_chapters,  # Análisis de registro disponible
-            "tension_curve": has_chapters,  # Curva de tensión narrativa
-            "sensory_report": has_chapters,  # Reporte sensorial (5 sentidos)
-            "sentence_energy": has_chapters,  # Energía de oraciones (voz, verbos, estructura)
-            "narrative_templates": has_chapters,  # Plantillas narrativas (diagnóstico)
-            "narrative_health": has_chapters and has_entities,  # Salud narrativa (12 dimensiones)
-            "character_archetypes": has_entities and has_chapters,  # Arquetipos Jung/Campbell
-            "story_bible": has_entities,  # Story Bible / Wiki de entidades
-            "speaker_attribution": has_entities and has_chapters,  # Atribución de hablantes
-        }
+            with db.connection() as conn:
+                try:
+                    cursor = conn.execute(
+                        "SELECT COUNT(*) FROM timeline_events WHERE project_id = ?", (project_id,)
+                    )
+                    has_timeline = cursor.fetchone()[0] > 0
+                except Exception:
+                    pass
+
+            executed = {
+                "parsing": has_chapters,
+                "structure": has_chapters,
+                "entities": has_entities,
+                "coreference": has_entities,
+                "attributes": has_entities,
+                "relationships": False,
+                "interactions": False,
+                "alerts": has_alerts,
+                "grammar_alerts": has_alerts,
+                "spelling": has_alerts,
+                "grammar": has_alerts,
+                "register": has_alerts,
+                "pacing": has_chapters,
+                "coherence": has_entities and has_chapters,
+                "temporal": has_timeline,
+                "timeline": has_timeline,
+                "emotional": False,
+                "sentiment": False,
+                "focalization": False,
+                "voice_profiles": has_entities and has_chapters,
+                "voice_deviations": has_entities and has_chapters,
+                "register_analysis": has_chapters,
+                "tension_curve": has_chapters,
+                "sensory_report": has_chapters,
+                "sentence_energy": has_chapters,
+                "narrative_templates": has_chapters,
+                "narrative_health": has_chapters and has_entities,
+                "character_archetypes": has_entities and has_chapters,
+                "story_bible": has_entities,
+                "speaker_attribution": has_entities and has_chapters,
+            }
 
         return ApiResponse(
             success=True,

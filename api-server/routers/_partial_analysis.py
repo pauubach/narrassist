@@ -727,6 +727,28 @@ def run_partial_analysis_thread(
         project.analysis_status = "completed"
         total_duration = round(time.time() - ctx["start_time"], 1)
         ProjectManager(db_session).update(project)
+
+        # Persistir run ledger parcial
+        try:
+            import json
+            from narrative_assistant.persistence.analysis import AnalysisRepository
+
+            analysis_repo = AnalysisRepository(db_session)
+            ledger_run_id = analysis_repo.create_run(
+                project_id=project_id,
+                config_json=json.dumps({"mode": "partial", "phases": phases_to_run}),
+            )
+            for phase_key, duration in tracker.phase_durations.items():
+                analysis_repo.save_phase(
+                    run_id=ledger_run_id,
+                    phase_name=phase_key,
+                    executed=True,
+                    metadata={"duration": round(duration, 2)},
+                )
+            analysis_repo.complete_run(ledger_run_id)
+        except Exception as e:
+            logger.warning(f"Could not persist partial run ledger: {e}")
+
         logger.info(
             f"Partial analysis completed for project {project_id} "
             f"({len(phases_to_run)} phases in {total_duration}s)"

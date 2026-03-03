@@ -5568,6 +5568,29 @@ def run_completion(ctx: dict, tracker: ProgressTracker):
     proj_manager = ProjectManager(ctx["db_session"])
     proj_manager.update(project)
 
+    # Persistir run ledger: registro real de fases ejecutadas
+    try:
+        from narrative_assistant.persistence.analysis import AnalysisRepository
+
+        analysis_repo = AnalysisRepository(ctx["db_session"])
+        run_id = analysis_repo.create_run(
+            project_id=project_id,
+            config_json=json.dumps({"mode": ctx.get("run_mode", "full")}),
+        )
+        for phase_key, duration in tracker.phase_durations.items():
+            analysis_repo.save_phase(
+                run_id=run_id,
+                phase_name=phase_key,
+                executed=True,
+                metadata={"duration": round(duration, 2)},
+            )
+        analysis_repo.complete_run(run_id)
+        logger.debug(
+            f"Run ledger saved: {len(tracker.phase_durations)} phases for project {project_id}"
+        )
+    except Exception as e:
+        logger.warning(f"Could not persist run ledger: {e}")
+
     # Formatear duración en minutos si es > 60s
     duration_str = f"{total_duration}s"
     if total_duration >= 60:
