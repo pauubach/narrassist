@@ -1175,7 +1175,7 @@ DoD:
 - En vez de "GPU no compatible (Compute Capability...)": "Tu equipo usara modo estandar para mantener estabilidad".
 - En vez de "Timeout Ollama": "El motor avanzado no respondio a tiempo. Seguimos en modo basico y puedes reintentar desde Configuracion".
 
-## 21) Meta-validacion del documento (2026-03-03, revision 5)
+## 21) Meta-validacion del documento (2026-03-03, revision 6)
 
 ### 21.1 Estado de hallazgos criticos en codigo actual
 
@@ -1201,6 +1201,11 @@ DoD:
   - Gating efectivo para flags de pipeline (incluyendo `name_variants`, `multi_model_voting`, `spelling`): `api-server/routers/_analysis_phases.py:1153-1161,2723,2925,4213,4238,4262,4495,4564` y `api-server/routers/analysis.py:908`.
   - Tests de soporte: `tests/unit/test_cr03_runtime_settings.py` + `frontend/src/stores/__tests__/analysis.spec.ts` + `frontend/src/composables/__tests__/useSettingsMigration.spec.ts` + `frontend/src/composables/__tests__/useSettingsPersistence.spec.ts`.
 - `CR-07`: CERRADO. `timeline` integrada en `PHASE_ORDER` y tracker dinamico por clave.
+- `CR-08`: CERRADO. Analisis parcial distingue `accepted` (POST ok) de `completed` (fin real):
+  - `runPartialAnalysis()` ya no limpia estado en `finally`; solo limpia en error de POST.
+  - `AnalysisRequired.vue` emite `analysis-completed` via `watch(isExecuted)` (estado real), no al retorno del POST.
+  - `setAnalyzing(false)` limpia `runningPhases` al detectar fin via polling.
+  - Archivos: `frontend/src/stores/analysis.ts`, `frontend/src/components/analysis/AnalysisRequired.vue`.
 
 ### 21.2 Estado de hallazgos timeline/progreso
 
@@ -1210,7 +1215,31 @@ DoD:
 - `HI-21`: CERRADO. Loop de timeline con `check_cancelled`.
 - `CR-07a`: CERRADO. Full analysis gatea timeline por `run_temporal`: `api-server/routers/analysis.py:897`.
 
-### 21.3 Matriz actualizada de CR-03
+### 21.3 Estado de hallazgos run_id / concurrencia
+
+- `HI-13`: CERRADO. Todas las escrituras de progreso migradas a `tracker.update_storage()` con `run_id` automatico (36 callsites).
+  - Wrapper seguro: `tracker.update_storage()` pasa `self.run_id` a `_update_storage()`.
+  - Tests: `tests/unit/test_run_id_guard.py` (7 tests).
+- `HI-14`: CERRADO. Analisis parcial genera `run_id = uuid4().hex[:12]`, propagado via `ctx["run_id"]` al tracker.
+  - `api-server/routers/analysis.py`: genera run_id en storage + ctx.
+  - `api-server/routers/_partial_analysis.py`: tracker recibe run_id.
+
+### 21.4 Estado de hallazgos analysis-status / estados UI
+
+- `HI-23`: CERRADO. `get_analysis_status()` usa run ledger (tablas `analysis_runs`/`analysis_phases`) como fuente primaria, con fallback heuristico para proyectos legacy.
+  - Run ledger se persiste en `run_completion()` y en parcial completion via `AnalysisRepository`.
+  - Archivos: `api-server/routers/_analysis_phases.py`, `api-server/routers/_partial_analysis.py`, `api-server/routers/projects.py`.
+- `HI-15`: CERRADO. Polling de `ProjectsView` corregido:
+  - `idle` ya no se mapea a `completed`; trigger refetch para obtener estado real de DB.
+  - `failed`/`error`/`cancelled` se manejan explicitamente.
+  - `queued_for_heavy` mapeado a `queued`.
+  - Archivo: `frontend/src/views/ProjectsView.vue`.
+- `ME-06`: CERRADO. Tipos API alineados:
+  - `ApiAnalysisStatus` incluye `queued` y `cancelled`.
+  - Transformer default cambiado de `'completed'` a `'pending'` cuando `analysis_status` es falsy.
+  - Archivos: `frontend/src/types/api/projects.ts`, `frontend/src/types/transformers/projects.ts`.
+
+### 21.5 Matriz actualizada de CR-03
 
 Estado por bloques:
 
@@ -1224,34 +1253,48 @@ Resultado:
 
 - Gap original de CR-03 ("settings no gobiernan ejecucion"): **CERRADO**.
 
-### 21.4 Pendientes reales (no bloqueantes CR-03 MVP)
+### 21.6 Pendientes reales (no bloqueantes)
 
 - P1:
   - E2E pipeline completo `PATCH settings -> run -> verificacion de artefactos/fases`.
+  - `HI-16`: Logica watchdog heavy slot (heuristica de status ambigua).
+  - `HI-17`: Timeline falla → estado degradado visible en UI.
+  - `HI-22`: Lock idempotente en `autoConfigOnStartup`.
 - P2:
   - `CR-05`: incrementalidad fina por subgrafo entidad-relacion-accion.
+  - `ME-07`..`ME-11`: Mejoras de UX en errores, polling, instalacion.
 
-### 21.5 Estado de pruebas (revalidado)
+### 21.7 Estado de pruebas (revalidado)
 
 - Backend:
-  - `pytest tests/unit/test_cr03_runtime_settings.py tests/api/test_project_settings.py tests/api/test_project_settings_e2e.py tests/unit/test_cr03_settings_e2e.py -q`
-  - Resultado: `30 passed`
+  - `pytest tests/unit/test_cr03_runtime_settings.py tests/api/test_project_settings.py tests/unit/test_run_id_guard.py -q`
+  - Resultado: `26 passed`
 - Frontend:
-  - `npm --prefix frontend run type-check`
-  - Resultado: `OK`
-  - `npm --prefix frontend run test:run -- src/stores/__tests__/analysis.spec.ts src/composables/__tests__/useSettingsMigration.spec.ts src/composables/__tests__/useSettingsPersistence.spec.ts`
-  - Resultado: `59 passed`
+  - `vitest run src/types/__tests__/transformers.spec.ts src/stores/__tests__/analysis.spec.ts src/stores/__tests__/projects.spec.ts`
+  - Resultado: `115 passed` (42 + 52 + 21)
 
-### 21.6 Re-priorizacion recomendada desde este estado
+### 21.8 Tickets P0 completados (sprint 2026-03-03)
+
+| Ticket | Hallazgo | Commit | Resumen |
+|--------|----------|--------|---------|
+| T-003 | CR-08 | `a1fe7c8` | Parcial espera fin real via polling, no POST accepted |
+| T-004 | HI-13/HI-14 | `edd2217` | run_id propagado a 36 callsites + parcial |
+| T-005 | HI-23 | `c4c0a15` | analysis-status basado en run ledger real |
+| T-006 | HI-15/ME-06 | `d6c6b4b` | Tipos API completos + polling ProjectsView corregido |
+
+### 21.9 Re-priorizacion recomendada desde este estado
 
 - P0 inmediato:
-  - Sin pendientes criticos abiertos de CR-03/CR-07 en el workspace actual.
+  - **Sin pendientes criticos abiertos.** Todos los P0 del sprint plan (T-003..T-006) cerrados.
 - P1:
   - E2E de pipeline completo.
+  - Watchdog heavy slot (HI-16).
+  - Timeline degraded state en UI (HI-17).
 - P2:
   - CR-05 arquitectonico (incrementalidad fina).
+  - Mejoras UX errores/polling (ME-07..ME-11).
 
-### 21.7 Recomendacion de uso de documentos
+### 21.10 Recomendacion de uso de documentos
 
 - Documento base: version para stakeholders y seguimiento ejecutivo.
 - Documento extremo: referencia tecnica de implementacion, QA y tracking por sprints, incluyendo estado historico + meta-validacion viva.
