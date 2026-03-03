@@ -780,13 +780,14 @@ def system_capabilities():
             has_cupy = detector.detect_cupy() if cuda_device else False
             blocked_gpu = get_blocked_gpu_info()
 
+        hardware_uncertain = False
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(_detect_hardware)
             try:
                 future.result(timeout=10)
             except concurrent.futures.TimeoutError:
-                logger.warning("Hardware detection timed out after 10s")
-                # Fallback: al menos CPU info
+                logger.warning("Hardware detection timed out after 10s — GPU info may be incomplete")
+                hardware_uncertain = True
                 try:
                     cpu_device = detector.get_cpu_info()
                 except Exception:
@@ -829,37 +830,48 @@ def system_capabilities():
             import shutil
             ollama_installed = shutil.which("ollama") is not None
 
-        # Verificar si está corriendo y obtener modelos
+        # Verificar si está corriendo y obtener modelos (con 1 reintento)
         import json as json_module
         import urllib.error
         import urllib.request
 
+        ollama_uncertain = False
         if not ollama_installed:
             logger.info("Ollama no instalado — instálalo desde Configuración o https://ollama.com/download")
         else:
-            try:
-                ollama_host = "http://localhost:11434"
-                logger.debug(f"Verificando Ollama en {ollama_host}/api/tags...")
-                req = urllib.request.Request(f"{ollama_host}/api/tags")
-                with urllib.request.urlopen(req, timeout=3.0) as response:  # Reduced from 10s
-                    if response.status == 200:
-                        ollama_available = True
-                        data = json_module.loads(response.read().decode('utf-8'))
-                        ollama_models = [
-                            {
-                                "name": model.get("name", "").split(":")[0],
-                                "size": model.get("size", 0),
-                                "modified": model.get("modified_at", ""),
-                            }
-                            for model in data.get("models", [])
-                        ]
-                        logger.info(f"Ollama detectado: {len(ollama_models)} modelo(s)")
-            except urllib.error.URLError:
-                logger.info("Ollama instalado pero no iniciado — inícialo desde Configuración")
-            except TimeoutError:
-                logger.info("Ollama instalado pero no responde (timeout)")
-            except Exception as e:
-                logger.info(f"Ollama instalado pero error de conexión: {type(e).__name__}")
+            ollama_host = "http://localhost:11434"
+            for attempt, timeout_s in enumerate([(3.0,), (5.0,)], start=1):
+                try:
+                    logger.debug(f"Verificando Ollama en {ollama_host}/api/tags (intento {attempt})...")
+                    req = urllib.request.Request(f"{ollama_host}/api/tags")
+                    with urllib.request.urlopen(req, timeout=timeout_s[0]) as response:
+                        if response.status == 200:
+                            ollama_available = True
+                            data = json_module.loads(response.read().decode('utf-8'))
+                            ollama_models = [
+                                {
+                                    "name": model.get("name", "").split(":")[0],
+                                    "size": model.get("size", 0),
+                                    "modified": model.get("modified_at", ""),
+                                }
+                                for model in data.get("models", [])
+                            ]
+                            logger.info(f"Ollama detectado: {len(ollama_models)} modelo(s)")
+                    break  # Éxito, no reintentar
+                except urllib.error.URLError:
+                    logger.info("Ollama instalado pero no iniciado — inícialo desde Configuración")
+                    break  # No reintentar errores de conexión (servicio no levantado)
+                except (TimeoutError, OSError):
+                    if attempt < 2:
+                        logger.info(f"Ollama timeout en intento {attempt}, reintentando con timeout mayor...")
+                        import time as _time_retry
+                        _time_retry.sleep(0.5)
+                        continue
+                    logger.info("Ollama instalado pero no responde tras 2 intentos (timeout)")
+                    ollama_uncertain = True
+                except Exception as e:
+                    logger.info(f"Ollama instalado pero error de conexión: {type(e).__name__}")
+                    break
 
         # Verificar LanguageTool (puede intentar iniciarlo si está instalado)
         lt_available = _check_languagetool_available()
@@ -1075,7 +1087,8 @@ def system_capabilities():
         elif has_gpu:
             ollama_recommendations = ["qwen3", "hermes3"]
         else:
-            ollama_recommendations = ["qwen3"]  # Funciona en CPU
+            # CPU-only: recomendar modelos ligeros (qwen3 necesita 12GB RAM)
+            ollama_recommendations = ["llama3.2", "qwen2.5"]
 
         # Verificar si el modelo de embeddings está disponible localmente
         embeddings_available = False
@@ -1086,9 +1099,26 @@ def system_capabilities():
         except Exception:
             pass
 
+        # Estado de detección: completo, parcial o incierto
+        detection_uncertain = hardware_uncertain or ollama_uncertain
+        detection_status = "complete" if not detection_uncertain else "uncertain"
+        detection_warnings: list[str] = []
+        if hardware_uncertain:
+            detection_warnings.append(
+                "La detección de hardware excedió el tiempo. "
+                "La GPU podría no haberse detectado correctamente."
+            )
+        if ollama_uncertain:
+            detection_warnings.append(
+                "Ollama no respondió a tiempo. "
+                "Si está instalado, reinicia el servicio desde Configuración."
+            )
+
         return ApiResponse(
             success=True,
             data={
+                "detection_status": detection_status,
+                "detection_warnings": detection_warnings,
                 "hardware": {
                     "gpu": gpu_info,
                     "gpu_type": gpu_type,
@@ -1104,6 +1134,7 @@ def system_capabilities():
                 "ollama": {
                     "installed": ollama_installed,
                     "available": ollama_available,
+                    "uncertain": ollama_uncertain,
                     "models": ollama_models,
                     "recommended_models": ollama_recommendations,
                     "init_status": _get_ollama_init_status(),
