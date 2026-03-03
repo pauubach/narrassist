@@ -610,6 +610,24 @@ class ProgressTracker:
                     else:
                         storage[key] = value
 
+    def update_storage(
+        self,
+        *,
+        metrics_update: dict[str, Any] | None = None,
+        **updates,
+    ) -> None:
+        """Wrapper seguro sobre _update_storage con run_id automático.
+
+        Todas las funciones run_* deben usar este método en vez de
+        _update_storage() directa para evitar escrituras stale tras cancel.
+        """
+        _update_storage(
+            self.project_id,
+            metrics_update=metrics_update,
+            _run_id=self.run_id,
+            **updates,
+        )
+
     def get_phase_progress_range(self, phase_id: str) -> tuple[int, int]:
         """Calcula el rango de progreso (inicio, fin) para una fase basado en pesos."""
         cumulative = 0.0
@@ -1008,8 +1026,7 @@ def _persist_sections_recursive(
 
 def run_snapshot(ctx: dict, tracker: ProgressTracker):
     """Captura snapshot pre-reanálisis (BK-05)."""
-    _update_storage(
-        ctx["project_id"],
+    tracker.update_storage(
         current_action="Preparando re-análisis — guardando snapshot",
     )
     try:
@@ -1028,8 +1045,7 @@ def run_cleanup(ctx: dict, tracker: ProgressTracker):
     """Limpia datos existentes antes de re-analizar."""
     project_id = ctx["project_id"]
     db_session = ctx["db_session"]
-    _update_storage(
-        project_id,
+    tracker.update_storage(
         current_action="Preparando re-análisis — limpiando datos anteriores",
     )
     logger.info(f"Clearing existing data for project {project_id}")
@@ -1880,7 +1896,7 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
     def ner_progress_callback(fase: str, pct: float, msg: str):
         ner_range = ner_pct_end - ner_pct_start
         ner_progress = ner_pct_start + int(pct * ner_range)
-        _update_storage(project_id, progress=ner_progress, current_action=msg)
+        tracker.update_storage( progress=ner_progress, current_action=msg)
         tracker.update_time_remaining()
 
     # Verificar si el modelo transformer NER necesita descargarse
@@ -1889,8 +1905,7 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
 
         manager = get_model_manager()
         if not manager.get_model_path(ModelType.TRANSFORMER_NER):
-            _update_storage(
-                project_id,
+            tracker.update_storage(
                 current_action="Descargando modelo NER (~500 MB, solo la primera vez)...",
             )
     except Exception:
@@ -1967,8 +1982,7 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
                         sub_progress / 100.0,
                         f"Analizando capítulo {idx}/{total_missing} (personajes y lugares)..."
                     )
-                    _update_storage(
-                        project_id,
+                    tracker.update_storage(
                         current_action=(
                             f"Analizando capítulo {idx}/{total_missing} (NER)"
                         ),
@@ -2005,7 +2019,7 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
                     # Final progress update after processing this chapter
                     final_sub_pct = idx / total_missing
                     final_sub_progress = ner_pct_start + int(final_sub_pct * (ner_pct_end - ner_pct_start))
-                    _update_storage(project_id, progress=min(ner_pct_end, final_sub_progress))
+                    tracker.update_storage( progress=min(ner_pct_end, final_sub_progress))
                     tracker.update_time_remaining()
 
     # Fallback: full-document NER
@@ -2216,7 +2230,7 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
                 if entities_created % 5 == 0 and total_entities_to_create > 0:
                     sub_pct = entities_created / total_entities_to_create
                     sub_progress = ner_pct_start + int(sub_pct * (ner_pct_end - ner_pct_start))
-                    _update_storage(project_id, progress=min(ner_pct_end, sub_progress))
+                    tracker.update_storage( progress=min(ner_pct_end, sub_progress))
                     tracker.update_time_remaining()
 
             except Exception as e:
@@ -2265,8 +2279,7 @@ def run_llm_entity_validation(ctx: dict, tracker: ProgressTracker):
                 p["completed"] = False
                 break
 
-    _update_storage(
-        project_id,
+    tracker.update_storage(
         current_action="Verificando personajes detectados con modelo de lenguaje...",
     )
     try:
@@ -2424,7 +2437,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
     selected_nlp_methods = ctx.get("selected_nlp_methods", {})
 
     tracker.start_phase("fusion", 4, "Unificando entidades mencionadas de diferentes formas...")
-    _update_storage(project_id, current_action="Preparando unificación...")
+    tracker.update_storage( current_action="Preparando unificación...")
 
     fusion_pct_start, fusion_pct_end = tracker.get_phase_progress_range("fusion")
     coref_result = None
@@ -2484,7 +2497,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
         if not updates:
             return
 
-        _update_storage(project_id, _run_id=tracker.run_id, **updates)
+        tracker.update_storage(**updates)
         if progress_changed:
             tracker.update_time_remaining()
 
@@ -2754,8 +2767,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
         )
 
         # 2. Resolución de correferencias
-        _update_storage(
-            project_id,
+        tracker.update_storage(
             current_action="Identificando referencias cruzadas entre personajes...",
         )
         _update_fusion_progress(
@@ -3406,8 +3418,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                 )
 
         # AHORA sí: marcar entities_found después de MentionFinder + recalcular importancia
-        _update_storage(
-            project_id,
+        tracker.update_storage(
             metrics_update={"entities_found": len(entities)},
         )
 
@@ -3437,7 +3448,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
         tracker.phases[4]["completed"] = True
         tracker.phases[4]["current"] = False
         tracker.phases[4]["duration"] = round(tracker.phase_durations["fusion"], 1)
-        _update_storage(project_id, subphase=None)
+        tracker.update_storage( subphase=None)
 
     tracker.check_cancelled()
 
@@ -3494,8 +3505,7 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
         for idx, chapter in enumerate(chapters_with_ids, start=1):
             tracker.check_cancelled()
             # Actualizar progreso (0-50% de la fase se dedica a extracción)
-            _update_storage(
-                project_id,
+            tracker.update_storage(
                 current_action=f"Extrayendo marcadores temporales del capítulo {idx}/{total_chapters}..."
             )
             tracker.update_time_remaining()
@@ -3516,7 +3526,7 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
         logger.info(f"Timeline: {len(chapters_with_ids)} chapters, {len(all_markers)} markers")
 
         # Actualizar progreso (50% - construcción de timeline)
-        _update_storage(project_id, current_action="Construyendo línea temporal...")
+        tracker.update_storage( current_action="Construyendo línea temporal...")
         tracker.update_time_remaining()
 
         # Construir timeline
@@ -3534,7 +3544,7 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
         timeline = builder.build_from_markers(all_markers, chapter_data)
 
         # Verificar consistencia temporal (75%)
-        _update_storage(project_id, current_action="Verificando consistencia temporal...")
+        tracker.update_storage( current_action="Verificando consistencia temporal...")
         tracker.update_time_remaining()
 
         checker = TemporalConsistencyChecker()
@@ -3545,7 +3555,7 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
         )
 
         # Persistir timeline en BD (90%)
-        _update_storage(project_id, current_action="Guardando timeline en base de datos...")
+        tracker.update_storage( current_action="Guardando timeline en base de datos...")
         tracker.update_time_remaining()
         try:
             # Limpiar timeline anterior si existe
@@ -3646,7 +3656,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
         use_embeddings = has_gpu
         if use_embeddings:
             logger.info("GPU detectada - habilitando análisis de embeddings para atributos")
-            _update_storage(project_id, current_action="Análisis avanzado con GPU activado")
+            tracker.update_storage( current_action="Análisis avanzado con GPU activado")
         else:
             logger.info("Sin GPU - usando métodos rápidos para atributos (LLM, patrones)")
 
@@ -3733,8 +3743,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
                     progress_pct / 100.0,
                     f"Analizando personaje {batch_end}/{total_chars}: {names_str}"
                 )
-                _update_storage(
-                    project_id,
+                tracker.update_storage(
                     current_action=f"Analizando: {names_str} ({batch_end}/{total_chars})",
                     progress=progress_pct,
                 )
@@ -3768,8 +3777,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
             attr_result = Result.success(AttributeExtractionResult(attributes=all_extracted_attrs))
             logger.info(f"Atributos extraídos: {len(all_extracted_attrs)}")
 
-            _update_storage(
-                project_id,
+            tracker.update_storage(
                 progress=attr_pct_start + int((attr_pct_end - attr_pct_start) * 0.5),
                 current_action="Registrando características encontradas...",
             )
@@ -3921,8 +3929,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
                     attrs_processed += 1
                     if attrs_processed % 10 == 0 or attrs_processed == total_attrs:
                         save_progress = 0.6 + (0.35 * attrs_processed / max(total_attrs, 1))
-                        _update_storage(
-                            project_id,
+                        tracker.update_storage(
                             progress=attr_pct_start
                             + int((attr_pct_end - attr_pct_start) * save_progress),
                             current_action=(
@@ -3934,7 +3941,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
     _restore_verified_attributes(ctx)
 
     tracker.end_phase("attributes")
-    _update_storage(project_id, metrics_update={"attributes_extracted": len(attributes)})
+    tracker.update_storage( metrics_update={"attributes_extracted": len(attributes)})
     logger.info(f"Attribute extraction complete: {len(attributes)} attributes")
 
     ctx["attributes"] = attributes
@@ -3974,8 +3981,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     chapter_progress_report = None
 
     sub_progress = cons_pct_start + int((cons_pct_end - cons_pct_start) * 0.0)
-    _update_storage(
-        project_id,
+    tracker.update_storage(
         current_action="Verificando estado vital de personajes...",
         progress=sub_progress
     )
@@ -4103,8 +4109,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
 
     # Sub-fase 7.2: Ubicaciones (33-66%)
     sub_progress = cons_pct_start + int((cons_pct_end - cons_pct_start) * 0.33)
-    _update_storage(
-        project_id,
+    tracker.update_storage(
         current_action="Verificando ubicaciones de personajes...",
         progress=sub_progress
     )
@@ -4182,8 +4187,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
 
     # Sub-fase 7.3: Resumen por capítulo (66-100%)
     sub_progress = cons_pct_start + int((cons_pct_end - cons_pct_start) * 0.66)
-    _update_storage(
-        project_id,
+    tracker.update_storage(
         current_action="Generando resumen de avance narrativo...",
         progress=sub_progress
     )
@@ -4214,8 +4218,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     # Sub-fase 7.4: Out-of-character
     ooc_report = None
     if analysis_config.run_ooc_detection:
-        _update_storage(
-            project_id,
+        tracker.update_storage(
             current_action="Detectando comportamiento fuera de personaje...",
         )
         try:
@@ -4302,7 +4305,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     # Sub-fase 7.5: Anacronismos
     anachronism_report = None
     if analysis_config.run_anachronism_detection:
-        _update_storage(project_id, current_action="Detectando anacronismos...")
+        tracker.update_storage( current_action="Detectando anacronismos...")
         try:
             from narrative_assistant.temporal.anachronisms import AnachronismDetector
 
@@ -4327,7 +4330,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     # Sub-fase 7.6: Español clásico
     classical_normalization = None
     if analysis_config.run_classical_spanish:
-        _update_storage(project_id, current_action="Detectando español clásico...")
+        tracker.update_storage( current_action="Detectando español clásico...")
         try:
             from narrative_assistant.nlp.classical_spanish import ClassicalSpanishNormalizer
 
@@ -4351,7 +4354,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     # Sub-fase 7.7: Speech consistency tracking (v0.10.14)
     speech_change_count = 0
     if analysis_config.run_speech_tracking:
-        _update_storage(project_id, current_action="Analizando consistencia del habla...")
+        tracker.update_storage( current_action="Analizando consistencia del habla...")
         try:
             from narrative_assistant.analysis.speech_tracking import (
                 ContextualAnalyzer,
@@ -4442,8 +4445,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
         tracker.check_cancelled()
 
     # Guardar métricas
-    _update_storage(
-        project_id,
+    tracker.update_storage(
         metrics_update={
             "vital_status_deaths": (
                 len(vital_status_report.death_events) if vital_status_report else 0
@@ -4460,7 +4462,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     )
 
     tracker.end_phase("consistency")
-    _update_storage(project_id, metrics_update={"inconsistencies_found": len(inconsistencies)})
+    tracker.update_storage( metrics_update={"inconsistencies_found": len(inconsistencies)})
     logger.info(f"Consistency analysis complete: {len(inconsistencies)} inconsistencies")
 
     ctx["inconsistencies"] = inconsistencies
@@ -4835,8 +4837,7 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
 
         def corrections_progress_callback(message: str, current: int, total: int):
             """Callback para reportar progreso de correcciones."""
-            _update_storage(
-                project_id,
+            tracker.update_storage(
                 current_action=f"Revisando capítulo {current}/{total} (tipografía y repeticiones)..."
             )
             tracker.update_time_remaining()
@@ -4864,7 +4865,7 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
                 correction_issues.extend(ch_issues)
         else:
             # Fallback: análisis monolítico si no hay capítulos
-            _update_storage(project_id, current_action="Buscando repeticiones y errores tipográficos...")
+            tracker.update_storage( current_action="Buscando repeticiones y errores tipográficos...")
             correction_issues = orchestrator.analyze(
                 text=full_text,
                 chapter_index=None,
@@ -4907,8 +4908,7 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
         logger.warning(f"Error in corrections analysis: {e}")
 
     tracker.end_phase("grammar")
-    _update_storage(
-        project_id,
+    tracker.update_storage(
         metrics_update={
             "grammar_issues_found": len(grammar_issues),
             "correction_suggestions": len(correction_issues),
@@ -5006,7 +5006,7 @@ def _emit_grammar_alerts(ctx: dict, tracker: ProgressTracker):
                 logger.warning(f"Error creating correction alert: {e}")
 
     # No marcar fase aquí: run_alerts() gestiona el ciclo de la fase "alerts"
-    _update_storage(project_id, metrics_update={"alerts_generated": alerts_created})
+    tracker.update_storage( metrics_update={"alerts_generated": alerts_created})
     logger.info(f"Grammar alerts emitted: {alerts_created} alerts")
 
     ctx.setdefault("alerts_created", 0)
@@ -5286,7 +5286,7 @@ def run_alerts(ctx: dict, tracker: ProgressTracker):
 
     tracker.end_phase("alerts")
     total = ctx.get("alerts_created", 0)
-    _update_storage(project_id, metrics_update={"alerts_generated": total})
+    tracker.update_storage( metrics_update={"alerts_generated": total})
     logger.info(f"Alerts phase complete: {total} total alerts")
 
     # SP-1: Auto-descartar alertas que el usuario ya había descartado

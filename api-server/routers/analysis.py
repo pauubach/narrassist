@@ -1159,13 +1159,17 @@ def start_partial_analysis(project_id: int, request: PartialAnalysisRequest):
 
         # Initialize progress (only partial phases)
         import time as time_module
+        import uuid
 
         now = time_module.time()
         progress_phases, partial_weights, partial_order = build_partial_progress(phases_to_run)
+        partial_run_id = uuid.uuid4().hex[:12]
 
         with deps._progress_lock:
+            deps.analysis_cancellation_flags.pop(project_id, None)
             deps.analysis_progress_storage[project_id] = {
                 "project_id": project_id,
+                "_run_id": partial_run_id,
                 "status": "running",
                 "progress": 0,
                 "current_phase": "Iniciando análisis parcial...",
@@ -1197,6 +1201,7 @@ def start_partial_analysis(project_id: int, request: PartialAnalysisRequest):
             "queue_mode": "partial",
             "partial_frontend_phases": request.phases,
             "partial_force": request.force,
+            "run_id": partial_run_id,
         }
 
         thread = threading.Thread(

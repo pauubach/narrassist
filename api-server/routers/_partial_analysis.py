@@ -597,6 +597,7 @@ def run_partial_analysis_thread(
         phase_weights=partial_weights,
         phase_order=partial_order,
         db_session=db_session,
+        run_id=ctx.get("run_id", ""),
     )
 
     try:
