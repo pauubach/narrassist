@@ -1259,10 +1259,8 @@ Resultado:
   - E2E pipeline completo `PATCH settings -> run -> verificacion de artefactos/fases`.
   - `HI-16`: Logica watchdog heavy slot (heuristica de status ambigua).
   - `HI-17`: Timeline falla → estado degradado visible en UI.
-  - `HI-22`: Lock idempotente en `autoConfigOnStartup`.
 - P2:
   - `CR-05`: incrementalidad fina por subgrafo entidad-relacion-accion.
-  - `ME-07`..`ME-11`: Mejoras de UX en errores, polling, instalacion.
 
 ### 21.7 Estado de pruebas (revalidado)
 
@@ -1270,6 +1268,7 @@ Resultado:
   - `pytest tests/unit/test_cr03_runtime_settings.py tests/api/test_project_settings.py tests/unit/test_run_id_guard.py -q`
   - Resultado: `26 passed`
 - Frontend:
+  - `vue-tsc --noEmit`: OK
   - `vitest run src/types/__tests__/transformers.spec.ts src/stores/__tests__/analysis.spec.ts src/stores/__tests__/projects.spec.ts`
   - Resultado: `115 passed` (42 + 52 + 21)
 
@@ -1282,19 +1281,28 @@ Resultado:
 | T-005 | HI-23 | `c4c0a15` | analysis-status basado en run ledger real |
 | T-006 | HI-15/ME-06 | `d6c6b4b` | Tipos API completos + polling ProjectsView corregido |
 
-### 21.9 Re-priorizacion recomendada desde este estado
+### 21.9 Tickets P1 completados (sprint 2026-03-04)
+
+| Ticket | Hallazgo | Commit | Resumen |
+|--------|----------|--------|---------|
+| T-008 | HI-21 | (ya resuelto) | `check_cancelled` ya presente en loop de run_timeline |
+| T-009 | HI-19/HI-06 | `775dd31` | Retry Ollama, detection_status/warnings, CPU → llama3.2 |
+| T-010 | HI-22 | `51dd3ac` | autoConfigOnStartup idempotente + fix llmDownloadingModels |
+| T-011 | ME-07/ME-08 | `e891e72` | pip timeout 5min + stopPolling en error terminal |
+| T-012 | ME-09/ME-11 | `e8b8d7c` | Mensajeria no tecnica + fetch → apiClient en SettingsView |
+
+### 21.10 Re-priorizacion recomendada desde este estado
 
 - P0 inmediato:
-  - **Sin pendientes criticos abiertos.** Todos los P0 del sprint plan (T-003..T-006) cerrados.
-- P1:
+  - **Sin pendientes criticos abiertos.** Todos los P0 (T-003..T-006) y P1 priorizados (T-008..T-012) cerrados.
+- P1 restante:
   - E2E de pipeline completo.
   - Watchdog heavy slot (HI-16).
   - Timeline degraded state en UI (HI-17).
 - P2:
   - CR-05 arquitectonico (incrementalidad fina).
-  - Mejoras UX errores/polling (ME-07..ME-11).
 
-### 21.10 Recomendacion de uso de documentos
+### 21.11 Recomendacion de uso de documentos
 
 - Documento base: version para stakeholders y seguimiento ejecutivo.
 - Documento extremo: referencia tecnica de implementacion, QA y tracking por sprints, incluyendo estado historico + meta-validacion viva.
