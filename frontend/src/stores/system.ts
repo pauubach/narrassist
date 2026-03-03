@@ -537,7 +537,11 @@ export const useSystemStore = defineStore('system', () => {
    * - Descarga modelo por defecto si Ollama está listo pero sin modelos
    * Ejecutar en background después de que modelos NLP estén listos.
    */
+  let _autoConfigRunning = false
   async function autoConfigOnStartup(): Promise<void> {
+    // Guard idempotente: evitar ejecución concurrente (HI-22)
+    if (_autoConfigRunning) return
+    _autoConfigRunning = true
     try {
       // Asegurar que capabilities están cargadas
       const caps = await loadCapabilities()
@@ -602,12 +606,13 @@ export const useSystemStore = defineStore('system', () => {
           }
         } catch {
           // Silencioso — el usuario puede configurarlo desde Settings
-        } finally {
           llmDownloadingModels.value = []
         }
       }
     } catch {
       // Auto-config es best-effort, no debe bloquear la app
+    } finally {
+      _autoConfigRunning = false
     }
   }
 
