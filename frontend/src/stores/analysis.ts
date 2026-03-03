@@ -219,6 +219,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
    * Fases actualmente en ejecución (para mostrar loading).
    */
   const runningPhases = ref<Set<keyof ExecutedPhases>>(new Set())
+  /** Proyecto al que pertenecen las runningPhases actuales */
+  let _runningPhasesProjectId: number | null = null
 
   // ============================================================================
   // Computed: vista del proyecto activo (backward-compatible)
@@ -420,8 +422,11 @@ export const useAnalysisStore = defineStore('analysis', () => {
       executedPhases.value[projectId] = {}
     } else {
       delete _analyses.value[projectId]
-      // Limpiar fases parciales en ejecución (si quedan)
-      runningPhases.value.clear()
+      // Limpiar fases parciales solo si pertenecen a este proyecto
+      if (_runningPhasesProjectId === null || _runningPhasesProjectId === projectId) {
+        runningPhases.value.clear()
+        _runningPhasesProjectId = null
+      }
     }
   }
 
@@ -511,7 +516,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
     // Guard: prevent duplicate concurrent requests
     if (_analyzing.value[projectId]) return false
 
-    // Añadir a fases en ejecución
+    // Añadir a fases en ejecución (scoped al proyecto)
+    _runningPhasesProjectId = projectId
     phases.forEach(p => runningPhases.value.add(p))
 
     _analyzing.value[projectId] = true

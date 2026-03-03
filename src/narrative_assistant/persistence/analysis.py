@@ -462,19 +462,26 @@ class AnalysisRepository:
         """
         Obtiene qué fases se han ejecutado para un proyecto.
 
+        Fusiona TODOS los runs (completos y parciales): si una fase se
+        ejecutó en cualquier run previo, se marca como True.  Así un
+        run parcial reciente no "apaga" fases de runs anteriores.
+
         Returns:
             Dict con nombre de fase -> bool ejecutado
         """
-        run = self.get_latest_run(project_id)
-        if not run:
-            return {}
-
         with self.db.transaction() as conn:
             conn.row_factory = lambda c, r: dict(
                 zip([col[0] for col in c.description], r, strict=False)
             )
             rows = conn.execute(
-                "SELECT phase_name, executed FROM analysis_phases WHERE run_id = ?", (run.id,)
+                """
+                SELECT ap.phase_name, MAX(ap.executed) AS executed
+                FROM analysis_phases ap
+                JOIN analysis_runs ar ON ar.id = ap.run_id
+                WHERE ar.project_id = ?
+                GROUP BY ap.phase_name
+                """,
+                (project_id,),
             ).fetchall()
 
         return {row["phase_name"]: bool(row["executed"]) for row in rows}

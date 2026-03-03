@@ -710,15 +710,19 @@ def run_partial_analysis_thread(
         # --- Completion ---
         run_reconciliation(ctx, tracker)
 
-        # Mark as completed
+        # Mark as completed (con guard de run_id)
+        my_run_id = ctx.get("run_id", "")
         with deps._progress_lock:
             storage = deps.analysis_progress_storage.get(project_id)
             if storage:
-                storage["status"] = "completed"
-                storage["progress"] = 100
-                storage["current_phase"] = "Análisis parcial completado"
-                storage["current_action"] = ""
-                storage["estimated_seconds_remaining"] = 0
+                if my_run_id and storage.get("_run_id", "") != my_run_id:
+                    logger.warning(f"Stale partial run {my_run_id} skipping storage write; current is {storage.get('_run_id')}")
+                else:
+                    storage["status"] = "completed"
+                    storage["progress"] = 100
+                    storage["current_phase"] = "Análisis parcial completado"
+                    storage["current_action"] = ""
+                    storage["estimated_seconds_remaining"] = 0
 
         # Update project status
         from narrative_assistant.persistence.project import ProjectManager

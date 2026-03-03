@@ -5535,30 +5535,35 @@ def run_completion(ctx: dict, tracker: ProgressTracker):
     total_duration = round(time.time() - start_time, 1)
 
     # F-006: Atomic status transition — lock protects against cancel race
+    my_run_id = tracker.run_id
     with deps._progress_lock:
         storage = deps.analysis_progress_storage.get(project_id, {})
-        storage["status"] = "completed"
-        storage["current_phase"] = "Análisis completado"
-        storage["progress"] = 1.0  # Explicitly set to 100%
-        storage["estimated_seconds_remaining"] = 0
-        storage.setdefault("metrics", {})["total_duration_seconds"] = total_duration
-        metrics = storage.get("metrics", {})
-        storage["stats"] = {
-            "entities": metrics.get("entities_found", len(entities)),
-            "alerts": metrics.get("alerts_generated", alerts_created),
-            "chapters": metrics.get("chapters_found", chapters_count),
-            "corrections": metrics.get("correction_suggestions", 0),
-            "grammar": metrics.get("grammar_issues_found", 0),
-            "attributes": metrics.get("attributes_extracted", len(attributes)),
-            "words": metrics.get("word_count", word_count),
-            "duration": total_duration,
-        }
-        if ctx.get("version_chapter_diff"):
-            storage["stats"]["chapter_diff"] = ctx["version_chapter_diff"]
-        if ctx.get("version_entity_diff"):
-            storage["stats"]["entity_diff"] = ctx["version_entity_diff"]
-        if ctx.get("run_mode"):
-            storage["stats"]["run_mode"] = ctx["run_mode"]
+        # Guard: no sobreescribir storage si un run más nuevo ya lo tomó
+        if my_run_id and storage.get("_run_id", "") != my_run_id:
+            logger.warning(f"Stale run {my_run_id} skipping storage write; current is {storage.get('_run_id')}")
+        else:
+            storage["status"] = "completed"
+            storage["current_phase"] = "Análisis completado"
+            storage["progress"] = 1.0  # Explicitly set to 100%
+            storage["estimated_seconds_remaining"] = 0
+            storage.setdefault("metrics", {})["total_duration_seconds"] = total_duration
+            metrics = storage.get("metrics", {})
+            storage["stats"] = {
+                "entities": metrics.get("entities_found", len(entities)),
+                "alerts": metrics.get("alerts_generated", alerts_created),
+                "chapters": metrics.get("chapters_found", chapters_count),
+                "corrections": metrics.get("correction_suggestions", 0),
+                "grammar": metrics.get("grammar_issues_found", 0),
+                "attributes": metrics.get("attributes_extracted", len(attributes)),
+                "words": metrics.get("word_count", word_count),
+                "duration": total_duration,
+            }
+            if ctx.get("version_chapter_diff"):
+                storage["stats"]["chapter_diff"] = ctx["version_chapter_diff"]
+            if ctx.get("version_entity_diff"):
+                storage["stats"]["entity_diff"] = ctx["version_entity_diff"]
+            if ctx.get("run_mode"):
+                storage["stats"]["run_mode"] = ctx["run_mode"]
 
     project.analysis_status = "completed"
     project.analysis_progress = 1.0
@@ -5717,16 +5722,21 @@ def handle_analysis_error(ctx: dict, error: Exception):
     else:
         user_msg = f"Error en el análisis: {err_str}"
 
+    my_run_id = ctx.get("_run_id", "")
     with deps._progress_lock:
         storage = deps.analysis_progress_storage.get(project_id, {})
-        storage["status"] = "error"
-        storage["current_phase"] = user_msg
-        storage["error"] = user_msg
+        if my_run_id and storage.get("_run_id", "") != my_run_id:
+            logger.warning(f"Stale run {my_run_id} skipping error write; current is {storage.get('_run_id')}")
+        else:
+            storage["status"] = "error"
+            storage["current_phase"] = user_msg
+            storage["error"] = user_msg
 
     try:
-        project.analysis_status = "error"
-        proj_manager = ProjectManager(ctx["db_session"])
-        proj_manager.update(project)
+        if not my_run_id or deps.analysis_progress_storage.get(project_id, {}).get("_run_id", "") == my_run_id:
+            project.analysis_status = "error"
+            proj_manager = ProjectManager(ctx["db_session"])
+            proj_manager.update(project)
     except Exception as db_error:
         logger.error(f"Failed to update project status to error: {db_error}")
 
