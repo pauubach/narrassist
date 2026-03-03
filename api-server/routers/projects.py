@@ -21,6 +21,242 @@ from narrative_assistant.persistence.manuscript_identity import (
 router = APIRouter()
 
 
+# ── Mapa de requisitos de servicio por método NLP (CR-03 post-MVP) ──────────
+_METHOD_SERVICE_MAP: dict[tuple[str, str], str] = {
+    # Métodos que requieren Ollama
+    ("coreference", "llm"): "ollama",
+    ("ner", "llm"): "ollama",
+    ("grammar", "llm"): "ollama",
+    ("spelling", "llm_arbitrator"): "ollama",
+    ("character_knowledge", "llm"): "ollama",
+    ("character_knowledge", "hybrid"): "ollama",
+    # Métodos que requieren LanguageTool
+    ("grammar", "languagetool"): "languagetool",
+    ("spelling", "languagetool"): "languagetool",
+    # Métodos que requieren GPU
+    ("spelling", "beto"): "gpu",
+}
+
+# Mensajes de warning por servicio (reutilizables)
+_SERVICE_WARNING_TEMPLATES: dict[str, str] = {
+    "ollama": (
+        "Método '{method}' en '{category}' requiere Ollama, "
+        "que no está disponible actualmente. "
+        "Se guardará la preferencia y se usará degradación automática."
+    ),
+    "languagetool": (
+        "Método '{method}' en '{category}' requiere LanguageTool, "
+        "que no está corriendo actualmente. "
+        "Se guardará la preferencia y se usará degradación automática."
+    ),
+    "gpu": (
+        "Método '{method}' en '{category}' requiere GPU, "
+        "que no está disponible. "
+        "Se guardará la preferencia pero el método se omitirá en el análisis."
+    ),
+}
+
+
+def _get_lightweight_capabilities() -> dict:
+    """Verificación rápida de servicios para warnings en PATCH settings.
+
+    NO ejecuta detección de hardware costosa (CUDA init ~10s).
+    Solo verifica servicios que pueden estar transitorialmente no disponibles:
+    - Ollama: corriendo (HTTP check, timeout 1.5s)
+    - LanguageTool: corriendo (HTTP check, timeout 1.5s)
+    - GPU: valor cacheado de torch (sin re-init)
+
+    Returns:
+        dict con keys: ollama_available, languagetool_available, has_gpu
+    """
+    caps: dict[str, bool] = {
+        "ollama_available": False,
+        "languagetool_available": False,
+        "has_gpu": False,
+    }
+
+    # Ollama check
+    try:
+        from narrative_assistant.llm.ollama_manager import is_ollama_available
+        caps["ollama_available"] = is_ollama_available()
+    except Exception:
+        pass
+
+    # LanguageTool check
+    try:
+        caps["languagetool_available"] = deps._check_languagetool_available()
+    except Exception:
+        pass
+
+    # GPU check (cacheado por torch, no re-inicia CUDA)
+    try:
+        import torch
+        caps["has_gpu"] = torch.cuda.is_available()
+    except Exception:
+        pass
+
+    return caps
+
+
+def _get_default_analysis_features() -> dict:
+    """Defaults seguros para analysis_features (MVP CR-03).
+
+    Devuelve configuración deseada por defecto:
+    - pipeline_flags: 11 claves en true (preferencia activada)
+    - nlp_methods: por categoría, métodos con default_enabled=true
+
+    No consulta capabilities (lo hace el cliente en validación runtime).
+    """
+    return {
+        "schema_version": 1,
+        "pipeline_flags": {
+            "character_profiling": True,
+            "network_analysis": True,
+            "anachronism_detection": True,
+            "ooc_detection": True,
+            "classical_spanish": True,
+            "name_variants": True,
+            "multi_model_voting": True,
+            "spelling": True,
+            "grammar": True,
+            "consistency": True,
+            "speech_tracking": True,
+        },
+        "nlp_methods": {
+            # Defaults basados en lo más compatible
+            "coreference": ["embeddings", "morpho", "heuristics"],
+            "ner": ["spacy", "gazetteer"],
+            "grammar": ["spacy_rules"],
+            "spelling": ["patterns", "symspell", "hunspell", "pyspellchecker"],
+            "character_knowledge": ["rules"],
+        },
+        "updated_at": None,
+        "updated_by": "default",
+    }
+
+
+def _validate_analysis_features(
+    features: dict,
+    capabilities: Optional[dict] = None,
+    updated_by: str = "ui"
+) -> tuple[dict, list[str]]:
+    """Valida y sanea analysis_features contra schema conocido.
+
+    Reglas MVP CR-03:
+    - Eliminar keys desconocidas con warning
+    - Toda no disponibilidad se trata como transitoria (no borrar de desired)
+    - Degradación solo en ejecución, no en persistido
+
+    Args:
+        features: analysis_features enviado por cliente
+        capabilities: dict de capabilities (opcional para validación básica)
+        updated_by: fuente del cambio (ui | api | migration), default "ui"
+
+    Returns:
+        tuple (sanitized_features, warnings)
+
+    Raises:
+        ValueError: Si el payload tiene estructura inválida
+    """
+    warnings = []
+    sanitized = {}
+
+    # P1: Type guard - features debe ser dict
+    if not isinstance(features, dict):
+        raise ValueError(f"analysis_features debe ser un objeto, recibido: {type(features).__name__}")
+
+    # Schema version
+    schema_ver = features.get("schema_version", 1)
+    if not isinstance(schema_ver, int):
+        raise ValueError(f"schema_version debe ser número entero, recibido: {type(schema_ver).__name__}")
+    sanitized["schema_version"] = schema_ver
+
+    # Validar pipeline_flags
+    known_flags = {
+        "character_profiling", "network_analysis", "anachronism_detection",
+        "ooc_detection", "classical_spanish", "name_variants",
+        "multi_model_voting", "spelling", "grammar", "consistency",
+        "speech_tracking"
+    }
+
+    pipeline_flags = features.get("pipeline_flags", {})
+    # P1: Type guard - pipeline_flags debe ser dict
+    if not isinstance(pipeline_flags, dict):
+        raise ValueError(f"pipeline_flags debe ser un objeto, recibido: {type(pipeline_flags).__name__}")
+
+    sanitized_flags = {}
+    for key, value in pipeline_flags.items():
+        if key not in known_flags:
+            warnings.append(f"Flag '{key}' desconocido, se omitirá")
+            continue
+        # P1: Validación estricta de booleanos (no coerción permisiva)
+        if not isinstance(value, bool):
+            raise ValueError(f"Flag '{key}' debe ser booleano (true/false), recibido: {type(value).__name__}")
+        sanitized_flags[key] = value
+
+    sanitized["pipeline_flags"] = sanitized_flags
+
+    # Validar nlp_methods
+    known_categories = {"coreference", "ner", "grammar", "spelling", "character_knowledge"}
+    # Métodos conocidos por categoría (schema MVP CR-03)
+    known_methods = {
+        "coreference": {"embeddings", "llm", "morpho", "heuristics"},
+        "ner": {"spacy", "gazetteer", "llm"},
+        "grammar": {"spacy_rules", "languagetool", "llm"},
+        "spelling": {"patterns", "symspell", "hunspell", "pyspellchecker", "languagetool", "beto", "llm_arbitrator"},
+        "character_knowledge": {"rules", "llm", "hybrid"}
+    }
+
+    nlp_methods = features.get("nlp_methods", {})
+    # P1: Type guard - nlp_methods debe ser dict
+    if not isinstance(nlp_methods, dict):
+        raise ValueError(f"nlp_methods debe ser un objeto, recibido: {type(nlp_methods).__name__}")
+
+    sanitized_methods = {}
+
+    for category, methods in nlp_methods.items():
+        if category not in known_categories:
+            warnings.append(f"Categoría NLP '{category}' desconocida, se omitirá")
+            continue
+
+        if not isinstance(methods, list):
+            warnings.append(f"Categoría '{category}' debe ser lista, se omitirá")
+            continue
+
+        # Validar métodos contra schema conocido
+        valid_methods = []
+        for method in methods:
+            method_str = str(method)
+            if method_str in known_methods.get(category, set()):
+                valid_methods.append(method_str)
+            else:
+                warnings.append(f"Método '{method_str}' desconocido en categoría '{category}', se omitirá")
+
+        sanitized_methods[category] = valid_methods
+
+    sanitized["nlp_methods"] = sanitized_methods
+
+    # Warnings de capabilities (CR-03 post-MVP)
+    if capabilities:
+        _caps_check = {
+            "ollama": capabilities.get("ollama_available", False),
+            "languagetool": capabilities.get("languagetool_available", False),
+            "gpu": capabilities.get("has_gpu", False),
+        }
+        for (cat, method), service in _METHOD_SERVICE_MAP.items():
+            if method in sanitized_methods.get(cat, []) and not _caps_check.get(service, False):
+                template = _SERVICE_WARNING_TEMPLATES.get(service, "")
+                if template:
+                    warnings.append(template.format(method=method, category=cat))
+
+    # Metadatos
+    import datetime
+    sanitized["updated_at"] = datetime.datetime.utcnow().isoformat() + "Z"
+    sanitized["updated_by"] = updated_by
+
+    return sanitized, warnings
+
+
 def _get_license_subject() -> str:
     """Obtiene un identificador estable de licencia para controles de riesgo."""
     try:
@@ -382,6 +618,11 @@ def get_project(project_id: int):
         document_classification = project_settings.get("document_classification", None)
         recommended_analysis = project_settings.get("recommended_analysis", None)
 
+        # CR-03: analysis_features (devolver defaults si no existe)
+        analysis_features = project_settings.get("analysis_features")
+        if not analysis_features:
+            analysis_features = _get_default_analysis_features()
+
         project_data = {
             "id": project.id,
             "name": project.name,
@@ -404,6 +645,10 @@ def get_project(project_id: int):
             "document_type": document_type,
             "document_classification": document_classification,
             "recommended_analysis": recommended_analysis,
+            # CR-03: settings por proyecto
+            "settings": {
+                "analysis_features": analysis_features
+            },
         }
 
         return ApiResponse(success=True, data=project_data)
@@ -538,6 +783,125 @@ def get_analysis_status(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error getting analysis status for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.patch("/api/projects/{project_id}/settings", response_model=ApiResponse)
+def update_project_settings(
+    project_id: int,
+    settings: dict = Body(...)
+):
+    """
+    Actualiza configuración de análisis del proyecto (CR-03).
+
+    Args:
+        project_id: ID del proyecto
+        settings: dict con analysis_features y otras configuraciones
+
+    Returns:
+        ApiResponse con settings saneados y warnings de degradación
+    """
+    try:
+        if not deps.project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = deps.project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        project = result.value
+
+        # Obtener settings actuales
+        import json
+        current_settings = (
+            project.settings
+            if isinstance(project.settings, dict)
+            else (json.loads(project.settings) if project.settings else {})
+        )
+
+        runtime_warnings = []
+
+        # Validar y sanear analysis_features si se envían
+        if "analysis_features" in settings:
+            try:
+                sanitized_features, warnings = _validate_analysis_features(
+                    settings["analysis_features"],
+                    capabilities=_get_lightweight_capabilities(),
+                    updated_by="api"
+                )
+                settings["analysis_features"] = sanitized_features
+                runtime_warnings.extend(warnings)
+            except ValueError as val_err:
+                # P1: Retornar 400 para payload malformado
+                raise HTTPException(status_code=400, detail=str(val_err))
+
+        # P2: Whitelist de ramas permitidas en settings
+        ALLOWED_SETTINGS_KEYS = {"analysis_features"}
+        for key in list(settings.keys()):
+            if key not in ALLOWED_SETTINGS_KEYS:
+                runtime_warnings.append(f"Clave '{key}' no permitida en settings, se omitirá")
+                del settings[key]
+
+        # Merge profundo: preservar otras ramas de settings
+        # Solo actualizar las claves enviadas
+        for key, value in settings.items():
+            if key == "analysis_features":
+                # Merge profundo dentro de analysis_features
+                # Si no existe, inicializar con defaults
+                if "analysis_features" not in current_settings:
+                    current_settings["analysis_features"] = _get_default_analysis_features()
+
+                af_current = current_settings["analysis_features"]
+                af_new = value
+
+                # Merge pipeline_flags (preservar flags existentes)
+                if "pipeline_flags" in af_new:
+                    if "pipeline_flags" not in af_current:
+                        # Inicializar con defaults
+                        defaults = _get_default_analysis_features()
+                        af_current["pipeline_flags"] = defaults["pipeline_flags"]
+                    af_current["pipeline_flags"].update(af_new["pipeline_flags"])
+
+                # Merge nlp_methods (reemplazo completo por categoría)
+                if "nlp_methods" in af_new:
+                    if "nlp_methods" not in af_current:
+                        # Inicializar con defaults
+                        defaults = _get_default_analysis_features()
+                        af_current["nlp_methods"] = defaults["nlp_methods"]
+                    for cat, methods in af_new["nlp_methods"].items():
+                        af_current["nlp_methods"][cat] = methods  # reemplazo completo
+
+                # Metadatos ya vienen de _validate_analysis_features (schema_version, updated_at, updated_by)
+                for key in ["schema_version", "updated_at", "updated_by"]:
+                    if key in af_new:
+                        af_current[key] = af_new[key]
+
+                current_settings["analysis_features"] = af_current
+            else:
+                # Otras ramas: merge directo
+                current_settings[key] = value
+
+        # Persistir
+        project.settings = current_settings
+        update_result = deps.project_manager.update(project)
+
+        if update_result.is_failure:
+            logger.error(f"Failed to update project settings: {update_result.error}")
+            return ApiResponse(success=False, error="Error al guardar configuración")
+
+        return ApiResponse(
+            success=True,
+            data={
+                "settings": {
+                    "analysis_features": current_settings.get("analysis_features")
+                },
+                "runtime_warnings": runtime_warnings
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating settings for project {project_id}: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
 

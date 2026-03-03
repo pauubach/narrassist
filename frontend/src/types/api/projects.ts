@@ -42,6 +42,56 @@ export interface ApiRecommendedAnalysis {
   alerts: Record<string, boolean>
 }
 
+/** CR-03: Configuración de flags de pipeline */
+export interface ApiPipelineFlags {
+  character_profiling?: boolean
+  network_analysis?: boolean
+  anachronism_detection?: boolean
+  ooc_detection?: boolean
+  classical_spanish?: boolean
+  name_variants?: boolean
+  multi_model_voting?: boolean
+  spelling?: boolean
+  grammar?: boolean
+  consistency?: boolean
+  speech_tracking?: boolean
+}
+
+/** CR-03: Configuración de métodos NLP por categoría */
+export interface ApiNLPMethods {
+  coreference?: string[]
+  ner?: string[]
+  grammar?: string[]
+  spelling?: string[]
+  character_knowledge?: string[]
+}
+
+/** CR-03: Features de análisis por proyecto */
+export interface ApiAnalysisFeatures {
+  schema_version: number
+  pipeline_flags: ApiPipelineFlags
+  nlp_methods: ApiNLPMethods
+  updated_at: string | null
+  updated_by: string
+}
+
+/** CR-03: Settings del proyecto */
+export interface ApiProjectSettings {
+  analysis_features?: ApiAnalysisFeatures
+}
+
+/** CR-03: Patch parcial de analysis_features para PATCH /settings */
+export interface ApiAnalysisFeaturesPatch {
+  schema_version?: number
+  pipeline_flags?: ApiPipelineFlags
+  nlp_methods?: ApiNLPMethods
+}
+
+/** CR-03: Patch parcial de settings del proyecto */
+export interface ApiProjectSettingsPatch {
+  analysis_features?: ApiAnalysisFeaturesPatch
+}
+
 /** Proyecto tal como lo devuelve la API */
 export interface ApiProject {
   id: number
@@ -65,6 +115,8 @@ export interface ApiProject {
   document_classification?: ApiDocumentClassification | null
   /** Configuración de análisis recomendada */
   recommended_analysis?: ApiRecommendedAnalysis | null
+  /** CR-03: Settings por proyecto */
+  settings?: ApiProjectSettings
 }
 
 /** Versión con métricas tal como la devuelve la API (S15, BK-28) */

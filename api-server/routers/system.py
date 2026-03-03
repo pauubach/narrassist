@@ -1339,8 +1339,8 @@ def get_resource_status():
                     "max_concurrent_heavy_tasks": rm.recommendation.max_concurrent_heavy_tasks,
                 },
                 "heavy_tasks": {
-                    "running": list(rm._running_tasks),
-                    "semaphore_available": rm._heavy_task_semaphore.available,
+                    "running": rm.heavy_task_semaphore.active_tasks,
+                    "semaphore_available": rm.heavy_task_semaphore.available_slots,
                     "semaphore_max": rm.recommendation.max_concurrent_heavy_tasks,
                 },
                 "semantic_redundancy": {

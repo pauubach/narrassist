@@ -1,5 +1,5 @@
 """
-Partial analysis: run only specific phases instead of the full 13-phase pipeline.
+Partial analysis: run only specific phases instead of the full 14-phase pipeline.
 
 Provides:
 - Frontend→backend phase name mapping
@@ -34,7 +34,7 @@ class PartialAnalysisRequest(BaseModel):
 
 
 # ============================================================================
-# Phase mapping: frontend (15 phases) → backend (13 phases)
+# Phase mapping: frontend (15 phases) → backend (14 phases)
 # ============================================================================
 
 FRONTEND_TO_BACKEND: dict[str, list[str]] = {
@@ -44,6 +44,7 @@ FRONTEND_TO_BACKEND: dict[str, list[str]] = {
     # Tier 2: heavy NLP phases
     "entities": ["ner"],
     "coreference": ["fusion"],
+    "timeline": ["timeline"],
     "attributes": ["attributes"],
     "coherence": ["consistency"],
     "grammar": ["grammar"],
@@ -68,6 +69,7 @@ BACKEND_PHASE_ORDER = [
     "structure",
     "ner",
     "fusion",
+    "timeline",
     "attributes",
     "consistency",
     "grammar",
@@ -85,6 +87,7 @@ BACKEND_PHASE_DEPS: dict[str, list[str]] = {
     "structure": ["parsing"],
     "ner": ["parsing", "classification", "structure"],
     "fusion": ["ner"],
+    "timeline": ["fusion"],
     "attributes": ["fusion"],
     "consistency": ["attributes"],
     "grammar": ["parsing", "structure"],
@@ -96,7 +99,7 @@ BACKEND_PHASE_DEPS: dict[str, list[str]] = {
 }
 
 TIER1_PHASES = {"parsing", "classification", "structure"}
-TIER2_PHASES = {"ner", "fusion", "attributes", "consistency", "grammar", "alerts"}
+TIER2_PHASES = {"ner", "fusion", "timeline", "attributes", "consistency", "grammar", "alerts"}
 TIER3_PHASES = {"relationships", "voice", "prose", "health"}
 
 # Phase display names (Spanish)
@@ -106,6 +109,7 @@ PHASE_NAMES: dict[str, str] = {
     "structure": "Identificando capítulos",
     "ner": "Buscando personajes y lugares",
     "fusion": "Unificando entidades",
+    "timeline": "Construyendo línea temporal",
     "attributes": "Analizando características",
     "consistency": "Verificando coherencia",
     "grammar": "Revisando gramática y ortografía",
@@ -121,8 +125,9 @@ PHASE_WEIGHTS: dict[str, float] = {
     "parsing": 0.01,
     "classification": 0.01,
     "structure": 0.01,
-    "ner": 0.22,
-    "fusion": 0.28,
+    "ner": 0.21,
+    "fusion": 0.25,
+    "timeline": 0.04,
     "attributes": 0.07,
     "consistency": 0.03,
     "grammar": 0.06,
@@ -165,6 +170,11 @@ def get_completed_phases(db_session: Any, project_id: int) -> set[str]:
                 (project_id,),
             ).fetchone()[0]
 
+            timeline_count = conn.execute(
+                "SELECT COUNT(*) FROM timeline_events WHERE project_id = ?",
+                (project_id,),
+            ).fetchone()[0]
+
             # Check enrichment cache
             def _has_enrichment(etype: str) -> bool:
                 row = conn.execute(
@@ -181,6 +191,8 @@ def get_completed_phases(db_session: Any, project_id: int) -> set[str]:
         # Tier 2
         if entity_count > 0:
             completed |= {"ner", "fusion"}
+        if timeline_count > 0:
+            completed.add("timeline")
         if attr_count > 0:
             completed.add("attributes")
         if alert_count > 0:
@@ -373,6 +385,7 @@ _PHASE_CTX_NEEDS: dict[str, list[str]] = {
     "structure": ["full_text"],
     "ner": ["full_text", "find_chapter_id_for_position"],
     "fusion": ["full_text", "chapters_data", "entities", "find_chapter_id_for_position"],
+    "timeline": ["chapters_with_ids", "entities", "entity_repo"],
     "attributes": ["full_text", "chapters_data", "entities"],
     "consistency": ["full_text", "chapters_data", "entities", "attributes"],
     "grammar": ["full_text"],
@@ -453,6 +466,9 @@ def cleanup_phase_data(db_session: Any, project_id: int, phase: str) -> None:
                     "(SELECT id FROM entities WHERE project_id = ?)",
                     (project_id,),
                 )
+            elif phase == "timeline":
+                conn.execute("DELETE FROM timeline_events WHERE project_id = ?", (project_id,))
+                conn.execute("DELETE FROM temporal_markers WHERE project_id = ?", (project_id,))
             elif phase == "consistency":
                 # Consistency sub-products
                 conn.execute(
@@ -552,6 +568,7 @@ def run_partial_analysis_thread(
         run_parsing,
         run_reconciliation,
         run_structure,
+        run_timeline,
     )
     from routers._enrichment_phases import (
         capture_entity_fingerprint,
@@ -614,7 +631,9 @@ def run_partial_analysis_thread(
                 logger.info(f"Partial analysis project {project_id}: queued for heavy slot")
                 return  # Will be resumed when slot frees
 
-            run_ollama_healthcheck(ctx, tracker)
+            llm_sensitive_tier2 = {"ner", "fusion", "attributes", "consistency", "grammar", "alerts"}
+            if phases_set & llm_sensitive_tier2:
+                run_ollama_healthcheck(ctx, tracker)
 
             # Run only requested Tier 2 phases in order
             if "ner" in phases_set:
@@ -625,6 +644,9 @@ def run_partial_analysis_thread(
             if "fusion" in phases_set:
                 ensure_context(ctx, "fusion")
                 run_fusion(ctx, tracker)
+            if "timeline" in phases_set:
+                ensure_context(ctx, "timeline")
+                run_timeline(ctx, tracker)
             if "attributes" in phases_set:
                 ensure_context(ctx, "attributes")
                 run_attributes(ctx, tracker)

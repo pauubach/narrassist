@@ -474,6 +474,37 @@ async function postChecked<T>(
   return raw.data
 }
 
+/**
+ * PATCH con check de envelope { success, data, error }.
+ *
+ * @example
+ *   const result = await api.patchChecked<Result>('/api/projects/1/settings', { analysis_features })
+ */
+async function patchChecked<T>(
+  path: string,
+  body?: Record<string, unknown>,
+  options: RequestOptions = {},
+): Promise<T> {
+  const { timeout = 30000, headers = {}, signal } = options
+  const abortSignal = createTimeoutSignal(timeout, signal)
+
+  const response = await monitoredFetch(apiUrl(path), {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers,
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal: abortSignal,
+  })
+
+  const raw = await parseRawResponse<{ success: boolean; data: T; error?: string }>(response)
+  if (!raw.success) {
+    throw new ApiError(raw.error || 'Error interno', response.status, raw.error)
+  }
+  return raw.data
+}
+
 export const api = {
   get,
   getRaw,
@@ -486,5 +517,6 @@ export const api = {
   put,
   putRaw,
   patch,
+  patchChecked,
   del,
 } as const

@@ -534,6 +534,7 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
 
     project_id = ctx["project_id"]
     db = ctx["db_session"]
+    analysis_config = ctx.get("analysis_config")
 
     try:
         entities = _load_entities(db, project_id)
@@ -553,15 +554,18 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
 
         # --- 10a: Character Network ---
         step += 1
-        tracker.update_parallel_progress(phase_key, step / total_steps, "Calculando red de personajes...")
-        _run_enrichment(
-            db,
-            project_id,
-            "character_network",
-            10,
-            lambda: _compute_character_network(db, project_id, entities, chapters),
-            "character_network",
-        )
+        if not analysis_config or analysis_config.run_network_analysis:
+            tracker.update_parallel_progress(phase_key, step / total_steps, "Calculando red de personajes...")
+            _run_enrichment(
+                db,
+                project_id,
+                "character_network",
+                10,
+                lambda: _compute_character_network(db, project_id, entities, chapters),
+                "character_network",
+            )
+        else:
+            tracker.update_parallel_progress(phase_key, step / total_steps, "Red de personajes omitida")
 
         # --- 10b: Character Timeline ---
         step += 1
@@ -577,15 +581,18 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
 
         # --- 10c: Character Profiles (6 indicators) ---
         step += 1
-        tracker.update_parallel_progress(phase_key, step / total_steps, "Perfilando personajes...")
-        _run_enrichment(
-            db,
-            project_id,
-            "character_profiles",
-            10,
-            lambda: _compute_character_profiles(db, project_id, entities, chapters),
-            "character_profiles",
-        )
+        if not analysis_config or analysis_config.run_character_profiling:
+            tracker.update_parallel_progress(phase_key, step / total_steps, "Perfilando personajes...")
+            _run_enrichment(
+                db,
+                project_id,
+                "character_profiles",
+                10,
+                lambda: _compute_character_profiles(db, project_id, entities, chapters),
+                "character_profiles",
+            )
+        else:
+            tracker.update_parallel_progress(phase_key, step / total_steps, "Perfilado de personajes omitido")
 
         # --- 10d: Emotional Analysis ---
         step += 1
@@ -615,17 +622,28 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
 
         # --- 10f: Character Knowledge ---
         step += 1
-        tracker.update_progress(
-            phase_key, step / total_steps, "Analizando conocimiento entre personajes..."
-        )
-        _run_enrichment(
-            db,
-            project_id,
-            "character_knowledge",
-            10,
-            lambda: _compute_character_knowledge(project_id, entities, chapters),
-            "character_knowledge",
-        )
+        if not analysis_config or analysis_config.run_knowledge:
+            knowledge_mode = _resolve_character_knowledge_mode(ctx)
+            tracker.update_progress(
+                phase_key, step / total_steps, "Analizando conocimiento entre personajes..."
+            )
+            _run_enrichment(
+                db,
+                project_id,
+                "character_knowledge",
+                10,
+                lambda: _compute_character_knowledge(
+                    project_id,
+                    entities,
+                    chapters,
+                    extraction_mode=knowledge_mode,
+                ),
+                "character_knowledge",
+            )
+        else:
+            tracker.update_progress(
+                phase_key, step / total_steps, "Conocimiento de personajes omitido"
+            )
 
     except Exception as e:
         logger.error(f"[Phase 10] Relationships enrichment failed: {e}", exc_info=True)
@@ -885,14 +903,52 @@ def _compute_character_archetypes(db, project_id, entities, chapters, chapters_d
     return report.to_dict() if hasattr(report, "to_dict") else report
 
 
-def _compute_character_knowledge(project_id, entities, chapters):
-    """Compute character knowledge (rules mode — no LLM)."""
+def _resolve_character_knowledge_mode(ctx: dict):
+    """Resolve knowledge extraction mode from selected NLP methods with safe fallback."""
+    from narrative_assistant.analysis.character_knowledge import KnowledgeExtractionMode
+
+    selected_nlp_methods = ctx.get("selected_nlp_methods", {})
+    analysis_config = ctx.get("analysis_config")
+    methods: list[str] = []
+
+    if isinstance(selected_nlp_methods, dict):
+        raw_methods = selected_nlp_methods.get("character_knowledge")
+        if isinstance(raw_methods, list):
+            methods = [
+                m.strip().lower()
+                for m in raw_methods
+                if isinstance(m, str) and m.strip()
+            ]
+
+    mode = KnowledgeExtractionMode.RULES
+    if methods:
+        if "hybrid" in methods:
+            mode = KnowledgeExtractionMode.HYBRID
+        elif "llm" in methods:
+            mode = KnowledgeExtractionMode.LLM
+        elif "rules" in methods:
+            mode = KnowledgeExtractionMode.RULES
+
+    llm_enabled = not analysis_config or bool(getattr(analysis_config, "use_llm", True))
+    if mode in (KnowledgeExtractionMode.LLM, KnowledgeExtractionMode.HYBRID) and not llm_enabled:
+        logger.info(
+            "Character knowledge mode '%s' requested but use_llm=False; fallback to rules",
+            mode.value,
+        )
+        return KnowledgeExtractionMode.RULES
+
+    return mode
+
+
+def _compute_character_knowledge(project_id, entities, chapters, extraction_mode=None):
+    """Compute character knowledge using selected extraction mode."""
     from narrative_assistant.analysis.character_knowledge import (
         CharacterKnowledgeAnalyzer,
         KnowledgeExtractionMode,
     )
 
     analyzer = CharacterKnowledgeAnalyzer()
+    mode = extraction_mode or KnowledgeExtractionMode.RULES
     character_entities = [
         e
         for e in entities
@@ -906,7 +962,7 @@ def _compute_character_knowledge(project_id, entities, chapters):
                 ch.content or "",
                 ch.chapter_number,
                 0,  # start_char
-                extraction_mode=KnowledgeExtractionMode.RULES,
+                extraction_mode=mode,
             )
         except Exception as e:
             logger.warning(f"Knowledge extraction failed for chapter {ch.chapter_number}: {e}")
@@ -920,7 +976,7 @@ def _compute_character_knowledge(project_id, entities, chapters):
         "total_facts": len(knowledge_dicts),
         "characters_analyzed": len(character_entities),
         "chapters_analyzed": len(chapters),
-        "extraction_mode": "rules",
+        "extraction_mode": mode.value if hasattr(mode, "value") else str(mode),
     }
 
 

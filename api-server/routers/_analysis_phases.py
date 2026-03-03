@@ -78,6 +78,89 @@ def _find_chapter_number_for_position(
     return candidates[0][1]
 
 
+# Mapa de requisitos de servicio por método NLP (consistente con projects.py).
+_METHOD_SERVICE_REQUIREMENTS: dict[tuple[str, str], str] = {
+    ("coreference", "llm"): "ollama",
+    ("ner", "llm"): "ollama",
+    ("grammar", "llm"): "ollama",
+    ("spelling", "llm_arbitrator"): "ollama",
+    ("character_knowledge", "llm"): "ollama",
+    ("character_knowledge", "hybrid"): "ollama",
+    ("grammar", "languagetool"): "languagetool",
+    ("spelling", "languagetool"): "languagetool",
+    ("spelling", "beto"): "gpu",
+}
+
+
+def _get_runtime_service_capabilities() -> dict[str, bool]:
+    """Obtiene disponibilidad runtime de servicios para validación estricta."""
+    caps = {
+        "ollama": False,
+        "languagetool": False,
+        "gpu": False,
+    }
+
+    try:
+        from narrative_assistant.llm.ollama_manager import is_ollama_available
+
+        caps["ollama"] = bool(is_ollama_available())
+    except Exception:
+        pass
+
+    try:
+        caps["languagetool"] = bool(deps._check_languagetool_available())
+    except Exception:
+        pass
+
+    try:
+        import torch
+
+        caps["gpu"] = bool(torch.cuda.is_available())
+    except Exception:
+        pass
+
+    return caps
+
+
+def _filter_nlp_methods_by_runtime_capabilities(
+    selected_methods: dict[str, list[str]],
+) -> tuple[dict[str, list[str]], list[str]]:
+    """
+    Filtra métodos NLP no viables en runtime antes de ejecutar fases.
+
+    Devuelve:
+    - métodos filtrados (bloqueo estricto de combinaciones inviables)
+    - warnings legibles para logs/UI
+    """
+    runtime_caps = _get_runtime_service_capabilities()
+    filtered: dict[str, list[str]] = {}
+    warnings: list[str] = []
+
+    for category, methods in selected_methods.items():
+        if not isinstance(category, str) or not isinstance(methods, list):
+            continue
+
+        allowed: list[str] = []
+        for method in methods:
+            if not isinstance(method, str):
+                continue
+            normalized_method = method.strip()
+            if not normalized_method:
+                continue
+
+            service = _METHOD_SERVICE_REQUIREMENTS.get((category, normalized_method))
+            if service and not runtime_caps.get(service, False):
+                warnings.append(
+                    f"Método '{normalized_method}' en '{category}' no está disponible ahora y se omitirá."
+                )
+                continue
+            allowed.append(normalized_method)
+
+        filtered[category] = allowed
+
+    return filtered, warnings
+
+
 # ============================================================================
 # Cache Serialization/Deserialization Helpers (v0.10.15)
 # ============================================================================
@@ -539,41 +622,56 @@ class ProgressTracker:
             cumulative += weight
         return (0, 100)
 
-    def start_phase(self, phase_key: str, phase_index: int, message: str):
-        """Marca el inicio de una fase."""
+    def start_phase(
+        self,
+        phase_key: str,
+        phase_index_or_message: int | str,
+        message: str | None = None,
+    ):
+        """Marca el inicio de una fase.
+
+        Firmas soportadas:
+        - start_phase("phase", 3, "mensaje")  # legado
+        - start_phase("phase", "mensaje")      # recomendado
+        """
+        if message is None:
+            legacy_index = None
+            phase_message = str(phase_index_or_message)
+        else:
+            legacy_index = (
+                phase_index_or_message if isinstance(phase_index_or_message, int) else None
+            )
+            phase_message = message
+
+        phase_index = self._resolve_index(phase_key, fallback_index=legacy_index)
         self.current_phase_key = phase_key
         self.phase_start_times[phase_key] = time.time()
         pct_start, _ = self.get_phase_progress_range(phase_key)
-        # Actualizar fase y storage atómicamente dentro del lock.
-        # current_phase = phase_key (no el mensaje) para que el frontend
-        # pueda emparejar step.id === currentStep y mostrar subphase info.
         with deps._progress_lock:
             self.phases[phase_index]["current"] = True
             storage = deps.analysis_progress_storage.get(self.project_id)
             if storage and storage.get("_run_id", "") == self.run_id:
                 storage["progress"] = pct_start
                 storage["current_phase"] = phase_key
-                storage["current_action"] = message
+                storage["current_action"] = phase_message
                 storage["subphase"] = None
 
-    def end_phase(self, phase_key: str, phase_index: int):
+    def end_phase(self, phase_key: str, phase_index: int | None = None):
         """Marca el fin de una fase."""
+        resolved_index = self._resolve_index(phase_key, fallback_index=phase_index)
         _, pct_end = self.get_phase_progress_range(phase_key)
-        self.phase_durations[phase_key] = time.time() - self.phase_start_times[phase_key]
+        started_at = self.phase_start_times.get(phase_key, time.time())
+        self.phase_durations[phase_key] = time.time() - started_at
         duration = round(self.phase_durations[phase_key], 1)
-        # Actualizar progreso Y fases atómicamente dentro del lock
-        # para evitar que un poll vea la fase anterior como current=True al 100%
         with deps._progress_lock:
             storage = deps.analysis_progress_storage.get(self.project_id)
             if storage and storage.get("_run_id", "") == self.run_id:
                 storage["progress"] = pct_end
                 storage["subphase"] = None
-            self.phases[phase_index]["completed"] = True
-            self.phases[phase_index]["current"] = False
-            self.phases[phase_index]["duration"] = duration
-            # Pre-activar la siguiente fase para que el spinner no desaparezca
-            # entre end_phase() y el siguiente start_phase()
-            next_index = phase_index + 1
+            self.phases[resolved_index]["completed"] = True
+            self.phases[resolved_index]["current"] = False
+            self.phases[resolved_index]["duration"] = duration
+            next_index = resolved_index + 1
             if next_index < len(self.phases):
                 self.phases[next_index]["current"] = True
         self.check_cancelled()
@@ -619,24 +717,37 @@ class ProgressTracker:
                 storage["progress"] = max(current, global_pct)
                 storage["current_action"] = message
 
-    def complete_phase(self, phase_key: str, phase_index: int):
+    def complete_phase(self, phase_key: str, phase_index: int | None = None):
         """Alias for end_phase."""
         self.end_phase(phase_key, phase_index)
 
-    def _resolve_index(self, phase_key: str) -> int:
-        """Resolve phase index from phase_order (for partial analysis)."""
-        try:
-            return self.phase_order.index(phase_key)
-        except ValueError:
-            return 0
+    def _resolve_index(self, phase_key: str, fallback_index: int | None = None) -> int:
+        """Resolve phase index by key inside self.phases.
+
+        If key is not found, use fallback_index only for legacy compatibility.
+        """
+        for idx, phase in enumerate(self.phases):
+            if phase.get("id") == phase_key:
+                return idx
+
+        if fallback_index is not None and 0 <= fallback_index < len(self.phases):
+            expected = self.phases[fallback_index].get("id")
+            logger.warning(
+                f"[ProgressTracker] phase_key '{phase_key}' not found; "
+                f"using legacy index {fallback_index} (phase at index='{expected}')"
+            )
+            return fallback_index
+
+        available = [p.get("id", "?") for p in self.phases]
+        raise ValueError(f"Phase '{phase_key}' not found in tracker phases. Available: {available}")
 
     def start_phase_by_key(self, phase_key: str, message: str):
         """Start a phase resolving index from phase_order (partial analysis)."""
-        self.start_phase(phase_key, self._resolve_index(phase_key), message)
+        self.start_phase(phase_key, message)
 
     def end_phase_by_key(self, phase_key: str):
         """End a phase resolving index from phase_order (partial analysis)."""
-        self.end_phase(phase_key, self._resolve_index(phase_key))
+        self.end_phase(phase_key)
 
     def complete_phase_by_key(self, phase_key: str):
         """Alias for end_phase_by_key."""
@@ -722,6 +833,7 @@ class ProgressTracker:
                     "structure": 2,
                     "ner": 30,
                     "fusion": 10,
+                    "timeline": 8,
                     "attributes": 15,
                     "consistency": 3,
                     "grammar": 5,
@@ -1101,7 +1213,31 @@ def apply_license_and_settings(ctx: dict, tracker: ProgressTracker):
             else (json.loads(project.settings) if project.settings else {})
         )
         analysis_features = project_settings.get("analysis_features", {})
-        if analysis_features:
+        pipeline_flags = analysis_features.get("pipeline_flags", {})
+        nlp_methods = analysis_features.get("nlp_methods", {})
+
+        normalized_nlp_methods: dict[str, list[str]] = {}
+        if isinstance(nlp_methods, dict):
+            for category, methods in nlp_methods.items():
+                if not isinstance(category, str) or not isinstance(methods, list):
+                    continue
+                normalized: list[str] = []
+                for method in methods:
+                    if isinstance(method, str):
+                        method_value = method.strip()
+                        if method_value and method_value not in normalized:
+                            normalized.append(method_value)
+                normalized_nlp_methods[category] = normalized
+        filtered_nlp_methods, runtime_method_warnings = _filter_nlp_methods_by_runtime_capabilities(
+            normalized_nlp_methods
+        )
+        ctx["selected_nlp_methods"] = filtered_nlp_methods
+        if runtime_method_warnings:
+            ctx["analysis_settings_warnings"] = runtime_method_warnings
+            tracker.set_metric("analysis_settings_warnings", runtime_method_warnings)
+            for warning in runtime_method_warnings:
+                logger.warning("[SETTINGS_RUNTIME] %s", warning)
+        if isinstance(pipeline_flags, dict) and pipeline_flags:
             _SETTINGS_MAP = {
                 "character_profiling": "run_character_profiling",
                 "network_analysis": "run_network_analysis",
@@ -1116,11 +1252,58 @@ def apply_license_and_settings(ctx: dict, tracker: ProgressTracker):
                 "speech_tracking": "run_speech_tracking",
             }
             for feat_key, config_field in _SETTINGS_MAP.items():
-                if feat_key in analysis_features and hasattr(analysis_config, config_field):
-                    user_val = bool(analysis_features[feat_key])
+                if feat_key in pipeline_flags and hasattr(analysis_config, config_field):
+                    user_val = pipeline_flags[feat_key]
+                    # Fail-safe para settings legacy mal tipados en DB
+                    if not isinstance(user_val, bool):
+                        logger.warning(
+                            "Ignoring non-bool pipeline flag '%s' (type=%s)",
+                            feat_key,
+                            type(user_val).__name__,
+                        )
+                        continue
                     if not user_val:
                         setattr(analysis_config, config_field, False)
-            logger.info(f"Applied project analysis settings: {analysis_features}")
+            logger.info(f"Applied pipeline_flags from project settings: {pipeline_flags}")
+
+        # CR-03: aplicar selección de métodos NLP (disable-only, sin forzar activaciones).
+        # Permite que categorías vacías desactiven fases dependientes.
+        if filtered_nlp_methods:
+            disabled_from_methods: list[str] = []
+
+            def _disable_flag(config_field: str) -> None:
+                if hasattr(analysis_config, config_field):
+                    setattr(analysis_config, config_field, False)
+                    disabled_from_methods.append(config_field)
+
+            ner_methods = filtered_nlp_methods.get("ner")
+            if isinstance(ner_methods, list) and len(ner_methods) == 0:
+                _disable_flag("run_ner")
+
+            coref_methods = filtered_nlp_methods.get("coreference")
+            if isinstance(coref_methods, list) and len(coref_methods) == 0:
+                _disable_flag("run_coreference")
+
+            grammar_methods = filtered_nlp_methods.get("grammar")
+            spelling_methods = filtered_nlp_methods.get("spelling")
+            if isinstance(grammar_methods, list) and isinstance(spelling_methods, list):
+                if len(grammar_methods) == 0 and len(spelling_methods) == 0:
+                    _disable_flag("run_grammar")
+                    _disable_flag("run_spelling")
+            elif isinstance(grammar_methods, list) and len(grammar_methods) == 0:
+                _disable_flag("run_grammar")
+            elif isinstance(spelling_methods, list) and len(spelling_methods) == 0:
+                _disable_flag("run_spelling")
+
+            knowledge_methods = filtered_nlp_methods.get("character_knowledge")
+            if isinstance(knowledge_methods, list) and len(knowledge_methods) == 0:
+                _disable_flag("run_knowledge")
+
+            if disabled_from_methods:
+                logger.info(
+                    "Applied nlp_methods disable-only gating: %s",
+                    sorted(set(disabled_from_methods)),
+                )
     except Exception as settings_err:
         logger.debug(f"Could not apply project analysis settings: {settings_err}")
 
@@ -1553,7 +1736,7 @@ def run_ollama_healthcheck(ctx: dict, tracker: ProgressTracker):
 
         if _ollama_init_started:
             # Hay auto-configuración en curso → esperar con feedback
-            tracker.update_action("Preparando análisis semántico (configurando Ollama)...")
+            tracker.set_action("Preparando análisis semántico (configurando Ollama)...")
             logger.info("Ollama health check: esperando auto-configuración en background...")
             available = wait_for_ollama_init(timeout=300)
         else:
@@ -1624,6 +1807,29 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
             getattr(_fp_project, "document_fingerprint", "") if _fp_project else ""
         )
     analysis_config = ctx.get("analysis_config")
+    selected_nlp_methods = ctx.get("selected_nlp_methods", {})
+
+    ner_methods: list[str] | None = None
+    if isinstance(selected_nlp_methods, dict):
+        raw_ner_methods = selected_nlp_methods.get("ner")
+        if isinstance(raw_ner_methods, list):
+            ner_methods = [m for m in raw_ner_methods if isinstance(m, str)]
+    ner_methods_set = set(ner_methods or [])
+
+    # Si no hay selección explícita, mantener comportamiento actual.
+    use_llm_ner = (not ner_methods_set) or ("llm" in ner_methods_set)
+    enable_gazetteer_ner = (not ner_methods_set) or ("gazetteer" in ner_methods_set)
+    enable_name_variants = not analysis_config or bool(
+        getattr(analysis_config, "run_name_variants", True)
+    )
+
+    if ner_methods_set:
+        logger.info(
+            "NER methods requested from settings: %s (llm=%s, gazetteer=%s)",
+            sorted(ner_methods_set),
+            use_llm_ner,
+            enable_gazetteer_ner,
+        )
 
     tracker.start_phase("ner", 3, "Buscando personajes, lugares y otros elementos...")
 
@@ -1740,7 +1946,10 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
             )
 
             if missing_chapters:
-                ner_extractor = NERExtractor(use_llm_preprocessing=True)
+                ner_extractor = NERExtractor(
+                    enable_gazetteer=enable_gazetteer_ner,
+                    use_llm_preprocessing=use_llm_ner,
+                )
                 total_missing = len(missing_chapters)
 
                 for idx, (chapter, chapter_hash) in enumerate(missing_chapters, start=1):
@@ -1802,7 +2011,10 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
     # Fallback: full-document NER
     if not incremental_mode:
         # Habilitar preprocesamiento con LLM para mejor detección de entidades
-        ner_extractor = NERExtractor(use_llm_preprocessing=True)
+        ner_extractor = NERExtractor(
+            enable_gazetteer=enable_gazetteer_ner,
+            use_llm_preprocessing=use_llm_ner,
+        )
         ner_result = ner_extractor.extract_entities(
             full_text,
             progress_callback=ner_progress_callback,
@@ -1920,7 +2132,7 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
 
             entity_type = label_to_type.get(best_label, EntityType.CONCEPT)
             auto_aliases = []
-            if entity_type == EntityType.CHARACTER:
+            if entity_type == EntityType.CHARACTER and enable_name_variants:
                 auto_aliases = generate_person_aliases(canonical_text, all_canonical_names)
                 if auto_aliases:
                     logger.debug(f"Generated aliases for '{canonical_text}': {auto_aliases}")
@@ -2208,6 +2420,8 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
     chapters_data = ctx["chapters_data"]
     entities = ctx["entities"]
     find_chapter_id_for_position = ctx["find_chapter_id_for_position"]
+    analysis_config = ctx.get("analysis_config")
+    selected_nlp_methods = ctx.get("selected_nlp_methods", {})
 
     tracker.start_phase("fusion", 4, "Unificando entidades mencionadas de diferentes formas...")
     _update_storage(project_id, current_action="Preparando unificación...")
@@ -2564,15 +2778,59 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                 resolve_coreferences_voting,
             )
 
+            coref_method_map = {
+                "embeddings": CorefMethod.EMBEDDINGS,
+                "llm": CorefMethod.LLM,
+                "morpho": CorefMethod.MORPHO,
+                "heuristics": CorefMethod.HEURISTICS,
+            }
+            default_coref_methods = [
+                CorefMethod.EMBEDDINGS,
+                CorefMethod.LLM,
+                CorefMethod.MORPHO,
+                CorefMethod.HEURISTICS,
+            ]
+
+            raw_coref_methods = None
+            if isinstance(selected_nlp_methods, dict):
+                raw_coref_methods = selected_nlp_methods.get("coreference")
+
+            configured_coref_methods: list[CorefMethod] = []
+            if isinstance(raw_coref_methods, list):
+                for method_name in raw_coref_methods:
+                    if not isinstance(method_name, str):
+                        continue
+                    mapped = coref_method_map.get(method_name.strip())
+                    if mapped and mapped not in configured_coref_methods:
+                        configured_coref_methods.append(mapped)
+
+            enabled_coref_methods = (
+                configured_coref_methods.copy()
+                if configured_coref_methods
+                else default_coref_methods.copy()
+            )
+
+            multi_model_enabled = not analysis_config or bool(
+                getattr(analysis_config, "run_multi_model_voting", True)
+            )
+            if not multi_model_enabled and len(enabled_coref_methods) > 1:
+                # Sin votación multi-modelo: usar solo el primer método solicitado
+                # (o heuristics si no hubo preferencia explícita).
+                if configured_coref_methods:
+                    enabled_coref_methods = [configured_coref_methods[0]]
+                else:
+                    enabled_coref_methods = [CorefMethod.HEURISTICS]
+
+            logger.info(
+                "Coref config methods: %s (multi_model_voting=%s)",
+                [m.value for m in enabled_coref_methods],
+                multi_model_enabled,
+            )
+
             coref_config = CorefConfig(
-                enabled_methods=[
-                    CorefMethod.EMBEDDINGS,
-                    CorefMethod.LLM,
-                    CorefMethod.MORPHO,
-                    CorefMethod.HEURISTICS,
-                ],
+                enabled_methods=enabled_coref_methods,
                 min_confidence=0.5,
-                consensus_threshold=0.6,
+                consensus_threshold=0.6 if len(enabled_coref_methods) > 1 else 0.0,
                 use_chapter_boundaries=True,
                 quality_level=ctx.get("quality_level", "rapida"),
                 sensitivity=ctx.get("sensitivity", 5.0),
@@ -2755,84 +3013,87 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
 
             # Enriquecer cadenas con alias nominales: apodos, roles, parentescos,
             # descriptores físicos ("el manco"), etc.
-            try:
-                character_entities = [e for e in entities if e.entity_type == EntityType.CHARACTER]
-                alias_result = detect_and_resolve_aliases(
-                    full_text,
-                    known_entities=character_entities,
-                )
-                if alias_result.clusters:
-                    entity_lookup: dict[str, Any] = {}
-                    for ent in character_entities:
-                        canonical = (ent.canonical_name or "").strip()
-                        canonical_norm = _normalize_name_shared(canonical)
-                        if canonical_norm:
-                            entity_lookup[canonical_norm] = ent
-                        for alias in ent.aliases or []:
-                            alias_norm = _normalize_name_shared(alias)
-                            if alias_norm and alias_norm not in entity_lookup:
-                                entity_lookup[alias_norm] = ent
+            if not analysis_config or analysis_config.run_name_variants:
+                try:
+                    character_entities = [e for e in entities if e.entity_type == EntityType.CHARACTER]
+                    alias_result = detect_and_resolve_aliases(
+                        full_text,
+                        known_entities=character_entities,
+                    )
+                    if alias_result.clusters:
+                        entity_lookup: dict[str, Any] = {}
+                        for ent in character_entities:
+                            canonical = (ent.canonical_name or "").strip()
+                            canonical_norm = _normalize_name_shared(canonical)
+                            if canonical_norm:
+                                entity_lookup[canonical_norm] = ent
+                            for alias in ent.aliases or []:
+                                alias_norm = _normalize_name_shared(alias)
+                                if alias_norm and alias_norm not in entity_lookup:
+                                    entity_lookup[alias_norm] = ent
 
-                    chain_lookup: dict[str, Any] = {}
-                    for chain in coref_result.chains:
-                        chain_main_norm = _normalize_name_shared(chain.main_mention or "")
-                        if chain_main_norm:
-                            chain_lookup[chain_main_norm] = chain
+                        chain_lookup: dict[str, Any] = {}
+                        for chain in coref_result.chains:
+                            chain_main_norm = _normalize_name_shared(chain.main_mention or "")
+                            if chain_main_norm:
+                                chain_lookup[chain_main_norm] = chain
 
-                    alias_mentions_added = 0
-                    for cluster in alias_result.clusters:
-                        resolved_raw = (cluster.canonical_name or "").strip()
-                        if not resolved_raw:
-                            continue
-                        resolved_norm = _normalize_name_shared(resolved_raw)
-                        matching_entity = entity_lookup.get(resolved_norm)
-                        if not matching_entity and len(resolved_norm) >= 4:
-                            for key, ent in entity_lookup.items():
-                                if resolved_norm in key or key in resolved_norm:
-                                    matching_entity = ent
-                                    break
+                        alias_mentions_added = 0
+                        for cluster in alias_result.clusters:
+                            resolved_raw = (cluster.canonical_name or "").strip()
+                            if not resolved_raw:
+                                continue
+                            resolved_norm = _normalize_name_shared(resolved_raw)
+                            matching_entity = entity_lookup.get(resolved_norm)
+                            if not matching_entity and len(resolved_norm) >= 4:
+                                for key, ent in entity_lookup.items():
+                                    if resolved_norm in key or key in resolved_norm:
+                                        matching_entity = ent
+                                        break
 
-                        resolved_name = (
-                            matching_entity.canonical_name if matching_entity else resolved_raw
-                        )
-                        resolved_name_norm = _normalize_name_shared(resolved_name)
-                        chain = chain_lookup.get(resolved_name_norm)
-                        if chain is None:
-                            chain = CoreferenceChain(main_mention=resolved_name, mentions=[])
-                            coref_result.chains.append(chain)
-                            chain_lookup[resolved_name_norm] = chain
-
-                        for alias in cluster.aliases:
-                            mention = CorefMention(
-                                text=alias.text,
-                                start_char=alias.start_char,
-                                end_char=alias.end_char,
-                                mention_type=CorefMentionType.DEFINITE_NP,
+                            resolved_name = (
+                                matching_entity.canonical_name if matching_entity else resolved_raw
                             )
-                            before = len(chain.mentions)
-                            chain.add_mention(mention)
-                            if len(chain.mentions) > before:
-                                alias_mentions_added += 1
+                            resolved_name_norm = _normalize_name_shared(resolved_name)
+                            chain = chain_lookup.get(resolved_name_norm)
+                            if chain is None:
+                                chain = CoreferenceChain(main_mention=resolved_name, mentions=[])
+                                coref_result.chains.append(chain)
+                                chain_lookup[resolved_name_norm] = chain
 
-                            if matching_entity:
-                                if matching_entity.aliases is None:
-                                    matching_entity.aliases = []
-                                if (
-                                    alias.text.lower() != matching_entity.canonical_name.lower()
-                                    and alias.text not in matching_entity.aliases
-                                ):
-                                    matching_entity.aliases.append(alias.text)
+                            for alias in cluster.aliases:
+                                mention = CorefMention(
+                                    text=alias.text,
+                                    start_char=alias.start_char,
+                                    end_char=alias.end_char,
+                                    mention_type=CorefMentionType.DEFINITE_NP,
+                                )
+                                before = len(chain.mentions)
+                                chain.add_mention(mention)
+                                if len(chain.mentions) > before:
+                                    alias_mentions_added += 1
 
-                        # Preservar mención principal canónica para el matching posterior.
-                        chain.main_mention = resolved_name
+                                if matching_entity:
+                                    if matching_entity.aliases is None:
+                                        matching_entity.aliases = []
+                                    if (
+                                        alias.text.lower() != matching_entity.canonical_name.lower()
+                                        and alias.text not in matching_entity.aliases
+                                    ):
+                                        matching_entity.aliases.append(alias.text)
 
-                    if alias_mentions_added:
-                        logger.info(
-                            f"Alias enrichment: +{alias_mentions_added} menciones nominales "
-                            f"({len(alias_result.clusters)} clusters)"
-                        )
-            except Exception as alias_err:
-                logger.debug(f"Alias enrichment skipped: {alias_err}")
+                            # Preservar mención principal canónica para el matching posterior.
+                            chain.main_mention = resolved_name
+
+                        if alias_mentions_added:
+                            logger.info(
+                                f"Alias enrichment: +{alias_mentions_added} menciones nominales "
+                                f"({len(alias_result.clusters)} clusters)"
+                            )
+                except Exception as alias_err:
+                    logger.debug(f"Alias enrichment skipped: {alias_err}")
+            else:
+                logger.info("Alias/name variants omitidos por configuración")
 
             # Vincular cadenas con entidades
             character_entities = [e for e in entities if e.entity_type == EntityType.CHARACTER]
@@ -3185,13 +3446,13 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
 
 
 # ============================================================================
-# Phase 4.5: Timeline Construction
+# Phase 5: Timeline Construction
 # ============================================================================
 
 
 def run_timeline(ctx: dict, tracker: ProgressTracker):
     """
-    Fase 4.5: Construcción de Timeline Temporal.
+    Fase 5: Construcción de Timeline Temporal.
 
     Extrae marcadores temporales y construye la timeline.
     Requiere: capítulos + entidades (disponibles después de fusion).
@@ -3209,7 +3470,7 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
     entities = ctx["entities"]
     entity_repo = ctx.get("entity_repo")
 
-    tracker.start_phase("timeline", 5, "Construyendo línea temporal...")
+    tracker.start_phase("timeline", "Construyendo linea temporal...")
 
     try:
         timeline_repo = TimelineRepository()
@@ -3231,6 +3492,7 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
         # Extraer por capítulo con progreso granular
         total_chapters = len(chapters_with_ids)
         for idx, chapter in enumerate(chapters_with_ids, start=1):
+            tracker.check_cancelled()
             # Actualizar progreso (0-50% de la fase se dedica a extracción)
             _update_storage(
                 project_id,
@@ -3338,21 +3600,21 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
         ctx["temporal_markers"] = all_markers
         ctx["temporal_inconsistencies"] = inconsistencies
 
-        tracker.end_phase("timeline", 5)
+        tracker.end_phase("timeline")
 
     except Exception as e:
         logger.warning(f"Timeline construction failed (non-critical): {e}")
         # No bloquear el análisis si falla la timeline
-        tracker.end_phase("timeline", 5)
+        tracker.end_phase("timeline")
 
 
 # ============================================================================
-# Phase 5: Attributes
+# Phase 6: Attributes
 # ============================================================================
 
 
 def run_attributes(ctx: dict, tracker: ProgressTracker):
-    """Fase 5: Extracción de atributos de personajes."""
+    """Fase 6: Extracción de atributos de personajes."""
     project_id = ctx["project_id"]
     _ensure_storage_exists(project_id)
 
@@ -3366,7 +3628,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
     entities = ctx["entities"]
     coref_result = ctx.get("coref_result")
 
-    tracker.start_phase("attributes", 5, "Analizando características de los personajes...")
+    tracker.start_phase("attributes", "Analizando caracteristicas de los personajes...")
 
     attr_pct_start, attr_pct_end = tracker.get_phase_progress_range("attributes")
     attributes = []
@@ -3671,7 +3933,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
     # SP-1: Restaurar is_verified en atributos que el usuario verificó antes
     _restore_verified_attributes(ctx)
 
-    tracker.end_phase("attributes", 5)
+    tracker.end_phase("attributes")
     _update_storage(project_id, metrics_update={"attributes_extracted": len(attributes)})
     logger.info(f"Attribute extraction complete: {len(attributes)} attributes")
 
@@ -3679,12 +3941,12 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
 
 
 # ============================================================================
-# Phase 6: Consistency (+ vital status, locations, OOC, anachronisms, classical)
+# Phase 7: Consistency (+ vital status, locations, OOC, anachronisms, classical)
 # ============================================================================
 
 
 def run_consistency(ctx: dict, tracker: ProgressTracker):
-    """Fase 6: Verificación de consistencia y sub-análisis."""
+    """Fase 7: Verificación de consistencia y sub-análisis."""
     from narrative_assistant.analysis.attribute_consistency import AttributeConsistencyChecker
 
     project_id = ctx["project_id"]
@@ -3694,7 +3956,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     attributes = ctx["attributes"]
     analysis_config = ctx["analysis_config"]
 
-    tracker.start_phase("consistency", 6, "Verificando la coherencia del relato...")
+    tracker.start_phase("consistency", "Verificando la coherencia del relato...")
 
     cons_pct_start, cons_pct_end = tracker.get_phase_progress_range("consistency")
 
@@ -3706,7 +3968,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
         if check_result.is_success:
             inconsistencies = check_result.value or []
 
-    # Sub-fase 5.1: Estado vital (0-33%)
+    # Sub-fase 7.1: Estado vital (0-33%)
     vital_status_report = None
     location_report = None
     chapter_progress_report = None
@@ -3839,7 +4101,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
 
     tracker.check_cancelled()
 
-    # Sub-fase 5.2: Ubicaciones (33-66%)
+    # Sub-fase 7.2: Ubicaciones (33-66%)
     sub_progress = cons_pct_start + int((cons_pct_end - cons_pct_start) * 0.33)
     _update_storage(
         project_id,
@@ -3918,7 +4180,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
 
     tracker.check_cancelled()
 
-    # Sub-fase 5.3: Resumen por capítulo (66-100%)
+    # Sub-fase 7.3: Resumen por capítulo (66-100%)
     sub_progress = cons_pct_start + int((cons_pct_end - cons_pct_start) * 0.66)
     _update_storage(
         project_id,
@@ -3949,7 +4211,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
 
     tracker.check_cancelled()
 
-    # Sub-fase 5.4: Out-of-character
+    # Sub-fase 7.4: Out-of-character
     ooc_report = None
     if analysis_config.run_ooc_detection:
         _update_storage(
@@ -3977,51 +4239,58 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
                 chapter_texts = {ch["chapter_number"]: ch["content"] for ch in chapters_data}
                 profiles = profiler.build_profiles(character_entities, chapters_data, chapter_texts)  # type: ignore[arg-type]
                 if profiles:
-                    ooc_detector = OutOfCharacterDetector()
-                    ooc_report = ooc_detector.detect(
-                        profiles=profiles,
-                        chapter_texts=chapter_texts,
-                    )
-                    logger.info(f"OOC detection: {len(ooc_report.events)} events found")
+                    # Check run_ooc_detection flag
+                    analysis_config = ctx.get("analysis_config")
+                    if not analysis_config or analysis_config.run_ooc_detection:
+                        ooc_detector = OutOfCharacterDetector()
+                        ooc_report = ooc_detector.detect(
+                            profiles=profiles,
+                            chapter_texts=chapter_texts,
+                        )
+                        logger.info(f"OOC detection: {len(ooc_report.events)} events found")
+                    else:
+                        logger.info("OOC detection omitida por configuración")
+                        ooc_report = None
 
                     # S8a-05: Persist OOC events to DB
-                    try:
-                        db = ctx["db_session"]
-                        with db.connection() as conn:
-                            conn.execute(
-                                "DELETE FROM ooc_events WHERE project_id = ?",
-                                (project_id,),
-                            )
-                            for ev in ooc_report.events:
+                    if ooc_report:
+                        try:
+                            db = ctx["db_session"]
+                            with db.connection() as conn:
                                 conn.execute(
-                                    """INSERT INTO ooc_events
-                                    (project_id, entity_id, entity_name,
-                                     deviation_type, severity, description,
-                                     expected, actual, chapter, excerpt,
-                                     confidence, is_intentional)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                                    (
-                                        project_id,
-                                        ev.entity_id,
-                                        ev.entity_name,
-                                        ev.deviation_type.value
-                                        if hasattr(ev.deviation_type, "value")
-                                        else str(ev.deviation_type),
-                                        ev.severity.value
-                                        if hasattr(ev.severity, "value")
-                                        else str(ev.severity),
-                                        ev.description,
-                                        ev.expected,
-                                        ev.actual,
-                                        ev.chapter,
-                                        ev.excerpt,
-                                        ev.confidence,
-                                        1 if ev.is_intentional else 0,
-                                    ),
+                                    "DELETE FROM ooc_events WHERE project_id = ?",
+                                    (project_id,),
                                 )
-                        logger.info(f"Persisted {len(ooc_report.events)} OOC events to DB")
-                    except Exception as persist_err:
-                        logger.warning(f"Error persisting OOC events (continuing): {persist_err}")
+                                for ev in ooc_report.events:
+                                    conn.execute(
+                                        """INSERT INTO ooc_events
+                                        (project_id, entity_id, entity_name,
+                                         deviation_type, severity, description,
+                                         expected, actual, chapter, excerpt,
+                                         confidence, is_intentional)
+                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                        (
+                                            project_id,
+                                            ev.entity_id,
+                                            ev.entity_name,
+                                            ev.deviation_type.value
+                                            if hasattr(ev.deviation_type, "value")
+                                            else str(ev.deviation_type),
+                                            ev.severity.value
+                                            if hasattr(ev.severity, "value")
+                                            else str(ev.severity),
+                                            ev.description,
+                                            ev.expected,
+                                            ev.actual,
+                                            ev.chapter,
+                                            ev.excerpt,
+                                            ev.confidence,
+                                            1 if ev.is_intentional else 0,
+                                        ),
+                                    )
+                            logger.info(f"Persisted {len(ooc_report.events)} OOC events to DB")
+                        except Exception as persist_err:
+                            logger.warning(f"Error persisting OOC events (continuing): {persist_err}")
 
         except ImportError as e:
             logger.warning(f"OOC detection module not available: {e}")
@@ -4030,7 +4299,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
 
         tracker.check_cancelled()
 
-    # Sub-fase 5.5: Anacronismos
+    # Sub-fase 7.5: Anacronismos
     anachronism_report = None
     if analysis_config.run_anachronism_detection:
         _update_storage(project_id, current_action="Detectando anacronismos...")
@@ -4055,7 +4324,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
 
         tracker.check_cancelled()
 
-    # Sub-fase 5.6: Español clásico
+    # Sub-fase 7.6: Español clásico
     classical_normalization = None
     if analysis_config.run_classical_spanish:
         _update_storage(project_id, current_action="Detectando español clásico...")
@@ -4079,7 +4348,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
 
         tracker.check_cancelled()
 
-    # Sub-fase 5.7: Speech consistency tracking (v0.10.14)
+    # Sub-fase 7.7: Speech consistency tracking (v0.10.14)
     speech_change_count = 0
     if analysis_config.run_speech_tracking:
         _update_storage(project_id, current_action="Analizando consistencia del habla...")
@@ -4190,7 +4459,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
         },
     )
 
-    tracker.end_phase("consistency", 6)
+    tracker.end_phase("consistency")
     _update_storage(project_id, metrics_update={"inconsistencies_found": len(inconsistencies)})
     logger.info(f"Consistency analysis complete: {len(inconsistencies)} inconsistencies")
 
@@ -4204,7 +4473,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
 
 
 # ============================================================================
-# Phase 6b: Event Detection & Persistence (silent — no UI phase)
+# Phase 7b: Event Detection & Persistence (silent — no UI phase)
 # ============================================================================
 
 
@@ -4291,58 +4560,206 @@ def run_events(ctx: dict, tracker: ProgressTracker):
 
 
 # ============================================================================
-# Phase 7: Grammar
+# Phase 8: Grammar
 # ============================================================================
 
 
 def run_grammar(ctx: dict, tracker: ProgressTracker):
-    """Fase 7: Análisis gramatical y correcciones editoriales."""
+    """Fase 8: Análisis gramatical y correcciones editoriales."""
     project_id = ctx["project_id"]
     full_text = ctx["full_text"]
     project = ctx["project"]
+    chapters_data = ctx.get("chapters_data", [])
+    entities = ctx.get("entities", [])
+    analysis_config = ctx.get("analysis_config")
+    selected_nlp_methods = ctx.get("selected_nlp_methods", {})
 
-    tracker.start_phase("grammar", 7, "Revisando la redacción...")
+    grammar_methods: list[str] | None = None
+    spelling_methods: list[str] | None = None
+    if isinstance(selected_nlp_methods, dict):
+        raw_grammar_methods = selected_nlp_methods.get("grammar")
+        raw_spelling_methods = selected_nlp_methods.get("spelling")
+        if isinstance(raw_grammar_methods, list):
+            grammar_methods = [m for m in raw_grammar_methods if isinstance(m, str)]
+        if isinstance(raw_spelling_methods, list):
+            spelling_methods = [m for m in raw_spelling_methods if isinstance(m, str)]
+
+    run_grammar_checks = not analysis_config or bool(getattr(analysis_config, "run_grammar", True))
+    run_spelling_checks = not analysis_config or bool(getattr(analysis_config, "run_spelling", True))
+    if grammar_methods is not None and len(grammar_methods) == 0:
+        run_grammar_checks = False
+    if spelling_methods is not None and len(spelling_methods) == 0:
+        run_spelling_checks = False
+
+    tracker.start_phase("grammar", "Revisando la redacción...")
 
     grammar_issues = []
     spelling_issues = []
-    try:
-        from narrative_assistant.nlp.grammar import (
-            ensure_languagetool_running,
-            get_grammar_checker,
-            is_languagetool_installed,
-        )
+    if run_grammar_checks:
+        try:
+            from narrative_assistant.nlp.grammar import (
+                ensure_languagetool_running,
+                get_grammar_checker,
+                is_languagetool_installed,
+            )
 
-        if is_languagetool_installed():
-            lt_started = ensure_languagetool_running()
-            if lt_started:
-                logger.info("LanguageTool server started successfully")
+            use_languagetool = True
+            use_llm = None
+            if grammar_methods is not None:
+                method_set = {m.strip() for m in grammar_methods}
+                use_languagetool = "languagetool" in method_set
+                use_llm = "llm" in method_set
+                logger.info(
+                    "Grammar methods requested from settings: %s (languagetool=%s, llm=%s)",
+                    sorted(method_set),
+                    use_languagetool,
+                    use_llm,
+                )
 
-        grammar_checker = get_grammar_checker()
+            if use_languagetool and is_languagetool_installed():
+                lt_started = ensure_languagetool_running()
+                if lt_started:
+                    logger.info("LanguageTool server started successfully")
 
-        if not grammar_checker.languagetool_available:
-            grammar_checker.reload_languagetool()
-            if grammar_checker.languagetool_available:
-                logger.info("LanguageTool now available after reload")
+            grammar_checker = get_grammar_checker()
 
-        grammar_result = grammar_checker.check(full_text)
+            if use_languagetool and not grammar_checker.languagetool_available:
+                grammar_checker.reload_languagetool()
+                if grammar_checker.languagetool_available:
+                    logger.info("LanguageTool now available after reload")
 
-        if grammar_result.is_success:
-            grammar_report = grammar_result.value
-            grammar_issues = grammar_report.issues  # type: ignore[union-attr]
-            logger.info(f"Grammar check found {len(grammar_issues)} issues")
-        else:
-            logger.warning(f"Grammar check failed: {grammar_result.error}")
+            grammar_result = grammar_checker.check(
+                full_text,
+                use_languagetool=use_languagetool,
+                use_llm=use_llm,
+            )
 
-    except ImportError as e:
-        logger.warning(f"Grammar module not available: {e}")
-    except Exception as e:
-        logger.warning(f"Error in grammar analysis: {e}")
+            if grammar_result.is_success:
+                grammar_report = grammar_result.value
+                grammar_issues = grammar_report.issues  # type: ignore[union-attr]
+                logger.info(f"Grammar check found {len(grammar_issues)} issues")
+            else:
+                logger.warning(f"Grammar check failed: {grammar_result.error}")
+
+        except ImportError as e:
+            logger.warning(f"Grammar module not available: {e}")
+        except Exception as e:
+            logger.warning(f"Error in grammar analysis: {e}")
+    else:
+        logger.info("Grammar checks omitted by project settings")
 
     # Correcciones editoriales
+    class _SkipSpellingChecks(Exception):
+        pass
+
     correction_issues = []
     try:
+        if not run_spelling_checks:
+            raise _SkipSpellingChecks()
+
+        from narrative_assistant.corrections.base import CorrectionIssue
         from narrative_assistant.corrections import CorrectionConfig
         from narrative_assistant.corrections.orchestrator import CorrectionOrchestrator
+        from narrative_assistant.nlp.orthography.voting_checker import VotingSpellingChecker
+
+        if spelling_methods is not None:
+            logger.info(
+                "Spelling methods requested from settings: %s",
+                sorted({m.strip() for m in spelling_methods}),
+            )
+
+        # Spelling checker multi-método: respeta selección exacta de nlp_methods.spelling.
+        spelling_correction_issues: list[CorrectionIssue] = []
+        try:
+            selected_spelling = {m.strip() for m in (spelling_methods or []) if m.strip()}
+            use_all_spelling_methods = len(selected_spelling) == 0
+
+            base_voters = {"patterns", "symspell", "hunspell", "pyspellchecker", "languagetool", "beto"}
+            if not use_all_spelling_methods and not (selected_spelling & base_voters):
+                logger.warning(
+                    "Spelling methods selected without base voter (%s): omitiendo corrector ortográfico",
+                    sorted(selected_spelling),
+                )
+            else:
+                spelling_checker = VotingSpellingChecker(
+                    use_patterns=use_all_spelling_methods or "patterns" in selected_spelling,
+                    use_hunspell=use_all_spelling_methods or "hunspell" in selected_spelling,
+                    use_symspell=use_all_spelling_methods or "symspell" in selected_spelling,
+                    use_pyspellchecker=use_all_spelling_methods or "pyspellchecker" in selected_spelling,
+                    use_beto=use_all_spelling_methods or "beto" in selected_spelling,
+                    use_languagetool=use_all_spelling_methods or "languagetool" in selected_spelling,
+                    use_llm_arbitration=(
+                        use_all_spelling_methods or "llm_arbitrator" in selected_spelling
+                    ),
+                )
+
+                known_entities: list[str] = []
+                if isinstance(entities, list):
+                    for entity in entities:
+                        canonical_name = getattr(entity, "canonical_name", None)
+                        if isinstance(canonical_name, str) and canonical_name.strip():
+                            known_entities.append(canonical_name.strip())
+                        aliases = getattr(entity, "aliases", None)
+                        if isinstance(aliases, list):
+                            for alias in aliases:
+                                if isinstance(alias, str) and alias.strip():
+                                    known_entities.append(alias.strip())
+
+                spelling_result = spelling_checker.check(
+                    full_text,
+                    known_entities=known_entities,
+                )
+                if spelling_result.is_success:
+                    spelling_report = spelling_result.value
+                    spelling_issues = spelling_report.issues  # type: ignore[union-attr]
+
+                    for issue in spelling_issues:
+                        start_char = _to_optional_int(getattr(issue, "start_char", None))
+                        end_char = _to_optional_int(getattr(issue, "end_char", None))
+                        if start_char is None or end_char is None:
+                            continue
+
+                        suggestion = getattr(issue, "best_suggestion", None)
+                        if not suggestion:
+                            issue_suggestions = getattr(issue, "suggestions", None)
+                            if isinstance(issue_suggestions, list) and issue_suggestions:
+                                suggestion = issue_suggestions[0]
+
+                        chapter_index = _to_optional_int(getattr(issue, "chapter", None))
+                        if chapter_index is None:
+                            chapter_index = _find_chapter_number_for_position(
+                                chapters_data,
+                                start_char,
+                            )
+
+                        spelling_correction_issues.append(
+                            CorrectionIssue(
+                                category="orthography",
+                                issue_type=f"spelling_{getattr(getattr(issue, 'error_type', None), 'value', 'misspelling')}",
+                                start_char=start_char,
+                                end_char=end_char,
+                                text=str(getattr(issue, "word", "")),
+                                explanation=str(
+                                    getattr(issue, "explanation", "")
+                                    or "Posible error ortográfico detectado por consenso."
+                                ),
+                                suggestion=str(suggestion) if suggestion else None,
+                                confidence=float(getattr(issue, "confidence", 0.5)),
+                                context=str(getattr(issue, "sentence", "")),
+                                chapter_index=chapter_index,
+                                rule_id="spelling_voting",
+                                extra_data={
+                                    "source": "spelling_voting",
+                                    "severity": getattr(getattr(issue, "severity", None), "value", "warning"),
+                                },
+                            )
+                        )
+                else:
+                    logger.warning("Spelling voting check failed: %s", spelling_result.error)
+        except ImportError as spelling_import_err:
+            logger.warning("Spelling voting checker unavailable: %s", spelling_import_err)
+        except Exception as spelling_err:
+            logger.warning("Error in spelling voting check: %s", spelling_err)
 
         correction_config = CorrectionConfig.default()
         try:
@@ -4454,14 +4871,42 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
                 spacy_doc=ctx.get("spacy_doc"),
             )
 
+        if spelling_correction_issues:
+            existing_keys = {
+                (
+                    issue.start_char,
+                    issue.end_char,
+                    str(issue.text).strip().lower(),
+                    str(issue.suggestion or "").strip().lower(),
+                )
+                for issue in correction_issues
+            }
+            added_spelling_issues = 0
+            for issue in spelling_correction_issues:
+                issue_key = (
+                    issue.start_char,
+                    issue.end_char,
+                    str(issue.text).strip().lower(),
+                    str(issue.suggestion or "").strip().lower(),
+                )
+                if issue_key in existing_keys:
+                    continue
+                correction_issues.append(issue)
+                existing_keys.add(issue_key)
+                added_spelling_issues += 1
+            if added_spelling_issues:
+                logger.info("Added %s spelling issues from voting checker", added_spelling_issues)
+
         logger.info(f"Corrections analysis found {len(correction_issues)} suggestions")
 
+    except _SkipSpellingChecks:
+        logger.info("Spelling/editorial checks omitted by project settings")
     except ImportError as e:
         logger.warning(f"Corrections module not available: {e}")
     except Exception as e:
         logger.warning(f"Error in corrections analysis: {e}")
 
-    tracker.end_phase("grammar", 7)
+    tracker.end_phase("grammar")
     _update_storage(
         project_id,
         metrics_update={
@@ -4480,7 +4925,7 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
 
 
 # ============================================================================
-# Phase 8: Alerts
+# Phase 9: Alerts
 # ============================================================================
 
 
@@ -4826,10 +5271,10 @@ def _emit_consistency_alerts(ctx: dict, tracker: ProgressTracker):
 
 
 def run_alerts(ctx: dict, tracker: ProgressTracker):
-    """Fase 8: Finaliza emisión de alertas y aplica reglas post-procesamiento."""
+    """Fase 9: Finaliza emisión de alertas y aplica reglas post-procesamiento."""
     project_id = ctx["project_id"]
 
-    tracker.start_phase("alerts", 8, "Finalizando alertas...")
+    tracker.start_phase("alerts", "Finalizando alertas...")
 
     # Emitir alertas de gramática si no se emitieron antes (ejecución secuencial legacy)
     if not ctx.get("_grammar_alerts_emitted"):
@@ -4839,7 +5284,7 @@ def run_alerts(ctx: dict, tracker: ProgressTracker):
     if not ctx.get("_consistency_alerts_emitted"):
         _emit_consistency_alerts(ctx, tracker)
 
-    tracker.end_phase("alerts", 8)
+    tracker.end_phase("alerts")
     total = ctx.get("alerts_created", 0)
     _update_storage(project_id, metrics_update={"alerts_generated": total})
     logger.info(f"Alerts phase complete: {total} total alerts")

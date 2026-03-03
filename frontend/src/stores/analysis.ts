@@ -187,6 +187,7 @@ const BACKEND_PHASE_TO_FRONTEND: Record<string, keyof ExecutedPhases | null> = {
   structure: 'structure',
   ner: 'entities',
   fusion: 'coreference',
+  timeline: 'timeline',
   attributes: 'attributes',
   consistency: 'coherence',
   grammar: 'grammar',
@@ -196,6 +197,7 @@ const BACKEND_PHASE_TO_FRONTEND: Record<string, keyof ExecutedPhases | null> = {
   prose: 'register',
   health: null, // Salud narrativa es un resumen, no una fase específica
 }
+
 
 export const useAnalysisStore = defineStore('analysis', () => {
   // ============================================================================

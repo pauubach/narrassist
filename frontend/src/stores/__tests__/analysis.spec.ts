@@ -35,6 +35,7 @@ describe('analysisStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    localStorage.clear()
   })
 
   afterEach(() => {
@@ -221,6 +222,25 @@ describe('analysisStore', () => {
       expect(result).toBe(false)
       expect(store.error).toBe('Failed to start')
       expect(store.isAnalyzing).toBe(false)
+    })
+
+  })
+
+  describe('runPartialAnalysis', () => {
+    it('should run partial analysis request', async () => {
+      const store = useAnalysisStore()
+      store.setActiveProjectId(1)
+
+      mockApiClient.post.mockResolvedValueOnce({})
+      mockApiClient.get.mockResolvedValueOnce({ executed: {} })
+
+      const result = await store.runPartialAnalysis(1, ['timeline'])
+
+      expect(result).toBe(true)
+      expect(mockApiClient.post).toHaveBeenCalledWith('/api/projects/1/analyze/partial', {
+        phases: ['timeline'],
+        force: false,
+      })
     })
   })
 

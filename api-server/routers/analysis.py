@@ -19,6 +19,7 @@ PHASE_ORDER = [
     "structure",
     "ner",
     "fusion",
+    "timeline",
     "attributes",
     "consistency",
     "grammar",
@@ -464,6 +465,12 @@ async def start_analysis(
                         "current": False,
                     },
                     {
+                        "id": "timeline",
+                        "name": "Construyendo línea temporal",
+                        "completed": False,
+                        "current": False,
+                    },
+                    {
                         "id": "attributes",
                         "name": "Analizando características",
                         "completed": False,
@@ -887,26 +894,32 @@ async def start_analysis(
                 else:
                     _skip_phase("fusion", 4, "Fusión omitida (modo ligero).")
 
-                _t0 = time.time()
-                run_timeline(ctx, tracker)
-                logger.info(f"[TIMING] run_timeline: {time.time() - _t0:.2f}s")
+                if not _acfg or _acfg.run_temporal:
+                    _t0 = time.time()
+                    run_timeline(ctx, tracker)
+                    logger.info(f"[TIMING] run_timeline: {time.time() - _t0:.2f}s")
+                else:
+                    _skip_phase("timeline", 5, "Timeline omitida.")
 
                 # Grammar is independent of attributes/consistency.
                 # Run in parallel: Thread 1 = grammar → grammar_alerts
                 #                  Thread 2 = attributes → consistency
                 def _run_grammar_pipeline():
-                    run_grammar(ctx, tracker)
-                    _emit_grammar_alerts(ctx, tracker)
+                    if not _acfg or _acfg.run_grammar or _acfg.run_spelling:
+                        run_grammar(ctx, tracker)
+                        _emit_grammar_alerts(ctx, tracker)
+                    else:
+                        _skip_phase("grammar", 8, "Análisis de gramática desactivado")
 
                 def _run_attrs_consistency_pipeline():
                     if not _acfg or _acfg.run_attributes:
                         run_attributes(ctx, tracker)
                     else:
-                        _skip_phase("attributes", 5, "Atributos omitidos.")
+                        _skip_phase("attributes", 6, "Atributos omitidos.")
                     if not _acfg or _acfg.run_consistency:
                         run_consistency(ctx, tracker)
                     else:
-                        _skip_phase("consistency", 6, "Consistencia omitida.")
+                        _skip_phase("consistency", 7, "Consistencia omitida.")
 
                 with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
                     future_grammar = pool.submit(_run_grammar_pipeline)
@@ -949,23 +962,23 @@ async def start_analysis(
                         futures.append(pool.submit(run_relationships_enrichment, ctx, tracker))
                     else:
                         _mark_incremental_skip(
-                            "relationships", 9, "Relaciones omitidas (cambio acotado)."
+                            "relationships", 10, "Relaciones omitidas (cambio acotado)."
                         )
 
                     if run_voice:
                         futures.append(pool.submit(run_voice_enrichment, ctx, tracker))
                     else:
-                        _mark_incremental_skip("voice", 10, "Voz omitida (cambio acotado).")
+                        _mark_incremental_skip("voice", 11, "Voz omitida (cambio acotado).")
 
                     if run_prose:
                         futures.append(pool.submit(run_prose_enrichment, ctx, tracker))
                     else:
-                        _mark_incremental_skip("prose", 11, "Prosa omitida por planner.")
+                        _mark_incremental_skip("prose", 12, "Prosa omitida por planner.")
 
                     if run_health:
                         futures.append(pool.submit(run_health_enrichment, ctx, tracker))
                     else:
-                        _mark_incremental_skip("health", 12, "Salud omitida por planner.")
+                        _mark_incremental_skip("health", 13, "Salud omitida por planner.")
 
                     for f in concurrent.futures.as_completed(futures):
                         f.result()  # Propagate exceptions

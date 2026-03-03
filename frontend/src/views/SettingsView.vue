@@ -1125,7 +1125,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/apiClient'
 import Card from 'primevue/card'
@@ -1144,6 +1144,7 @@ import CorrectionDefaultsManager from '@/components/settings/CorrectionDefaultsM
 import AppearanceSection from '@/components/settings/AppearanceSection.vue'
 import { useSystemStore, type LTState } from '@/stores/system'
 import { useLicenseStore } from '@/stores/license'
+import { useProjectsStore } from '@/stores/projects'
 import LicenseDialog from '@/components/LicenseDialog.vue'
 import type { CorrectionConfig } from '@/types'
 
@@ -1165,6 +1166,7 @@ const router = useRouter()
 const toast = useToast()
 const systemStore = useSystemStore()
 const licenseStore = useLicenseStore()
+const projectsStore = useProjectsStore()
 const showLicenseDialog = ref(false)
 
 function onLicenseActivated() {
@@ -1175,7 +1177,8 @@ function onLicenseActivated() {
 
 const {
   settings, loadSettings, saveSettings, onSettingChange, onSliderChange,
-  applyDefaultsFromCapabilities, resetSettings: doResetSettings, cleanup: cleanupPersistence,
+  applyDefaultsFromCapabilities, resetSettings: doResetSettings,
+  loadAnalysisSettingsFromBackend, syncAnalysisSettingsToBackend, cleanup: cleanupPersistence,
 } = useSettingsPersistence()
 
 const {
@@ -1597,10 +1600,67 @@ async function removeRejection(rejection: UserRejection) {
 // Navigation
 const activeSection = ref('apariencia')
 const contentArea = ref<HTMLElement | null>(null)
+const activeProjectId = computed(() => projectsStore.currentProject?.id ?? null)
+const loadingProjectAnalysisSettings = ref(false)
+let analysisSyncTimer: ReturnType<typeof setTimeout> | null = null
+
+async function loadProjectAnalysisSettings(projectId: number): Promise<void> {
+  loadingProjectAnalysisSettings.value = true
+  try {
+    await loadAnalysisSettingsFromBackend(projectId)
+  } finally {
+    loadingProjectAnalysisSettings.value = false
+  }
+}
+
+function queueAnalysisSettingsSync(): void {
+  const projectId = activeProjectId.value
+  if (!projectId || loadingProjectAnalysisSettings.value) return
+
+  if (analysisSyncTimer) {
+    clearTimeout(analysisSyncTimer)
+  }
+  analysisSyncTimer = setTimeout(async () => {
+    await syncAnalysisSettingsToBackend(projectId)
+  }, 400)
+}
+
+const analysisSettingsSignature = computed(() =>
+  JSON.stringify({
+    projectId: activeProjectId.value,
+    coreference: settings.value.enabledNLPMethods.coreference,
+    ner: settings.value.enabledNLPMethods.ner,
+    grammar: settings.value.enabledNLPMethods.grammar,
+    spelling: settings.value.enabledNLPMethods.spelling,
+    characterKnowledge: settings.value.enabledNLPMethods.character_knowledge,
+    characterKnowledgeMode: settings.value.characterKnowledgeMode,
+    multiModelSynthesis: settings.value.multiModelSynthesis,
+  })
+)
+
+watch(
+  analysisSettingsSignature,
+  (_newValue, oldValue) => {
+    if (!oldValue) return
+    queueAnalysisSettingsSync()
+  },
+  { flush: 'post' }
+)
+
+watch(
+  activeProjectId,
+  async (projectId, previousProjectId) => {
+    if (!projectId || projectId === previousProjectId) return
+    await loadProjectAnalysisSettings(projectId)
+  }
+)
 
 
 onMounted(async () => {
   loadSettings()
+  if (activeProjectId.value) {
+    await loadProjectAnalysisSettings(activeProjectId.value)
+  }
   await loadSystemCapabilities()
   await loadCurrentDataLocation()
   await loadCorrectionPresets()
@@ -1609,6 +1669,15 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  if (analysisSyncTimer) {
+    clearTimeout(analysisSyncTimer)
+    analysisSyncTimer = null
+    // Flush: enviar settings pendientes al backend antes de salir
+    const projectId = activeProjectId.value
+    if (projectId) {
+      syncAnalysisSettingsToBackend(projectId).catch(() => undefined)
+    }
+  }
   cleanupPersistence()
   cleanupOllama()
   systemStore.stopLTPolling()

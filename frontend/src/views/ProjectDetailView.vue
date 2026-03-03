@@ -317,7 +317,7 @@
           <AnalysisRequired
             v-else-if="workspaceStore.activeTab === 'timeline'"
             :project-id="project.id"
-            required-phase="structure"
+            required-phase="timeline"
             tab="timeline"
             :description="TAB_PHASE_DESCRIPTIONS.timeline"
             @analysis-completed="onAnalysisCompleted"
@@ -611,6 +611,7 @@ import { api } from '@/services/apiClient'
 import { useNotifications } from '@/composables/useNotifications'
 import { useGlobalUndo } from '@/composables/useGlobalUndo'
 import { updateProjectStats } from '@/composables/useGlobalStats'
+import { waitForPendingAnalysisSettingsSync } from '@/composables/useSettingsPersistence'
 import { useToast } from 'primevue/usetoast'
 
 const route = useRoute()
@@ -1763,6 +1764,16 @@ const startReanalysis = async () => {
   stopAnalysisPolling()
 
   try {
+    const settingsSyncOk = await waitForPendingAnalysisSettingsSync(project.value.id)
+    if (!settingsSyncOk) {
+      toast.add({
+        severity: 'warn',
+        summary: 'Configuración pendiente',
+        detail: 'No se pudo confirmar la última configuración. Se iniciará el análisis con la configuración guardada disponible.',
+        life: 4000,
+      })
+    }
+
     const modeParam = selectedAnalysisMode.value !== 'auto' ? `?mode=${selectedAnalysisMode.value}` : ''
     const data = await api.postRaw<{ success: boolean; error?: string }>(`/api/projects/${project.value.id}/reanalyze${modeParam}`)
 
