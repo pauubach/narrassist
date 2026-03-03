@@ -91,12 +91,12 @@ describe('transformProject', () => {
     }
   })
 
-  it('should default analysisStatus to completed when missing', () => {
+  it('should default analysisStatus to pending when missing', () => {
     const projectWithoutStatus = { ...mockApiProject } as any
     delete projectWithoutStatus.analysis_status
 
     const result = transformProject(projectWithoutStatus)
-    expect(result.analysisStatus).toBe('completed')
+    expect(result.analysisStatus).toBe('pending')
   })
 
   it('should transform dates correctly', () => {
@@ -634,8 +634,8 @@ describe('Transformer Robustness', () => {
 
     const result = transformProject(legacyApiProject)
 
-    // Should default to 'completed' if missing
-    expect(result.analysisStatus).toBe('completed')
+    // Should default to 'pending' if missing
+    expect(result.analysisStatus).toBe('pending')
   })
 
   it('should handle empty entity_ids array', () => {

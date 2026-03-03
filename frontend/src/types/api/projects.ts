@@ -7,7 +7,7 @@
 import type { ApiAlertSeverity } from './alerts'
 
 /** Estado del análisis en la API */
-export type ApiAnalysisStatus = 'pending' | 'in_progress' | 'analyzing' | 'completed' | 'error' | 'failed'
+export type ApiAnalysisStatus = 'pending' | 'queued' | 'in_progress' | 'analyzing' | 'completed' | 'error' | 'failed' | 'cancelled'
 
 /** Tipo de documento en la API */
 export type ApiDocumentType =

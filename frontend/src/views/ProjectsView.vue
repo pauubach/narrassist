@@ -468,10 +468,18 @@ function startProgressPolling() {
       try {
         const data = await api.get<{ status: string; progress: number }>(`/api/projects/${pid}/analysis/progress`)
         const progress = data.progress ?? 0
-        if (data.status === 'completed' || data.status === 'idle') {
+        if (data.status === 'completed') {
           projectsStore.updateProjectProgress(pid, 100, 'completed')
           anyCompleted = true
-        } else if (data.status === 'queued') {
+        } else if (data.status === 'idle') {
+          // idle = no hay análisis en storage, refrescar para obtener estado real de DB
+          anyCompleted = true
+        } else if (data.status === 'failed' || data.status === 'error') {
+          projectsStore.updateProjectProgress(pid, progress, 'error')
+          anyCompleted = true
+        } else if (data.status === 'cancelled') {
+          anyCompleted = true
+        } else if (data.status === 'queued' || data.status === 'queued_for_heavy') {
           projectsStore.updateProjectProgress(pid, 0, 'queued')
         } else {
           projectsStore.updateProjectProgress(pid, progress, 'analyzing')

@@ -61,7 +61,7 @@ export function transformProject(api: ApiProject): Project {
     createdAt: safeDate(api.created_at, new Date())!,
     lastModified: safeDate(api.last_modified, new Date())!,
     lastOpened: safeDate(api.last_opened),
-    analysisStatus: api.analysis_status || 'completed',
+    analysisStatus: api.analysis_status || 'pending',
     analysisProgress: api.analysis_progress,
     wordCount: api.word_count,
     chapterCount: api.chapter_count,
