@@ -485,14 +485,19 @@ def install_dependencies():
 
             for dep in dependencies:
                 logger.info(f"Installing {dep}...")
-                result = subprocess.run(
-                    [python_exe, "-m", "pip", "install"] + pip_install_args + [dep],
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    creationflags=creation_flags
-                )
+                try:
+                    result = subprocess.run(
+                        [python_exe, "-m", "pip", "install", "--no-input"] + pip_install_args + [dep],
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        creationflags=creation_flags,
+                        timeout=300,  # 5 min max por paquete
+                    )
+                except subprocess.TimeoutExpired:
+                    logger.error(f"Timeout installing {dep} after 5 minutes")
+                    raise Exception(f"La instalación de {dep} excedió el tiempo máximo (5 min). Reinicia la aplicación e intenta de nuevo.")
                 if result.returncode != 0:
                     logger.error(f"Failed to install {dep}: {result.stderr}")
                     raise Exception(f"Failed to install {dep}: {result.stderr}")

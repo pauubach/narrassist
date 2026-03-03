@@ -286,6 +286,7 @@ function finishSetup(llmComplete: boolean = true) {
 watch(() => systemStore.modelsError, (error) => {
   if (error) {
     downloadPhase.value = 'error'
+    systemStore.stopPolling()  // ME-08: detener polling en error terminal
     showNotification({
       title: 'Error en la instalación',
       body: error,
@@ -355,9 +356,11 @@ watch(() => systemStore.dependenciesInstalling, (installing) => {
         startAutomaticDownload()
       } else if (systemStore.modelsError) {
         downloadPhase.value = 'error'
+        systemStore.stopPolling()
       } else if (systemStore.dependenciesNeeded || !systemStore.backendLoaded) {
         // Still not ready, show error
         downloadPhase.value = 'error'
+        systemStore.stopPolling()
         systemStore.modelsError = 'Failed to load backend after installing dependencies. Try restarting the application.'
       }
     }, 2000)
