@@ -1253,10 +1253,9 @@ const llmSensitivityLabel = computed(() => {
 
 async function loadQualityLevels() {
   try {
-    const response = await fetch('/api/services/llm/hardware')
-    const data = await response.json()
-    if (data.success && data.data?.levels) {
-      for (const apiLevel of data.data.levels) {
+    const hwData = await api.get<{ levels: Array<{ value: string; available: boolean; recommended: boolean; reason: string }> }>('/api/services/llm/hardware')
+    if (hwData?.levels) {
+      for (const apiLevel of hwData.levels) {
         const local = qualityLevels.value.find(l => l.value === apiLevel.value)
         if (local) {
           local.available = apiLevel.available
@@ -1267,23 +1266,21 @@ async function loadQualityLevels() {
     }
 
     // Cargar estimaciones
-    const estResponse = await fetch('/api/services/llm/estimates?word_count=50000')
-    const estData = await estResponse.json()
-    if (estData.success && estData.data?.estimates) {
-      for (const [level, est] of Object.entries(estData.data.estimates)) {
+    const estData = await api.get<{ estimates: Record<string, { description: string }> }>('/api/services/llm/estimates?word_count=50000')
+    if (estData?.estimates) {
+      for (const [level, est] of Object.entries(estData.estimates)) {
         const local = qualityLevels.value.find(l => l.value === level)
-        if (local && est && typeof est === 'object' && 'description' in est) {
-          local.estimate = (est as { description: string }).description
+        if (local && est?.description) {
+          local.estimate = est.description
         }
       }
     }
 
     // Cargar config actual
-    const cfgResponse = await fetch('/api/services/llm/config')
-    const cfgData = await cfgResponse.json()
-    if (cfgData.success && cfgData.data) {
-      settings.value.qualityLevel = cfgData.data.qualityLevel || 'rapida'
-      settings.value.llmSensitivity = cfgData.data.sensitivity ?? 5
+    const cfgData = await api.get<{ qualityLevel: string; sensitivity: number }>('/api/services/llm/config')
+    if (cfgData) {
+      settings.value.qualityLevel = cfgData.qualityLevel || 'rapida'
+      settings.value.llmSensitivity = cfgData.sensitivity ?? 5
     }
   } catch (e) {
     console.debug('Error loading quality levels:', e)
@@ -1293,20 +1290,15 @@ async function loadQualityLevels() {
 async function selectQualityLevel(level: string) {
   settings.value.qualityLevel = level
   try {
-    const response = await fetch('/api/services/llm/config', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        qualityLevel: level,
-        sensitivity: settings.value.llmSensitivity ?? 5,
-      }),
+    const data = await api.put<{ modelsToDownload?: string[] }>('/api/services/llm/config', {
+      qualityLevel: level,
+      sensitivity: settings.value.llmSensitivity ?? 5,
     })
-    const data = await response.json()
 
-    if (data.success && data.data?.modelsToDownload?.length > 0) {
+    if (data?.modelsToDownload?.length) {
       // Auto-download missing models
       qualityLevelDownloading.value = true
-      for (const modelName of data.data.modelsToDownload) {
+      for (const modelName of data.modelsToDownload) {
         await installModel(modelName)
       }
       qualityLevelDownloading.value = false
@@ -1319,13 +1311,9 @@ async function selectQualityLevel(level: string) {
 }
 
 function onLlmSensitivityChange() {
-  fetch('/api/services/llm/config', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      qualityLevel: settings.value.qualityLevel || 'rapida',
-      sensitivity: settings.value.llmSensitivity ?? 5,
-    }),
+  api.put('/api/services/llm/config', {
+    qualityLevel: settings.value.qualityLevel || 'rapida',
+    sensitivity: settings.value.llmSensitivity ?? 5,
   }).catch(e => console.debug('Error saving sensitivity:', e))
   onSettingChange()
 }

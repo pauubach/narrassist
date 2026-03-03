@@ -3656,7 +3656,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
         use_embeddings = has_gpu
         if use_embeddings:
             logger.info("GPU detectada - habilitando análisis de embeddings para atributos")
-            tracker.update_storage( current_action="Análisis avanzado con GPU activado")
+            tracker.update_storage( current_action="Analizando características de personajes (modo avanzado)...")
         else:
             logger.info("Sin GPU - usando métodos rápidos para atributos (LLM, patrones)")
 

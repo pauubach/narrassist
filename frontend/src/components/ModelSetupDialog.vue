@@ -499,7 +499,7 @@ async function recheckPython() {
           </div>
 
           <DsDownloadProgress
-            label="Instalando numpy, spaCy, transformers..."
+            label="Instalando componentes de análisis de texto..."
             :percentage="null"
             class="progress-section"
           />
@@ -617,9 +617,9 @@ async function recheckPython() {
       <template v-else-if="downloadPhase === 'python-missing'">
         <div class="python-missing-state" role="alert" aria-live="assertive">
           <i class="pi pi-exclamation-circle python-icon"></i>
-          <h3>Python 3.10+ requerido</h3>
+          <h3>Componente del sistema no encontrado</h3>
           <p class="python-message">
-            Narrative Assistant necesita Python 3.10 o superior para funcionar correctamente.
+            Falta un componente necesario para el motor de análisis. Consulta la guía de instalación o contacta soporte.
           </p>
           <p v-if="systemStore.pythonError" class="error-detail">
             {{ systemStore.pythonError }}
