@@ -5,7 +5,7 @@
  * Muestra un mensaje indicando que el análisis no se ha ejecutado,
  * con opción de ejecutarlo incluyendo sus dependencias si las hay.
  */
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import Button from 'primevue/button'
 import { useAnalysisStore, PHASE_LABELS, TAB_RUNNING_DESCRIPTIONS, type ExecutedPhases, type WorkspaceTab } from '@/stores/analysis'
 
@@ -96,16 +96,23 @@ const runButtonLabel = computed(() => {
   return 'Ejecutar análisis completo'
 })
 
+// Emitir analysis-completed cuando la fase pase a ejecutada (vía polling),
+// no al retorno del POST (que solo indica "accepted").
+watch(isExecuted, (executed, wasExecuted) => {
+  if (executed && !wasExecuted) {
+    emit('analysis-completed')
+  }
+})
+
 // Actions
 async function runAnalysis() {
-  const success = await analysisStore.runPartialAnalysis(
+  await analysisStore.runPartialAnalysis(
     props.projectId,
     phasesToRun.value,
     false
   )
-  if (success) {
-    emit('analysis-completed')
-  }
+  // No emitimos analysis-completed aquí. El watcher de isExecuted lo hará
+  // cuando el polling detecte que el backend completó la fase realmente.
 }
 </script>
 

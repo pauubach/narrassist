@@ -420,6 +420,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
       executedPhases.value[projectId] = {}
     } else {
       delete _analyses.value[projectId]
+      // Limpiar fases parciales en ejecución (si quedan)
+      runningPhases.value.clear()
     }
   }
 
@@ -529,20 +531,18 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
     try {
       await api.post(`/api/projects/${projectId}/analyze/partial`, { phases, force })
-      await loadExecutedPhases(projectId)
+      // El backend arranca un thread y retorna inmediatamente "accepted".
+      // NO limpiamos estado aquí — el polling (useAnalysisPolling) detectará
+      // el estado terminal (completed/error/cancelled) y hará la limpieza.
       return true
     } catch (err) {
+      // Solo limpiar si el POST falló (el backend ni siquiera arrancó)
+      phases.forEach(p => runningPhases.value.delete(p))
+      _analyzing.value[projectId] = false
+      delete _analyses.value[projectId]
       _errors.value[projectId] = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
       console.error('Error in partial analysis:', err)
       return false
-    } finally {
-      // Quitar de fases en ejecución
-      phases.forEach(p => runningPhases.value.delete(p))
-      // Limpiar estado si no quedan fases corriendo
-      if (runningPhases.value.size === 0) {
-        _analyzing.value[projectId] = false
-        delete _analyses.value[projectId]
-      }
     }
   }
 

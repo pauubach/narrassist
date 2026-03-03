@@ -227,12 +227,11 @@ describe('analysisStore', () => {
   })
 
   describe('runPartialAnalysis', () => {
-    it('should run partial analysis request', async () => {
+    it('should run partial analysis request and keep analyzing state for polling', async () => {
       const store = useAnalysisStore()
       store.setActiveProjectId(1)
 
       mockApiClient.post.mockResolvedValueOnce({})
-      mockApiClient.get.mockResolvedValueOnce({ executed: {} })
 
       const result = await store.runPartialAnalysis(1, ['timeline'])
 
@@ -241,6 +240,22 @@ describe('analysisStore', () => {
         phases: ['timeline'],
         force: false,
       })
+      // Estado debe permanecer como "analyzing" para que el polling lo gestione
+      expect(store.isProjectAnalyzing(1)).toBe(true)
+    })
+
+    it('should clean up state on POST failure', async () => {
+      const store = useAnalysisStore()
+      store.setActiveProjectId(1)
+
+      mockApiClient.post.mockRejectedValueOnce(new Error('Network error'))
+
+      const result = await store.runPartialAnalysis(1, ['timeline'])
+
+      expect(result).toBe(false)
+      // Si el POST falla, el estado se limpia inmediatamente
+      expect(store.isProjectAnalyzing(1)).toBe(false)
+      expect(store.error).toBe('Network error')
     })
   })
 
