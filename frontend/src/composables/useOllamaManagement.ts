@@ -242,10 +242,15 @@ export function useOllamaManagement() {
     try {
       const result = await api.postRaw<{ success: boolean; error?: string }>(`/api/ollama/pull/${normalized}`)
       if (!result.success) {
-        toast.add({ severity: 'error', summary: 'Error', detail: result.error || 'No se pudo iniciar la descarga', life: 5000 })
-        modelDownloading.value = false
-        delete modelOperations.value[normalized]
-        return false
+        // CR-06: si ya hay una descarga en curso, no es un error real —
+        // continuar al polling para seguir el progreso de la descarga existente.
+        const alreadyDownloading = result.error?.includes('descarga en curso')
+        if (!alreadyDownloading) {
+          toast.add({ severity: 'error', summary: 'Error', detail: result.error || 'No se pudo iniciar la descarga', life: 5000 })
+          modelDownloading.value = false
+          delete modelOperations.value[normalized]
+          return false
+        }
       }
 
       let pollCount = 0

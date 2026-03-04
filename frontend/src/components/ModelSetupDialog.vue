@@ -227,8 +227,8 @@ watch(() => systemStore.modelsReady, (ready) => {
 /** Verifica si hay modelos LLM pendientes y los descarga, o cierra el diálogo. */
 async function startLLMDownloadIfNeeded() {
   try {
-    // Auto-config hardware primero (inicia Ollama si necesario)
-    await systemStore.autoConfigOnStartup()
+    // CR-06: autoConfigOnStartup() ya se ejecutó en onMounted;
+    // no repetir aquí para evitar doble orquestación de descargas.
 
     // Consultar readiness
     const result = await api.getRaw<{ data: LLMReadiness }>('/api/services/llm/readiness')

@@ -30,6 +30,28 @@ PHASE_ORDER = [
     "health",
 ]
 
+# Estados que permiten reutilizar artefactos previos vía fast-path.
+# "error" queda excluido: puede indicar datos corruptos.
+_FAST_PATH_ELIGIBLE_STATUSES = frozenset(("completed", "cancelled", "pending"))
+
+
+def _should_use_fast_path(
+    previous_fp: str, current_fp: str, previous_status: str
+) -> bool:
+    """Determina si el fast-path es elegible por fingerprint y estado previo.
+
+    El fast-path reutiliza artefactos NLP de ejecuciones anteriores cuando el
+    documento no ha cambiado. Acepta ``completed``, ``cancelled`` y ``pending``
+    porque la validación de datos (chapters > 0, entities > 0) es la protección
+    real contra datos incompletos.
+    """
+    return (
+        bool(previous_fp)
+        and bool(current_fp)
+        and previous_fp == current_fp
+        and previous_status in _FAST_PATH_ELIGIBLE_STATUSES
+    )
+
 
 def _get_calibrated_weights(project_id: int, db_session: object) -> dict[str, float]:
     """Calcula pesos calibrados basados en duraciones históricas.
@@ -652,11 +674,8 @@ async def start_analysis(
                     except Exception as _inv_err:
                         logger.debug(f"Cache invalidation skipped: {_inv_err}")
 
-                is_same_document = (
-                    bool(previous_fp)
-                    and bool(current_fp)
-                    and previous_fp == current_fp
-                    and previous_status == "completed"
+                is_same_document = _should_use_fast_path(
+                    previous_fp, current_fp, previous_status
                 )
 
                 # Verificar que los datos del análisis previo están completos

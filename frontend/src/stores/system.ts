@@ -596,15 +596,8 @@ export const useSystemStore = defineStore('system', () => {
           const data = readiness?.data
           if (data && !data.ready && data.missing_models?.length > 0) {
             llmDownloadingModels.value = data.missing_models
-            for (const model of data.missing_models) {
-              try {
-                await api.postRaw(`/api/ollama/pull/${model}`)
-              } catch {
-                // Continuar con el siguiente modelo
-              }
-            }
-            // No limpiar llmDownloadingModels aquí — la descarga es async.
-            // Se limpiará cuando ModelSetupDialog termine o en refreshCapabilities.
+            // CR-06: descargas gestionadas por ModelSetupDialog — no iniciar aquí
+            // para evitar doble orquestación y toasts de error espurios.
           }
         } catch {
           // Silencioso — el usuario puede configurarlo desde Settings
