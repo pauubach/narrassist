@@ -25,6 +25,10 @@ class ChapterDiffMetrics:
     added: int
     removed: int
     changed_ratio: float
+    # CR-05: capítulos específicos afectados (para granularidad incremental)
+    modified_chapters: frozenset[int] = frozenset()
+    added_chapters: frozenset[int] = frozenset()
+    removed_chapters: frozenset[int] = frozenset()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -34,6 +38,9 @@ class ChapterDiffMetrics:
             "added": self.added,
             "removed": self.removed,
             "changed_ratio": round(self.changed_ratio, 4),
+            "modified_chapters": sorted(self.modified_chapters),
+            "added_chapters": sorted(self.added_chapters),
+            "removed_chapters": sorted(self.removed_chapters),
         }
 
 
@@ -116,6 +123,10 @@ class VersionDiffRepository:
         chapters_data: list[dict[str, Any]],
     ) -> ChapterDiffMetrics:
         if not snapshot_id:
+            all_nums = frozenset(
+                int(ch.get("chapter_number", idx + 1))
+                for idx, ch in enumerate(chapters_data)
+            )
             return ChapterDiffMetrics(
                 total_previous=0,
                 total_current=len(chapters_data),
@@ -123,6 +134,9 @@ class VersionDiffRepository:
                 added=len(chapters_data),
                 removed=0,
                 changed_ratio=1.0 if chapters_data else 0.0,
+                modified_chapters=all_nums,
+                added_chapters=all_nums,
+                removed_chapters=frozenset(),
             )
 
         previous = self.load_snapshot_chapter_texts(snapshot_id)
@@ -133,27 +147,30 @@ class VersionDiffRepository:
 
         prev_keys = set(previous.keys())
         curr_keys = set(current.keys())
-        added = len(curr_keys - prev_keys)
-        removed = len(prev_keys - curr_keys)
+        added_set = curr_keys - prev_keys
+        removed_set = prev_keys - curr_keys
         common = prev_keys & curr_keys
 
-        modified = 0
+        modified_set: set[int] = set()
         for chapter_num in common:
             old = previous.get(chapter_num, "").strip()
             new = current.get(chapter_num, "").strip()
             if old != new:
-                modified += 1
+                modified_set.add(chapter_num)
 
-        denominator = max(1, len(common) + added + removed)
-        changed_ratio = (modified + added + removed) / denominator
+        denominator = max(1, len(common) + len(added_set) + len(removed_set))
+        changed_ratio = (len(modified_set) + len(added_set) + len(removed_set)) / denominator
 
         return ChapterDiffMetrics(
             total_previous=len(previous),
             total_current=len(current),
-            modified=modified,
-            added=added,
-            removed=removed,
+            modified=len(modified_set),
+            added=len(added_set),
+            removed=len(removed_set),
             changed_ratio=changed_ratio,
+            modified_chapters=frozenset(modified_set),
+            added_chapters=frozenset(added_set),
+            removed_chapters=frozenset(removed_set),
         )
 
     def _load_snapshot_entities(self, snapshot_id: int) -> list[dict[str, Any]]:

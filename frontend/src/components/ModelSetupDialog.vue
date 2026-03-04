@@ -5,6 +5,7 @@ import type { DownloadProgressInfo, LLMReadiness, ModelStatus } from '@/stores/s
 import { useNotifications } from '@/composables/useNotifications'
 import { useOllamaManagement } from '@/composables/useOllamaManagement'
 import { api } from '@/services/apiClient'
+import { createEnsureAutoConfig } from '@/components/modelSetupAutoConfig'
 import Dialog from 'primevue/dialog'
 import DsDownloadProgress from '@/components/ds/DsDownloadProgress.vue'
 
@@ -18,6 +19,7 @@ const props = withDefaults(defineProps<{
 const systemStore = useSystemStore()
 const { showNotification } = useNotifications()
 const { downloadModel, ollamaDownloadProgress } = useOllamaManagement()
+const ensureAutoConfigReady = createEnsureAutoConfig(() => systemStore.autoConfigOnStartup())
 
 // LLM download tracking
 const llmModelsToDownload = ref<string[]>([])
@@ -191,9 +193,8 @@ onMounted(async () => {
 
   // Si los modelos estan listos, cerrar el dialogo rapidamente
   if (systemStore.modelsReady) {
+    await ensureAutoConfigReady()
     downloadPhase.value = 'completed'
-    // Auto-config hardware en background (Ollama, settings recomendados)
-    systemStore.autoConfigOnStartup()
     setTimeout(() => {
       visible.value = false
     }, 800) // breve flash de "Listo"
@@ -227,8 +228,9 @@ watch(() => systemStore.modelsReady, (ready) => {
 /** Verifica si hay modelos LLM pendientes y los descarga, o cierra el diálogo. */
 async function startLLMDownloadIfNeeded() {
   try {
-    // CR-06: autoConfigOnStartup() ya se ejecutó en onMounted;
-    // no repetir aquí para evitar doble orquestación de descargas.
+    // CR-06: asegurar auto-config una sola vez (con deduplicación/reintento),
+    // antes de evaluar readiness/descargas LLM.
+    await ensureAutoConfigReady()
 
     // Consultar readiness
     const result = await api.getRaw<{ data: LLMReadiness }>('/api/services/llm/readiness')
@@ -385,6 +387,7 @@ async function retryStartup() {
   await systemStore.checkModelsStatus()
 
   if (systemStore.modelsReady) {
+    await ensureAutoConfigReady()
     downloadPhase.value = 'completed'
     setTimeout(() => { visible.value = false }, 800)
     return
@@ -432,6 +435,7 @@ async function recheckPython() {
     downloadPhase.value = 'installing-deps'
     startDependenciesInstallation()
   } else if (systemStore.modelsReady) {
+    await ensureAutoConfigReady()
     downloadPhase.value = 'completed'
     setTimeout(() => {
       visible.value = false

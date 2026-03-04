@@ -19,6 +19,10 @@ export type OllamaState = 'configuring' | 'not_installed' | 'not_running' | 'no_
 // Estados del init_status que indican configuración en curso
 const CONFIGURING_STATUSES = new Set(['installing', 'starting', 'downloading_model'])
 
+export function isAlreadyDownloadingError(errorMessage: string | null | undefined): boolean {
+  return typeof errorMessage === 'string' && errorMessage.toLowerCase().includes('descarga en curso')
+}
+
 // ── Composable ─────────────────────────────────────────────
 
 export function useOllamaManagement() {
@@ -244,7 +248,7 @@ export function useOllamaManagement() {
       if (!result.success) {
         // CR-06: si ya hay una descarga en curso, no es un error real —
         // continuar al polling para seguir el progreso de la descarga existente.
-        const alreadyDownloading = result.error?.includes('descarga en curso')
+        const alreadyDownloading = isAlreadyDownloadingError(result.error)
         if (!alreadyDownloading) {
           toast.add({ severity: 'error', summary: 'Error', detail: result.error || 'No se pudo iniciar la descarga', life: 5000 })
           modelDownloading.value = false

@@ -44,6 +44,7 @@ class _FakeTracker:
     def start_phase(self, *a, **kw): pass
     def end_phase(self, *a, **kw): pass
     def update_progress(self, *a, **kw): pass
+    def update_storage(self, *a, **kw): pass
 
 
 def _run_cleanup(db, project_id: int):

@@ -318,6 +318,357 @@ def invalidate_enrichment_if_mutated(
     return False
 
 
+# ============================================================================
+# CR-05: Chapter-scoped & entity-scoped incremental helpers
+# ============================================================================
+
+# Umbral: si más del 50% de capítulos/entidades cambiaron, cómputo global.
+_GRANULAR_THRESHOLD = 0.5
+
+# Enrichments de prosa elegibles para caching per-chapter.
+CHAPTER_SCOPED_ENRICHMENTS = frozenset({
+    "sticky_sentences",
+    "sentence_energy",
+    "echo_report",
+    "sentence_variation",
+    "pacing_analysis",
+    "dialogue_validation",
+})
+
+
+def _build_per_chapter_content_hashes(
+    db_session: Any, project_id: int,
+) -> dict[int, str]:
+    """Hash de contenido por chapter_number para cache granular."""
+    try:
+        with db_session.connection() as conn:
+            rows = conn.execute(
+                "SELECT chapter_number, content FROM chapters "
+                "WHERE project_id = ? ORDER BY chapter_number",
+                (project_id,),
+            ).fetchall()
+        return {
+            int(row["chapter_number"]): hashlib.sha256(
+                (row["content"] or "").encode("utf-8")
+            ).hexdigest()[:16]
+            for row in rows
+        }
+    except Exception:
+        return {}
+
+
+def _get_cached_chapter_result(
+    db_session: Any,
+    project_id: int,
+    enrichment_type: str,
+    chapter_number: int,
+) -> dict | None:
+    """Lee resultado cacheado per-chapter (entity_scope = 'chapter:N')."""
+    scope = f"chapter:{chapter_number}"
+    try:
+        with db_session.connection() as conn:
+            row = conn.execute(
+                """SELECT result_json FROM enrichment_cache
+                   WHERE project_id = ? AND enrichment_type = ?
+                   AND entity_scope = ? AND status = 'completed'
+                   LIMIT 1""",
+                (project_id, enrichment_type, scope),
+            ).fetchone()
+        if row and row[0]:
+            return json.loads(row[0])
+    except Exception:
+        pass
+    return None
+
+
+def _cache_chapter_result(
+    db_session: Any,
+    project_id: int,
+    enrichment_type: str,
+    chapter_number: int,
+    result: dict,
+    phase: int,
+    content_hash: str,
+) -> None:
+    """Almacena resultado per-chapter en enrichment_cache."""
+    scope = f"chapter:{chapter_number}"
+    result_json = json.dumps(result, ensure_ascii=False, default=str, sort_keys=True)
+    try:
+        from routers._enrichment_cache import get_schema_version
+        schema_v = get_schema_version(enrichment_type)
+        with db_session.connection() as conn:
+            conn.execute(
+                """INSERT OR REPLACE INTO enrichment_cache
+                   (project_id, enrichment_type, entity_scope, status, phase,
+                    input_hash, result_json, schema_version, computed_at, updated_at)
+                   VALUES (?, ?, ?, 'completed', ?, ?, ?, ?, datetime('now'), datetime('now'))""",
+                (project_id, enrichment_type, scope, phase,
+                 content_hash, result_json, schema_v),
+            )
+            conn.commit()
+    except Exception as e:
+        logger.debug(f"[CR-05] Failed to cache chapter result: {e}")
+
+
+def _run_chapter_scoped_enrichment(
+    db_session: Any,
+    project_id: int,
+    enrichment_type: str,
+    phase: int,
+    chapters: list,
+    changed_chapter_numbers: list[int] | None,
+    compute_one_chapter,
+    merge_fn,
+    label: str,
+    ctx: dict | None = None,
+) -> bool:
+    """CR-05: Ejecuta un enrichment per-chapter, reutilizando cache para capítulos sin cambios.
+
+    Parámetros:
+        compute_one_chapter: callable(chapter) → dict  (resultado para 1 capítulo)
+        merge_fn: callable(dict[int, dict]) → dict  (agrega per-chapter → global)
+        changed_chapter_numbers: capítulos modificados (None = todos)
+
+    Fallback a cómputo global cuando:
+    - changed_chapter_numbers es None (primer análisis / sin snapshot)
+    - >50% de capítulos cambiaron
+    """
+    ch_numbers = [ch.chapter_number for ch in chapters]
+    changed_set = set(changed_chapter_numbers) if changed_chapter_numbers is not None else None
+
+    # Fallback: sin info o demasiados cambios
+    use_granular = (
+        changed_set is not None
+        and len(ch_numbers) > 0
+        and len(changed_set) <= len(ch_numbers) * _GRANULAR_THRESHOLD
+    )
+
+    if not use_granular:
+        # Fallback a cómputo global (comportamiento original)
+        def _compute_all():
+            per_ch = {}
+            for ch in chapters:
+                per_ch[ch.chapter_number] = compute_one_chapter(ch)
+            return merge_fn(per_ch)
+        return _run_enrichment(
+            db_session, project_id, enrichment_type, phase,
+            _compute_all, label, ctx=ctx,
+        )
+
+    # Modo granular per-chapter
+    t0 = time.time()
+    content_hashes = _build_per_chapter_content_hashes(db_session, project_id)
+    per_chapter_results: dict[int, dict] = {}
+    computed = 0
+    cached_count = 0
+
+    for ch in chapters:
+        ch_num = ch.chapter_number
+        if ch_num not in changed_set:
+            # Intentar leer cache
+            cached_result = _get_cached_chapter_result(
+                db_session, project_id, enrichment_type, ch_num,
+            )
+            if cached_result is not None:
+                per_chapter_results[ch_num] = cached_result
+                cached_count += 1
+                continue
+        # Computar (capítulo modificado o cache miss)
+        try:
+            result = compute_one_chapter(ch)
+            per_chapter_results[ch_num] = result
+            computed += 1
+            # Cachear resultado per-chapter
+            ch_hash = content_hashes.get(ch_num, "")
+            _cache_chapter_result(
+                db_session, project_id, enrichment_type, ch_num,
+                result, phase, ch_hash,
+            )
+        except Exception as e:
+            logger.warning(f"[CR-05] {label} ch{ch_num} failed: {e}")
+            per_chapter_results[ch_num] = {}
+
+    # Merge y cachear resultado global
+    merged = merge_fn(per_chapter_results)
+    _cache_result(db_session, project_id, enrichment_type, merged, phase)
+
+    elapsed = time.time() - t0
+    logger.info(
+        f"[CR-05] {label}: {computed} computed, {cached_count} cached, "
+        f"{elapsed:.1f}s"
+    )
+    if ctx is not None:
+        timings = ctx.setdefault("phase_durations_json", {})
+        if isinstance(timings, dict):
+            timings[enrichment_type] = round(elapsed, 3)
+    return True
+
+
+def _get_affected_entity_ids(
+    db_session: Any, project_id: int, changed_chapter_numbers: list[int],
+) -> set[int]:
+    """CR-05 Capa 3: Entidades con menciones en capítulos modificados."""
+    if not changed_chapter_numbers:
+        return set()
+    placeholders = ",".join("?" for _ in changed_chapter_numbers)
+    try:
+        with db_session.connection() as conn:
+            rows = conn.execute(
+                f"""SELECT DISTINCT em.entity_id
+                    FROM entity_mentions em
+                    JOIN chapters ch ON em.chapter_id = ch.id
+                    WHERE ch.project_id = ? AND ch.chapter_number IN ({placeholders})""",
+                (project_id, *changed_chapter_numbers),
+            ).fetchall()
+        return {int(row[0]) for row in rows}
+    except Exception:
+        return set()
+
+
+def _get_cached_entity_result(
+    db_session: Any,
+    project_id: int,
+    enrichment_type: str,
+    entity_id: int,
+) -> dict | None:
+    """Lee resultado cacheado per-entity (entity_scope = 'entity:ID')."""
+    scope = f"entity:{entity_id}"
+    try:
+        with db_session.connection() as conn:
+            row = conn.execute(
+                """SELECT result_json FROM enrichment_cache
+                   WHERE project_id = ? AND enrichment_type = ?
+                   AND entity_scope = ? AND status = 'completed'
+                   LIMIT 1""",
+                (project_id, enrichment_type, scope),
+            ).fetchone()
+        if row and row[0]:
+            return json.loads(row[0])
+    except Exception:
+        pass
+    return None
+
+
+def _cache_entity_result(
+    db_session: Any,
+    project_id: int,
+    enrichment_type: str,
+    entity_id: int,
+    result: dict,
+    phase: int,
+) -> None:
+    """Almacena resultado per-entity en enrichment_cache."""
+    scope = f"entity:{entity_id}"
+    result_json = json.dumps(result, ensure_ascii=False, default=str, sort_keys=True)
+    try:
+        from routers._enrichment_cache import get_schema_version
+        schema_v = get_schema_version(enrichment_type)
+        with db_session.connection() as conn:
+            conn.execute(
+                """INSERT OR REPLACE INTO enrichment_cache
+                   (project_id, enrichment_type, entity_scope, status, phase,
+                    result_json, schema_version, computed_at, updated_at)
+                   VALUES (?, ?, ?, 'completed', ?, ?, ?, datetime('now'), datetime('now'))""",
+                (project_id, enrichment_type, scope, phase, result_json, schema_v),
+            )
+            conn.commit()
+    except Exception as e:
+        logger.debug(f"[CR-05] Failed to cache entity result: {e}")
+
+
+def _run_entity_scoped_enrichment(
+    db_session: Any,
+    project_id: int,
+    enrichment_type: str,
+    phase: int,
+    entities: list,
+    changed_chapter_numbers: list[int] | None,
+    compute_one_entity,
+    merge_fn,
+    label: str,
+    ctx: dict | None = None,
+) -> bool:
+    """CR-05 Capa 3: Ejecuta enrichment per-entity, reutilizando cache para entidades sin cambios.
+
+    Parámetros:
+        compute_one_entity: callable(entity) → dict  (resultado para 1 entidad)
+        merge_fn: callable(dict[int, dict]) → dict  (agrega per-entity → global)
+        changed_chapter_numbers: capítulos modificados → determina entidades afectadas
+
+    Fallback a cómputo global cuando:
+    - changed_chapter_numbers es None (primer análisis)
+    - >50% de entidades afectadas
+    """
+    affected_ids: set[int] | None = None
+    if changed_chapter_numbers is not None:
+        affected_ids = _get_affected_entity_ids(
+            db_session, project_id, changed_chapter_numbers,
+        )
+
+    entity_ids = [e.id for e in entities]
+    use_granular = (
+        affected_ids is not None
+        and len(entity_ids) > 0
+        and len(affected_ids) <= len(entity_ids) * _GRANULAR_THRESHOLD
+    )
+
+    if not use_granular:
+        # Fallback a cómputo global
+        def _compute_all():
+            per_ent = {}
+            for entity in entities:
+                per_ent[entity.id] = compute_one_entity(entity)
+            return merge_fn(per_ent)
+        return _run_enrichment(
+            db_session, project_id, enrichment_type, phase,
+            _compute_all, label, ctx=ctx,
+        )
+
+    # Modo granular per-entity
+    t0 = time.time()
+    per_entity_results: dict[int, dict] = {}
+    computed = 0
+    cached_count = 0
+
+    for entity in entities:
+        eid = entity.id
+        if eid not in affected_ids:
+            cached_result = _get_cached_entity_result(
+                db_session, project_id, enrichment_type, eid,
+            )
+            if cached_result is not None:
+                per_entity_results[eid] = cached_result
+                cached_count += 1
+                continue
+        # Computar (entidad afectada o cache miss)
+        try:
+            result = compute_one_entity(entity)
+            per_entity_results[eid] = result
+            computed += 1
+            _cache_entity_result(
+                db_session, project_id, enrichment_type, eid,
+                result, phase,
+            )
+        except Exception as e:
+            logger.warning(f"[CR-05] {label} entity {eid} failed: {e}")
+            per_entity_results[eid] = {}
+
+    # Merge y cachear resultado global
+    merged = merge_fn(per_entity_results)
+    _cache_result(db_session, project_id, enrichment_type, merged, phase)
+
+    elapsed = time.time() - t0
+    logger.info(
+        f"[CR-05] {label}: {computed} computed, {cached_count} cached, "
+        f"{elapsed:.1f}s"
+    )
+    if ctx is not None:
+        timings = ctx.setdefault("phase_durations_json", {})
+        if isinstance(timings, dict):
+            timings[enrichment_type] = round(elapsed, 3)
+    return True
+
+
 def _run_enrichment(
     db_session: Any,
     project_id: int,
@@ -527,6 +878,8 @@ def _detect_all_dialogues(chapters):
 
 def run_relationships_enrichment(ctx: dict, tracker) -> None:
     """Phase 10: Pre-compute relationship-related analysis."""
+    from functools import partial
+
     phase_key = "relationships"
     phase_index = 9  # 0-indexed (10th phase)
 
@@ -535,6 +888,10 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
     project_id = ctx["project_id"]
     db = ctx["db_session"]
     analysis_config = ctx.get("analysis_config")
+
+    # CR-05: capítulos modificados para caching granular per-entity
+    inc_plan = ctx.get("incremental_plan") or {}
+    changed_ch = inc_plan.get("changed_chapter_numbers")
 
     try:
         entities = _load_entities(db, project_id)
@@ -567,16 +924,18 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
         else:
             tracker.update_parallel_progress(phase_key, step / total_steps, "Red de personajes omitida")
 
-        # --- 10b: Character Timeline ---
+        # --- 10b: Character Timeline (entity-scoped) ---
         step += 1
         tracker.update_parallel_progress(phase_key, step / total_steps, "Generando línea temporal...")
-        _run_enrichment(
-            db,
-            project_id,
-            "character_timeline",
-            10,
-            lambda: _compute_character_timeline(db, project_id, entities, chapters),
-            "character_timeline",
+        ch_number_map = {ch.id: ch.chapter_number for ch in chapters if hasattr(ch, "id")}
+        _shared_tl = {"db": db, "ch_number_map": ch_number_map, "chapters": chapters}
+        _compute_tl = partial(_compute_timeline_for_entity, _shared=_shared_tl)
+        _merge_tl = partial(_merge_timeline, chapters=chapters)
+        _run_entity_scoped_enrichment(
+            db, project_id, "character_timeline", 10,
+            character_entities, changed_ch,
+            _compute_tl, _merge_tl,
+            "character_timeline", ctx=ctx,
         )
 
         # --- 10c: Character Profiles (6 indicators) ---
@@ -1166,6 +1525,10 @@ def run_prose_enrichment(ctx: dict, tracker) -> None:
     project_id = ctx["project_id"]
     db = ctx["db_session"]
 
+    # CR-05: capítulos modificados para caching granular
+    inc_plan = ctx.get("incremental_plan") or {}
+    changed_ch = inc_plan.get("changed_chapter_numbers")
+
     try:
         chapters = _load_chapters(db, project_id)
         chapters_dicts = _chapters_to_dicts(chapters)
@@ -1174,117 +1537,98 @@ def run_prose_enrichment(ctx: dict, tracker) -> None:
         total_steps = 10
         step = 0
 
-        # --- 12a: Sticky Sentences ---
+        # --- 12a: Sticky Sentences (chapter-scoped) ---
         step += 1
         tracker.update_parallel_progress(phase_key, step / total_steps, "Detectando frases pegajosas...")
-        _run_enrichment(
-            db,
-            project_id,
-            "sticky_sentences",
-            12,
-            lambda: _compute_sticky_sentences(chapters),
-            "sticky_sentences",
+        _run_chapter_scoped_enrichment(
+            db, project_id, "sticky_sentences", 12,
+            chapters, changed_ch,
+            _compute_sticky_for_chapter, _merge_sticky,
+            "sticky_sentences", ctx=ctx,
         )
 
-        # --- 12b: Sentence Energy ---
+        # --- 12b: Sentence Energy (chapter-scoped) ---
         step += 1
         tracker.update_parallel_progress(phase_key, step / total_steps, "Midiendo energía narrativa...")
-        _run_enrichment(
-            db,
-            project_id,
-            "sentence_energy",
-            12,
-            lambda: _compute_sentence_energy(chapters),
-            "sentence_energy",
+        _run_chapter_scoped_enrichment(
+            db, project_id, "sentence_energy", 12,
+            chapters, changed_ch,
+            _compute_energy_for_chapter, _merge_energy,
+            "sentence_energy", ctx=ctx,
         )
 
-        # --- 12c: Echo Report (lexical only — skip semantic to avoid embeddings) ---
+        # --- 12c: Echo Report (chapter-scoped, lexical only) ---
         step += 1
         tracker.update_parallel_progress(phase_key, step / total_steps, "Buscando repeticiones...")
-        _run_enrichment(
-            db, project_id, "echo_report", 12, lambda: _compute_echo_report(chapters), "echo_report"
+        _run_chapter_scoped_enrichment(
+            db, project_id, "echo_report", 12,
+            chapters, changed_ch,
+            _compute_echo_for_chapter, _merge_echo,
+            "echo_report", ctx=ctx,
         )
 
-        # --- 12d: Pacing Analysis ---
+        # --- 12d: Pacing Analysis (chapter-scoped) ---
         step += 1
         tracker.update_parallel_progress(phase_key, step / total_steps, "Analizando ritmo narrativo...")
-        _run_enrichment(
-            db,
-            project_id,
-            "pacing_analysis",
-            12,
-            lambda: _compute_pacing_analysis(chapters_dicts),
-            "pacing_analysis",
+        _run_chapter_scoped_enrichment(
+            db, project_id, "pacing_analysis", 12,
+            chapters, changed_ch,
+            _compute_pacing_for_chapter, _merge_pacing,
+            "pacing_analysis", ctx=ctx,
         )
 
-        # --- 12e: Tension Curve ---
+        # --- 12e: Tension Curve (cross-chapter, global) ---
         step += 1
         tracker.update_parallel_progress(phase_key, step / total_steps, "Trazando curva de tensión...")
         _run_enrichment(
-            db,
-            project_id,
-            "tension_curve",
-            12,
+            db, project_id, "tension_curve", 12,
             lambda: _compute_tension_curve(chapters_dicts, full_text),
             "tension_curve",
         )
 
-        # --- 12f: Sensory Report ---
+        # --- 12f: Sensory Report (cross-chapter, global) ---
         step += 1
         tracker.update_parallel_progress(phase_key, step / total_steps, "Evaluando detalles sensoriales...")
         _run_enrichment(
-            db,
-            project_id,
-            "sensory_report",
-            12,
+            db, project_id, "sensory_report", 12,
             lambda: _compute_sensory_report(full_text, chapters_dicts),
             "sensory_report",
         )
 
-        # --- 12g: Age Readability ---
+        # --- 12g: Age Readability (global, full text) ---
         step += 1
         tracker.update_parallel_progress(phase_key, step / total_steps, "Calculando legibilidad...")
         _run_enrichment(
-            db,
-            project_id,
-            "age_readability",
-            12,
+            db, project_id, "age_readability", 12,
             lambda: _compute_readability(full_text),
             "age_readability",
         )
 
-        # --- 12h: Sentence Variation ---
+        # --- 12h: Sentence Variation (chapter-scoped) ---
         step += 1
         tracker.update_parallel_progress(phase_key, step / total_steps, "Analizando variación sintáctica...")
-        _run_enrichment(
-            db,
-            project_id,
-            "sentence_variation",
-            12,
-            lambda: _compute_sentence_variation(chapters),
-            "sentence_variation",
+        _run_chapter_scoped_enrichment(
+            db, project_id, "sentence_variation", 12,
+            chapters, changed_ch,
+            _compute_variation_for_chapter, _merge_variation,
+            "sentence_variation", ctx=ctx,
         )
 
-        # --- 12i: Dialogue Validation ---
+        # --- 12i: Dialogue Validation (chapter-scoped) ---
         step += 1
         tracker.update_parallel_progress(phase_key, step / total_steps, "Validando diálogos...")
-        _run_enrichment(
-            db,
-            project_id,
-            "dialogue_validation",
-            12,
-            lambda: _compute_dialogue_validation(chapters),
-            "dialogue_validation",
+        _run_chapter_scoped_enrichment(
+            db, project_id, "dialogue_validation", 12,
+            chapters, changed_ch,
+            _compute_dialogue_for_chapter, _merge_dialogue,
+            "dialogue_validation", ctx=ctx,
         )
 
-        # --- 12j: Narrative Structure ---
+        # --- 12j: Narrative Structure (cross-chapter, global) ---
         step += 1
         tracker.update_parallel_progress(phase_key, step / total_steps, "Detectando estructura narrativa...")
         _run_enrichment(
-            db,
-            project_id,
-            "narrative_structure",
-            12,
+            db, project_id, "narrative_structure", 12,
             lambda: _compute_narrative_structure(full_text, chapters_dicts),
             "narrative_structure",
         )
@@ -1465,6 +1809,242 @@ def _compute_narrative_structure(full_text, chapters_dicts):
     detector = get_narrative_structure_detector()
     report = detector.detect_all(full_text, chapters_dicts, min_confidence=0.5)
     return report.to_dict() if hasattr(report, "to_dict") else report
+
+
+# ============================================================================
+# CR-05: Per-chapter compute & merge functions for chapter-scoped caching
+# ============================================================================
+
+def _compute_sticky_for_chapter(ch):
+    """Compute sticky sentences para un solo capítulo."""
+    from narrative_assistant.nlp.style.sticky_sentences import get_sticky_sentence_detector
+    detector = get_sticky_sentence_detector()
+    report = detector.analyze(ch.content or "", threshold=0.45)
+    items = []
+    for s in getattr(report, "sticky_sentences", []):
+        d = s.to_dict() if hasattr(s, "to_dict") else s
+        if isinstance(d, dict):
+            d["chapter"] = ch.chapter_number
+        items.append(d)
+    return {
+        "sticky_sentences": items,
+        "total_sentences": getattr(report, "total_sentences", 0),
+        "total_sticky": len(items),
+    }
+
+
+def _merge_sticky(per_ch: dict[int, dict]) -> dict:
+    all_sticky, total_s, total_st = [], 0, 0
+    for ch_num in sorted(per_ch):
+        r = per_ch[ch_num]
+        all_sticky.extend(r.get("sticky_sentences", []))
+        total_s += r.get("total_sentences", 0)
+        total_st += r.get("total_sticky", 0)
+    return {"sticky_sentences": all_sticky, "stats": {"total_sentences": total_s, "total_sticky": total_st}}
+
+
+def _compute_energy_for_chapter(ch):
+    """Compute sentence energy para un solo capítulo."""
+    from narrative_assistant.nlp.style.sentence_energy import get_sentence_energy_detector
+    detector = get_sentence_energy_detector()
+    report = detector.analyze(ch.content or "", chapter=ch.chapter_number)
+    items = []
+    for s in getattr(report, "low_energy_sentences", []):
+        d = s.to_dict() if hasattr(s, "to_dict") else s
+        if isinstance(d, dict):
+            d["chapter"] = ch.chapter_number
+        items.append(d)
+    return {
+        "low_energy_sentences": items,
+        "avg_energy": getattr(report, "avg_energy", 0.5),
+    }
+
+
+def _merge_energy(per_ch: dict[int, dict]) -> dict:
+    all_low, energy_sum, count = [], 0.0, 0
+    for ch_num in sorted(per_ch):
+        r = per_ch[ch_num]
+        all_low.extend(r.get("low_energy_sentences", []))
+        energy_sum += r.get("avg_energy", 0.5)
+        count += 1
+    avg = energy_sum / max(count, 1)
+    return {"low_energy_sentences": all_low, "stats": {"avg_energy": avg, "chapters": count}}
+
+
+def _compute_echo_for_chapter(ch):
+    """Compute echo (lexical repetitions) para un solo capítulo."""
+    from narrative_assistant.nlp.style.repetition_detector import get_repetition_detector
+    detector = get_repetition_detector()
+    report = detector.detect_lexical(ch.content or "", min_distance=3)
+    items = []
+    for r in getattr(report, "repetitions", []):
+        d = r.to_dict() if hasattr(r, "to_dict") else r
+        if isinstance(d, dict):
+            d["chapter"] = ch.chapter_number
+        items.append(d)
+    return {"repetitions": items}
+
+
+def _merge_echo(per_ch: dict[int, dict]) -> dict:
+    all_reps = []
+    for ch_num in sorted(per_ch):
+        all_reps.extend(per_ch[ch_num].get("repetitions", []))
+    return {"repetitions": all_reps, "total": len(all_reps)}
+
+
+def _compute_variation_for_chapter(ch):
+    """Compute sentence variation para un solo capítulo."""
+    SENTENCE_RE = re.compile(r"[^.!?…]+[.!?…]+")
+    sentences = SENTENCE_RE.findall(ch.content or "")
+    lengths = [len(s.split()) for s in sentences if len(s.split()) > 2]
+    if not lengths:
+        return {"lengths": [], "chapter": ch.chapter_number}
+    avg = sum(lengths) / len(lengths)
+    variance = sum((l - avg) ** 2 for l in lengths) / len(lengths)
+    std = variance**0.5
+    cv = std / avg if avg > 0 else 0
+    return {
+        "chapter_result": {
+            "chapter": ch.chapter_number,
+            "avg_length": round(avg, 1),
+            "std_dev": round(std, 1),
+            "variation_coefficient": round(cv, 3),
+            "min_length": min(lengths),
+            "max_length": max(lengths),
+            "sentence_count": len(lengths),
+        },
+        "lengths": lengths,
+    }
+
+
+def _merge_variation(per_ch: dict[int, dict]) -> dict:
+    chapter_results, all_lengths = [], []
+    for ch_num in sorted(per_ch):
+        r = per_ch[ch_num]
+        if r.get("chapter_result"):
+            chapter_results.append(r["chapter_result"])
+        all_lengths.extend(r.get("lengths", []))
+    g_avg = sum(all_lengths) / len(all_lengths) if all_lengths else 0
+    g_var = sum((l - g_avg) ** 2 for l in all_lengths) / len(all_lengths) if all_lengths else 0
+    g_std = g_var**0.5
+    g_cv = g_std / g_avg if g_avg > 0 else 0
+    return {
+        "global_stats": {
+            "avg_length": round(g_avg, 1), "std_dev": round(g_std, 1),
+            "variation_coefficient": round(g_cv, 3),
+            "min_length": min(all_lengths) if all_lengths else 0,
+            "max_length": max(all_lengths) if all_lengths else 0,
+            "total_sentences": len(all_lengths),
+        },
+        "chapters": chapter_results,
+    }
+
+
+def _compute_pacing_for_chapter(ch):
+    """Compute pacing para un solo capítulo."""
+    from narrative_assistant.analysis.pacing import get_pacing_analyzer
+    analyzer = get_pacing_analyzer()
+    ch_dict = {"chapter_number": ch.chapter_number, "content": ch.content or "", "title": ch.title or ""}
+    result = analyzer.analyze([ch_dict])
+    if hasattr(result, "to_dict"):
+        return result.to_dict()
+    if hasattr(result, "chapter_metrics") and result.chapter_metrics:
+        m = result.chapter_metrics[0]
+        return m.to_dict() if hasattr(m, "to_dict") else m
+    return result if isinstance(result, dict) else {}
+
+
+def _merge_pacing(per_ch: dict[int, dict]) -> dict:
+    metrics = [per_ch[ch_num] for ch_num in sorted(per_ch) if per_ch[ch_num]]
+    return {"chapter_metrics": metrics}
+
+
+def _compute_dialogue_for_chapter(ch):
+    """Compute dialogue validation para un solo capítulo."""
+    from narrative_assistant.nlp.dialogue_validator import DialogueContextValidator
+    validator = DialogueContextValidator()
+    ch_info = [{"number": ch.chapter_number, "start_char": 0, "content": ch.content or ""}]
+    report = validator.validate_all(ch_info)
+    return report.to_dict() if hasattr(report, "to_dict") else (report if isinstance(report, dict) else {})
+
+
+def _merge_dialogue(per_ch: dict[int, dict]) -> dict:
+    # DialogueContextValidator.validate_all returns a combined report.
+    # For per-chapter, merge issues/warnings.
+    all_issues = []
+    for ch_num in sorted(per_ch):
+        r = per_ch[ch_num]
+        all_issues.extend(r.get("issues", []))
+        all_issues.extend(r.get("warnings", []))
+    return {"issues": all_issues, "total": len(all_issues)}
+
+
+# ============================================================================
+# CR-05 Capa 3: Per-entity compute & merge for entity-scoped caching
+# ============================================================================
+
+
+def _compute_timeline_for_entity(entity, *, _shared=None):
+    """Compute timeline para una sola entidad.
+
+    _shared debe contener: db, ch_number_map, chapters.
+    Se inyecta via functools.partial en run_relationships_enrichment.
+    """
+    from narrative_assistant.entities.repository import get_entity_repository
+
+    db = _shared["db"]
+    ch_number_map = _shared["ch_number_map"]
+
+    etype = (
+        entity.entity_type.value
+        if hasattr(entity.entity_type, "value")
+        else str(entity.entity_type)
+    )
+    if etype not in ("character", "animal", "creature"):
+        return {}
+
+    entity_repo = get_entity_repository(db)
+    mentions = entity_repo.get_mentions_by_entity(entity.id)
+    ch_counts: dict[int, int] = {}
+    for m in mentions:
+        ch_id = getattr(m, "chapter_id", None)
+        ch_num = ch_number_map.get(ch_id, 0) if ch_id else 0
+        ch_counts[ch_num] = ch_counts.get(ch_num, 0) + 1
+
+    if not ch_counts:
+        return {}
+
+    appearances = [
+        {"chapter": ch_num, "mentions": count}
+        for ch_num, count in sorted(ch_counts.items())
+    ]
+    return {
+        "entity_id": entity.id,
+        "name": entity.canonical_name,
+        "entity_type": etype,
+        "importance": getattr(entity, "importance", None),
+        "total_mentions": sum(ch_counts.values()),
+        "chapters_present": len(ch_counts),
+        "first_chapter": min(ch_counts.keys()),
+        "last_chapter": max(ch_counts.keys()),
+        "appearances": appearances,
+    }
+
+
+def _merge_timeline(per_ent: dict[int, dict], *, chapters=None) -> dict:
+    """Merge per-entity timeline results en resultado global."""
+    characters = [v for v in per_ent.values() if v]
+    characters.sort(key=lambda c: c.get("total_mentions", 0), reverse=True)
+    ch_list = []
+    total_ch = 0
+    if chapters is not None:
+        ch_list = [{"number": ch.chapter_number, "title": ch.title} for ch in chapters]
+        total_ch = len(chapters)
+    return {
+        "characters": characters,
+        "chapters": ch_list,
+        "total_chapters": total_ch,
+    }
 
 
 # ============================================================================

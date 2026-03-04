@@ -93,6 +93,11 @@ def build_phase_plan(
     )
     force_full = bool(invalidations.get("force_full", False))
 
+    # CR-05: capítulos específicos afectados (para granularidad en enrichment)
+    changed_chapters = sorted(
+        chapter_diff.modified_chapters | chapter_diff.added_chapters
+    )
+
     if severe_structure_change or force_full:
         reason = "severe_structure_change" if severe_structure_change else "forced_full"
         return {
@@ -103,6 +108,7 @@ def build_phase_plan(
             "run_prose": True,
             "run_health": True,
             "chapter_diff": chapter_diff.to_dict(),
+            "changed_chapter_numbers": changed_chapters,
             "reason": reason,
         }
 
@@ -123,6 +129,7 @@ def build_phase_plan(
         "run_prose": "prose" in impacted_nodes,
         "run_health": "health" in impacted_nodes,
         "chapter_diff": chapter_diff.to_dict(),
+        "changed_chapter_numbers": changed_chapters,
         "reason": "impact_planner",
     }
 

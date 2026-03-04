@@ -33,6 +33,19 @@ PHASE_ORDER = [
 # Estados que permiten reutilizar artefactos previos vía fast-path.
 # "error" queda excluido: puede indicar datos corruptos.
 _FAST_PATH_ELIGIBLE_STATUSES = frozenset(("completed", "cancelled", "pending"))
+_FAST_PATH_REQUIRED_PHASES = frozenset(
+    (
+        "classification",
+        "structure",
+        "ner",
+        "fusion",
+        "timeline",
+        "attributes",
+        "consistency",
+        "grammar",
+        "alerts",
+    )
+)
 
 
 def _should_use_fast_path(
@@ -45,12 +58,57 @@ def _should_use_fast_path(
     porque la validación de datos (chapters > 0, entities > 0) es la protección
     real contra datos incompletos.
     """
+    normalized_status = (previous_status or "").strip().lower()
+    previous_fp_norm = (previous_fp or "").strip()
+    current_fp_norm = (current_fp or "").strip()
     return (
-        bool(previous_fp)
-        and bool(current_fp)
-        and previous_fp == current_fp
-        and previous_status in _FAST_PATH_ELIGIBLE_STATUSES
+        bool(previous_fp_norm)
+        and bool(current_fp_norm)
+        and previous_fp_norm == current_fp_norm
+        and normalized_status in _FAST_PATH_ELIGIBLE_STATUSES
     )
+
+
+def _missing_fast_path_phases(executed_phases: dict[str, bool]) -> list[str]:
+    """Retorna fases requeridas que no figuran como ejecutadas."""
+    return [
+        phase
+        for phase in PHASE_ORDER
+        if phase in _FAST_PATH_REQUIRED_PHASES and not bool(executed_phases.get(phase, False))
+    ]
+
+
+def _has_complete_fast_path_artifacts(
+    *,
+    chapters_count: int,
+    entities_count: int,
+    executed_phases: dict[str, bool],
+    previous_status: str,
+) -> tuple[bool, str]:
+    """Valida que fast-path tenga artefactos suficientes y trazabilidad.
+
+    Reglas:
+    - Siempre requiere capítulos + entidades ya persistidos.
+    - Si hay run ledger, exige cobertura de fases core del pipeline.
+    - Sin run ledger, solo se permite fallback legacy cuando el estado previo
+      era `completed` (compatibilidad con proyectos antiguos).
+    """
+    if chapters_count <= 0 or entities_count <= 0:
+        return (
+            False,
+            f"incomplete persisted data (chapters={chapters_count}, entities={entities_count})",
+        )
+
+    if not executed_phases:
+        if previous_status == "completed":
+            return True, "legacy completed run without ledger"
+        return False, "missing run ledger for non-completed previous status"
+
+    missing = _missing_fast_path_phases(executed_phases)
+    if missing:
+        return False, f"missing executed phases in run ledger: {', '.join(missing)}"
+
+    return True, "ok"
 
 
 def _get_calibrated_weights(project_id: int, db_session: object) -> dict[str, float]:
@@ -674,31 +732,63 @@ async def start_analysis(
                     except Exception as _inv_err:
                         logger.debug(f"Cache invalidation skipped: {_inv_err}")
 
-                is_same_document = _should_use_fast_path(
-                    previous_fp, current_fp, previous_status
-                )
+                is_same_document = _should_use_fast_path(previous_fp, current_fp, previous_status)
+                fast_path_metrics: dict[str, int] = {}
 
                 # Verificar que los datos del análisis previo están completos
-                # antes de activar fast-path (protege contra datos parciales)
+                # antes de activar fast-path (protege contra datos parciales).
                 if is_same_document:
                     with db_session.connection() as conn:
-                        _ch_count = int(
+                        fast_path_metrics["chapters_count"] = int(
                             conn.execute(
                                 "SELECT COUNT(*) FROM chapters WHERE project_id = ?",
                                 (project_id,),
                             ).fetchone()[0]
                         )
-                        _ent_count = int(
+                        fast_path_metrics["entities_count"] = int(
                             conn.execute(
                                 "SELECT COUNT(*) FROM entities WHERE project_id = ?",
                                 (project_id,),
                             ).fetchone()[0]
                         )
-                    if _ch_count == 0 or _ent_count == 0:
+                        fast_path_metrics["attributes_count"] = int(
+                            conn.execute(
+                                "SELECT COUNT(*) FROM entity_attributes "
+                                "WHERE entity_id IN (SELECT id FROM entities WHERE project_id = ?)",
+                                (project_id,),
+                            ).fetchone()[0]
+                        )
+                        fast_path_metrics["alerts_count"] = int(
+                            conn.execute(
+                                "SELECT COUNT(*) FROM alerts WHERE project_id = ?",
+                                (project_id,),
+                            ).fetchone()[0]
+                        )
+
+                    executed_phases: dict[str, bool] = {}
+                    try:
+                        from narrative_assistant.persistence.analysis import AnalysisRepository
+
+                        analysis_repo = AnalysisRepository(db_session)
+                        executed_phases = analysis_repo.get_executed_phases(project_id)
+                    except Exception as ledger_err:
                         logger.warning(
-                            f"[FAST_PATH] Project {project_id}: fingerprint match but "
-                            f"incomplete data (chapters={_ch_count}, entities={_ent_count}). "
-                            "Running full analysis."
+                            "[FAST_PATH] Project %s: could not read run ledger (%s).",
+                            project_id,
+                            ledger_err,
+                        )
+
+                    is_complete, reason = _has_complete_fast_path_artifacts(
+                        chapters_count=fast_path_metrics.get("chapters_count", 0),
+                        entities_count=fast_path_metrics.get("entities_count", 0),
+                        executed_phases=executed_phases,
+                        previous_status=previous_status,
+                    )
+                    if not is_complete:
+                        logger.warning(
+                            "[FAST_PATH] Project %s: fingerprint match but %s. Running full analysis.",
+                            project_id,
+                            reason,
                         )
                         is_same_document = False
 
@@ -710,33 +800,10 @@ async def start_analysis(
                         "reusing previous analysis artifacts."
                     )
 
-                    # Cargar métricas existentes para que run_completion refleje datos reales.
-                    with db_session.connection() as conn:
-                        chapters_count = int(
-                            conn.execute(
-                                "SELECT COUNT(*) FROM chapters WHERE project_id = ?",
-                                (project_id,),
-                            ).fetchone()[0]
-                        )
-                        entities_count = int(
-                            conn.execute(
-                                "SELECT COUNT(*) FROM entities WHERE project_id = ?",
-                                (project_id,),
-                            ).fetchone()[0]
-                        )
-                        attributes_count = int(
-                            conn.execute(
-                                "SELECT COUNT(*) FROM entity_attributes "
-                                "WHERE entity_id IN (SELECT id FROM entities WHERE project_id = ?)",
-                                (project_id,),
-                            ).fetchone()[0]
-                        )
-                        alerts_count = int(
-                            conn.execute(
-                                "SELECT COUNT(*) FROM alerts WHERE project_id = ?",
-                                (project_id,),
-                            ).fetchone()[0]
-                        )
+                    chapters_count = fast_path_metrics.get("chapters_count", 0)
+                    entities_count = fast_path_metrics.get("entities_count", 0)
+                    attributes_count = fast_path_metrics.get("attributes_count", 0)
+                    alerts_count = fast_path_metrics.get("alerts_count", 0)
 
                     ctx["chapters_count"] = (
                         chapters_count or int(getattr(project, "chapter_count", 0) or 0) or 1
@@ -750,38 +817,37 @@ async def start_analysis(
                     tracker.set_metric("attributes_extracted", attributes_count)
                     tracker.set_metric("alerts_generated", alerts_count)
 
-                    def _mark_skipped_phase(phase_key: str, phase_index: int, message: str) -> None:
-                        tracker.start_phase(phase_key, phase_index, message)
+                    def _mark_skipped_phase(phase_key: str, message: str) -> None:
+                        tracker.start_phase(phase_key, message)
                         tracker.set_action(
                             "Sin cambios detectados, reutilizando resultados previos."
                         )
-                        tracker.end_phase(phase_key, phase_index)
+                        tracker.end_phase(phase_key)
 
                     _mark_skipped_phase(
                         "classification",
-                        1,
                         "Clasificación omitida (documento sin cambios).",
                     )
                     _mark_skipped_phase(
                         "structure",
-                        2,
                         "Estructura reutilizada (documento sin cambios).",
                     )
-                    _mark_skipped_phase("ner", 3, "NER reutilizado (documento sin cambios).")
-                    _mark_skipped_phase("fusion", 4, "Fusión reutilizada (documento sin cambios).")
+                    _mark_skipped_phase("ner", "NER reutilizado (documento sin cambios).")
+                    _mark_skipped_phase("fusion", "Fusión reutilizada (documento sin cambios).")
+                    _mark_skipped_phase(
+                        "timeline",
+                        "Timeline reutilizada (documento sin cambios).",
+                    )
                     _mark_skipped_phase(
                         "attributes",
-                        5,
                         "Atributos reutilizados (documento sin cambios).",
                     )
                     _mark_skipped_phase(
                         "consistency",
-                        6,
                         "Consistencia reutilizada (documento sin cambios).",
                     )
                     _mark_skipped_phase(
                         "grammar",
-                        7,
                         "Gramática reutilizada (documento sin cambios).",
                     )
 
@@ -803,19 +869,18 @@ async def start_analysis(
                         )
 
                     _enrichment_phase_map = {
-                        "relationships": (9, "Relaciones", run_relationships_enrichment),
-                        "voice": (10, "Voz", run_voice_enrichment),
-                        "prose": (11, "Prosa", run_prose_enrichment),
-                        "health": (12, "Salud narrativa", run_health_enrichment),
+                        "relationships": ("Relaciones", run_relationships_enrichment),
+                        "voice": ("Voz", run_voice_enrichment),
+                        "prose": ("Prosa", run_prose_enrichment),
+                        "health": ("Salud narrativa", run_health_enrichment),
                     }
 
-                    for phase_name, (idx, label, runner) in _enrichment_phase_map.items():
+                    for phase_name, (label, runner) in _enrichment_phase_map.items():
                         if phase_name in stale_phases:
                             runner(ctx, tracker)
                         else:
                             _mark_skipped_phase(
                                 phase_name,
-                                idx,
                                 f"{label} reutilizada (documento sin cambios).",
                             )
 
