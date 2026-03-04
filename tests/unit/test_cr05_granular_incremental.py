@@ -9,6 +9,7 @@ _api_server = str(Path(__file__).resolve().parents[2] / "api-server")
 if _api_server not in sys.path:
     sys.path.insert(0, _api_server)
 
+from narrative_assistant.persistence.database import Database  # noqa: E402
 from narrative_assistant.persistence.version_diff import ChapterDiffMetrics  # noqa: E402
 from routers._incremental_planner import build_phase_plan  # noqa: E402
 
@@ -303,3 +304,161 @@ class TestEntityScopedFallback:
             and len(affected_ids) <= len(entity_ids) * _GRANULAR_THRESHOLD
         )
         assert use_granular is True
+
+
+class TestAffectedEntityClosure:
+    """Verifica expansión por vecinos (relaciones/interacciones)."""
+
+    def test_changed_character_expands_to_related_entities(self, tmp_path):
+        from routers._enrichment_phases import _get_affected_entity_ids
+
+        db = Database(db_path=tmp_path / "cr05_entity_closure.db")
+        with db.connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO projects (
+                    id, name, document_path, document_format, document_fingerprint, word_count, chapter_count
+                ) VALUES (1, 'Proyecto Cierre', '/tmp/closure.docx', 'DOCX', 'fp_closure', 500, 1)
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO chapters (id, project_id, chapter_number, title, content, start_char, end_char)
+                VALUES (10, 1, 1, 'Cap 1', 'Texto', 0, 5)
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO entities (id, project_id, entity_type, canonical_name, mention_count, is_active)
+                VALUES (1, 1, 'character', 'Ana', 2, 1)
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO entities (id, project_id, entity_type, canonical_name, mention_count, is_active)
+                VALUES (2, 1, 'character', 'Beto', 1, 1)
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO entity_mentions (entity_id, chapter_id, surface_form, start_char, end_char, source)
+                VALUES (1, 10, 'Ana', 0, 3, 'ner')
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO relationships (project_id, entity1_id, entity2_id, relation_type)
+                VALUES (1, 1, 2, 'allies')
+                """
+            )
+
+        affected = _get_affected_entity_ids(
+            db_session=db,
+            project_id=1,
+            changed_chapter_numbers=[1],
+        )
+        assert affected == {1, 2}
+
+
+class TestScopedCacheValidation:
+    """Verifica que caches granulares validan schema/hash antes de reutilizar."""
+
+    @staticmethod
+    def _insert_project(db: Database) -> None:
+        with db.connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO projects (
+                    id, name, document_path, document_format, document_fingerprint, word_count, chapter_count
+                ) VALUES (1, 'Proyecto CR05', '/tmp/cr05.docx', 'DOCX', 'fp_cr05', 1000, 3)
+                """
+            )
+
+    def test_chapter_cache_ignores_schema_mismatch(self, tmp_path):
+        from routers._enrichment_cache import get_schema_version
+        from routers._enrichment_phases import _get_cached_chapter_result
+
+        db = Database(db_path=tmp_path / "cr05_scope_schema.db")
+        self._insert_project(db)
+        schema_v = int(get_schema_version("sticky_sentences"))
+        with db.connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO enrichment_cache (
+                    project_id, enrichment_type, entity_scope, status, phase,
+                    input_hash, result_json, schema_version, computed_at, updated_at
+                ) VALUES (
+                    1, 'sticky_sentences', 'chapter:2', 'completed', 12,
+                    'hash-ok', '{"ok": true}', ?, datetime('now'), datetime('now')
+                )
+                """,
+                (max(0, schema_v - 1),),
+            )
+
+        result = _get_cached_chapter_result(
+            db_session=db,
+            project_id=1,
+            enrichment_type="sticky_sentences",
+            chapter_number=2,
+            expected_input_hash="hash-ok",
+        )
+        assert result is None
+
+    def test_chapter_cache_ignores_hash_mismatch(self, tmp_path):
+        from routers._enrichment_cache import get_schema_version
+        from routers._enrichment_phases import _get_cached_chapter_result
+
+        db = Database(db_path=tmp_path / "cr05_scope_hash.db")
+        self._insert_project(db)
+        schema_v = int(get_schema_version("sticky_sentences"))
+        with db.connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO enrichment_cache (
+                    project_id, enrichment_type, entity_scope, status, phase,
+                    input_hash, result_json, schema_version, computed_at, updated_at
+                ) VALUES (
+                    1, 'sticky_sentences', 'chapter:4', 'completed', 12,
+                    'cached-hash', '{"ok": true}', ?, datetime('now'), datetime('now')
+                )
+                """,
+                (schema_v,),
+            )
+
+        result = _get_cached_chapter_result(
+            db_session=db,
+            project_id=1,
+            enrichment_type="sticky_sentences",
+            chapter_number=4,
+            expected_input_hash="current-hash",
+        )
+        assert result is None
+
+    def test_entity_cache_ignores_schema_mismatch(self, tmp_path):
+        from routers._enrichment_cache import get_schema_version
+        from routers._enrichment_phases import _get_cached_entity_result
+
+        db = Database(db_path=tmp_path / "cr05_scope_entity_schema.db")
+        self._insert_project(db)
+        schema_v = int(get_schema_version("character_timeline"))
+        with db.connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO enrichment_cache (
+                    project_id, enrichment_type, entity_scope, status, phase,
+                    result_json, schema_version, computed_at, updated_at
+                ) VALUES (
+                    1, 'character_timeline', 'entity:99', 'completed', 10,
+                    '{"entity_id": 99}', ?, datetime('now'), datetime('now')
+                )
+                """,
+                (max(0, schema_v - 1),),
+            )
+
+        result = _get_cached_entity_result(
+            db_session=db,
+            project_id=1,
+            enrichment_type="character_timeline",
+            entity_id=99,
+        )
+        assert result is None

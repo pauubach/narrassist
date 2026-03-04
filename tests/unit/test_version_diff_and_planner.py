@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from narrative_assistant.persistence.database import Database
-from narrative_assistant.persistence.version_diff import VersionDiffRepository
+from narrative_assistant.persistence.version_diff import ChapterDiffMetrics, VersionDiffRepository
 
 _api_server = str(Path(__file__).resolve().parents[2] / "api-server")
 if _api_server not in sys.path:
@@ -208,6 +208,69 @@ def test_phase_plan_dependency_closure_adds_health():
     assert plan["run_voice"] is True
     assert plan["run_health"] is True
     assert "health" in plan["impacted_nodes"]
+
+
+def test_incremental_plan_uses_explicit_entity_changes_even_with_small_text_delta():
+    chapter_diff = ChapterDiffMetrics(
+        total_previous=20,
+        total_current=20,
+        modified=1,
+        added=0,
+        removed=0,
+        changed_ratio=0.05,
+        modified_chapters=frozenset({7}),
+    )
+
+    plan = build_incremental_plan(
+        db=object(),
+        project_id=1,
+        snapshot_id=1,
+        chapters_data=[],
+        chapter_metrics=chapter_diff,
+        entity_changes={"has_ner_delta": True, "has_attribute_delta": False},
+        invalidations={},
+    )
+
+    assert plan["mode"] == "incremental"
+    assert plan["run_relationships"] is True
+    assert plan["run_voice"] is True
+
+
+def test_incremental_plan_derives_stale_invalidations_from_cache(tmp_path):
+    db = Database(db_path=tmp_path / "plan_stale.db")
+    _insert_project(db)
+
+    with db.connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO enrichment_cache (
+                project_id, enrichment_type, entity_scope, status, phase, result_json, schema_version, updated_at
+            ) VALUES (1, 'character_network', NULL, 'stale', 10, '{}', 1, datetime('now'))
+            """
+        )
+
+    chapter_diff = ChapterDiffMetrics(
+        total_previous=20,
+        total_current=20,
+        modified=1,
+        added=0,
+        removed=0,
+        changed_ratio=0.05,
+        modified_chapters=frozenset({3}),
+    )
+
+    plan = build_incremental_plan(
+        db=db,
+        project_id=1,
+        snapshot_id=1,
+        chapters_data=[],
+        chapter_metrics=chapter_diff,
+        entity_changes={"has_ner_delta": False, "has_attribute_delta": False},
+    )
+
+    assert plan["mode"] == "incremental"
+    assert plan["run_relationships"] is True
+    assert plan["run_voice"] is True
 
 
 def test_projects_router_exposes_version_diff_endpoints():

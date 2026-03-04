@@ -362,19 +362,29 @@ def _get_cached_chapter_result(
     project_id: int,
     enrichment_type: str,
     chapter_number: int,
+    expected_input_hash: str | None = None,
 ) -> dict | None:
     """Lee resultado cacheado per-chapter (entity_scope = 'chapter:N')."""
     scope = f"chapter:{chapter_number}"
     try:
+        from routers._enrichment_cache import get_schema_version
+
         with db_session.connection() as conn:
             row = conn.execute(
-                """SELECT result_json FROM enrichment_cache
+                """SELECT result_json, input_hash, schema_version FROM enrichment_cache
                    WHERE project_id = ? AND enrichment_type = ?
                    AND entity_scope = ? AND status = 'completed'
                    LIMIT 1""",
                 (project_id, enrichment_type, scope),
             ).fetchone()
         if row and row[0]:
+            cached_hash = str(row[1] or "")
+            cached_schema = int(row[2] or 0)
+            required_schema = int(get_schema_version(enrichment_type))
+            if cached_schema < required_schema:
+                return None
+            if expected_input_hash and (not cached_hash or cached_hash != expected_input_hash):
+                return None
             return json.loads(row[0])
     except Exception:
         pass
@@ -467,7 +477,11 @@ def _run_chapter_scoped_enrichment(
         if ch_num not in changed_set:
             # Intentar leer cache
             cached_result = _get_cached_chapter_result(
-                db_session, project_id, enrichment_type, ch_num,
+                db_session,
+                project_id,
+                enrichment_type,
+                ch_num,
+                expected_input_hash=content_hashes.get(ch_num, ""),
             )
             if cached_result is not None:
                 per_chapter_results[ch_num] = cached_result
@@ -520,9 +534,77 @@ def _get_affected_entity_ids(
                     WHERE ch.project_id = ? AND ch.chapter_number IN ({placeholders})""",
                 (project_id, *changed_chapter_numbers),
             ).fetchall()
-        return {int(row[0]) for row in rows}
+        base_ids = {int(row[0]) for row in rows if row and row[0]}
+        return _expand_related_entity_ids(db_session, project_id, base_ids)
     except Exception:
         return set()
+
+
+def _expand_related_entity_ids(
+    db_session: Any,
+    project_id: int,
+    seed_ids: set[int],
+    max_depth: int = 2,
+) -> set[int]:
+    """Amplía entidades afectadas con vecinos relacionales (cierre transitivo acotado)."""
+    if not seed_ids:
+        return set()
+
+    related = set(seed_ids)
+    frontier = set(seed_ids)
+
+    for _ in range(max_depth):
+        if not frontier:
+            break
+
+        ids = sorted(frontier)
+        placeholders = ",".join("?" for _ in ids)
+        neighbors: set[int] = set()
+
+        try:
+            with db_session.connection() as conn:
+                rel_rows = conn.execute(
+                    f"""
+                    SELECT entity1_id, entity2_id
+                    FROM relationships
+                    WHERE project_id = ?
+                      AND (entity1_id IN ({placeholders}) OR entity2_id IN ({placeholders}))
+                    """,
+                    (project_id, *ids, *ids),
+                ).fetchall()
+                for row in rel_rows:
+                    e1 = int(row[0] or 0)
+                    e2 = int(row[1] or 0)
+                    if e1 > 0:
+                        neighbors.add(e1)
+                    if e2 > 0:
+                        neighbors.add(e2)
+
+                inter_rows = conn.execute(
+                    f"""
+                    SELECT entity1_id, entity2_id
+                    FROM interactions
+                    WHERE project_id = ?
+                      AND (entity1_id IN ({placeholders}) OR entity2_id IN ({placeholders}))
+                    """,
+                    (project_id, *ids, *ids),
+                ).fetchall()
+                for row in inter_rows:
+                    e1 = int(row[0] or 0)
+                    e2 = int(row[1] or 0)
+                    if e1 > 0:
+                        neighbors.add(e1)
+                    if e2 > 0:
+                        neighbors.add(e2)
+        except Exception:
+            # Best-effort: si falla la expansión, devolvemos al menos el seed set.
+            return related
+
+        new_nodes = neighbors - related
+        related.update(new_nodes)
+        frontier = new_nodes
+
+    return related
 
 
 def _get_cached_entity_result(
@@ -534,15 +616,21 @@ def _get_cached_entity_result(
     """Lee resultado cacheado per-entity (entity_scope = 'entity:ID')."""
     scope = f"entity:{entity_id}"
     try:
+        from routers._enrichment_cache import get_schema_version
+
         with db_session.connection() as conn:
             row = conn.execute(
-                """SELECT result_json FROM enrichment_cache
+                """SELECT result_json, schema_version FROM enrichment_cache
                    WHERE project_id = ? AND enrichment_type = ?
                    AND entity_scope = ? AND status = 'completed'
                    LIMIT 1""",
                 (project_id, enrichment_type, scope),
             ).fetchone()
         if row and row[0]:
+            cached_schema = int(row[1] or 0)
+            required_schema = int(get_schema_version(enrichment_type))
+            if cached_schema < required_schema:
+                return None
             return json.loads(row[0])
     except Exception:
         pass
@@ -715,7 +803,7 @@ def _run_enrichment(
                 if (
                     cached
                     and cached[1] == input_hash
-                    and cached[0] in ("completed", "stale")
+                    and cached[0] == "completed"
                     and cached[2]
                 ):
                     conn.execute(

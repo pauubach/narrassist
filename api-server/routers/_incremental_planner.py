@@ -12,6 +12,46 @@ from narrative_assistant.persistence.version_diff import ChapterDiffMetrics, Ver
 ENRICHMENT_PHASES = ("relationships", "voice", "prose", "health")
 
 
+def _derive_invalidation_signals(db: Any, project_id: int) -> dict[str, bool]:
+    """Infiere señales de invalidación desde enrichment_cache."""
+    try:
+        with db.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT DISTINCT enrichment_type
+                FROM enrichment_cache
+                WHERE project_id = ? AND status = 'stale'
+                """,
+                (project_id,),
+            ).fetchall()
+        stale_types = {str(row[0]) for row in rows if row and row[0]}
+    except Exception:
+        stale_types = set()
+
+    if not stale_types:
+        return {
+            "entity_dependent_stale": False,
+            "attribute_dependent_stale": False,
+            "force_full": False,
+        }
+
+    try:
+        from routers._invalidation import ATTRIBUTE_DEPENDENT_TYPES, ENTITY_DEPENDENT_TYPES
+
+        entity_dependent_stale = bool(stale_types & ENTITY_DEPENDENT_TYPES)
+        attribute_dependent_stale = bool(stale_types & ATTRIBUTE_DEPENDENT_TYPES)
+    except Exception:
+        # Fallback conservador: si no podemos resolver categorías, asumimos impacto.
+        entity_dependent_stale = True
+        attribute_dependent_stale = True
+
+    return {
+        "entity_dependent_stale": entity_dependent_stale,
+        "attribute_dependent_stale": attribute_dependent_stale,
+        "force_full": False,
+    }
+
+
 def build_impact_graph() -> dict[str, set[str]]:
     """
     Grafo de dependencias (simple) para cierre transitivo del impacto.
@@ -139,22 +179,30 @@ def build_incremental_plan(
     project_id: int,
     snapshot_id: int | None,
     chapters_data: list[dict[str, Any]],
+    *,
+    chapter_metrics: ChapterDiffMetrics | None = None,
+    entity_changes: dict[str, Any] | None = None,
+    invalidations: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     API legacy usada por `analysis.py`.
     """
-    repo = VersionDiffRepository(db)
-    chapter_metrics = repo.compute_chapter_diff(snapshot_id, chapters_data)
+    if chapter_metrics is None:
+        repo = VersionDiffRepository(db)
+        chapter_metrics = repo.compute_chapter_diff(snapshot_id, chapters_data)
 
-    # Heurística de entity_changes previa a Tier 2:
-    # no conocemos el delta NER real aún, pero cambios moderados/altos anticipan impacto.
-    entity_changes = {
-        "has_ner_delta": chapter_metrics.changed_ratio >= 0.12,
-        "has_attribute_delta": chapter_metrics.changed_ratio >= 0.20,
-    }
+    if entity_changes is None:
+        # Heurística de fallback cuando no hay señales reales de Tier 2.
+        entity_changes = {
+            "has_ner_delta": chapter_metrics.changed_ratio >= 0.12,
+            "has_attribute_delta": chapter_metrics.changed_ratio >= 0.20,
+        }
+
+    if invalidations is None:
+        invalidations = _derive_invalidation_signals(db, project_id)
 
     return build_phase_plan(
         chapter_diff=chapter_metrics,
         entity_changes=entity_changes,
-        invalidations={},
+        invalidations=invalidations,
     )

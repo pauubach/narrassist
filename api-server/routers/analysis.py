@@ -911,22 +911,6 @@ async def start_analysis(
                 run_structure(ctx, tracker)
                 logger.info(f"[TIMING] run_structure: {time.time() - _t0:.2f}s")
 
-                incremental_plan = build_incremental_plan(
-                    db=db_session,
-                    project_id=project_id,
-                    snapshot_id=ctx.get("pre_analysis_snapshot_id"),
-                    chapters_data=ctx.get("chapters_data", []),
-                )
-                ctx["incremental_plan"] = incremental_plan
-                logger.info(
-                    "[INCREMENTAL_PLAN] project=%s mode=%s reason=%s impacted=%s chapter_diff=%s",
-                    project_id,
-                    incremental_plan.get("mode"),
-                    incremental_plan.get("reason"),
-                    incremental_plan.get("impacted_nodes"),
-                    incremental_plan.get("chapter_diff"),
-                )
-
                 # Tier 2 gate: claim heavy slot or queue
                 got_slot = claim_heavy_slot_or_queue(ctx, tracker)
                 if not got_slot:
@@ -1021,6 +1005,68 @@ async def start_analysis(
                 # Finalize alerts phase (marks completion, applies dismissals)
                 run_alerts(ctx, tracker)
 
+                # CR-05: decidir plan incremental con señales reales tras Tier 2.
+                version_diff_repo = VersionDiffRepository(ctx["db_session"])
+                chapter_diff = version_diff_repo.compute_chapter_diff(
+                    snapshot_id=ctx.get("pre_analysis_snapshot_id"),
+                    chapters_data=ctx.get("chapters_data", []),
+                )
+                entity_diff = version_diff_repo.compute_and_store_entity_links(
+                    project_id=project_id,
+                    snapshot_id=ctx.get("pre_analysis_snapshot_id"),
+                )
+
+                changed_chapters = sorted(chapter_diff.modified_chapters | chapter_diff.added_chapters)
+                has_entities_in_changed = False
+                if changed_chapters:
+                    placeholders = ",".join("?" for _ in changed_chapters)
+                    try:
+                        with db_session.connection() as conn:
+                            row = conn.execute(
+                                f"""
+                                SELECT COUNT(DISTINCT em.entity_id)
+                                FROM entity_mentions em
+                                JOIN chapters ch ON em.chapter_id = ch.id
+                                WHERE ch.project_id = ?
+                                  AND ch.chapter_number IN ({placeholders})
+                                """,
+                                (project_id, *changed_chapters),
+                            ).fetchone()
+                        has_entities_in_changed = bool(int(row[0]) if row else 0)
+                    except Exception:
+                        has_entities_in_changed = False
+
+                entity_changes = {
+                    "has_ner_delta": bool(
+                        int(getattr(entity_diff, "new_entities", 0))
+                        or int(getattr(entity_diff, "removed_entities", 0))
+                        or int(getattr(entity_diff, "renamed", 0))
+                        or has_entities_in_changed
+                    ),
+                    "has_attribute_delta": False,
+                }
+
+                incremental_plan = build_incremental_plan(
+                    db=db_session,
+                    project_id=project_id,
+                    snapshot_id=ctx.get("pre_analysis_snapshot_id"),
+                    chapters_data=ctx.get("chapters_data", []),
+                    chapter_metrics=chapter_diff,
+                    entity_changes=entity_changes,
+                )
+                ctx["incremental_plan"] = incremental_plan
+                ctx["_chapter_diff_metrics"] = chapter_diff
+                ctx["_entity_diff_metrics"] = entity_diff
+                logger.info(
+                    "[INCREMENTAL_PLAN] project=%s mode=%s reason=%s impacted=%s chapter_diff=%s entity_changes=%s",
+                    project_id,
+                    incremental_plan.get("mode"),
+                    incremental_plan.get("reason"),
+                    incremental_plan.get("impacted_nodes"),
+                    incremental_plan.get("chapter_diff"),
+                    entity_changes,
+                )
+
                 # S8a-15: Release heavy slot — enrichment is CPU-only,
                 # next queued project can start heavy NLP immediately
                 release_heavy_slot(ctx)
@@ -1068,14 +1114,18 @@ async def start_analysis(
                         f.result()  # Propagate exceptions
 
                 version_diff_repo = VersionDiffRepository(ctx["db_session"])
-                chapter_diff = version_diff_repo.compute_chapter_diff(
-                    snapshot_id=ctx.get("pre_analysis_snapshot_id"),
-                    chapters_data=ctx.get("chapters_data", []),
-                )
-                entity_diff = version_diff_repo.compute_and_store_entity_links(
-                    project_id=project_id,
-                    snapshot_id=ctx.get("pre_analysis_snapshot_id"),
-                )
+                chapter_diff = ctx.get("_chapter_diff_metrics")
+                if chapter_diff is None:
+                    chapter_diff = version_diff_repo.compute_chapter_diff(
+                        snapshot_id=ctx.get("pre_analysis_snapshot_id"),
+                        chapters_data=ctx.get("chapters_data", []),
+                    )
+                entity_diff = ctx.get("_entity_diff_metrics")
+                if entity_diff is None:
+                    entity_diff = version_diff_repo.compute_and_store_entity_links(
+                        project_id=project_id,
+                        snapshot_id=ctx.get("pre_analysis_snapshot_id"),
+                    )
 
                 ctx["version_chapter_diff"] = chapter_diff.to_dict()
                 ctx["version_entity_diff"] = entity_diff.to_dict()
