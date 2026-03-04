@@ -1282,6 +1282,16 @@ def apply_license_and_settings(ctx: dict, tracker: ProgressTracker):
                         setattr(analysis_config, config_field, False)
             logger.info(f"Applied pipeline_flags from project settings: {pipeline_flags}")
 
+        # HI-08: Extract voting thresholds from user settings
+        voting_thresholds = analysis_features.get("voting_thresholds", {})
+        if isinstance(voting_thresholds, dict):
+            inf_conf = voting_thresholds.get("inferenceMinConfidence")
+            inf_cons = voting_thresholds.get("inferenceMinConsensus")
+            if isinstance(inf_conf, (int, float)) and 0 <= inf_conf <= 100:
+                ctx["inference_min_confidence"] = inf_conf / 100.0  # UI uses 0-100, backend 0-1
+            if isinstance(inf_cons, (int, float)) and 0 <= inf_cons <= 100:
+                ctx["inference_min_consensus"] = inf_cons / 100.0
+
         # CR-03: aplicar selección de métodos NLP (disable-only, sin forzar activaciones).
         # Permite que categorías vacías desactiven fases dependientes.
         if filtered_nlp_methods:
@@ -1695,8 +1705,11 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
                 # newer analysis already running for the same project (which
                 # would have replaced the storage entry).
                 stale_storage = deps.analysis_progress_storage.get(stale_pid)
+                # HI-16: Mark stale as error — including "running" (the most
+                # dangerous case: hung thread).  Skip only terminal or waiting states.
                 if stale_storage and stale_storage.get("status") not in (
-                    "running",
+                    "completed",
+                    "error",
                     "queued_for_heavy",
                 ):
                     stale_storage["status"] = "error"
@@ -2839,10 +2852,13 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                 multi_model_enabled,
             )
 
+            # HI-08: Read voting thresholds from user settings (defaults: 0.5/0.6)
+            user_min_conf = ctx.get("inference_min_confidence", 0.5)
+            user_consensus = ctx.get("inference_min_consensus", 0.6)
             coref_config = CorefConfig(
                 enabled_methods=enabled_coref_methods,
-                min_confidence=0.5,
-                consensus_threshold=0.6 if len(enabled_coref_methods) > 1 else 0.0,
+                min_confidence=user_min_conf,
+                consensus_threshold=user_consensus if len(enabled_coref_methods) > 1 else 0.0,
                 use_chapter_boundaries=True,
                 quality_level=ctx.get("quality_level", "rapida"),
                 sensitivity=ctx.get("sensitivity", 5.0),
@@ -3614,8 +3630,14 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
 
     except Exception as e:
         logger.warning(f"Timeline construction failed (non-critical): {e}")
-        # No bloquear el análisis si falla la timeline
+        # HI-17: Mark timeline as degraded (not blocking, but visible in UI)
         tracker.end_phase("timeline")
+        with deps._progress_lock:
+            storage = deps.analysis_progress_storage.get(ctx["project_id"])
+            if storage:
+                degraded = storage.setdefault("degraded_phases", [])
+                if "timeline" not in degraded:
+                    degraded.append("timeline")
 
 
 # ============================================================================

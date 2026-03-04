@@ -4,6 +4,10 @@ Router: system
 
 import os
 import sys
+import threading
+import time
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -20,6 +24,130 @@ from deps import (
 from fastapi import APIRouter, HTTPException, Request
 
 router = APIRouter()
+
+
+# Descarga NLP: timeout global para evitar sesiones eternas en redes lentas.
+NLP_DOWNLOAD_DEADLINE_S = 600
+NLP_DOWNLOAD_POLL_INTERVAL_S = 0.5
+NLP_DOWNLOAD_MAX_WORKERS = 2
+_NLP_DOWNLOAD_TERMINAL_PHASES = {"completed", "error"}
+_nlp_download_start_lock = threading.Lock()
+
+
+@dataclass(frozen=True)
+class _NlpDownloadJob:
+    model_name: str
+    model_type: object
+    progress_token: int
+
+
+def _has_active_nlp_downloads() -> bool:
+    """True si hay alguna descarga NLP en curso (fase no terminal)."""
+    try:
+        from narrative_assistant.core.model_manager import get_download_progress
+
+        progress = get_download_progress() or {}
+        return any(
+            info.get("phase") not in _NLP_DOWNLOAD_TERMINAL_PHASES
+            for info in progress.values()
+        )
+    except Exception:
+        # Si no podemos inspeccionar el estado, no bloquear por falso positivo.
+        return False
+
+
+def _run_nlp_download_jobs(jobs: list[_NlpDownloadJob], manager, force_download: bool) -> None:
+    """
+    Ejecuta descargas NLP con deadline global y guard de sesion por modelo.
+
+    Si expira el deadline, las tareas pendientes se marcan en error y se rota
+    su token para que actualizaciones tardias queden ignoradas.
+    """
+    from narrative_assistant.core.model_manager import (
+        bind_download_progress_session,
+        rotate_download_progress_session,
+        _update_download_progress,
+    )
+
+    deadline_at = time.monotonic() + NLP_DOWNLOAD_DEADLINE_S
+
+    def _download_one(job: _NlpDownloadJob) -> None:
+        with bind_download_progress_session(job.progress_token):
+            result = manager.ensure_model(job.model_type, force_download=force_download)
+
+        if result.is_success:
+            logger.info("Model %s downloaded successfully", job.model_name)
+            _update_download_progress(
+                job.model_type,
+                phase="completed",
+                progress_token=job.progress_token,
+            )
+            return
+
+        logger.error("Model %s download failed: %s", job.model_name, result.error)
+        _update_download_progress(
+            job.model_type,
+            phase="error",
+            error_message=str(result.error),
+            progress_token=job.progress_token,
+        )
+
+    future_to_job: dict[Future, _NlpDownloadJob] = {}
+    with ThreadPoolExecutor(max_workers=NLP_DOWNLOAD_MAX_WORKERS) as pool:
+        for job in jobs:
+            future_to_job[pool.submit(_download_one, job)] = job
+
+        pending = set(future_to_job.keys())
+        while pending:
+            remaining = deadline_at - time.monotonic()
+            if remaining <= 0:
+                break
+
+            done, pending = wait(
+                pending,
+                timeout=min(NLP_DOWNLOAD_POLL_INTERVAL_S, remaining),
+                return_when=FIRST_COMPLETED,
+            )
+            for future in done:
+                job = future_to_job[future]
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.error("Download worker crashed for %s: %s", job.model_name, e, exc_info=True)
+                    _update_download_progress(
+                        job.model_type,
+                        phase="error",
+                        error_message="No se pudo completar la descarga. Reintenta desde Configuración.",
+                        progress_token=job.progress_token,
+                    )
+
+        if not pending:
+            return
+
+        logger.error(
+            "NLP download deadline exceeded (%ss). Marking %s pending model(s) as timed out.",
+            NLP_DOWNLOAD_DEADLINE_S,
+            len(pending),
+        )
+
+        timeout_message = (
+            "La descarga está tardando más de lo esperado y se ha detenido para "
+            "evitar bloquear el sistema. Reintenta desde Configuración."
+        )
+        for future in pending:
+            job = future_to_job[future]
+            if not future.cancel():
+                logger.warning(
+                    "Could not cancel running download thread for %s; stale updates will be ignored",
+                    job.model_name,
+                )
+            _update_download_progress(
+                job.model_type,
+                phase="error",
+                error_message=timeout_message,
+                progress_token=job.progress_token,
+            )
+            rotate_download_progress_session(job.model_type, expected_token=job.progress_token)
 
 @router.get("/api/health", response_model=HealthResponse)
 def health_check():
@@ -68,8 +196,8 @@ def system_info():
             device = detector.detect_best_device()
             gpu_available = device.device_type in (DeviceType.CUDA, DeviceType.MPS)
             gpu_device_str = device.device_type.name.lower()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("GPU detection failed during health check: %s", e)
 
         return ApiResponse(
             success=True,
@@ -441,6 +569,13 @@ def install_dependencies():
     import importlib
     import subprocess
 
+    # HI-11: Idempotent guard — reject if already installing
+    if deps.INSTALLING_DEPENDENCIES:
+        return ApiResponse(
+            success=True,
+            message="Dependencies installation already in progress.",
+        )
+
     # Verificar que Python está disponible antes de intentar instalar
     python_info = get_python_status()
     if not python_info["python_available"]:
@@ -563,12 +698,12 @@ def download_models(request: DownloadModelsRequest):
         )
 
     try:
-        import threading
-
         from narrative_assistant.core.model_manager import (
             KNOWN_MODELS,
             ModelType,
+            begin_download_progress_session,
             get_model_manager,
+            _update_download_progress,
         )
 
         manager = get_model_manager()
@@ -579,84 +714,79 @@ def download_models(request: DownloadModelsRequest):
             "transformer_ner": ModelType.TRANSFORMER_NER,
         }
 
-        def download_task():
-            from concurrent.futures import ThreadPoolExecutor, as_completed
+        requested_models = request.models or list(MODEL_TYPE_MAP.keys())
+        valid_models: list[str] = []
+        invalid_models: list[str] = []
+        seen: set[str] = set()
+        for model_name in requested_models:
+            if model_name in seen:
+                continue
+            seen.add(model_name)
+            if model_name in MODEL_TYPE_MAP:
+                valid_models.append(model_name)
+            else:
+                invalid_models.append(model_name)
 
-            from narrative_assistant.core.model_manager import (
-                _clear_download_progress,
-                _update_download_progress,
+        if not valid_models:
+            allowed = ", ".join(MODEL_TYPE_MAP.keys())
+            raise HTTPException(
+                status_code=400,
+                detail=f"No valid models requested. Allowed values: {allowed}",
             )
 
-            models_to_download = []
-            for model_name in request.models:
-                mt = MODEL_TYPE_MAP.get(model_name)
-                if mt:
-                    models_to_download.append((model_name, mt))
-                    # Clear stale progress from previous attempts
-                    _clear_download_progress(mt)
-
-            # Registrar TODOS los modelos como "queued" ANTES de iniciar descargas.
-            # Sin esto, el frontend ve solo los modelos activos (max_workers=2),
-            # concluye que "todo terminó" cuando los 2 primeros acaban y deja
-            # de hacer polling antes de que el tercero empiece.
-            # IMPORTANTE: incluir bytes_total estimado para que la barra de
-            # progreso cuente TODOS los modelos, no solo los activos.
-            for _name, mt in models_to_download:
-                estimated_bytes = KNOWN_MODELS[mt].size_mb * 1024 * 1024
-                _update_download_progress(
-                    mt, phase="queued", bytes_total=estimated_bytes,
+        with _nlp_download_start_lock:
+            if _has_active_nlp_downloads():
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Ya hay una descarga de modelos NLP en curso. "
+                        "Espera a que termine antes de iniciar otra."
+                    ),
                 )
 
-            # Descargas paralelas: spaCy (GitHub CDN) + HF model en paralelo
-            # Máximo 2 workers para no saturar red ni RAM
-            def _download_one(name_and_type):
-                name, mt = name_and_type
-                try:
-                    result = manager.ensure_model(mt, force_download=request.force)
-                    if result.is_success:
-                        logger.info(f"Model {name} downloaded successfully")
-                        # Mark completed in progress tracker (ensure_model
-                        # doesn't update progress when model is found locally)
-                        _update_download_progress(mt, phase="completed")
-                    else:
-                        logger.error(f"Model {name} download failed: {result.error}")
-                        _update_download_progress(
-                            mt, phase="error",
-                            error_message=str(result.error),
-                        )
-                except Exception as e:
-                    logger.error(f"Error downloading {name}: {e}")
-                    _update_download_progress(
-                        mt, phase="error", error_message=str(e),
+            jobs: list[_NlpDownloadJob] = []
+            for model_name in valid_models:
+                model_type = MODEL_TYPE_MAP[model_name]
+                token = begin_download_progress_session(model_type)
+                jobs.append(
+                    _NlpDownloadJob(
+                        model_name=model_name,
+                        model_type=model_type,
+                        progress_token=token,
                     )
+                )
+                estimated_bytes = KNOWN_MODELS[model_type].size_mb * 1024 * 1024
+                _update_download_progress(
+                    model_type,
+                    phase="queued",
+                    bytes_total=estimated_bytes,
+                    progress_token=token,
+                )
 
-            with ThreadPoolExecutor(max_workers=2) as pool:
-                futures = {pool.submit(_download_one, item): item[0] for item in models_to_download}
-                for future in as_completed(futures, timeout=600):  # 10 min max total
-                    model_name = futures[future]
-                    try:
-                        future.result(timeout=300)  # 5 min max per model
-                    except TimeoutError:
-                        logger.error(f"Download timeout for {model_name} (>5 min)")
-                        mt = MODEL_TYPE_MAP.get(model_name)
-                        if mt:
-                            _update_download_progress(
-                                mt, phase="error",
-                                error_message="Descarga excedió el tiempo límite (5 min). Reintenta desde Configuración.",
-                            )
-                    except Exception as e:
-                        logger.error(f"Download thread error for {model_name}: {e}")
+            # Ejecutar en segundo plano y devolver inmediatamente al frontend.
+            thread = threading.Thread(
+                target=_run_nlp_download_jobs,
+                args=(jobs, manager, request.force),
+                daemon=True,
+            )
+            thread.start()
 
-        # Ejecutar en segundo plano
-        thread = threading.Thread(target=download_task, daemon=True)
-        thread.start()
+        response_data = {
+            "models": valid_models,
+            "ignored_models": invalid_models,
+        }
+        response_message = "Model download started"
+        if invalid_models:
+            response_message = "Model download started (some unknown models were ignored)"
 
         return ApiResponse(
             success=True,
-            message="Model download started",
-            data={"models": request.models},
+            message=response_message,
+            data=response_data,
         )
 
+    except HTTPException:
+        raise
     except ImportError as e:
         logger.error(f"Import error in download_models: {e}", exc_info=True)
         raise HTTPException(
@@ -909,6 +1039,8 @@ def system_capabilities():
                     "description": "Detecta cuándo dos expresiones se refieren a lo mismo por su significado",
                     "weight": 0.30,
                     "available": True,
+                    "hardware_supported": True,
+                    "requires_ollama": False,
                     "default_enabled": True,
                     "requires_gpu": False,
                     "recommended_gpu": True,
@@ -918,6 +1050,8 @@ def system_capabilities():
                     "description": "Comprende el contexto para resolver referencias complejas",
                     "weight": 0.35,
                     "available": ollama_available and len(ollama_models) > 0,
+                    "hardware_supported": True,
+                    "requires_ollama": True,
                     "default_enabled": ollama_available and (has_gpu or len(ollama_models) > 0),
                     "requires_gpu": False,
                     "recommended_gpu": True,
@@ -927,6 +1061,8 @@ def system_capabilities():
                     "description": "Analiza género, número y concordancia entre palabras",
                     "weight": 0.20,
                     "available": True,
+                    "hardware_supported": True,
+                    "requires_ollama": False,
                     "default_enabled": True,
                     "requires_gpu": False,
                     "recommended_gpu": False,
@@ -936,6 +1072,8 @@ def system_capabilities():
                     "description": "Patrones comunes en textos narrativos (proximidad, diálogos...)",
                     "weight": 0.15,
                     "available": True,
+                    "hardware_supported": True,
+                    "requires_ollama": False,
                     "default_enabled": True,
                     "requires_gpu": False,
                     "recommended_gpu": False,
@@ -946,6 +1084,8 @@ def system_capabilities():
                     "name": "Detector de nombres",
                     "description": "Identifica nombres propios automáticamente en el texto",
                     "available": True,
+                    "hardware_supported": True,
+                    "requires_ollama": False,
                     "default_enabled": True,
                     "requires_gpu": False,
                     "recommended_gpu": True,
@@ -954,6 +1094,8 @@ def system_capabilities():
                     "name": "Diccionario de nombres",
                     "description": "Lista de nombres propios conocidos (más precisión)",
                     "available": True,
+                    "hardware_supported": True,
+                    "requires_ollama": False,
                     "default_enabled": True,
                     "requires_gpu": False,
                     "recommended_gpu": False,
@@ -962,6 +1104,8 @@ def system_capabilities():
                     "name": "Detección inteligente",
                     "description": "Usa contexto para identificar entidades ambiguas",
                     "available": ollama_available,
+                    "hardware_supported": True,
+                    "requires_ollama": True,
                     "default_enabled": ollama_available and has_gpu,
                     "requires_gpu": False,
                     "recommended_gpu": True,
@@ -972,6 +1116,8 @@ def system_capabilities():
                     "name": "Corrector básico",
                     "description": "Reglas gramaticales esenciales del español",
                     "available": True,
+                    "hardware_supported": True,
+                    "requires_ollama": False,
                     "default_enabled": True,
                     "requires_gpu": False,
                     "recommended_gpu": False,
@@ -980,6 +1126,8 @@ def system_capabilities():
                     "name": "Corrector avanzado",
                     "description": "Más de 2000 reglas gramaticales (requiere Java)",
                     "available": lt_available,
+                    "hardware_supported": True,
+                    "requires_ollama": False,
                     "default_enabled": lt_available,
                     "requires_gpu": False,
                     "recommended_gpu": False,
@@ -988,6 +1136,8 @@ def system_capabilities():
                     "name": "LLM Grammar",
                     "description": "Análisis contextual con LLM",
                     "available": ollama_available,
+                    "hardware_supported": True,
+                    "requires_ollama": True,
                     "default_enabled": False,  # Deshabilitado por defecto (lento)
                     "requires_gpu": False,
                     "recommended_gpu": True,
@@ -999,6 +1149,8 @@ def system_capabilities():
                     "description": "Reglas y patrones comunes de errores ortográficos",
                     "weight": 0.26,
                     "available": True,
+                    "hardware_supported": True,
+                    "requires_ollama": False,
                     "default_enabled": True,
                     "requires_gpu": False,
                     "recommended_gpu": False,
@@ -1008,6 +1160,8 @@ def system_capabilities():
                     "description": "Servidor de ortografía avanzado (requiere Java)",
                     "weight": 0.24,
                     "available": lt_available,
+                    "hardware_supported": True,
+                    "requires_ollama": False,
                     "default_enabled": lt_available,
                     "requires_gpu": False,
                     "recommended_gpu": False,
@@ -1017,6 +1171,8 @@ def system_capabilities():
                     "description": "Algoritmo de alta velocidad para corrección",
                     "weight": 0.16,
                     "available": True,
+                    "hardware_supported": True,
+                    "requires_ollama": False,
                     "default_enabled": True,
                     "requires_gpu": False,
                     "recommended_gpu": False,
@@ -1026,6 +1182,8 @@ def system_capabilities():
                     "description": "Diccionario profesional de español",
                     "weight": 0.14,
                     "available": True,
+                    "hardware_supported": True,
+                    "requires_ollama": False,
                     "default_enabled": True,
                     "requires_gpu": False,
                     "recommended_gpu": False,
@@ -1035,6 +1193,8 @@ def system_capabilities():
                     "description": "Corrector Python con diccionario incluido",
                     "weight": 0.08,
                     "available": True,
+                    "hardware_supported": True,
+                    "requires_ollama": False,
                     "default_enabled": True,
                     "requires_gpu": False,
                     "recommended_gpu": False,
@@ -1044,6 +1204,8 @@ def system_capabilities():
                     "description": "Modelo BERT en español para detección contextual",
                     "weight": 0.12,
                     "available": has_gpu,
+                    "hardware_supported": has_gpu,
+                    "requires_ollama": False,
                     "default_enabled": has_gpu,
                     "requires_gpu": True,
                     "recommended_gpu": True,
@@ -1052,6 +1214,8 @@ def system_capabilities():
                     "name": "LLM Arbitrador",
                     "description": "Resuelve conflictos entre correctores con IA",
                     "available": ollama_available,
+                    "hardware_supported": True,
+                    "requires_ollama": True,
                     "default_enabled": ollama_available and has_gpu,
                     "requires_gpu": False,
                     "recommended_gpu": True,
@@ -1062,6 +1226,8 @@ def system_capabilities():
                     "name": "Reglas",
                     "description": "Extracción basada en patrones y heurísticas",
                     "available": True,
+                    "hardware_supported": True,
+                    "requires_ollama": False,
                     "default_enabled": True,
                     "requires_gpu": False,
                     "recommended_gpu": False,
@@ -1070,6 +1236,8 @@ def system_capabilities():
                     "name": "LLM",
                     "description": "Extracción inteligente con comprensión contextual",
                     "available": ollama_available,
+                    "hardware_supported": True,
+                    "requires_ollama": True,
                     "default_enabled": ollama_available and has_gpu,
                     "requires_gpu": False,
                     "recommended_gpu": True,
@@ -1078,6 +1246,8 @@ def system_capabilities():
                     "name": "Híbrido",
                     "description": "Combina reglas y LLM para mejor cobertura",
                     "available": ollama_available,
+                    "hardware_supported": True,
+                    "requires_ollama": True,
                     "default_enabled": False,
                     "requires_gpu": False,
                     "recommended_gpu": True,
@@ -1139,6 +1309,7 @@ def system_capabilities():
                 "ollama": {
                     "installed": ollama_installed,
                     "available": ollama_available,
+                    "hardware_supported": True,  # HI-05: Ollama runs on any x86/arm64
                     "uncertain": ollama_uncertain,
                     "models": ollama_models,
                     "recommended_models": ollama_recommendations,

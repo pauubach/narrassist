@@ -477,7 +477,9 @@
                       severity="warning"
                       class="method-tag"
                     />
-                    <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
+                    <Tag v-if="!method.available && method.requires_ollama" value="Requiere iniciar el analizador" severity="warning" class="method-tag" />
+                    <Tag v-else-if="!method.available && method.hardware_supported === false" value="No compatible con este equipo" severity="danger" class="method-tag" />
+                    <Tag v-else-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
                   </div>
                   <p class="method-description">{{ method.description }}</p>
                   <div v-if="method.weight" class="method-weight">
@@ -516,7 +518,9 @@
                       severity="warning"
                       class="method-tag"
                     />
-                    <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
+                    <Tag v-if="!method.available && method.requires_ollama" value="Requiere iniciar el analizador" severity="warning" class="method-tag" />
+                    <Tag v-else-if="!method.available && method.hardware_supported === false" value="No compatible con este equipo" severity="danger" class="method-tag" />
+                    <Tag v-else-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
                   </div>
                   <p class="method-description">{{ method.description }}</p>
                 </div>
@@ -592,7 +596,9 @@
                       severity="warning"
                       class="method-tag"
                     />
-                    <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
+                    <Tag v-if="!method.available && method.requires_ollama" value="Requiere iniciar el analizador" severity="warning" class="method-tag" />
+                    <Tag v-else-if="!method.available && method.hardware_supported === false" value="No compatible con este equipo" severity="danger" class="method-tag" />
+                    <Tag v-else-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
                   </div>
                   <p class="method-description">{{ method.description }}</p>
                 </div>
@@ -628,7 +634,9 @@
                       severity="warning"
                       class="method-tag"
                     />
-                    <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
+                    <Tag v-if="!method.available && method.requires_ollama" value="Requiere iniciar el analizador" severity="warning" class="method-tag" />
+                    <Tag v-else-if="!method.available && method.hardware_supported === false" value="No compatible con este equipo" severity="danger" class="method-tag" />
+                    <Tag v-else-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
                   </div>
                   <p class="method-description">{{ method.description }}</p>
                   <div v-if="method.weight" class="method-weight">
@@ -659,7 +667,9 @@
                   <p class="mode-description">{{ method.description }}</p>
                   <Tag v-if="method.recommended_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con aceleración" severity="secondary" class="method-tag" />
                   <Tag v-if="method.recommended_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
-                  <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
+                  <Tag v-if="!method.available && method.requires_ollama" value="Requiere iniciar el analizador" severity="warning" class="method-tag" />
+                  <Tag v-else-if="!method.available && method.hardware_supported === false" value="No compatible con este equipo" severity="danger" class="method-tag" />
+                  <Tag v-else-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
                 </div>
               </div>
             </div>

@@ -322,6 +322,11 @@
             :description="TAB_PHASE_DESCRIPTIONS.timeline"
             @analysis-completed="onAnalysisCompleted"
           >
+            <!-- HI-17: degraded timeline warning -->
+            <div v-if="analysisStore.isTabDegraded(project.id, 'timeline')" class="degraded-banner">
+              <i class="pi pi-exclamation-triangle"></i>
+              <span>La línea temporal se generó con datos parciales. Puedes relanzar el análisis para obtener resultados completos.</span>
+            </div>
             <TimelineView
               :project-id="project.id"
               :entities="entities"
@@ -1847,6 +1852,23 @@ const onReplaceDocumentSelected = async (event: Event) => {
 </script>
 
 <style scoped>
+/* HI-17: Degraded phase banner */
+.degraded-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+  background: var(--p-orange-50);
+  color: var(--p-orange-700);
+  border-radius: var(--app-radius);
+  font-size: 0.85rem;
+}
+
+.degraded-banner i {
+  color: var(--p-orange-500);
+}
+
 .project-detail-view {
   height: 100vh;
   display: flex;

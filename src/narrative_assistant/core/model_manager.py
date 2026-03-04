@@ -23,9 +23,12 @@ import os
 import shutil
 import socket
 import threading
+from contextlib import contextmanager
+import contextvars
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
+from itertools import count
 from pathlib import Path
 from typing import Optional
 
@@ -189,6 +192,12 @@ class DownloadProgress:
 # Estado global de descargas activas (thread-safe via locks)
 _download_progress: dict[ModelType, DownloadProgress] = {}
 _progress_lock = threading.Lock()
+_download_progress_session_tokens: dict[ModelType, int] = {}
+_download_progress_session_ctx: contextvars.ContextVar[int | None] = contextvars.ContextVar(
+    "download_progress_session_token",
+    default=None,
+)
+_download_progress_session_seq = count(1)
 
 # Cache de tamaños de modelos (consultados dinámicamente de HuggingFace/GitHub)
 _model_sizes_cache: dict[str, int | None] = {}
@@ -1578,6 +1587,51 @@ def get_download_progress(model_type: ModelType | None = None) -> dict[str, dict
         return {mt.value: p.to_dict() for mt, p in _download_progress.items()}
 
 
+def begin_download_progress_session(model_type: ModelType) -> int:
+    """
+    Inicia una nueva sesion de progreso para un modelo.
+
+    Devuelve un token monotono. Cualquier actualizacion con token anterior
+    quedara ignorada por _update_download_progress().
+    """
+    with _progress_lock:
+        token = next(_download_progress_session_seq)
+        _download_progress_session_tokens[model_type] = token
+        _download_progress.pop(model_type, None)
+        return token
+
+
+@contextmanager
+def bind_download_progress_session(token: int):
+    """
+    Vincula un token de sesion al contexto actual (hilo worker).
+
+    Permite que _update_download_progress() valide automaticamente escrituras
+    sin pasar progress_token en cada llamada interna.
+    """
+    ctx_token = _download_progress_session_ctx.set(token)
+    try:
+        yield
+    finally:
+        _download_progress_session_ctx.reset(ctx_token)
+
+
+def rotate_download_progress_session(model_type: ModelType, expected_token: int | None = None) -> int:
+    """
+    Invalida la sesion actual de un modelo rotando a un nuevo token.
+
+    Si expected_token se informa y no coincide, no rota (evita invalidar por
+    error una sesion mas nueva).
+    """
+    with _progress_lock:
+        current = _download_progress_session_tokens.get(model_type)
+        if expected_token is not None and current != expected_token:
+            return current if current is not None else 0
+        new_token = next(_download_progress_session_seq)
+        _download_progress_session_tokens[model_type] = new_token
+        return new_token
+
+
 def _update_download_progress(
     model_type: ModelType,
     phase: str,
@@ -1585,11 +1639,36 @@ def _update_download_progress(
     bytes_total: int = 0,
     speed_bps: float = 0.0,
     error_message: str | None = None,
+    progress_token: int | None = None,
 ) -> None:
     """Actualiza el estado de progreso de una descarga."""
     import time
 
+    effective_token = (
+        progress_token
+        if progress_token is not None
+        else _download_progress_session_ctx.get()
+    )
+
     with _progress_lock:
+        active_token = _download_progress_session_tokens.get(model_type)
+        if active_token is not None:
+            if effective_token is None:
+                logger.debug(
+                    "Ignoring unbound download progress update for %s while session %s is active",
+                    model_type.value,
+                    active_token,
+                )
+                return
+            if effective_token != active_token:
+                logger.debug(
+                    "Ignoring stale download progress update for %s (token=%s active=%s)",
+                    model_type.value,
+                    effective_token,
+                    active_token,
+                )
+                return
+
         if model_type not in _download_progress:
             _download_progress[model_type] = DownloadProgress(
                 model_type=model_type,
@@ -1614,6 +1693,7 @@ def _clear_download_progress(model_type: ModelType) -> None:
     """Limpia el estado de progreso de una descarga completada."""
     with _progress_lock:
         _download_progress.pop(model_type, None)
+        _download_progress_session_tokens.pop(model_type, None)
 
 
 def get_model_size_from_huggingface(model_name: str, use_cache: bool = True) -> int | None:

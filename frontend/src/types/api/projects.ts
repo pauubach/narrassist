@@ -67,10 +67,16 @@ export interface ApiNLPMethods {
 }
 
 /** CR-03: Features de análisis por proyecto */
+export interface ApiVotingThresholds {
+  inferenceMinConfidence?: number
+  inferenceMinConsensus?: number
+}
+
 export interface ApiAnalysisFeatures {
   schema_version: number
   pipeline_flags: ApiPipelineFlags
   nlp_methods: ApiNLPMethods
+  voting_thresholds?: ApiVotingThresholds
   updated_at: string | null
   updated_by: string
 }
@@ -85,6 +91,7 @@ export interface ApiAnalysisFeaturesPatch {
   schema_version?: number
   pipeline_flags?: ApiPipelineFlags
   nlp_methods?: ApiNLPMethods
+  voting_thresholds?: ApiVotingThresholds
 }
 
 /** CR-03: Patch parcial de settings del proyecto */

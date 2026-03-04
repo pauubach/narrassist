@@ -1,4 +1,16 @@
-import { isAlreadyDownloadingError } from '../useOllamaManagement'
+import { isAlreadyDownloadingError, MODEL_DOWNLOAD_POLL_MAX_ITERATIONS } from '../useOllamaManagement'
+
+// HI-01: Named constant exported
+describe('MODEL_DOWNLOAD_POLL_MAX_ITERATIONS', () => {
+  it('is a positive number', () => {
+    expect(typeof MODEL_DOWNLOAD_POLL_MAX_ITERATIONS).toBe('number')
+    expect(MODEL_DOWNLOAD_POLL_MAX_ITERATIONS).toBeGreaterThan(0)
+  })
+
+  it('is at least 60 iterations (1 minute minimum)', () => {
+    expect(MODEL_DOWNLOAD_POLL_MAX_ITERATIONS).toBeGreaterThanOrEqual(60)
+  })
+})
 
 describe('isAlreadyDownloadingError', () => {
   it('detecta mensaje exacto del backend', () => {

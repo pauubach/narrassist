@@ -114,8 +114,9 @@ def _mark_failed(
                 (project_id, enrichment_type, error, phase),
             )
             conn.commit()
-    except Exception:
-        pass  # Best effort
+    except Exception as e:
+        logger.warning("Failed to persist enrichment failure for %s/%s: %s",
+                        project_id, enrichment_type, e)
 
 
 def capture_entity_fingerprint(db_session: Any, project_id: int) -> str:
@@ -835,8 +836,9 @@ def _run_enrichment(
                 (project_id, enrichment_type, phase, input_hash),
             )
             conn.commit()
-    except Exception:
-        pass  # Best effort
+    except Exception as e:
+        logger.warning("Failed to mark enrichment %s/%s as computing: %s",
+                        project_id, enrichment_type, e)
 
     try:
         t0 = time.time()

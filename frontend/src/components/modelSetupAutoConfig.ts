@@ -27,8 +27,9 @@ export function createEnsureAutoConfig(
 
     try {
       await pending
-    } catch {
-      // Best-effort: los errores no deben bloquear el flujo de setup.
+    } catch (e) {
+      // HI-02: Best-effort, but log for diagnostics
+      console.warn('[autoConfig] ensureAutoConfig failed:', e)
     }
   }
 }

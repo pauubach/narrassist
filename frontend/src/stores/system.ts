@@ -47,6 +47,7 @@ export interface ModelsStatus {
   dependencies_status?: Record<string, boolean>
   all_installed?: boolean
   installing?: boolean
+  needs_restart?: boolean  // HI-04: frozen mode requires app restart
   // Python status fields
   python_available?: boolean
   python_version?: string | null
@@ -70,6 +71,7 @@ export interface SystemCapabilities {
   ollama: {
     installed: boolean
     available: boolean
+    hardware_supported?: boolean  // HI-05: tri-axis
     models: Array<{ name: string; size: number; modified: string }>
     recommended_models: string[]
     init_status?: string
@@ -110,6 +112,8 @@ export interface NLPMethod {
   description: string
   weight?: number
   available: boolean
+  hardware_supported?: boolean   // HI-05: can this hardware run it?
+  requires_ollama?: boolean      // HI-05: needs Ollama service?
   default_enabled: boolean
   requires_gpu: boolean
   recommended_gpu: boolean
@@ -143,6 +147,39 @@ export const useSystemStore = defineStore('system', () => {
 
   // LLM readiness (auto-download tracking)
   const llmDownloadingModels = ref<string[]>([])
+
+  // HI-02: Structured auto-config error tracking
+  const autoConfigErrors = ref<string[]>([])
+
+  // HI-03: LLM download visibility
+  const isLlmDownloading = computed(() => llmDownloadingModels.value.length > 0)
+  let llmHeartbeatTimer: ReturnType<typeof setInterval> | null = null
+
+  function startLlmHeartbeat() {
+    if (llmHeartbeatTimer) return
+    llmHeartbeatTimer = setInterval(async () => {
+      try {
+        const result = await api.getRaw<{ data: LLMReadiness }>('/api/services/llm/readiness')
+        const data = result?.data
+        if (data?.ready || !data?.missing_models?.length) {
+          llmDownloadingModels.value = []
+          stopLlmHeartbeat()
+        }
+      } catch {
+        // heartbeat is best-effort
+      }
+    }, 10000)
+  }
+
+  function stopLlmHeartbeat() {
+    if (llmHeartbeatTimer) {
+      clearInterval(llmHeartbeatTimer)
+      llmHeartbeatTimer = null
+    }
+  }
+
+  // HI-04: Restart detection
+  const needsRestart = computed(() => modelsStatus.value?.needs_restart === true)
 
   // System capabilities (cached - loaded once at startup)
   const systemCapabilities = ref<SystemCapabilities | null>(null)
@@ -581,8 +618,11 @@ export const useSystemStore = defineStore('system', () => {
           // Esperar a que arranque
           await new Promise(r => setTimeout(r, 3000))
           await refreshCapabilities()
-        } catch {
-          // Silencioso — el usuario puede iniciarlo manualmente desde Configuración
+        } catch (e) {
+          // HI-02: log structured warning instead of silent swallow
+          const msg = e instanceof Error ? e.message : String(e)
+          console.warn('[autoConfig] Ollama start failed:', msg)
+          autoConfigErrors.value.push(`Ollama start: ${msg}`)
         }
       }
 
@@ -598,14 +638,22 @@ export const useSystemStore = defineStore('system', () => {
             llmDownloadingModels.value = data.missing_models
             // CR-06: descargas gestionadas por ModelSetupDialog — no iniciar aquí
             // para evitar doble orquestación y toasts de error espurios.
+            // HI-03: start heartbeat to track background LLM downloads
+            startLlmHeartbeat()
           }
-        } catch {
-          // Silencioso — el usuario puede configurarlo desde Settings
-          llmDownloadingModels.value = []
+        } catch (e) {
+          // HI-02: log structured warning instead of silent swallow
+          const msg = e instanceof Error ? e.message : String(e)
+          console.warn('[autoConfig] LLM readiness check failed:', msg)
+          autoConfigErrors.value.push(`LLM readiness: ${msg}`)
+          // HI-03: don't clear llmDownloadingModels here — heartbeat handles it
         }
       }
-    } catch {
-      // Auto-config es best-effort, no debe bloquear la app
+    } catch (e) {
+      // HI-02: log structured warning for outer auto-config failure
+      const msg = e instanceof Error ? e.message : String(e)
+      console.warn('[autoConfig] autoConfigOnStartup failed:', msg)
+      autoConfigErrors.value.push(`autoConfig: ${msg}`)
     } finally {
       _autoConfigRunning = false
     }
@@ -682,6 +730,15 @@ export const useSystemStore = defineStore('system', () => {
 
     // LLM readiness
     llmDownloadingModels,
+    isLlmDownloading,      // HI-03
+    startLlmHeartbeat,     // HI-03
+    stopLlmHeartbeat,      // HI-03
+
+    // HI-02: structured auto-config errors
+    autoConfigErrors,
+
+    // HI-04: restart detection
+    needsRestart,
 
     // Auto-config
     autoConfigOnStartup,

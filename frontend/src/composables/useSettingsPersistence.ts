@@ -302,6 +302,18 @@ export function useSettingsPersistence() {
 
       settings.value.multiModelSynthesis = features.pipeline_flags?.multi_model_voting ?? true
       settings.value.characterKnowledgeMode = extractCharacterKnowledgeMode(features)
+
+      // HI-08: Load voting thresholds from backend
+      const vt = features.voting_thresholds
+      if (vt && typeof vt === 'object') {
+        if (typeof vt.inferenceMinConfidence === 'number') {
+          settings.value.inferenceMinConfidence = vt.inferenceMinConfidence
+        }
+        if (typeof vt.inferenceMinConsensus === 'number') {
+          settings.value.inferenceMinConsensus = vt.inferenceMinConsensus
+        }
+      }
+
       return true
     } catch (err) {
       console.warn('Could not load analysis settings from backend:', err)
@@ -347,6 +359,11 @@ export function useSettingsPersistence() {
             schema_version: 1,
             pipeline_flags: pipelineFlags,
             nlp_methods: nlpMethods,
+            // HI-08: Pass voting thresholds to backend
+            voting_thresholds: {
+              inferenceMinConfidence: s.inferenceMinConfidence,
+              inferenceMinConsensus: s.inferenceMinConsensus,
+            },
           },
         })
 

@@ -129,6 +129,50 @@ describe('ModelSetupDialog (CR-06 orchestration)', () => {
     wrapper.unmount()
   })
 
+  // HI-04: needs-restart phase when backend returns needs_restart
+  it('muestra fase needs-restart cuando el backend indica reinicio necesario', async () => {
+    h.store = createSystemStore({
+      dependenciesNeeded: true,
+      backendLoaded: false,
+      dependenciesInstalling: true,
+      needsRestart: false,
+      checkModelsStatus: vi.fn().mockImplementation(async () => {
+        h.store.needsRestart = true
+      }),
+    })
+
+    const wrapper = mountDialog()
+    await flushPromises()
+
+    // Simulate dependencies finishing
+    h.store.dependenciesInstalling = false
+    await nextTick()
+    // Wait for the setTimeout(2000) in the watcher
+    await new Promise(r => setTimeout(r, 2100))
+    await flushPromises()
+
+    expect(wrapper.find('.needs-restart-state').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Reinicio necesario')
+
+    wrapper.unmount()
+  })
+
+  // HI-03: LLM background banner in completed phase
+  it('muestra banner de descarga LLM en segundo plano cuando isLlmDownloading', async () => {
+    h.store = createSystemStore({
+      modelsReady: true,
+      isLlmDownloading: true,
+    })
+
+    const wrapper = mountDialog()
+    await flushPromises()
+
+    expect(wrapper.find('.llm-background-banner').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Instalando motores de análisis en segundo plano')
+
+    wrapper.unmount()
+  })
+
   it('recheckPython ejecuta autoConfig cuando Python aparece y modelsReady=true', async () => {
     h.store = createSystemStore({
       pythonAvailable: false,

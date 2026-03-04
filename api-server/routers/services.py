@@ -527,8 +527,8 @@ def get_languagetool_status():
 
     except Exception as e:
         logger.error(f"Error checking LanguageTool status: {e}", exc_info=True)
-        return ApiResponse(success=True, data={
-            "status": "not_installed",
+        return ApiResponse(success=False, error=f"Error checking LanguageTool: {e}", data={
+            "status": "error",
             "is_installed": False,
             "is_running": False,
             "is_installing": False,

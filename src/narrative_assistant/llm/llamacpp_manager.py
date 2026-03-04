@@ -28,6 +28,10 @@ from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
+# HI-01: Named timeout constants
+LLAMACPP_BINARY_TIMEOUT_S = 300    # 5 min for llama-server binary (~50 MB)
+LLAMACPP_MODEL_TIMEOUT_S = 3600    # 1 hour for GGUF model files (~4-8 GB)
+
 # Lock para thread-safety
 _manager_lock = threading.Lock()
 _manager: "LlamaCppManager | None" = None
@@ -245,7 +249,7 @@ class LlamaCppManager:
                 )
 
             # Descargar con progreso
-            with httpx.stream("GET", url, follow_redirects=True, timeout=300.0) as response:
+            with httpx.stream("GET", url, follow_redirects=True, timeout=LLAMACPP_BINARY_TIMEOUT_S) as response:
                 response.raise_for_status()
 
                 total_size = int(response.headers.get("content-length", 0))
@@ -328,7 +332,7 @@ class LlamaCppManager:
                 )
 
             # Descargar con progreso
-            with httpx.stream("GET", model_info.url, follow_redirects=True, timeout=3600.0) as response:
+            with httpx.stream("GET", model_info.url, follow_redirects=True, timeout=LLAMACPP_MODEL_TIMEOUT_S) as response:
                 response.raise_for_status()
 
                 total_size = int(response.headers.get("content-length", 0))

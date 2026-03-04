@@ -36,6 +36,7 @@ type DownloadPhase =
   | 'error'
   | 'python-missing'
   | 'backend-error'
+  | 'needs-restart'  // HI-04: frozen mode requires app restart
 
 interface RealProgress {
   percent: number
@@ -352,6 +353,11 @@ watch(() => systemStore.dependenciesInstalling, (installing) => {
     // Dependencies installed, check if backend is ready
     setTimeout(async () => {
       await systemStore.checkModelsStatus()
+      // HI-04: frozen mode (PyInstaller) — backend says restart needed
+      if (systemStore.needsRestart) {
+        downloadPhase.value = 'needs-restart'
+        return
+      }
       if (!systemStore.dependenciesNeeded && systemStore.backendLoaded) {
         // Dependencies OK AND backend loaded, now download models
         downloadPhase.value = 'downloading'
@@ -608,12 +614,26 @@ async function recheckPython() {
         </div>
       </template>
 
+      <!-- HI-04: Needs restart state (frozen/PyInstaller mode) -->
+      <template v-else-if="downloadPhase === 'needs-restart'">
+        <div class="needs-restart-state">
+          <i class="pi pi-refresh needs-restart-icon"></i>
+          <h3>Reinicio necesario</h3>
+          <p>Los componentes se han instalado correctamente. Cierra y vuelve a abrir la aplicación para continuar.</p>
+        </div>
+      </template>
+
       <!-- Completed state -->
       <template v-else-if="downloadPhase === 'completed'">
         <div class="download-complete">
           <i class="pi pi-check-circle complete-icon"></i>
           <h3>Listo para usar</h3>
           <p>Narrative Assistant está preparado.</p>
+          <!-- HI-03: LLM background download banner -->
+          <div v-if="systemStore.isLlmDownloading" class="llm-background-banner">
+            <i class="pi pi-spin pi-spinner"></i>
+            <span>Instalando motores de análisis en segundo plano...</span>
+          </div>
         </div>
       </template>
 
@@ -806,6 +826,42 @@ async function recheckPython() {
 }
 
 .download-complete p {
+  margin: 0;
+  color: var(--p-text-muted-color);
+}
+
+/* HI-03: LLM background download banner */
+.llm-background-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background: var(--p-blue-50);
+  color: var(--p-blue-700);
+  border-radius: var(--app-radius);
+  font-size: 0.85rem;
+}
+
+/* HI-04: Needs restart state */
+.needs-restart-state {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.needs-restart-icon {
+  font-size: 3rem;
+  color: var(--p-orange-500);
+  margin-bottom: 1rem;
+}
+
+.needs-restart-state h3 {
+  margin: 0 0 0.5rem 0;
+  color: var(--p-orange-700);
+}
+
+.needs-restart-state p {
   margin: 0;
   color: var(--p-text-muted-color);
 }
@@ -1007,5 +1063,14 @@ async function recheckPython() {
 
 .dark .retry-button.secondary:hover {
   background: var(--p-surface-600);
+}
+
+.dark .llm-background-banner {
+  background: var(--p-blue-900);
+  color: var(--p-blue-300);
+}
+
+.dark .needs-restart-state h3 {
+  color: var(--p-orange-400);
 }
 </style>

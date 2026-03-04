@@ -19,6 +19,9 @@ export type OllamaState = 'configuring' | 'not_installed' | 'not_running' | 'no_
 // Estados del init_status que indican configuración en curso
 const CONFIGURING_STATUSES = new Set(['installing', 'starting', 'downloading_model'])
 
+/** HI-01: Max poll iterations for model download (1 iteration ≈ 1s) */
+export const MODEL_DOWNLOAD_POLL_MAX_ITERATIONS = 900  // 15 minutes
+
 export function isAlreadyDownloadingError(errorMessage: string | null | undefined): boolean {
   return typeof errorMessage === 'string' && errorMessage.toLowerCase().includes('descarga en curso')
 }
@@ -261,7 +264,7 @@ export function useOllamaManagement() {
       const ok = await new Promise<boolean>((resolve) => {
         ollamaDownloadPollTimer = setInterval(async () => {
           pollCount++
-          if (pollCount > 900) {
+          if (pollCount > MODEL_DOWNLOAD_POLL_MAX_ITERATIONS) {
             stopOllamaDownloadPolling()
             toast.add({ severity: 'error', summary: 'Timeout', detail: 'La descarga tardó demasiado', life: 5000 })
             resolve(false)

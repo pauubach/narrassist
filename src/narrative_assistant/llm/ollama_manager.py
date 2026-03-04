@@ -31,6 +31,13 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
+# HI-01: Named timeout constants
+OLLAMA_INSTALLER_TIMEOUT_S = 300      # 5 min for installer binary download/exec
+OLLAMA_BREW_INSTALL_TIMEOUT_S = 600   # 10 min for brew install
+OLLAMA_LINUX_INSTALL_TIMEOUT_S = 600  # 10 min for Linux install script
+OLLAMA_MODEL_PULL_TIMEOUT_S = 3600    # 1 hour for model pull (large models ~8 GB)
+OLLAMA_GENERATE_TIMEOUT_S = 120       # 2 min for generate/chat call
+
 # Lock para thread-safety
 _manager_lock = threading.Lock()
 _manager: Optional["OllamaManager"] = None
@@ -655,7 +662,7 @@ class OllamaManager:
                 result = subprocess.run(
                     [str(installer_path), "/S"],
                     capture_output=True,
-                    timeout=300.0,  # 5 minutos
+                    timeout=OLLAMA_INSTALLER_TIMEOUT_S,
                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
                 if result.returncode != 0:
@@ -727,7 +734,7 @@ class OllamaManager:
                     text=True,
                     encoding="utf-8",
                     errors="replace",
-                    timeout=600.0,  # 10 minutos
+                    timeout=OLLAMA_BREW_INSTALL_TIMEOUT_S,
                 )
                 if result.returncode == 0:
                     logger.info("Ollama instalado via Homebrew correctamente")
@@ -848,7 +855,7 @@ class OllamaManager:
                 errors="replace",
             )
 
-            stdout, _ = process.communicate(input=install_script, timeout=600.0)
+            stdout, _ = process.communicate(input=install_script, timeout=OLLAMA_LINUX_INSTALL_TIMEOUT_S)
 
             if process.returncode == 0:
                 if progress_callback:
@@ -893,7 +900,7 @@ class OllamaManager:
                 }
                 req = urllib.request.Request(url, headers=headers)
 
-                with urllib.request.urlopen(req, timeout=300, context=ssl_ctx) as response:
+                with urllib.request.urlopen(req, timeout=OLLAMA_INSTALLER_TIMEOUT_S, context=ssl_ctx) as response:
                     total_size = int(response.headers.get("Content-Length", 0))
                     progress.total_bytes = total_size
                     block_size = 8192
@@ -1359,7 +1366,7 @@ class OllamaManager:
                     "stream": False,
                     "options": {"num_predict": 30},
                 },
-                timeout=120.0,
+                timeout=OLLAMA_GENERATE_TIMEOUT_S,
             )
 
             elapsed = time.time() - start

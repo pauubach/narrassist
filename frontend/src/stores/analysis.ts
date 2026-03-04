@@ -34,6 +34,7 @@ export interface AnalysisProgress {
     total_steps?: number
   }
   error?: string
+  degraded_phases?: string[]  // HI-17: phases that completed but in degraded mode
 }
 
 /**
@@ -654,6 +655,20 @@ export const useAnalysisStore = defineStore('analysis', () => {
     return result as Record<WorkspaceTab, TabStatus>
   }
 
+  // HI-17: Check if a tab's backend phase completed in degraded mode
+  function isTabDegraded(projectId: number, tab: WorkspaceTab): boolean {
+    const gates = TAB_PHASE_GATES[tab]
+    if (!gates) return false
+    const analysis = _analyses.value[projectId]
+    const degraded = analysis?.degraded_phases
+    if (!degraded?.length) return false
+    // Map frontend gate phase → backend phase name
+    const backendPhase = Object.entries(BACKEND_PHASE_TO_FRONTEND).find(
+      ([, fe]) => fe === gates.complete,
+    )?.[0]
+    return backendPhase ? degraded.includes(backendPhase) : false
+  }
+
   return {
     // State (computed: sigue el proyecto activo)
     currentAnalysis,
@@ -695,5 +710,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
     getProjectPhases,
     getTabStatus,
     getBatchTabStatuses,
+    isTabDegraded,  // HI-17
   }
 })
