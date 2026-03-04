@@ -130,6 +130,10 @@ def _get_default_analysis_features() -> dict:
             "spelling": ["patterns", "symspell", "hunspell", "pyspellchecker"],
             "character_knowledge": ["rules"],
         },
+        "voting_thresholds": {
+            "inferenceMinConfidence": 55,
+            "inferenceMinConsensus": 60,
+        },
         "updated_at": None,
         "updated_by": "default",
     }
@@ -235,6 +239,32 @@ def _validate_analysis_features(
         sanitized_methods[category] = valid_methods
 
     sanitized["nlp_methods"] = sanitized_methods
+
+    # Validar voting_thresholds (0-100)
+    voting_thresholds = features.get("voting_thresholds")
+    if voting_thresholds is not None:
+        if not isinstance(voting_thresholds, dict):
+            raise ValueError(
+                f"voting_thresholds debe ser un objeto, recibido: {type(voting_thresholds).__name__}"
+            )
+
+        known_thresholds = {"inferenceMinConfidence", "inferenceMinConsensus"}
+        sanitized_thresholds: dict[str, int | float] = {}
+
+        for key, value in voting_thresholds.items():
+            if key not in known_thresholds:
+                warnings.append(f"Umbral '{key}' desconocido, se omitirá")
+                continue
+            if not isinstance(value, (int, float)):
+                raise ValueError(
+                    f"Umbral '{key}' debe ser numérico (0-100), recibido: {type(value).__name__}"
+                )
+            numeric = float(value)
+            if numeric < 0 or numeric > 100:
+                raise ValueError(f"Umbral '{key}' fuera de rango (0-100): {numeric}")
+            sanitized_thresholds[key] = numeric
+
+        sanitized["voting_thresholds"] = sanitized_thresholds
 
     # Warnings de capabilities (CR-03 post-MVP)
     if capabilities:
@@ -905,6 +935,13 @@ def update_project_settings(
                         af_current["nlp_methods"] = defaults["nlp_methods"]
                     for cat, methods in af_new["nlp_methods"].items():
                         af_current["nlp_methods"][cat] = methods  # reemplazo completo
+
+                # Merge voting_thresholds (merge por clave)
+                if "voting_thresholds" in af_new:
+                    if "voting_thresholds" not in af_current:
+                        defaults = _get_default_analysis_features()
+                        af_current["voting_thresholds"] = defaults["voting_thresholds"]
+                    af_current["voting_thresholds"].update(af_new["voting_thresholds"])
 
                 # Metadatos ya vienen de _validate_analysis_features (schema_version, updated_at, updated_by)
                 for key in ["schema_version", "updated_at", "updated_by"]:

@@ -255,6 +255,7 @@ def _force_clear_analysis(project_id: int):
         if deps._heavy_analysis_project_id == project_id:
             deps._heavy_analysis_project_id = None
             deps._heavy_analysis_claimed_at = None
+            deps._heavy_analysis_run_id = None
             logger.info(f"[AUTO-RECOVERY] Released heavy slot held by project {project_id}")
 
     # Actualizar DB — marcar como "error" (no "completed") para que
@@ -1520,6 +1521,7 @@ def cancel_analysis(project_id: int):
             if deps._heavy_analysis_project_id == project_id:
                 deps._heavy_analysis_project_id = None
                 deps._heavy_analysis_claimed_at = None
+                deps._heavy_analysis_run_id = None
                 logger.info(f"[CANCEL] Released heavy slot for project {project_id}")
 
         logger.info(f"Analysis cancellation requested for project {project_id}")
@@ -1586,6 +1588,7 @@ def force_clear_stuck_analysis(project_id: int):
             if deps._heavy_analysis_project_id == project_id:
                 deps._heavy_analysis_project_id = None
                 deps._heavy_analysis_claimed_at = None
+                deps._heavy_analysis_run_id = None
                 logger.info(f"[FORCE-CLEAR] Released heavy slot for project {project_id}")
 
         # 5. Actualizar DB: status → error (no "completed") para que fast-path

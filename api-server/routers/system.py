@@ -32,6 +32,7 @@ NLP_DOWNLOAD_POLL_INTERVAL_S = 0.5
 NLP_DOWNLOAD_MAX_WORKERS = 2
 _NLP_DOWNLOAD_TERMINAL_PHASES = {"completed", "error"}
 _nlp_download_start_lock = threading.Lock()
+_deps_install_lock = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -569,12 +570,14 @@ def install_dependencies():
     import importlib
     import subprocess
 
-    # HI-11: Idempotent guard — reject if already installing
-    if deps.INSTALLING_DEPENDENCIES:
-        return ApiResponse(
-            success=True,
-            message="Dependencies installation already in progress.",
-        )
+    # Guard idempotente rápido (evita trabajo extra en llamadas concurrentes)
+    with _deps_install_lock:
+        if deps.INSTALLING_DEPENDENCIES:
+            return ApiResponse(
+                success=True,
+                message="Dependencies installation already in progress.",
+                data={"installing": True},
+            )
 
     # Verificar que Python está disponible antes de intentar instalar
     python_info = get_python_status()
@@ -584,10 +587,17 @@ def install_dependencies():
             detail=python_info["error"] or f"Python {deps.MIN_PYTHON_VERSION[0]}.{deps.MIN_PYTHON_VERSION[1]}+ no encontrado. Por favor instala Python desde python.org"
         )
 
-    def install_task():
-        # Globals managed via deps module
+    # HI-11: Guard idempotente atómico (segunda verificación tras preflight)
+    with _deps_install_lock:
+        if deps.INSTALLING_DEPENDENCIES:
+            return ApiResponse(
+                success=True,
+                message="Dependencies installation already in progress.",
+                data={"installing": True},
+            )
         deps.INSTALLING_DEPENDENCIES = True
 
+    def install_task():
         try:
             # Usar el path de Python ya verificado
             python_exe = python_info["python_path"]
@@ -652,7 +662,6 @@ def install_dependencies():
 
             # Usar la función helper para cargar los módulos
             if deps.load_narrative_assistant_modules():
-                deps.INSTALLING_DEPENDENCIES = False
                 logger.info("✓ Modules loaded successfully! Backend is now fully functional.")
             else:
                 logger.error("Failed to load modules after installation")
@@ -661,13 +670,20 @@ def install_dependencies():
 
         except Exception as e:
             logger.error(f"Error installing dependencies: {e}", exc_info=True)
-            deps.INSTALLING_DEPENDENCIES = False
             deps.MODULES_ERROR = str(e)
+        finally:
+            with _deps_install_lock:
+                deps.INSTALLING_DEPENDENCIES = False
 
     # Ejecutar en segundo plano
-    import threading
-    thread = threading.Thread(target=install_task, daemon=True)
-    thread.start()
+    try:
+        import threading
+        thread = threading.Thread(target=install_task, daemon=True)
+        thread.start()
+    except Exception:
+        with _deps_install_lock:
+            deps.INSTALLING_DEPENDENCIES = False
+        raise
 
     return ApiResponse(
         success=True,

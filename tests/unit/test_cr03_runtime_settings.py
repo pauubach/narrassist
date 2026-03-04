@@ -74,6 +74,38 @@ def test_apply_license_and_settings_applies_pipeline_flags_and_selected_methods(
     assert selected_methods["spelling"] == ["patterns"]
 
 
+def test_apply_license_and_settings_applies_voting_thresholds_to_context(monkeypatch):
+    """voting_thresholds persistidos deben llegar al ctx runtime (0-1)."""
+    project = SimpleNamespace(
+        settings={
+            "analysis_features": {
+                "pipeline_flags": {},
+                "nlp_methods": {"coreference": ["heuristics"]},
+                "voting_thresholds": {
+                    "inferenceMinConfidence": 77,
+                    "inferenceMinConsensus": 64,
+                },
+            }
+        }
+    )
+    ctx = {
+        "project": project,
+        "analysis_mode": "standard",
+        "word_count": 1200,
+    }
+    tracker = _DummyTracker()
+
+    monkeypatch.setattr(
+        "routers._analysis_phases._get_runtime_service_capabilities",
+        lambda: {"ollama": True, "languagetool": True, "gpu": True},
+    )
+
+    apply_license_and_settings(ctx, tracker)
+
+    assert ctx["inference_min_confidence"] == pytest.approx(0.77, rel=0.0, abs=1e-6)
+    assert ctx["inference_min_consensus"] == pytest.approx(0.64, rel=0.0, abs=1e-6)
+
+
 def test_apply_license_and_settings_disables_pipeline_when_nlp_categories_are_empty():
     project = SimpleNamespace(
         settings={

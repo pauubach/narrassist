@@ -1159,7 +1159,11 @@ async def get_llm_config():
 
     except Exception as e:
         logger.error(f"Error getting LLM config: {e}", exc_info=True)
-        return ApiResponse(success=True, data={"qualityLevel": "rapida", "sensitivity": 5.0})
+        return ApiResponse(
+            success=False,
+            error="No se pudo cargar la configuración de análisis avanzado.",
+            data={"qualityLevel": "rapida", "sensitivity": 5.0},
+        )
 
 
 @router.put("/api/services/llm/config")
@@ -1230,7 +1234,8 @@ async def get_llm_readiness():
     except Exception as e:
         logger.error(f"Error checking LLM readiness: {e}", exc_info=True)
         return ApiResponse(
-            success=True,
+            success=False,
+            error="No se pudo verificar el estado del análisis avanzado.",
             data={
                 "ready": False,
                 "ollama_installed": False,

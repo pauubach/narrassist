@@ -66,6 +66,11 @@ class TestProjectSettingsContract:
         assert "spelling" in methods
         assert "character_knowledge" in methods
 
+        # Defaults de umbrales de votación
+        thresholds = features["voting_thresholds"]
+        assert thresholds["inferenceMinConfidence"] == 55
+        assert thresholds["inferenceMinConsensus"] == 60
+
     def test_patch_settings_with_partial_update(self, test_client, sample_project):
         """PATCH settings con actualización parcial (merge profundo)."""
         # Actualización parcial: solo deshabilitar grammar
@@ -123,6 +128,62 @@ class TestProjectSettingsContract:
         # Otras categorías deben preservarse
         assert "ner" in features["nlp_methods"]
         assert "grammar" in features["nlp_methods"]
+
+    def test_patch_settings_persists_voting_thresholds(self, test_client, sample_project):
+        """PATCH persiste voting_thresholds y GET posterior los refleja."""
+        response = test_client.patch(
+            f"/api/projects/{sample_project.id}/settings",
+            json={
+                "analysis_features": {
+                    "voting_thresholds": {
+                        "inferenceMinConfidence": 72,
+                        "inferenceMinConsensus": 81,
+                    }
+                }
+            },
+        )
+        assert response.status_code == 200
+
+        features = response.json()["data"]["settings"]["analysis_features"]
+        assert features["voting_thresholds"]["inferenceMinConfidence"] == 72
+        assert features["voting_thresholds"]["inferenceMinConsensus"] == 81
+
+        get_response = test_client.get(f"/api/projects/{sample_project.id}")
+        assert get_response.status_code == 200
+        persisted = get_response.json()["data"]["settings"]["analysis_features"]["voting_thresholds"]
+        assert persisted["inferenceMinConfidence"] == 72
+        assert persisted["inferenceMinConsensus"] == 81
+
+    def test_patch_settings_voting_thresholds_supports_partial_merge(
+        self, test_client, sample_project
+    ):
+        """PATCH parcial de voting_thresholds solo modifica la clave enviada."""
+        test_client.patch(
+            f"/api/projects/{sample_project.id}/settings",
+            json={
+                "analysis_features": {
+                    "voting_thresholds": {
+                        "inferenceMinConfidence": 70,
+                        "inferenceMinConsensus": 80,
+                    }
+                }
+            },
+        )
+
+        response = test_client.patch(
+            f"/api/projects/{sample_project.id}/settings",
+            json={
+                "analysis_features": {
+                    "voting_thresholds": {
+                        "inferenceMinConsensus": 68,
+                    }
+                }
+            },
+        )
+        assert response.status_code == 200
+        thresholds = response.json()["data"]["settings"]["analysis_features"]["voting_thresholds"]
+        assert thresholds["inferenceMinConfidence"] == 70
+        assert thresholds["inferenceMinConsensus"] == 68
 
     def test_patch_settings_validates_unknown_methods(self, test_client, sample_project):
         """PATCH con métodos desconocidos: sanitiza y reporta warning."""
@@ -233,6 +294,42 @@ class TestProjectSettingsContract:
         data = response.json()
         assert "detail" in data
         assert "boolean" in data["detail"].lower()
+
+    def test_patch_settings_rejects_invalid_voting_threshold_type(
+        self, test_client, sample_project
+    ):
+        """PATCH con umbral no numérico retorna 400."""
+        response = test_client.patch(
+            f"/api/projects/{sample_project.id}/settings",
+            json={
+                "analysis_features": {
+                    "voting_thresholds": {
+                        "inferenceMinConfidence": "alto",
+                    }
+                }
+            },
+        )
+        assert response.status_code == 400
+        detail = response.json()["detail"]
+        assert "numérico" in detail
+
+    def test_patch_settings_rejects_voting_threshold_out_of_range(
+        self, test_client, sample_project
+    ):
+        """PATCH con umbral fuera de rango (0-100) retorna 400."""
+        response = test_client.patch(
+            f"/api/projects/{sample_project.id}/settings",
+            json={
+                "analysis_features": {
+                    "voting_thresholds": {
+                        "inferenceMinConsensus": 140,
+                    }
+                }
+            },
+        )
+        assert response.status_code == 400
+        detail = response.json()["detail"]
+        assert "fuera de rango" in detail
 
     def test_get_project_after_patch_reflects_changes(self, test_client, sample_project):
         """GET después de PATCH refleja los cambios persistidos."""

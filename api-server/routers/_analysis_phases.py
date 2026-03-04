@@ -1686,6 +1686,10 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
     """
 
     project_id = ctx["project_id"]
+    current_run_id_raw = ctx.get("_run_id") or ctx.get("run_id")
+    current_run_id = (
+        str(current_run_id_raw).strip() if current_run_id_raw is not None else ""
+    ) or None
     with deps._progress_lock:
         # S8a-18: Check watchdog timeout — if heavy slot has been held too long, force-release
         if (
@@ -1695,25 +1699,60 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
             elapsed = time.time() - deps._heavy_analysis_claimed_at
             if elapsed > deps.HEAVY_SLOT_TIMEOUT_SECONDS:
                 stale_pid = deps._heavy_analysis_project_id
+                stale_claim_ts = deps._heavy_analysis_claimed_at
+                stale_run_id = deps._heavy_analysis_run_id
                 logger.warning(
                     f"Watchdog: heavy slot held by project {stale_pid} for "
                     f"{elapsed:.0f}s (>{deps.HEAVY_SLOT_TIMEOUT_SECONDS}s). Force-releasing."
                 )
                 deps._heavy_analysis_project_id = None
                 deps._heavy_analysis_claimed_at = None
+                deps._heavy_analysis_run_id = None
                 # Mark stale project as error — but only if there isn't a
                 # newer analysis already running for the same project (which
                 # would have replaced the storage entry).
                 stale_storage = deps.analysis_progress_storage.get(stale_pid)
-                # HI-16: Mark stale as error — including "running" (the most
-                # dangerous case: hung thread).  Skip only terminal or waiting states.
-                if stale_storage and stale_storage.get("status") not in (
-                    "completed",
-                    "error",
-                    "queued_for_heavy",
-                ):
-                    stale_storage["status"] = "error"
-                    stale_storage["error"] = "Análisis excedió el tiempo máximo"
+                if stale_storage:
+                    storage_run_id_raw = stale_storage.get("_run_id")
+                    storage_run_id = (
+                        str(storage_run_id_raw).strip()
+                        if storage_run_id_raw is not None
+                        else ""
+                    ) or None
+                    storage_claim_ts = stale_storage.get("_heavy_slot_claim_ts")
+
+                    # HI-16: evitar marcar en error una ejecución nueva del mismo
+                    # proyecto que ya reemplazó a la stale.
+                    if stale_run_id:
+                        run_matches = stale_run_id == storage_run_id
+                    else:
+                        run_matches = storage_run_id is None
+
+                    claim_matches = (
+                        stale_claim_ts is None
+                        or storage_claim_ts is None
+                        or storage_claim_ts == stale_claim_ts
+                    )
+
+                    if not run_matches or not claim_matches:
+                        logger.info(
+                            "Watchdog: skip stale error mark for project %s "
+                            "(slot_run=%s, storage_run=%s, slot_claim=%s, storage_claim=%s)",
+                            stale_pid,
+                            stale_run_id,
+                            storage_run_id,
+                            stale_claim_ts,
+                            storage_claim_ts,
+                        )
+                    # HI-16: Mark stale as error — including "running" (the most
+                    # dangerous case: hung thread). Skip only terminal/waiting.
+                    elif stale_storage.get("status") not in (
+                        "completed",
+                        "error",
+                        "queued_for_heavy",
+                    ):
+                        stale_storage["status"] = "error"
+                        stale_storage["error"] = "Análisis excedió el tiempo máximo"
 
         if deps._heavy_analysis_project_id == project_id:
             # Same project re-claiming slot (e.g. cancel → re-analyze while
@@ -1721,7 +1760,12 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
             logger.info(f"Project {project_id}: re-claiming heavy slot (already held by self)")
             claim_ts = time.time()
             deps._heavy_analysis_claimed_at = claim_ts
+            deps._heavy_analysis_run_id = current_run_id
             ctx["_heavy_slot_claim_ts"] = claim_ts
+            ctx["_heavy_slot_run_id"] = current_run_id
+            storage = deps.analysis_progress_storage.get(project_id)
+            if storage is not None:
+                storage["_heavy_slot_claim_ts"] = claim_ts
             return True
         elif deps._heavy_analysis_project_id is not None:
             # Heavy slot busy — queue lightweight metadata only (F-005)
@@ -1744,7 +1788,12 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
             deps._heavy_analysis_project_id = project_id
             claim_ts = time.time()
             deps._heavy_analysis_claimed_at = claim_ts
+            deps._heavy_analysis_run_id = current_run_id
             ctx["_heavy_slot_claim_ts"] = claim_ts
+            ctx["_heavy_slot_run_id"] = current_run_id
+            storage = deps.analysis_progress_storage.get(project_id)
+            if storage is not None:
+                storage["_heavy_slot_claim_ts"] = claim_ts
             return True
 
 
@@ -3486,9 +3535,12 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
     """
     from narrative_assistant.persistence.timeline import TimelineRepository
     from narrative_assistant.temporal import (
+        TemporalDetectionConfig,
+        TemporalDetectionMethod,
         TemporalConsistencyChecker,
         TemporalMarkerExtractor,
         TimelineBuilder,
+        VotingTemporalChecker,
     )
     from narrative_assistant.temporal.entity_mentions import load_entity_mentions_by_chapter
 
@@ -3563,8 +3615,57 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
         tracker.update_storage( current_action="Verificando consistencia temporal...")
         tracker.update_time_remaining()
 
-        checker = TemporalConsistencyChecker()
-        inconsistencies = checker.check(timeline, all_markers)
+        analysis_config = ctx.get("analysis_config")
+        use_voting = not analysis_config or bool(
+            getattr(analysis_config, "run_multi_model_voting", True)
+        )
+        user_min_conf = float(ctx.get("inference_min_confidence", 0.5))
+        user_consensus = float(ctx.get("inference_min_consensus", 0.6))
+
+        if use_voting:
+            llm_enabled = not analysis_config or bool(
+                getattr(analysis_config, "use_llm", True)
+            )
+            enabled_methods = [
+                TemporalDetectionMethod.DIRECT,
+                TemporalDetectionMethod.CONTEXTUAL,
+                TemporalDetectionMethod.HEURISTICS,
+            ]
+            if llm_enabled:
+                enabled_methods.append(TemporalDetectionMethod.LLM)
+
+            voting_config = TemporalDetectionConfig(
+                enabled_methods=enabled_methods,
+                min_confidence=user_min_conf,
+                consensus_threshold=user_consensus,
+                use_llm=llm_enabled,
+            )
+            try:
+                checker = VotingTemporalChecker(voting_config)
+                voting_result = checker.check(
+                    timeline,
+                    all_markers,
+                    text=ctx.get("full_text"),
+                )
+                inconsistencies = voting_result.inconsistencies
+                tracker.set_metric("timeline_voting_enabled", True)
+                tracker.set_metric(
+                    "timeline_voting_methods",
+                    [m.value for m in voting_config.enabled_methods],
+                )
+                tracker.set_metric("timeline_voting_stats", voting_result.consensus_stats)
+            except Exception as voting_error:
+                logger.warning(
+                    "Timeline voting checker failed, using basic checker fallback: %s",
+                    voting_error,
+                )
+                checker = TemporalConsistencyChecker()
+                inconsistencies = checker.check(timeline, all_markers)
+                tracker.set_metric("timeline_voting_fallback", True)
+        else:
+            checker = TemporalConsistencyChecker()
+            inconsistencies = checker.check(timeline, all_markers)
+            tracker.set_metric("timeline_voting_enabled", False)
 
         logger.info(
             f"Timeline built: {len(timeline.events)} events, {len(inconsistencies)} inconsistencies"
@@ -5793,7 +5894,22 @@ def _release_heavy_and_start_next(project_id: int, ctx: dict | None = None) -> N
             # Guard: if a newer analysis for the same project has re-claimed
             # the slot, the old (cancelled) thread must NOT release it.
             my_claim_ts = ctx.get("_heavy_slot_claim_ts") if ctx else None
-            if my_claim_ts is not None and deps._heavy_analysis_claimed_at != my_claim_ts:
+            my_run_id_raw = (
+                (ctx.get("_heavy_slot_run_id") or ctx.get("_run_id") or ctx.get("run_id"))
+                if ctx
+                else None
+            )
+            my_run_id = (
+                str(my_run_id_raw).strip() if my_run_id_raw is not None else ""
+            ) or None
+            slot_run_id = deps._heavy_analysis_run_id
+
+            if my_run_id and slot_run_id and my_run_id != slot_run_id:
+                logger.info(
+                    f"Project {project_id}: skipping heavy slot release "
+                    f"(slot run_id={slot_run_id}, caller run_id={my_run_id})"
+                )
+            elif my_claim_ts is not None and deps._heavy_analysis_claimed_at != my_claim_ts:
                 logger.info(
                     f"Project {project_id}: skipping heavy slot release "
                     f"(slot re-claimed by newer analysis)"
@@ -5801,6 +5917,7 @@ def _release_heavy_and_start_next(project_id: int, ctx: dict | None = None) -> N
             else:
                 deps._heavy_analysis_project_id = None
                 deps._heavy_analysis_claimed_at = None
+                deps._heavy_analysis_run_id = None
                 if ctx is not None:
                     ctx["heavy_slot_released"] = True
                 logger.info(f"Project {project_id}: released heavy slot")

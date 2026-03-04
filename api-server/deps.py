@@ -88,6 +88,8 @@ _analysis_queue: list[dict] = []
 _heavy_analysis_project_id: int | None = None
 # Timestamp when the heavy slot was claimed (for watchdog timeout — S8a-18)
 _heavy_analysis_claimed_at: float | None = None
+# run_id que posee el heavy slot (para evitar marcar/error/liberar el run equivocado)
+_heavy_analysis_run_id: str | None = None
 # Queue of projects that finished Tier 1 (parsing/structure), waiting for heavy slot
 # Each entry is a dict with keys: project_id, context (data from Tier 1)
 _heavy_analysis_queue: list[dict] = []

@@ -85,15 +85,18 @@ class TestHI16WatchdogStaleRunning:
 
     def test_running_not_excluded_from_error_marking(self):
         source = _ANALYSIS_PHASES.read_text(encoding="utf-8")
-        # Find the watchdog section
-        idx = source.find("Watchdog: heavy slot held by project")
-        assert idx > 0, "Watchdog section not found"
-        # Get the status check after watchdog detection (next 1200 chars)
-        nearby = source[idx:idx + 1200]
+        match = re.search(
+            r"def claim_heavy_slot_or_queue\b.*?(?=\ndef\s|\Z)",
+            source,
+            re.DOTALL,
+        )
+        assert match, "claim_heavy_slot_or_queue function not found"
+        body = match.group(0)
+
         # "running" should NOT be in the exclusion list
-        # The exclusion list should only have "completed", "error", "queued_for_heavy"
-        status_check = re.search(r'status.*not in\s*\((.*?)\)', nearby, re.DOTALL)
-        assert status_check, "Status exclusion check not found near watchdog"
+        # The exclusion list should only have terminal/waiting states.
+        status_check = re.search(r'status.*not in\s*\((.*?)\)', body, re.DOTALL)
+        assert status_check, "Status exclusion check not found in watchdog function"
         excluded = status_check.group(1)
         assert '"running"' not in excluded, \
             "Watchdog should NOT exclude 'running' from error marking (HI-16)"
