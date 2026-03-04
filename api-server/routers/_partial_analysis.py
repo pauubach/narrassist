@@ -711,12 +711,14 @@ def run_partial_analysis_thread(
         run_reconciliation(ctx, tracker)
 
         # Mark as completed (con guard de run_id)
+        can_commit_partial_run = True
         my_run_id = ctx.get("run_id", "")
         with deps._progress_lock:
             storage = deps.analysis_progress_storage.get(project_id)
             if storage:
                 if my_run_id and storage.get("_run_id", "") != my_run_id:
                     logger.warning(f"Stale partial run {my_run_id} skipping storage write; current is {storage.get('_run_id')}")
+                    can_commit_partial_run = False
                 else:
                     storage["status"] = "completed"
                     storage["progress"] = 100
@@ -727,31 +729,38 @@ def run_partial_analysis_thread(
         # Update project status
         from narrative_assistant.persistence.project import ProjectManager
 
-        project = ctx["project"]
-        project.analysis_status = "completed"
         total_duration = round(time.time() - ctx["start_time"], 1)
-        ProjectManager(db_session).update(project)
+        if can_commit_partial_run:
+            project = ctx["project"]
+            project.analysis_status = "completed"
+            ProjectManager(db_session).update(project)
 
-        # Persistir run ledger parcial
-        try:
-            import json
-            from narrative_assistant.persistence.analysis import AnalysisRepository
+            # Persistir run ledger parcial
+            try:
+                import json
+                from narrative_assistant.persistence.analysis import AnalysisRepository
 
-            analysis_repo = AnalysisRepository(db_session)
-            ledger_run_id = analysis_repo.create_run(
-                project_id=project_id,
-                config_json=json.dumps({"mode": "partial", "phases": phases_to_run}),
-            )
-            for phase_key, duration in tracker.phase_durations.items():
-                analysis_repo.save_phase(
-                    run_id=ledger_run_id,
-                    phase_name=phase_key,
-                    executed=True,
-                    metadata={"duration": round(duration, 2)},
+                analysis_repo = AnalysisRepository(db_session)
+                ledger_run_id = analysis_repo.create_run(
+                    project_id=project_id,
+                    config_json=json.dumps({"mode": "partial", "phases": phases_to_run}),
                 )
-            analysis_repo.complete_run(ledger_run_id)
-        except Exception as e:
-            logger.warning(f"Could not persist partial run ledger: {e}")
+                for phase_key, duration in tracker.phase_durations.items():
+                    analysis_repo.save_phase(
+                        run_id=ledger_run_id,
+                        phase_name=phase_key,
+                        executed=True,
+                        metadata={"duration": round(duration, 2)},
+                    )
+                analysis_repo.complete_run(ledger_run_id)
+            except Exception as e:
+                logger.warning(f"Could not persist partial run ledger: {e}")
+        else:
+            logger.info(
+                "Skipping partial DB status/ledger for stale run %s (project=%s)",
+                my_run_id,
+                project_id,
+            )
 
         logger.info(
             f"Partial analysis completed for project {project_id} "

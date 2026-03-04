@@ -55,6 +55,8 @@ export interface ModelsStatus {
 }
 
 export interface SystemCapabilities {
+  detection_status?: 'complete' | 'uncertain'
+  detection_warnings?: string[]
   hardware: {
     gpu: { type: string; name: string; memory_gb: number | null; device_id: number } | null
     gpu_type: string

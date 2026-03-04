@@ -361,7 +361,7 @@ watch(() => systemStore.dependenciesInstalling, (installing) => {
         // Still not ready, show error
         downloadPhase.value = 'error'
         systemStore.stopPolling()
-        systemStore.modelsError = 'Failed to load backend after installing dependencies. Try restarting the application.'
+        systemStore.modelsError = 'No se pudo preparar el motor de análisis tras la instalación inicial. Reinicia la aplicación y vuelve a intentarlo.'
       }
     }, 2000)
   }

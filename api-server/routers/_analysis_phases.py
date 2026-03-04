@@ -5535,16 +5535,18 @@ def run_completion(ctx: dict, tracker: ProgressTracker):
     total_duration = round(time.time() - start_time, 1)
 
     # F-006: Atomic status transition — lock protects against cancel race
+    can_commit_run = True
     my_run_id = tracker.run_id
     with deps._progress_lock:
         storage = deps.analysis_progress_storage.get(project_id, {})
         # Guard: no sobreescribir storage si un run más nuevo ya lo tomó
         if my_run_id and storage.get("_run_id", "") != my_run_id:
             logger.warning(f"Stale run {my_run_id} skipping storage write; current is {storage.get('_run_id')}")
+            can_commit_run = False
         else:
             storage["status"] = "completed"
             storage["current_phase"] = "Análisis completado"
-            storage["progress"] = 1.0  # Explicitly set to 100%
+            storage["progress"] = 100  # Progress storage uses 0..100 scale
             storage["estimated_seconds_remaining"] = 0
             storage.setdefault("metrics", {})["total_duration_seconds"] = total_duration
             metrics = storage.get("metrics", {})
@@ -5565,36 +5567,43 @@ def run_completion(ctx: dict, tracker: ProgressTracker):
             if ctx.get("run_mode"):
                 storage["stats"]["run_mode"] = ctx["run_mode"]
 
-    project.analysis_status = "completed"
-    project.analysis_progress = 1.0
-    project.word_count = word_count
-    project.chapter_count = chapters_count
+    if can_commit_run:
+        project.analysis_status = "completed"
+        project.analysis_progress = 1.0
+        project.word_count = word_count
+        project.chapter_count = chapters_count
 
-    proj_manager = ProjectManager(ctx["db_session"])
-    proj_manager.update(project)
+        proj_manager = ProjectManager(ctx["db_session"])
+        proj_manager.update(project)
 
-    # Persistir run ledger: registro real de fases ejecutadas
-    try:
-        from narrative_assistant.persistence.analysis import AnalysisRepository
+        # Persistir run ledger: registro real de fases ejecutadas
+        try:
+            from narrative_assistant.persistence.analysis import AnalysisRepository
 
-        analysis_repo = AnalysisRepository(ctx["db_session"])
-        run_id = analysis_repo.create_run(
-            project_id=project_id,
-            config_json=json.dumps({"mode": ctx.get("run_mode", "full")}),
-        )
-        for phase_key, duration in tracker.phase_durations.items():
-            analysis_repo.save_phase(
-                run_id=run_id,
-                phase_name=phase_key,
-                executed=True,
-                metadata={"duration": round(duration, 2)},
+            analysis_repo = AnalysisRepository(ctx["db_session"])
+            run_id = analysis_repo.create_run(
+                project_id=project_id,
+                config_json=json.dumps({"mode": ctx.get("run_mode", "full")}),
             )
-        analysis_repo.complete_run(run_id)
-        logger.debug(
-            f"Run ledger saved: {len(tracker.phase_durations)} phases for project {project_id}"
+            for phase_key, duration in tracker.phase_durations.items():
+                analysis_repo.save_phase(
+                    run_id=run_id,
+                    phase_name=phase_key,
+                    executed=True,
+                    metadata={"duration": round(duration, 2)},
+                )
+            analysis_repo.complete_run(run_id)
+            logger.debug(
+                f"Run ledger saved: {len(tracker.phase_durations)} phases for project {project_id}"
+            )
+        except Exception as e:
+            logger.warning(f"Could not persist run ledger: {e}")
+    else:
+        logger.info(
+            "Skipping DB status/ledger for stale run %s (project=%s)",
+            my_run_id,
+            project_id,
         )
-    except Exception as e:
-        logger.warning(f"Could not persist run ledger: {e}")
 
     # Formatear duración en minutos si es > 60s
     duration_str = f"{total_duration}s"
@@ -5681,6 +5690,7 @@ def handle_analysis_error(ctx: dict, error: Exception):
     if isinstance(error, AnalysisCancelledError):
         logger.info(f"Analysis cancelled by user for project {project_id}")
         my_run_id = ctx.get("_run_id", "")
+        can_write_cancel_db = True
         with deps._progress_lock:
             storage = deps.analysis_progress_storage.get(project_id, {})
             # Solo escribir en storage si somos la ejecución actual.
@@ -5689,6 +5699,7 @@ def handle_analysis_error(ctx: dict, error: Exception):
                 storage["status"] = "cancelled"
                 storage["current_phase"] = "Análisis cancelado por el usuario"
             else:
+                can_write_cancel_db = False
                 logger.info(
                     f"[STALE] Skipping cancel status write for project {project_id} "
                     f"(run {my_run_id} replaced)"
@@ -5697,7 +5708,7 @@ def handle_analysis_error(ctx: dict, error: Exception):
             deps.analysis_cancellation_flags.pop(project_id, None)
         try:
             # Solo actualizar DB si somos la ejecución actual
-            if not my_run_id or storage.get("_run_id", "") == my_run_id:
+            if can_write_cancel_db:
                 project.analysis_status = "cancelled"
                 project.analysis_progress = 0.0
                 proj_manager = ProjectManager(ctx["db_session"])
@@ -5723,17 +5734,19 @@ def handle_analysis_error(ctx: dict, error: Exception):
         user_msg = f"Error en el análisis: {err_str}"
 
     my_run_id = ctx.get("_run_id", "")
+    can_write_error_db = True
     with deps._progress_lock:
         storage = deps.analysis_progress_storage.get(project_id, {})
         if my_run_id and storage.get("_run_id", "") != my_run_id:
             logger.warning(f"Stale run {my_run_id} skipping error write; current is {storage.get('_run_id')}")
+            can_write_error_db = False
         else:
             storage["status"] = "error"
             storage["current_phase"] = user_msg
             storage["error"] = user_msg
 
     try:
-        if not my_run_id or deps.analysis_progress_storage.get(project_id, {}).get("_run_id", "") == my_run_id:
+        if can_write_error_db:
             project.analysis_status = "error"
             proj_manager = ProjectManager(ctx["db_session"])
             proj_manager.update(project)

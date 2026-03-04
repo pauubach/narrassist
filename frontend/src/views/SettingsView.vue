@@ -1591,6 +1591,7 @@ const contentArea = ref<HTMLElement | null>(null)
 const activeProjectId = computed(() => projectsStore.currentProject?.id ?? null)
 const loadingProjectAnalysisSettings = ref(false)
 let analysisSyncTimer: ReturnType<typeof setTimeout> | null = null
+let capabilitiesWarningShown = false
 
 async function loadProjectAnalysisSettings(projectId: number): Promise<void> {
   loadingProjectAnalysisSettings.value = true
@@ -1675,6 +1676,21 @@ const loadSystemCapabilities = async (): Promise<boolean> => {
   // Usar el store centralizado
   const capabilities = await systemStore.loadCapabilities(true) // force refresh
   if (capabilities) {
+    if (
+      !capabilitiesWarningShown &&
+      capabilities.detection_status === 'uncertain' &&
+      Array.isArray(capabilities.detection_warnings) &&
+      capabilities.detection_warnings.length > 0
+    ) {
+      capabilitiesWarningShown = true
+      toast.add({
+        severity: 'warn',
+        summary: 'Preparación en curso',
+        detail: 'El sistema sigue verificando algunos componentes. Puedes continuar y reintentar más tarde si alguna función no aparece.',
+        life: 6000,
+      })
+    }
+
     // Si es la primera vez (no hay settings guardados), aplicar defaults según hardware
     const savedSettings = safeGetItem('narrative_assistant_settings')
     if (!savedSettings) {

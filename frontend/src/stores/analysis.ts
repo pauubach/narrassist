@@ -544,6 +544,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
     } catch (err) {
       // Solo limpiar si el POST falló (el backend ni siquiera arrancó)
       phases.forEach(p => runningPhases.value.delete(p))
+      if (runningPhases.value.size === 0) {
+        _runningPhasesProjectId = null
+      }
       _analyzing.value[projectId] = false
       delete _analyses.value[projectId]
       _errors.value[projectId] = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
