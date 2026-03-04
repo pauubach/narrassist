@@ -216,11 +216,26 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const executedPhases = ref<Record<number, Partial<ExecutedPhases>>>({})
 
   /**
-   * Fases actualmente en ejecución (para mostrar loading).
+   * Fases actualmente en ejecución por proyecto.
+   * Evita contaminar overlays de loading entre proyectos distintos.
    */
-  const runningPhases = ref<Set<keyof ExecutedPhases>>(new Set())
-  /** Proyecto al que pertenecen las runningPhases actuales */
-  let _runningPhasesProjectId: number | null = null
+  const _runningPhases = ref<Record<number, Set<keyof ExecutedPhases>>>({})
+  const runningPhases = computed<Set<keyof ExecutedPhases>>(() => {
+    const projectId = _activeProjectId.value
+    if (projectId == null) return new Set<keyof ExecutedPhases>()
+    return _runningPhases.value[projectId] ?? new Set<keyof ExecutedPhases>()
+  })
+
+  function _ensureRunningPhases(projectId: number): Set<keyof ExecutedPhases> {
+    if (!_runningPhases.value[projectId]) {
+      _runningPhases.value[projectId] = new Set<keyof ExecutedPhases>()
+    }
+    return _runningPhases.value[projectId]
+  }
+
+  function _clearRunningPhases(projectId: number): void {
+    delete _runningPhases.value[projectId]
+  }
 
   // ============================================================================
   // Computed: vista del proyecto activo (backward-compatible)
@@ -401,6 +416,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
       delete _analyses.value[id]
       delete _analyzing.value[id]
       delete _errors.value[id]
+      _clearRunningPhases(id)
     }
   }
 
@@ -422,11 +438,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
       executedPhases.value[projectId] = {}
     } else {
       delete _analyses.value[projectId]
-      // Limpiar fases parciales solo si pertenecen a este proyecto
-      if (_runningPhasesProjectId === null || _runningPhasesProjectId === projectId) {
-        runningPhases.value.clear()
-        _runningPhasesProjectId = null
-      }
+      _clearRunningPhases(projectId)
     }
   }
 
@@ -517,8 +529,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
     if (_analyzing.value[projectId]) return false
 
     // Añadir a fases en ejecución (scoped al proyecto)
-    _runningPhasesProjectId = projectId
-    phases.forEach(p => runningPhases.value.add(p))
+    const projectRunningPhases = _ensureRunningPhases(projectId)
+    phases.forEach(p => projectRunningPhases.add(p))
 
     _analyzing.value[projectId] = true
     _analyses.value[projectId] = {
@@ -543,9 +555,12 @@ export const useAnalysisStore = defineStore('analysis', () => {
       return true
     } catch (err) {
       // Solo limpiar si el POST falló (el backend ni siquiera arrancó)
-      phases.forEach(p => runningPhases.value.delete(p))
-      if (runningPhases.value.size === 0) {
-        _runningPhasesProjectId = null
+      const currentRunningPhases = _runningPhases.value[projectId]
+      if (currentRunningPhases) {
+        phases.forEach(p => currentRunningPhases.delete(p))
+        if (currentRunningPhases.size === 0) {
+          _clearRunningPhases(projectId)
+        }
       }
       _analyzing.value[projectId] = false
       delete _analyses.value[projectId]
@@ -558,8 +573,26 @@ export const useAnalysisStore = defineStore('analysis', () => {
   /**
    * Verifica si una fase está actualmente ejecutándose.
    */
-  function isPhaseRunning(phase: keyof ExecutedPhases): boolean {
-    return runningPhases.value.has(phase)
+  function isPhaseRunning(projectId: number, phase: keyof ExecutedPhases): boolean
+  function isPhaseRunning(phase: keyof ExecutedPhases): boolean
+  function isPhaseRunning(
+    projectIdOrPhase: number | keyof ExecutedPhases,
+    maybePhase?: keyof ExecutedPhases,
+  ): boolean {
+    let projectId: number | null
+    let phase: keyof ExecutedPhases
+
+    if (typeof projectIdOrPhase === 'number') {
+      projectId = projectIdOrPhase
+      if (!maybePhase) return false
+      phase = maybePhase
+    } else {
+      projectId = _activeProjectId.value
+      phase = projectIdOrPhase
+    }
+
+    if (projectId == null) return false
+    return _runningPhases.value[projectId]?.has(phase) ?? false
   }
 
   /**
@@ -604,7 +637,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     }
 
     // Verificar si la fase está corriendo
-    if (isPhaseRunning(gates.partial)) return 'running'
+    if (isPhaseRunning(projectId, gates.partial)) return 'running'
 
     // Análisis global en curso → running
     if (_analyzing.value[projectId]) return 'running'
@@ -629,6 +662,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     warning,
     executedPhases,
     runningPhases,
+    _runningPhases,
     // Internal maps (para uso avanzado/testing)
     _analyses,
     _analyzing,

@@ -257,6 +257,32 @@ describe('analysisStore', () => {
       expect(store.isProjectAnalyzing(1)).toBe(false)
       expect(store.error).toBe('Network error')
     })
+
+    it('should isolate running phases between projects', async () => {
+      const store = useAnalysisStore()
+      mockApiClient.post.mockResolvedValue({})
+
+      await store.runPartialAnalysis(1, ['timeline'])
+      await store.runPartialAnalysis(2, ['grammar'])
+
+      expect(store.isPhaseRunning(1, 'timeline')).toBe(true)
+      expect(store.isPhaseRunning(1, 'grammar')).toBe(false)
+      expect(store.isPhaseRunning(2, 'grammar')).toBe(true)
+      expect(store.isPhaseRunning(2, 'timeline')).toBe(false)
+    })
+
+    it('should clear running phases only for the completed project', async () => {
+      const store = useAnalysisStore()
+      mockApiClient.post.mockResolvedValue({})
+
+      await store.runPartialAnalysis(1, ['timeline'])
+      await store.runPartialAnalysis(2, ['grammar'])
+
+      store.setAnalyzing(1, false)
+
+      expect(store.isPhaseRunning(1, 'timeline')).toBe(false)
+      expect(store.isPhaseRunning(2, 'grammar')).toBe(true)
+    })
   })
 
   describe('clearAnalysis', () => {
