@@ -89,6 +89,10 @@ export const useAppStore = defineStore('app', () => {
         if (payload.status === 'running') {
           systemStore.backendConnected = true
           systemStore.backendStartupError = null
+        } else if (payload.status === 'starting' || payload.status === 'restarting') {
+          // HI-12 + ME-05: Backend is (re)starting — not yet ready
+          systemStore.backendConnected = false
+          systemStore.backendStartupError = null
         } else if (payload.status === 'error') {
           systemStore.backendConnected = false
           systemStore.backendStartupError = payload.message

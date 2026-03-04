@@ -490,6 +490,7 @@ def models_status():
                     "all_installed": all_deps_installed,
                     "needs_restart": needs_restart,
                     "installing": deps.INSTALLING_DEPENDENCIES,
+                    "install_progress": deps.INSTALL_PROGRESS or None,
                     "python_available": python_info["python_available"],
                     "python_version": python_info["python_version"],
                     "python_path": python_info["python_path"],
@@ -603,6 +604,9 @@ def install_dependencies():
             python_exe = python_info["python_path"]
             logger.info(f"Starting dependencies installation using: {python_exe} (version {python_info['python_version']})")
 
+            # ME-04: Granular install progress for UI
+            deps.INSTALL_PROGRESS = "Preparando instalación..."
+
             # Lista de dependencias necesarias
             # sentence-transformers ya trae torch, transformers y scikit-learn como dependencias
             # No instalar paquetes redundantes - reduce el tiempo de instalación significativamente
@@ -628,7 +632,17 @@ def install_dependencies():
             else:
                 pip_install_args.append("--user")
 
-            for dep in dependencies:
+            # ME-04: User-friendly names for non-technical users
+            _dep_display_names = {
+                "numpy": "componentes numéricos",
+                "spacy": "motor de análisis de texto",
+                "sentence-transformers": "motor de similitud semántica",
+            }
+
+            for i, dep in enumerate(dependencies):
+                dep_name = dep.split(">=")[0].split("[")[0]
+                display_name = _dep_display_names.get(dep_name, dep_name)
+                deps.INSTALL_PROGRESS = f"Instalando {display_name} ({i + 1}/{len(dependencies)})..."
                 logger.info(f"Installing {dep}...")
                 try:
                     result = subprocess.run(
@@ -649,6 +663,7 @@ def install_dependencies():
                 logger.info(f"✓ {dep} installed")
 
             logger.info("All dependencies installed successfully!")
+            deps.INSTALL_PROGRESS = "Verificando componentes instalados..."
 
             # Ensure target dir is in sys.path for imports
             if deps.IS_EMBEDDED_RUNTIME and embed_site_packages not in sys.path:
@@ -658,6 +673,7 @@ def install_dependencies():
             # Invalidate import caches so newly installed packages are found
             importlib.invalidate_caches()
 
+            deps.INSTALL_PROGRESS = "Cargando motor de análisis de texto..."
             logger.info("Attempting to load narrative_assistant modules...")
 
             # Usar la función helper para cargar los módulos
@@ -671,9 +687,11 @@ def install_dependencies():
         except Exception as e:
             logger.error(f"Error installing dependencies: {e}", exc_info=True)
             deps.MODULES_ERROR = str(e)
+            deps.INSTALL_PROGRESS = ""
         finally:
             with _deps_install_lock:
                 deps.INSTALLING_DEPENDENCIES = False
+                deps.INSTALL_PROGRESS = ""
 
     # Ejecutar en segundo plano
     try:

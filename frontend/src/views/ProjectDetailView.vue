@@ -231,6 +231,12 @@
 
         <!-- Panel central (siempre visible) -->
         <div class="center-panel">
+          <!-- ME-01: Stale data banner -->
+          <div v-if="isActiveTabDataStale" class="stale-data-banner">
+            <i class="pi pi-info-circle"></i>
+            <span>Los datos mostrados podrían no reflejar el último análisis.</span>
+          </div>
+
           <!-- Tab Texto -->
           <TextTab
             v-if="workspaceStore.activeTab === 'text'"
@@ -649,6 +655,14 @@ const { isAnalyzing, hasBeenAnalyzed, cancellingAnalysis,
   project,
   entities, alerts, chapters,
   loadEntities, loadAlerts, loadChapters: loadChaptersWrapper,
+})
+
+// ME-01: Stale data signal for the active tab
+const isActiveTabDataStale = computed(() => {
+  if (!project.value) return false
+  const tab = workspaceStore.activeTab
+  if (tab === 'text') return false // Text tab always shows live document
+  return analysisStore.isTabDataStale(project.value.id, tab)
 })
 
 // Navegación de menciones - usar projectId reactivo
@@ -1650,13 +1664,16 @@ const onAnalysisCompleted = async () => {
   const activeTab = workspaceStore.activeTab
   if (activeTab === 'entities') {
     await loadEntities(project.value.id)
+    analysisStore.clearTabStale(project.value.id, 'entities')
   } else if (activeTab === 'relationships') {
     await loadEntities(project.value.id)
     await loadRelationships(project.value.id)
+    analysisStore.clearTabStale(project.value.id, 'relationships')
   } else if (activeTab === 'alerts') {
     await loadAlerts(project.value.id)
+    analysisStore.clearTabStale(project.value.id, 'alerts')
   }
-  // Timeline y Style cargan sus propios datos
+  // Timeline y Style cargan sus propios datos y limpian stale internamente
 }
 
 // Reload stale data when switching to tabs that depend on analysis
@@ -1682,7 +1699,13 @@ watch(() => workspaceStore.activeTab, async (newTab) => {
   if (newTab === 'relationships') {
     await loadEntities(project.value.id)  // Usa cache si ya están cargadas
     await loadRelationships(project.value.id)  // Usa cache si ya están cargadas
+    // ME-01: Clear stale only after successful data reload
+    analysisStore.clearTabStale(project.value.id, 'relationships')
   }
+
+  // ME-01: Tabs that self-load (timeline, style, glossary, summary, entities, alerts)
+  // clear their stale signal via component mount/reload hooks below.
+  // Text tab never has stale data (always shows live document).
 })
 
 // Cachear stats de alertas para métricas globales (HomeView)
@@ -2187,6 +2210,23 @@ const onReplaceDocumentSelected = async (event: Event) => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* ME-01: Stale data banner */
+.stale-data-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: var(--yellow-50);
+  color: var(--yellow-900);
+  font-size: 0.8rem;
+  border-bottom: 1px solid var(--yellow-200);
+}
+
+.stale-data-banner .pi {
+  font-size: 0.85rem;
+  color: var(--yellow-600);
 }
 
 .right-panel {

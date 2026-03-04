@@ -220,6 +220,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
    * Fases actualmente en ejecución por proyecto.
    * Evita contaminar overlays de loading entre proyectos distintos.
    */
+  // ME-01: Track tabs with potentially stale data (analysis completed since last data load)
+  const _staleTabs = ref<Record<number, Set<WorkspaceTab>>>({})
+
   const _runningPhases = ref<Record<number, Set<keyof ExecutedPhases>>>({})
   const runningPhases = computed<Set<keyof ExecutedPhases>>(() => {
     const projectId = _activeProjectId.value
@@ -655,6 +658,24 @@ export const useAnalysisStore = defineStore('analysis', () => {
     return result as Record<WorkspaceTab, TabStatus>
   }
 
+  // ME-01: Mark all data-bearing tabs as stale for a project (called when analysis completes)
+  function markTabsStale(projectId: number): void {
+    const dataTabs: WorkspaceTab[] = ['entities', 'relationships', 'alerts', 'timeline', 'style', 'glossary', 'summary']
+    _staleTabs.value[projectId] = new Set(dataTabs)
+  }
+
+  // ME-01: Clear stale flag for a specific tab (called when tab data is refreshed)
+  function clearTabStale(projectId: number, tab: WorkspaceTab): void {
+    _staleTabs.value[projectId]?.delete(tab)
+  }
+
+  // ME-01: Check if a tab's data is potentially stale
+  function isTabDataStale(projectId: number, tab: WorkspaceTab): boolean {
+    // Don't show stale if analysis is currently running (user already sees running state)
+    if (_analyzing.value[projectId]) return false
+    return _staleTabs.value[projectId]?.has(tab) ?? false
+  }
+
   // HI-17: Check if a tab's backend phase completed in degraded mode
   function isTabDegraded(projectId: number, tab: WorkspaceTab): boolean {
     const gates = TAB_PHASE_GATES[tab]
@@ -711,5 +732,10 @@ export const useAnalysisStore = defineStore('analysis', () => {
     getTabStatus,
     getBatchTabStatuses,
     isTabDegraded,  // HI-17
+    // ME-01: Stale data signals
+    markTabsStale,
+    clearTabStale,
+    isTabDataStale,
+    _staleTabs,
   }
 })

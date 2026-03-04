@@ -12,6 +12,7 @@
 
 import { ref, computed, onMounted, watch } from 'vue'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { useAnalysisStore } from '@/stores/analysis'
 import { useFeatureProfile } from '@/composables/useFeatureProfile'
 import RegisterAnalysisTab from './RegisterAnalysisTab.vue'
 import FocalizationTab from './FocalizationTab.vue'
@@ -57,6 +58,7 @@ const props = defineProps<{
 }>()
 
 const workspaceStore = useWorkspaceStore()
+const analysisStore = useAnalysisStore()
 const { isFeatureAvailable } = useFeatureProfile(computed(() => props.projectId))
 
 const activeTabId = ref('register')
@@ -176,6 +178,8 @@ const activeComponent = computed(() => componentMap[activeTabId.value])
 
 onMounted(() => {
   loadFeatureAvailability()
+  // ME-01: Clear stale when style tab mounts (child components will load fresh data)
+  analysisStore.clearTabStale(props.projectId, 'style')
 })
 
 watch(() => props.projectId, () => {

@@ -66,6 +66,7 @@ MODULES_ERROR: Optional[str] = None
 
 # Track installation status
 INSTALLING_DEPENDENCIES = False
+INSTALL_PROGRESS = ""  # ME-04: Current phase description for UI
 
 # Analysis progress storage (protected by _progress_lock)
 analysis_progress_storage: dict[int, dict] = {}

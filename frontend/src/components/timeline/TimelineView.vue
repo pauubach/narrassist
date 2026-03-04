@@ -508,6 +508,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useAnalysisStore } from '@/stores/analysis'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Select from 'primevue/select'
@@ -540,6 +541,8 @@ const props = defineProps<{
   entities?: Array<{ id: number; name: string }>
   chapters?: Array<{ id: number; chapterNumber: number }>
 }>()
+
+const analysisStore = useAnalysisStore()
 
 const emit = defineEmits<{
   eventSelect: [event: TimelineEvent]
@@ -720,6 +723,8 @@ const loadTimeline = async () => {
 
     if (data.success && data.data) {
       timeline.value = transformTimeline(data.data)
+      // ME-01: Data successfully loaded — clear stale signal
+      analysisStore.clearTabStale(props.projectId, 'timeline')
     } else {
       console.error('Error loading timeline:', data.error)
       error.value = data.error || 'Error al cargar el timeline'

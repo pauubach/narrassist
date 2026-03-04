@@ -304,17 +304,24 @@ def invalidate_enrichment_if_mutated(
                 )
                 conn.commit()
         except Exception as e:
-            logger.error(f"Failed to mark enrichment stale: {e}")
-            # Fallback: delete all (legacy behavior)
+            logger.error(f"Failed to mark enrichment stale (granular): {e}")
+            # HI-09: Fallback — mark ALL as stale (not delete) to preserve cache structure.
+            # DELETE destroys cache metadata needed for incremental re-computation.
             try:
                 with db_session.connection() as conn:
                     conn.execute(
-                        "DELETE FROM enrichment_cache WHERE project_id = ?",
+                        """UPDATE enrichment_cache
+                           SET status = 'stale', updated_at = datetime('now')
+                           WHERE project_id = ? AND status = 'completed'""",
                         (project_id,),
                     )
                     conn.commit()
-            except Exception:
-                pass
+                logger.warning(
+                    "Enrichment invalidation for project %s fell back to global stale mark",
+                    project_id,
+                )
+            except Exception as e2:
+                logger.error("Fallback stale marking also failed for project %s: %s", project_id, e2)
         return True
     return False
 

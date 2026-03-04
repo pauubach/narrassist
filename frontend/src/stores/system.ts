@@ -47,6 +47,7 @@ export interface ModelsStatus {
   dependencies_status?: Record<string, boolean>
   all_installed?: boolean
   installing?: boolean
+  install_progress?: string | null  // ME-04: granular install phase description
   needs_restart?: boolean  // HI-04: frozen mode requires app restart
   // Python status fields
   python_available?: boolean
@@ -206,6 +207,8 @@ export const useSystemStore = defineStore('system', () => {
   const dependenciesInstalling = computed(() => modelsStatus.value?.installing ?? false)
   const dependenciesNeeded = computed(() => modelsStatus.value?.dependencies_needed ?? false)
   const backendLoaded = computed(() => modelsStatus.value?.backend_loaded ?? false)
+  // ME-04: Granular install progress from backend
+  const installProgress = computed(() => modelsStatus.value?.install_progress ?? null)
 
   // Python availability
   const pythonAvailable = computed(() => modelsStatus.value?.python_available ?? true)
@@ -707,6 +710,7 @@ export const useSystemStore = defineStore('system', () => {
     dependenciesInstalling,
     dependenciesNeeded,
     backendLoaded,
+    installProgress,
     pythonAvailable,
     pythonVersion,
     pythonError,

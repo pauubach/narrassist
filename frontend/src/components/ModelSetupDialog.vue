@@ -509,7 +509,7 @@ async function recheckPython() {
           </div>
 
           <DsDownloadProgress
-            label="Instalando componentes de análisis de texto..."
+            :label="systemStore.installProgress || 'Instalando componentes de análisis de texto...'"
             :percentage="null"
             class="progress-section"
           />

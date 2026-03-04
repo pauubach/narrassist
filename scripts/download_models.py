@@ -286,7 +286,12 @@ Variables de entorno:
     download_embeddings = True
     download_transformer_ner = True
 
-    if args.spacy or args.embeddings or args.transformer_ner:
+    if args.all:
+        # --all: forzar todos los modelos (override parciales)
+        download_spacy = True
+        download_embeddings = True
+        download_transformer_ner = True
+    elif args.spacy or args.embeddings or args.transformer_ner:
         # Si se especifica alguno, descargar solo los especificados
         download_spacy = args.spacy
         download_embeddings = args.embeddings

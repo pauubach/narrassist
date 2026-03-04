@@ -1143,15 +1143,23 @@ def run_cleanup(ctx: dict, tracker: ProgressTracker):
                 (project_id,),
             )
             conn.execute("DELETE FROM analysis_runs WHERE project_id = ?", (project_id,))
-            # Sprint C: no borrar cache completo; marcar stale para recalcular solo lo necesario.
-            conn.execute(
+            # HI-09: Mark enrichment cache as stale (not delete) for re-computation.
+            # Global stale here is correct because run_cleanup deletes all underlying
+            # data (entities, relationships, chapters, etc.). The incremental planner
+            # and fast-path handle selective recomputation downstream.
+            stale_count = conn.execute(
                 """
                 UPDATE enrichment_cache
                 SET status = 'stale', updated_at = datetime('now')
-                WHERE project_id = ?
+                WHERE project_id = ? AND status = 'completed'
                 """,
                 (project_id,),
-            )
+            ).rowcount
+            if stale_count:
+                logger.info(
+                    "run_cleanup: marked %d enrichment cache entries as stale for project %s",
+                    stale_count, project_id,
+                )
 
         logger.info(f"Cleared existing data for project {project_id}")
     except Exception as clear_err:

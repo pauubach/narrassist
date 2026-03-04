@@ -454,12 +454,15 @@ def run_installation(
 
         progress.log(f"Instalando {total_steps} componente(s)...")
 
+        # ME-03: Track results per component for stratified final message
+        results = {"python": True, "nlp": True, "ollama": True, "llm": True}
+
         # Download NLP models
         if not status["spacy"] or not status["embeddings"] or force:
             if not download_nlp_models(progress, force):
                 if progress.cancelled:
                     return 2
-                return 1
+                results["nlp"] = False
 
         # Install Ollama if requested
         if include_ollama:
@@ -467,31 +470,61 @@ def run_installation(
                 if not install_ollama(progress):
                     if progress.cancelled:
                         return 2
-                    # Non-fatal, continue
+                    results["ollama"] = False
                     progress.log("Ollama no instalado, continuando...")
 
             if not status["llm"] and shutil.which("ollama"):
                 if not download_llm_model(progress):
                     if progress.cancelled:
                         return 2
-                    # Non-fatal
+                    results["llm"] = False
                     progress.log("Modelo LLM no instalado, continuando...")
 
-        progress.log("Instalación completada correctamente.")
+        # ME-03: Stratified final message
+        failed = [k for k, v in results.items() if not v]
+        nlp_failed = not results["nlp"]
+
+        if not failed:
+            final_title = "Instalación completada"
+            final_msg = (
+                "Los modelos se han instalado correctamente.\n\n"
+                "Narrative Assistant está listo para usar."
+            )
+            progress.log("Instalación completada correctamente.")
+        elif nlp_failed:
+            # Critical failure — NLP models are required
+            final_title = "Error de instalación"
+            final_msg = (
+                f"Componentes fallidos: {', '.join(failed)}.\n\n"
+                "Los modelos NLP son necesarios para el funcionamiento.\n"
+                "Verifica tu conexión a internet e intenta de nuevo."
+            )
+            progress.error(f"Instalación fallida: {', '.join(failed)}")
+        else:
+            # Partial — only optional components failed
+            final_title = "Instalación parcial"
+            final_msg = (
+                f"Componentes pendientes: {', '.join(failed)}.\n\n"
+                "Las funciones básicas están disponibles.\n"
+                "Los componentes opcionales se pueden instalar después."
+            )
+            progress.log(f"Instalación parcial: pendientes {', '.join(failed)}")
 
         if isinstance(progress, GUIProgress):
             try:
                 from tkinter import messagebox
-                messagebox.showinfo(
-                    "Instalación completada",
-                    "Los modelos se han instalado correctamente.\n\n"
-                    "Narrative Assistant está listo para usar."
-                )
+                if nlp_failed:
+                    messagebox.showerror(final_title, final_msg)
+                elif failed:
+                    messagebox.showwarning(final_title, final_msg)
+                else:
+                    messagebox.showinfo(final_title, final_msg)
             except:
                 pass
             progress.close()
 
-        return 0
+        # NLP failure is critical (exit 1), optional failures are OK (exit 0)
+        return 1 if nlp_failed else 0
 
     except Exception as e:
         progress.error(f"Error durante la instalación: {e}")

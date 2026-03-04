@@ -130,6 +130,8 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
 
         if (progressData.status === 'completed') {
           notifyAnalysisComplete(project.value?.name)
+          // ME-01: Mark all data tabs as stale so UI can show refresh signal
+          analysisStore.markTabsStale(project.value!.id)
         } else {
           notifyAnalysisError(progressData.error || 'Error durante el análisis')
         }
@@ -145,6 +147,13 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
         await loadEntities(project.value!.id, true) // forceReload para actualizar mention_count
         await loadAlerts(project.value!.id, true) // forceReload para actualizar alertas
         await loadChapters(project.value!.id, true) // forceReload para actualizar capítulos
+
+        // ME-01: Clear stale for tabs whose data was just reloaded
+        const pid = project.value!.id
+        analysisStore.clearTabStale(pid, 'entities')
+        analysisStore.clearTabStale(pid, 'alerts')
+        analysisStore.clearTabStale(pid, 'glossary')  // Uses same entities data
+        analysisStore.clearTabStale(pid, 'summary')   // Uses same entities/chapters data
 
         // Retry if data seems stale
         if (project.value && project.value.wordCount === 0 && (progressData.metrics?.chapters_found || 0) > 0) {

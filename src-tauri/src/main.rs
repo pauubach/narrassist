@@ -31,8 +31,8 @@ impl BackendServer {
     }
 }
 
-/// Comprueba si el backend responde al health check
-async fn poll_health_once() -> bool {
+/// Liveness check: el proceso backend responde HTTP 200 (puede no tener módulos cargados).
+async fn poll_health_alive() -> bool {
     let client = reqwest::Client::new();
     match client
         .get("http://127.0.0.1:8008/api/health")
@@ -45,12 +45,51 @@ async fn poll_health_once() -> bool {
     }
 }
 
-/// Espera a que el backend responda al health check (con reintentos)
+/// Readiness check: el backend responde Y tiene los módulos cargados (`backend_loaded: true`).
+/// Usa esto para decidir cuándo emitir "running" al frontend.
+async fn poll_health_ready() -> bool {
+    let client = reqwest::Client::new();
+    match client
+        .get("http://127.0.0.1:8008/api/health")
+        .timeout(std::time::Duration::from_secs(2))
+        .send()
+        .await
+    {
+        Ok(response) => {
+            if !response.status().is_success() {
+                return false;
+            }
+            match response.json::<serde_json::Value>().await {
+                Ok(body) => body
+                    .get("backend_loaded")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false),
+                Err(_) => false,
+            }
+        }
+        Err(_) => false,
+    }
+}
+
+/// Espera a que el backend esté alive (liveness). Retorna true si responde HTTP 200.
 #[cfg(not(debug_assertions))]
-async fn wait_for_health(max_attempts: u32, delay_ms: u64) -> bool {
+async fn wait_for_alive(max_attempts: u32, delay_ms: u64) -> bool {
     for attempt in 1..=max_attempts {
-        if poll_health_once().await {
-            println!("[Watchdog] Backend healthy after {} attempts", attempt);
+        if poll_health_alive().await {
+            println!("[Health] Backend alive after {} attempts", attempt);
+            return true;
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+    }
+    false
+}
+
+/// Espera a que el backend esté ready (readiness: backend_loaded == true).
+#[cfg(not(debug_assertions))]
+async fn wait_for_ready(max_attempts: u32, delay_ms: u64) -> bool {
+    for attempt in 1..=max_attempts {
+        if poll_health_ready().await {
+            println!("[Health] Backend ready after {} attempts", attempt);
             return true;
         }
         tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
@@ -101,14 +140,39 @@ async fn start_backend_server(
             spawn_output_logger(stderr, "stderr");
         }
 
+        // HI-12: Emit "starting" so frontend knows we're polling
+        let _ = _app.emit(
+            "backend-status",
+            serde_json::json!({
+                "status": "starting",
+                "message": "Iniciando servidor..."
+            }),
+        );
+
+        // HI-12: Two-phase health check — liveness then readiness.
+        // Phase 1: Wait for the process to respond at all (liveness).
+        // 30 attempts × 500ms = 15s max.
+        if !wait_for_alive(30, 500).await {
+            eprintln!("[Setup] Backend process did not respond after 15s — killing");
+            // Process never came alive — kill it to avoid stale handle
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("Backend did not respond after 15s of polling".to_string());
+        }
+
+        // Process is alive — persist the handle so watchdog can manage it
         {
             let mut child_lock = server_state.child.lock().unwrap();
             *child_lock = Some(child);
         }
 
-        // Esperar a que el backend responda (poll cada 500ms, max 30 intentos = 15s)
-        if !wait_for_health(30, 500).await {
-            eprintln!("[Setup] Backend did not respond after 15s of polling");
+        // Phase 2: Wait for backend_loaded == true (readiness).
+        // 60 attempts × 500ms = 30s extra for module loading.
+        if !wait_for_ready(60, 500).await {
+            // Process is alive but modules not loaded yet.
+            // Return "warming" — NOT Err — so watchdog can still start.
+            println!("[Setup] Backend alive but modules not loaded after 30s — entering warming mode");
+            return Ok("Backend warming up (modules loading)".to_string());
         }
 
         Ok("Backend server started successfully".to_string())
@@ -131,10 +195,10 @@ async fn stop_backend_server(server_state: State<'_, BackendServer>) -> Result<S
     }
 }
 
-/// Verifica si el servidor backend está corriendo
+/// Verifica si el servidor backend está corriendo (readiness para frontend)
 #[tauri::command]
 async fn check_backend_health() -> Result<bool, String> {
-    Ok(poll_health_once().await)
+    Ok(poll_health_ready().await)
 }
 
 /// Watchdog: monitoriza el backend y lo reinicia si se cae.
@@ -160,7 +224,9 @@ async fn backend_watchdog(app_handle: AppHandle) {
             break;
         }
 
-        if poll_health_once().await {
+        // HI-12: Use liveness (not readiness) for crash detection.
+        // A backend that's alive but still loading modules should NOT trigger restart.
+        if poll_health_alive().await {
             consecutive_failures = 0;
             continue;
         }
@@ -230,8 +296,8 @@ async fn backend_watchdog(app_handle: AppHandle) {
                     *child_lock = Some(child);
                 }
 
-                // Wait for health
-                if wait_for_health(30, 500).await {
+                // Wait for readiness after restart
+                if wait_for_ready(30, 500).await {
                     println!("[Watchdog] Backend restarted successfully");
                     restart_count += 1;
                     consecutive_failures = 0;
@@ -314,16 +380,32 @@ fn main() {
                 match start_backend_server(app_handle.clone(), server_state).await {
                     Ok(msg) => {
                         println!("[Setup] {}", msg);
-                        // Emitir evento al frontend indicando que el backend está listo
-                        let _ = app_handle.emit(
-                            "backend-status",
-                            serde_json::json!({
-                                "status": "running",
-                                "message": msg
-                            }),
-                        );
 
-                        // Iniciar watchdog en release builds
+                        // HI-12: Distinguish "fully ready" from "warming up"
+                        let is_warming = msg.contains("warming");
+                        if is_warming {
+                            // Process alive but modules still loading — emit "starting"
+                            let _ = app_handle.emit(
+                                "backend-status",
+                                serde_json::json!({
+                                    "status": "starting",
+                                    "message": "Servidor iniciado, cargando módulos..."
+                                }),
+                            );
+                        } else {
+                            // Fully ready
+                            let _ = app_handle.emit(
+                                "backend-status",
+                                serde_json::json!({
+                                    "status": "running",
+                                    "message": msg
+                                }),
+                            );
+                        }
+
+                        // HI-12: Always start watchdog when process is alive (Ok branch).
+                        // The watchdog uses readiness checks, so it will detect when
+                        // a warming backend finishes loading or if it crashes.
                         #[cfg(not(debug_assertions))]
                         {
                             let watchdog_handle = app_handle.clone();
