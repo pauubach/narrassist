@@ -15,6 +15,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use tauri::{AppHandle, Emitter, Manager, State};
 
+const BACKEND_WARMING_MSG: &str = "Backend warming up (modules loading)";
+
 /// Estado compartido del servidor backend
 struct BackendServer {
     child: Arc<Mutex<Option<Child>>>,
@@ -104,16 +106,34 @@ async fn start_backend_server(
     _app: AppHandle,
     server_state: State<'_, BackendServer>,
 ) -> Result<String, String> {
-    // Verificar si ya esta corriendo (scope limitado para el lock)
+    // Verificar handle existente y limpiar stale handles si el proceso ya terminó.
     {
-        let child_lock = server_state.child.lock().unwrap();
-        if child_lock.is_some() {
-            return Ok("Backend server already running".to_string());
+        let mut child_lock = server_state.child.lock().unwrap();
+        if let Some(child) = child_lock.as_mut() {
+            match child.try_wait() {
+                Ok(None) => {
+                    return Ok("Backend server already running".to_string());
+                }
+                Ok(Some(status)) => {
+                    eprintln!(
+                        "[Setup] Found stale backend child handle (exited with status: {:?}), cleaning up",
+                        status.code()
+                    );
+                    *child_lock = None;
+                }
+                Err(e) => {
+                    eprintln!(
+                        "[Setup] Failed to query backend child status ({}), cleaning up handle",
+                        e
+                    );
+                    *child_lock = None;
+                }
+            }
         }
     }
 
     // Verificar si el servidor ya esta corriendo externamente
-    if poll_health_once().await {
+    if poll_health_alive().await {
         println!("[Setup] Backend server already running externally");
         return Ok("Backend server already running externally".to_string());
     }
@@ -171,8 +191,10 @@ async fn start_backend_server(
         if !wait_for_ready(60, 500).await {
             // Process is alive but modules not loaded yet.
             // Return "warming" — NOT Err — so watchdog can still start.
-            println!("[Setup] Backend alive but modules not loaded after 30s — entering warming mode");
-            return Ok("Backend warming up (modules loading)".to_string());
+            println!(
+                "[Setup] Backend alive but modules not loaded after 30s — entering warming mode"
+            );
+            return Ok(BACKEND_WARMING_MSG.to_string());
         }
 
         Ok("Backend server started successfully".to_string())
@@ -382,7 +404,7 @@ fn main() {
                         println!("[Setup] {}", msg);
 
                         // HI-12: Distinguish "fully ready" from "warming up"
-                        let is_warming = msg.contains("warming");
+                        let is_warming = msg == BACKEND_WARMING_MSG;
                         if is_warming {
                             // Process alive but modules still loading — emit "starting"
                             let _ = app_handle.emit(
