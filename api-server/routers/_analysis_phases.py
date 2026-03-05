@@ -1376,7 +1376,7 @@ def run_parsing(ctx: dict, tracker: ProgressTracker):
 
     tmp_path = ctx["tmp_path"]
 
-    tracker.start_phase("parsing", 0, "Leyendo el documento...")
+    tracker.start_phase("parsing", "Leyendo el documento...")
 
     doc_format = detect_format(tmp_path)
     parser = get_parser(doc_format)
@@ -1398,7 +1398,7 @@ def run_parsing(ctx: dict, tracker: ProgressTracker):
         )
 
     tracker.set_metric("word_count", word_count)
-    tracker.end_phase("parsing", 0)
+    tracker.end_phase("parsing")
 
     # Actualizar word_count del proyecto inmediatamente
     try:
@@ -1429,7 +1429,7 @@ def run_classification(ctx: dict, tracker: ProgressTracker):
     """Fase 2: Clasifica el tipo de documento."""
     full_text = ctx["full_text"]
 
-    tracker.start_phase("classification", 1, "Clasificando tipo de documento...")
+    tracker.start_phase("classification", "Clasificando tipo de documento...")
 
     try:
         from narrative_assistant.feature_profile.models import normalize_document_type
@@ -1482,7 +1482,7 @@ def run_classification(ctx: dict, tracker: ProgressTracker):
         ctx["document_type"] = "FIC"  # Default coherente con Project.document_type
         ctx["document_subtype"] = None
 
-    tracker.end_phase("classification", 1)
+    tracker.end_phase("classification")
 
 
 # ============================================================================
@@ -1497,7 +1497,7 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
     raw_document = ctx["raw_document"]
     db_session = ctx["db_session"]
 
-    tracker.start_phase("structure", 2, "Identificando la estructura del documento...")
+    tracker.start_phase("structure", "Identificando la estructura del documento...")
 
     from narrative_assistant.parsers.structure_detector import StructureDetector
 
@@ -1668,7 +1668,7 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
         logger.warning(f"Error detecting/persisting dialogues (continuing): {e}")
 
     tracker.set_metric("chapters_found", chapters_count)
-    tracker.end_phase("structure", 2)
+    tracker.end_phase("structure")
 
     logger.info(f"Structure detection complete: {chapters_count} chapters")
 
@@ -1684,13 +1684,42 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
 # ============================================================================
 
 
+def _mark_project_error_from_watchdog(project_id: int) -> None:
+    """Best-effort DB sync when watchdog marks a stale run as error."""
+    project_manager = getattr(deps, "project_manager", None)
+    if project_manager is None:
+        return
+
+    try:
+        result = project_manager.get(project_id)
+        if getattr(result, "is_failure", False):
+            return
+        project = getattr(result, "value", None)
+        if project is None:
+            return
+
+        # Do not overwrite already terminal statuses.
+        if getattr(project, "analysis_status", None) in ("completed", "error", "cancelled"):
+            return
+
+        project.analysis_status = "error"
+        project.analysis_progress = 0.0
+        project_manager.update(project)
+    except Exception as err:
+        logger.warning(
+            "Watchdog: failed to sync DB error status for project %s: %s",
+            project_id,
+            err,
+        )
+
+
 def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
     """
-    Intenta reclamar el slot de análisis pesado.
+    Intenta reclamar el slot de analisis pesado.
 
     Returns:
-        True si se reclamó el slot (continuar con fases pesadas).
-        False si el proyecto fue encolado (detener aquí).
+        True si se reclamo el slot (continuar con fases pesadas).
+        False si el proyecto fue encolado (detener aqui).
     """
 
     project_id = ctx["project_id"]
@@ -1698,8 +1727,12 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
     current_run_id = (
         str(current_run_id_raw).strip() if current_run_id_raw is not None else ""
     ) or None
+
+    stale_project_to_sync: int | None = None
+    claimed_slot = False
+
     with deps._progress_lock:
-        # S8a-18: Check watchdog timeout — if heavy slot has been held too long, force-release
+        # S8a-18: check watchdog timeout and force-release stale ownership.
         if (
             deps._heavy_analysis_project_id is not None
             and deps._heavy_analysis_claimed_at is not None
@@ -1716,9 +1749,9 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
                 deps._heavy_analysis_project_id = None
                 deps._heavy_analysis_claimed_at = None
                 deps._heavy_analysis_run_id = None
-                # Mark stale project as error — but only if there isn't a
-                # newer analysis already running for the same project (which
-                # would have replaced the storage entry).
+                # Default: sync DB for stale run even if in-memory storage is gone.
+                stale_project_to_sync = stale_pid
+
                 stale_storage = deps.analysis_progress_storage.get(stale_pid)
                 if stale_storage:
                     storage_run_id_raw = stale_storage.get("_run_id")
@@ -1729,13 +1762,10 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
                     ) or None
                     storage_claim_ts = stale_storage.get("_heavy_slot_claim_ts")
 
-                    # HI-16: evitar marcar en error una ejecución nueva del mismo
-                    # proyecto que ya reemplazó a la stale.
-                    if stale_run_id:
-                        run_matches = stale_run_id == storage_run_id
-                    else:
-                        run_matches = storage_run_id is None
-
+                    # Do not mark error if storage already belongs to a newer run.
+                    run_matches = (
+                        stale_run_id == storage_run_id if stale_run_id else storage_run_id is None
+                    )
                     claim_matches = (
                         stale_claim_ts is None
                         or storage_claim_ts is None
@@ -1752,19 +1782,24 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
                             stale_claim_ts,
                             storage_claim_ts,
                         )
-                    # HI-16: Mark stale as error — including "running" (the most
-                    # dangerous case: hung thread). Skip only terminal/waiting.
+                        stale_project_to_sync = None
+                    # Keep "running" out of this excluded set on purpose.
                     elif stale_storage.get("status") not in (
                         "completed",
                         "error",
+                        "cancelled",
                         "queued_for_heavy",
                     ):
                         stale_storage["status"] = "error"
-                        stale_storage["error"] = "Análisis excedió el tiempo máximo"
+                        stale_storage["error"] = "An\u00e1lisis excedi\u00f3 el tiempo m\u00e1ximo"
+                        stale_storage["current_phase"] = "An\u00e1lisis detenido"
+                        stale_storage["current_action"] = "Se super\u00f3 el tiempo m\u00e1ximo permitido."
+                        stale_storage["last_update"] = time.time()
+                    else:
+                        stale_project_to_sync = None
 
         if deps._heavy_analysis_project_id == project_id:
-            # Same project re-claiming slot (e.g. cancel → re-analyze while
-            # old thread hasn't fully exited yet).  Reset the timer.
+            # Same project reclaiming slot (cancel -> reanalyze).
             logger.info(f"Project {project_id}: re-claiming heavy slot (already held by self)")
             claim_ts = time.time()
             deps._heavy_analysis_claimed_at = claim_ts
@@ -1774,9 +1809,9 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
             storage = deps.analysis_progress_storage.get(project_id)
             if storage is not None:
                 storage["_heavy_slot_claim_ts"] = claim_ts
-            return True
+            claimed_slot = True
         elif deps._heavy_analysis_project_id is not None:
-            # Heavy slot busy — queue lightweight metadata only (F-005)
+            # Heavy slot busy -> queue lightweight metadata only (F-005).
             queue_entry: dict[str, Any] = {
                 "project_id": project_id,
                 "mode": ctx.get("queue_mode", "full"),
@@ -1788,10 +1823,10 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
             deps._heavy_analysis_queue.append(queue_entry)
             deps.analysis_progress_storage[project_id]["status"] = "queued_for_heavy"
             deps.analysis_progress_storage[project_id]["current_phase"] = (
-                "Estructura lista — en cola para análisis profundo"
+                "Estructura lista, en cola para an\u00e1lisis profundo"
             )
             deps.analysis_progress_storage[project_id]["current_action"] = ""
-            return False
+            claimed_slot = False
         else:
             deps._heavy_analysis_project_id = project_id
             claim_ts = time.time()
@@ -1802,8 +1837,12 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
             storage = deps.analysis_progress_storage.get(project_id)
             if storage is not None:
                 storage["_heavy_slot_claim_ts"] = claim_ts
-            return True
+            claimed_slot = True
 
+    if stale_project_to_sync is not None:
+        _mark_project_error_from_watchdog(stale_project_to_sync)
+
+    return claimed_slot
 
 def run_ollama_healthcheck(ctx: dict, tracker: ProgressTracker):
     """S7c-04: Health check de Ollama antes de fases pesadas.
@@ -1917,7 +1956,7 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
             enable_gazetteer_ner,
         )
 
-    tracker.start_phase("ner", 3, "Buscando personajes, lugares y otros elementos...")
+    tracker.start_phase("ner", "Buscando personajes, lugares y otros elementos...")
 
     # ========================================================================
     # Cache Check: Skip expensive NER if document unchanged
@@ -1950,7 +1989,7 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
             ctx["entity_repo"] = get_entity_repository()
             ctx["_ner_cache_hit"] = True  # Skip LLM validation (already validated)
             tracker.set_metric("entities_found", len(entities))
-            tracker.end_phase("ner", 3)
+            tracker.end_phase("ner")
 
             logger.info(f"[NER] Cache restore complete: {len(entities)} entities")
             return  # Skip NER computation
@@ -2306,7 +2345,7 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
             except Exception as e:
                 logger.warning(f"Error creating entity {first_mention.text}: {e}")
 
-    tracker.end_phase("ner", 3)
+    tracker.end_phase("ner")
     logger.info(f"NER complete: {len(entities)} entities")
 
     ctx["entities"] = entities
@@ -2506,7 +2545,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
     analysis_config = ctx.get("analysis_config")
     selected_nlp_methods = ctx.get("selected_nlp_methods", {})
 
-    tracker.start_phase("fusion", 4, "Unificando entidades mencionadas de diferentes formas...")
+    tracker.start_phase("fusion", "Unificando entidades mencionadas de diferentes formas...")
     tracker.update_storage( current_action="Preparando unificación...")
 
     fusion_pct_start, fusion_pct_end = tracker.get_phase_progress_range("fusion")
@@ -3502,7 +3541,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             subphase_label="Consolidando resultados",
             subphase_progress=1.0,
         )
-        tracker.end_phase("fusion", 4)
+        tracker.end_phase("fusion")
 
         logger.info(
             f"Fusión de entidades completada en "
@@ -5697,6 +5736,26 @@ def run_completion(ctx: dict, tracker: ProgressTracker):
                 storage["stats"]["entity_diff"] = ctx["version_entity_diff"]
             if ctx.get("run_mode"):
                 storage["stats"]["run_mode"] = ctx["run_mode"]
+            incremental_plan = ctx.get("incremental_plan")
+            if isinstance(incremental_plan, dict):
+                impacted_nodes = incremental_plan.get("impacted_nodes")
+                if isinstance(impacted_nodes, (list, tuple, set)):
+                    storage["stats"]["impacted_nodes"] = sorted(
+                        {str(node) for node in impacted_nodes if str(node).strip()}
+                    )
+                changed_chapters = incremental_plan.get("changed_chapter_numbers")
+                if isinstance(changed_chapters, (list, tuple, set)):
+                    storage["stats"]["changed_chapter_numbers"] = sorted(
+                        {
+                            int(ch)
+                            for ch in changed_chapters
+                            if (isinstance(ch, int) and not isinstance(ch, bool))
+                            or (isinstance(ch, str) and ch.strip().lstrip("-").isdigit())
+                        }
+                    )
+                reason = incremental_plan.get("reason")
+                if reason is not None:
+                    storage["stats"]["incremental_reason"] = str(reason)
 
     if can_commit_run:
         project.analysis_status = "completed"
@@ -5712,9 +5771,38 @@ def run_completion(ctx: dict, tracker: ProgressTracker):
             from narrative_assistant.persistence.analysis import AnalysisRepository
 
             analysis_repo = AnalysisRepository(ctx["db_session"])
+            config_payload: dict[str, Any] = {"mode": ctx.get("run_mode", "full")}
+            incremental_plan = ctx.get("incremental_plan")
+            if isinstance(incremental_plan, dict):
+                planner_payload: dict[str, Any] = {}
+                if incremental_plan.get("mode") is not None:
+                    planner_payload["mode"] = str(incremental_plan.get("mode"))
+                if incremental_plan.get("reason") is not None:
+                    planner_payload["reason"] = str(incremental_plan.get("reason"))
+
+                impacted_nodes = incremental_plan.get("impacted_nodes")
+                if isinstance(impacted_nodes, (list, tuple, set)):
+                    planner_payload["impacted_nodes"] = sorted(
+                        {str(node) for node in impacted_nodes if str(node).strip()}
+                    )
+
+                changed_chapters = incremental_plan.get("changed_chapter_numbers")
+                if isinstance(changed_chapters, (list, tuple, set)):
+                    planner_payload["changed_chapter_numbers"] = sorted(
+                        {
+                            int(ch)
+                            for ch in changed_chapters
+                            if (isinstance(ch, int) and not isinstance(ch, bool))
+                            or (isinstance(ch, str) and ch.strip().lstrip("-").isdigit())
+                        }
+                    )
+
+                if planner_payload:
+                    config_payload["planner"] = planner_payload
+
             run_id = analysis_repo.create_run(
                 project_id=project_id,
-                config_json=json.dumps({"mode": ctx.get("run_mode", "full")}),
+                config_json=json.dumps(config_payload, ensure_ascii=False),
             )
             for phase_key, duration in tracker.phase_durations.items():
                 analysis_repo.save_phase(

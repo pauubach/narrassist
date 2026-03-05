@@ -1257,8 +1257,6 @@ Resultado:
 
 - P1:
   - E2E pipeline completo `PATCH settings -> run -> verificacion de artefactos/fases`.
-  - `HI-16`: Logica watchdog heavy slot (heuristica de status ambigua).
-  - `HI-17`: Timeline falla → estado degradado visible en UI.
 - P2:
   - `CR-05`: incrementalidad fina por subgrafo entidad-relacion-accion.
 
@@ -1297,8 +1295,6 @@ Resultado:
   - **Sin pendientes criticos abiertos.** Todos los P0 (T-003..T-006) y P1 priorizados (T-008..T-012) cerrados.
 - P1 restante:
   - E2E de pipeline completo.
-  - Watchdog heavy slot (HI-16).
-  - Timeline degraded state en UI (HI-17).
 - P2:
   - CR-05 arquitectonico (incrementalidad fina).
 
@@ -1306,3 +1302,33 @@ Resultado:
 
 - Documento base: version para stakeholders y seguimiento ejecutivo.
 - Documento extremo: referencia tecnica de implementacion, QA y tracking por sprints, incluyendo estado historico + meta-validacion viva.
+
+### 21.12 Actualizacion de cierre (2026-03-05)
+
+- `HI-12`: CERRADO con hardening adicional en sidecar startup:
+  - Arranque en dos fases (`liveness` y `readiness`) sin falso `running`.
+  - Limpieza de `child` stale al iniciar (si el proceso previo ya termino).
+  - Estado `warming` explicito y watchdog activo en `Ok`.
+  - Archivo: `src-tauri/src/main.rs`.
+
+- `HI-17`: CERRADO de forma completa en UX:
+  - Se mantiene banner de fase degradada para `timeline`.
+  - Se agrega accion de reintento aislado desde la propia vista (`runPartialAnalysis(['timeline'])`), sin forzar reanalisis completo.
+  - Archivo: `frontend/src/views/ProjectDetailView.vue`.
+
+- `CR-05`: MEJORA aplicada (no cierre total del objetivo arquitectonico):
+  - Se persiste contexto del planner incremental por corrida (`impacted_nodes`, `changed_chapter_numbers`, `incremental_reason`) en `analysis_progress.stats`.
+  - Se serializa el bloque `planner` en `analysis_runs.config_json` para trazabilidad de decisiones por run.
+  - Archivo: `api-server/routers/_analysis_phases.py`.
+  - Estado: **parcialmente cerrado** respecto al objetivo original de subgrafo entidad-relacion-accion completo.
+
+- `HI-16`: CERRADO con hardening adicional del watchdog heavy-slot:
+  - Si detecta run stale real, marca error en memoria y sincroniza tambien `project.analysis_status=error` en BD.
+  - No pisa estados terminales (`completed`, `error`, `cancelled`) y evita falsos positivos cuando el run stale ya fue reemplazado (match por `run_id` y `claim_ts`).
+  - Archivo: `api-server/routers/_analysis_phases.py`.
+  - Tests: `tests/unit/test_hi16_heavy_slot_watchdog.py`.
+
+- `CR-07` (robustez): mejora de mantenibilidad en orquestador principal:
+  - Se elimina dependencia de indices hardcodeados en skips de fases y skips incrementales (`start_phase/end_phase` por `phase_key`).
+  - Reduce riesgo de desalineacion futura al insertar/reordenar fases.
+  - Archivo: `api-server/routers/analysis.py`.

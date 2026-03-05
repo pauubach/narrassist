@@ -978,9 +978,8 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
     from functools import partial
 
     phase_key = "relationships"
-    phase_index = 9  # 0-indexed (10th phase)
 
-    tracker.start_phase(phase_key, phase_index, "Analizando relaciones entre personajes...")
+    tracker.start_phase(phase_key, "Analizando relaciones entre personajes...")
 
     project_id = ctx["project_id"]
     db = ctx["db_session"]
@@ -1104,7 +1103,7 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
     except Exception as e:
         logger.error(f"[Phase 10] Relationships enrichment failed: {e}", exc_info=True)
 
-    tracker.complete_phase(phase_key, phase_index)
+    tracker.complete_phase(phase_key)
 
 
 def _compute_character_network(db, project_id, entities, chapters):
@@ -1444,9 +1443,8 @@ def _compute_character_knowledge(project_id, entities, chapters, extraction_mode
 def run_voice_enrichment(ctx: dict, tracker) -> None:
     """Phase 11: Pre-compute voice-related analysis."""
     phase_key = "voice"
-    phase_index = 10
 
-    tracker.start_phase(phase_key, phase_index, "Perfilando voces de personajes...")
+    tracker.start_phase(phase_key, "Perfilando voces de personajes...")
 
     project_id = ctx["project_id"]
     db = ctx["db_session"]
@@ -1529,7 +1527,7 @@ def run_voice_enrichment(ctx: dict, tracker) -> None:
     except Exception as e:
         logger.error(f"[Phase 11] Voice enrichment failed: {e}", exc_info=True)
 
-    tracker.complete_phase(phase_key, phase_index)
+    tracker.complete_phase(phase_key)
 
 
 def _compute_voice_deviations(profiles, dialogues):
@@ -1615,9 +1613,8 @@ def _compute_focalization_violations(db, project_id, chapters, character_entitie
 def run_prose_enrichment(ctx: dict, tracker) -> None:
     """Phase 12: Pre-compute prose/style analysis."""
     phase_key = "prose"
-    phase_index = 11
 
-    tracker.start_phase(phase_key, phase_index, "Evaluando estilo de escritura...")
+    tracker.start_phase(phase_key, "Evaluando estilo de escritura...")
 
     project_id = ctx["project_id"]
     db = ctx["db_session"]
@@ -1733,7 +1730,7 @@ def run_prose_enrichment(ctx: dict, tracker) -> None:
     except Exception as e:
         logger.error(f"[Phase 12] Prose enrichment failed: {e}", exc_info=True)
 
-    tracker.complete_phase(phase_key, phase_index)
+    tracker.complete_phase(phase_key)
 
 
 def _compute_sticky_sentences(chapters):
@@ -2152,9 +2149,8 @@ def _merge_timeline(per_ent: dict[int, dict], *, chapters=None) -> dict:
 def run_health_enrichment(ctx: dict, tracker) -> None:
     """Phase 13: Pre-compute narrative health analysis."""
     phase_key = "health"
-    phase_index = 12
 
-    tracker.start_phase(phase_key, phase_index, "Evaluando salud narrativa...")
+    tracker.start_phase(phase_key, "Evaluando salud narrativa...")
 
     project_id = ctx["project_id"]
     db = ctx["db_session"]
@@ -2224,7 +2220,7 @@ def run_health_enrichment(ctx: dict, tracker) -> None:
     except Exception as e:
         logger.error(f"[Phase 13] Health enrichment failed: {e}", exc_info=True)
 
-    tracker.complete_phase(phase_key, phase_index)
+    tracker.complete_phase(phase_key)
 
 
 def _compute_narrative_templates(progress_data, chapters_dicts, total_chapters):

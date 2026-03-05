@@ -938,11 +938,11 @@ async def start_analysis(
 
                 # Tier 2: Heavy phases (exclusive — one project at a time)
 
-                def _skip_phase(phase_key, phase_index, reason):
+                def _skip_phase(phase_key, reason):
                     """Marca una fase como omitida en el tracker."""
-                    tracker.start_phase(phase_key, phase_index, reason)
+                    tracker.start_phase(phase_key, reason)
                     tracker.set_action("Omitida por modo de análisis.")
-                    tracker.end_phase(phase_key, phase_index)
+                    tracker.end_phase(phase_key)
 
                 # NER → LLM validation → Fusion → Timeline (sequential)
                 if not _acfg or _acfg.run_ner:
@@ -953,7 +953,7 @@ async def start_analysis(
                     run_llm_entity_validation(ctx, tracker)
                     logger.info(f"[TIMING] run_llm_entity_validation: {time.time() - _t0:.2f}s")
                 else:
-                    _skip_phase("ner", 3, "NER omitido (modo express).")
+                    _skip_phase("ner", "NER omitido (modo express).")
                     ctx.setdefault("entities", [])
 
                 if not _acfg or _acfg.run_entity_fusion:
@@ -961,14 +961,14 @@ async def start_analysis(
                     run_fusion(ctx, tracker)
                     logger.info(f"[TIMING] run_fusion: {time.time() - _t0:.2f}s")
                 else:
-                    _skip_phase("fusion", 4, "Fusión omitida (modo ligero).")
+                    _skip_phase("fusion", "Fusión omitida (modo ligero).")
 
                 if not _acfg or _acfg.run_temporal:
                     _t0 = time.time()
                     run_timeline(ctx, tracker)
                     logger.info(f"[TIMING] run_timeline: {time.time() - _t0:.2f}s")
                 else:
-                    _skip_phase("timeline", 5, "Timeline omitida.")
+                    _skip_phase("timeline", "Timeline omitida.")
 
                 # Grammar is independent of attributes/consistency.
                 # Run in parallel: Thread 1 = grammar → grammar_alerts
@@ -978,17 +978,17 @@ async def start_analysis(
                         run_grammar(ctx, tracker)
                         _emit_grammar_alerts(ctx, tracker)
                     else:
-                        _skip_phase("grammar", 8, "Análisis de gramática desactivado")
+                        _skip_phase("grammar", "Análisis de gramática desactivado")
 
                 def _run_attrs_consistency_pipeline():
                     if not _acfg or _acfg.run_attributes:
                         run_attributes(ctx, tracker)
                     else:
-                        _skip_phase("attributes", 6, "Atributos omitidos.")
+                        _skip_phase("attributes", "Atributos omitidos.")
                     if not _acfg or _acfg.run_consistency:
                         run_consistency(ctx, tracker)
                     else:
-                        _skip_phase("consistency", 7, "Consistencia omitida.")
+                        _skip_phase("consistency", "Consistencia omitida.")
 
                 with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
                     future_grammar = pool.submit(_run_grammar_pipeline)
@@ -1082,34 +1082,32 @@ async def start_analysis(
                 run_prose = bool(incremental_plan.get("run_prose", True))
                 run_health = bool(incremental_plan.get("run_health", True))
 
-                def _mark_incremental_skip(phase_key: str, phase_index: int, message: str) -> None:
-                    tracker.start_phase(phase_key, phase_index, message)
+                def _mark_incremental_skip(phase_key: str, message: str) -> None:
+                    tracker.start_phase(phase_key, message)
                     tracker.set_action("Planner incremental: fase omitida por bajo impacto.")
-                    tracker.end_phase(phase_key, phase_index)
+                    tracker.end_phase(phase_key)
 
                 with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
                     futures = []
                     if run_relationships:
                         futures.append(pool.submit(run_relationships_enrichment, ctx, tracker))
                     else:
-                        _mark_incremental_skip(
-                            "relationships", 10, "Relaciones omitidas (cambio acotado)."
-                        )
+                        _mark_incremental_skip("relationships", "Relaciones omitidas (cambio acotado).")
 
                     if run_voice:
                         futures.append(pool.submit(run_voice_enrichment, ctx, tracker))
                     else:
-                        _mark_incremental_skip("voice", 11, "Voz omitida (cambio acotado).")
+                        _mark_incremental_skip("voice", "Voz omitida (cambio acotado).")
 
                     if run_prose:
                         futures.append(pool.submit(run_prose_enrichment, ctx, tracker))
                     else:
-                        _mark_incremental_skip("prose", 12, "Prosa omitida por planner.")
+                        _mark_incremental_skip("prose", "Prosa omitida por planner.")
 
                     if run_health:
                         futures.append(pool.submit(run_health_enrichment, ctx, tracker))
                     else:
-                        _mark_incremental_skip("health", 13, "Salud omitida por planner.")
+                        _mark_incremental_skip("health", "Salud omitida por planner.")
 
                     for f in concurrent.futures.as_completed(futures):
                         f.result()  # Propagate exceptions
@@ -1751,3 +1749,4 @@ async def stream_analysis_progress(project_id: int):
             "X-Accel-Buffering": "no",  # Deshabilitar buffering en nginx
         },
     )
+

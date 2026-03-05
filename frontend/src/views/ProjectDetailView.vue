@@ -331,7 +331,20 @@
             <!-- HI-17: degraded timeline warning -->
             <div v-if="analysisStore.isTabDegraded(project.id, 'timeline')" class="degraded-banner">
               <i class="pi pi-exclamation-triangle"></i>
-              <span>La línea temporal se generó con datos parciales. Puedes relanzar el análisis para obtener resultados completos.</span>
+              <span class="degraded-banner__text">
+                La línea temporal se generó con datos parciales. Puedes relanzar solo esta parte para completar los resultados.
+              </span>
+              <Button
+                label="Reintentar cronología"
+                icon="pi pi-refresh"
+                size="small"
+                severity="warning"
+                text
+                class="degraded-banner__action"
+                :disabled="isAnalyzing || retryingTimeline"
+                :loading="retryingTimeline"
+                @click="retryTimelinePhase"
+              />
             </div>
             <TimelineView
               :project-id="project.id"
@@ -701,6 +714,7 @@ const analysisModeOptions = [
   { label: 'Profundo', value: 'deep', description: 'Todo incluido (requiere más recursos)' },
 ]
 const exportingStyleGuide = ref(false)
+const retryingTimeline = ref(false)
 
 // Estados de carga individuales vienen de useProjectData()
 // loadingEntities, loadingAlerts, loadingRelationships
@@ -1676,6 +1690,62 @@ const onAnalysisCompleted = async () => {
   // Timeline y Style cargan sus propios datos y limpian stale internamente
 }
 
+const retryTimelinePhase = async () => {
+  if (!project.value || retryingTimeline.value) return
+
+  if (isAnalyzing.value) {
+    toast.add({
+      severity: 'info',
+      summary: 'Análisis en curso',
+      detail: 'Espera a que termine el análisis actual para reintentar la cronología.',
+      life: 3500,
+    })
+    return
+  }
+
+  retryingTimeline.value = true
+  try {
+    const settingsSyncOk = await waitForPendingAnalysisSettingsSync(project.value.id)
+    if (!settingsSyncOk) {
+      toast.add({
+        severity: 'warn',
+        summary: 'Configuración pendiente',
+        detail: 'No se pudo confirmar la última configuración. Se usará la configuración guardada disponible.',
+        life: 4000,
+      })
+    }
+
+    const started = await analysisStore.runPartialAnalysis(project.value.id, ['timeline'], true)
+    if (started) {
+      toast.add({
+        severity: 'info',
+        summary: 'Cronología en actualización',
+        detail: 'Estamos reconstruyendo la línea temporal con los datos más recientes.',
+        life: 3500,
+      })
+    } else {
+      toast.add({
+        severity: 'warn',
+        summary: 'No se pudo iniciar',
+        detail: analysisStore.error || 'No se pudo iniciar el reanálisis de cronología. Inténtalo de nuevo.',
+        life: 4000,
+      })
+    }
+  } catch (err) {
+    const detail = err instanceof Error
+      ? err.message
+      : 'No se pudo reintentar la cronología. Si persiste, reinicia la aplicación.'
+    toast.add({
+      severity: 'error',
+      summary: 'Error al reintentar',
+      detail,
+      life: 4500,
+    })
+  } finally {
+    retryingTimeline.value = false
+  }
+}
+
 // Reload stale data when switching to tabs that depend on analysis
 watch(() => workspaceStore.activeTab, async (newTab) => {
   if (!project.value) return
@@ -1890,6 +1960,14 @@ const onReplaceDocumentSelected = async (event: Event) => {
 
 .degraded-banner i {
   color: var(--p-orange-500);
+}
+
+.degraded-banner__text {
+  flex: 1;
+}
+
+.degraded-banner__action {
+  flex-shrink: 0;
 }
 
 .project-detail-view {
