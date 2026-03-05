@@ -679,6 +679,7 @@ def _run_entity_scoped_enrichment(
     phase: int,
     entities: list,
     changed_chapter_numbers: list[int] | None,
+    affected_entity_ids: list[int] | set[int] | tuple[int, ...] | None,
     compute_one_entity,
     merge_fn,
     label: str,
@@ -696,7 +697,17 @@ def _run_entity_scoped_enrichment(
     - >50% de entidades afectadas
     """
     affected_ids: set[int] | None = None
-    if changed_chapter_numbers is not None:
+    if affected_entity_ids is not None:
+        affected_ids = {
+            int(eid)
+            for eid in affected_entity_ids
+            if (
+                (isinstance(eid, int) and not isinstance(eid, bool))
+                or (isinstance(eid, str) and eid.strip().isdigit())
+            )
+            and int(eid) > 0
+        }
+    elif changed_chapter_numbers is not None:
         affected_ids = _get_affected_entity_ids(
             db_session, project_id, changed_chapter_numbers,
         )
@@ -1030,6 +1041,7 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
         _run_entity_scoped_enrichment(
             db, project_id, "character_timeline", 10,
             character_entities, changed_ch,
+            inc_plan.get("impacted_entity_ids"),
             _compute_tl, _merge_tl,
             "character_timeline", ctx=ctx,
         )

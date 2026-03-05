@@ -5753,6 +5753,55 @@ def run_completion(ctx: dict, tracker: ProgressTracker):
                             or (isinstance(ch, str) and ch.strip().lstrip("-").isdigit())
                         }
                     )
+                impacted_chapters = incremental_plan.get("impacted_chapter_numbers")
+                if isinstance(impacted_chapters, (list, tuple, set)):
+                    storage["stats"]["impacted_chapter_numbers"] = sorted(
+                        {
+                            chapter_num
+                            for ch in impacted_chapters
+                            if (
+                                ((isinstance(ch, int) and not isinstance(ch, bool))
+                                or (isinstance(ch, str) and ch.strip().lstrip("-").isdigit()))
+                                and (chapter_num := int(ch)) >= 0
+                            )
+                        }
+                    )
+                impacted_entities = incremental_plan.get("impacted_entity_ids")
+                if isinstance(impacted_entities, (list, tuple, set)):
+                    storage["stats"]["impacted_entity_ids"] = sorted(
+                        {
+                            normalized_entity_id
+                            for entity_id in impacted_entities
+                            if (
+                                (
+                                    (isinstance(entity_id, int) and not isinstance(entity_id, bool))
+                                    or (
+                                        isinstance(entity_id, str)
+                                        and entity_id.strip().lstrip("-").isdigit()
+                                    )
+                                )
+                                and (normalized_entity_id := int(entity_id)) > 0
+                            )
+                        }
+                    )
+                seed_entities = incremental_plan.get("seed_entity_ids")
+                if isinstance(seed_entities, (list, tuple, set)):
+                    storage["stats"]["seed_entity_ids"] = sorted(
+                        {
+                            normalized_entity_id
+                            for entity_id in seed_entities
+                            if (
+                                (
+                                    (isinstance(entity_id, int) and not isinstance(entity_id, bool))
+                                    or (
+                                        isinstance(entity_id, str)
+                                        and entity_id.strip().lstrip("-").isdigit()
+                                    )
+                                )
+                                and (normalized_entity_id := int(entity_id)) > 0
+                            )
+                        }
+                    )
                 reason = incremental_plan.get("reason")
                 if reason is not None:
                     storage["stats"]["incremental_reason"] = str(reason)
@@ -5794,6 +5843,55 @@ def run_completion(ctx: dict, tracker: ProgressTracker):
                             for ch in changed_chapters
                             if (isinstance(ch, int) and not isinstance(ch, bool))
                             or (isinstance(ch, str) and ch.strip().lstrip("-").isdigit())
+                        }
+                    )
+                impacted_chapters = incremental_plan.get("impacted_chapter_numbers")
+                if isinstance(impacted_chapters, (list, tuple, set)):
+                    planner_payload["impacted_chapter_numbers"] = sorted(
+                        {
+                            chapter_num
+                            for ch in impacted_chapters
+                            if (
+                                ((isinstance(ch, int) and not isinstance(ch, bool))
+                                or (isinstance(ch, str) and ch.strip().lstrip("-").isdigit()))
+                                and (chapter_num := int(ch)) >= 0
+                            )
+                        }
+                    )
+                impacted_entities = incremental_plan.get("impacted_entity_ids")
+                if isinstance(impacted_entities, (list, tuple, set)):
+                    planner_payload["impacted_entity_ids"] = sorted(
+                        {
+                            normalized_entity_id
+                            for entity_id in impacted_entities
+                            if (
+                                (
+                                    (isinstance(entity_id, int) and not isinstance(entity_id, bool))
+                                    or (
+                                        isinstance(entity_id, str)
+                                        and entity_id.strip().lstrip("-").isdigit()
+                                    )
+                                )
+                                and (normalized_entity_id := int(entity_id)) > 0
+                            )
+                        }
+                    )
+                seed_entities = incremental_plan.get("seed_entity_ids")
+                if isinstance(seed_entities, (list, tuple, set)):
+                    planner_payload["seed_entity_ids"] = sorted(
+                        {
+                            normalized_entity_id
+                            for entity_id in seed_entities
+                            if (
+                                (
+                                    (isinstance(entity_id, int) and not isinstance(entity_id, bool))
+                                    or (
+                                        isinstance(entity_id, str)
+                                        and entity_id.strip().lstrip("-").isdigit()
+                                    )
+                                )
+                                and (normalized_entity_id := int(entity_id)) > 0
+                            )
                         }
                     )
 

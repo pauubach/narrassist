@@ -124,6 +124,51 @@ jobs:
         run: |
           npm run build
 
+  # Matriz extrema de regresión para rutas críticas de auditoría
+  extreme-matrix:
+    name: Extreme Matrix (${{ matrix.scenario }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [cr03_pipeline_e2e, cr05_subgraph_impact, tier3_adaptive_workers]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install -r api-server/requirements.txt
+
+      - name: Run scenario tests
+        run: |
+          case "${{ matrix.scenario }}" in
+            cr03_pipeline_e2e)
+              pytest tests/api/test_cr03_pipeline_e2e.py -v --tb=short -x --junitxml=junit-${{ matrix.scenario }}.xml
+              ;;
+            cr05_subgraph_impact)
+              pytest tests/unit/test_cr05_granular_incremental.py tests/unit/test_version_diff_and_planner.py -v --tb=short -x --junitxml=junit-${{ matrix.scenario }}.xml
+              ;;
+            tier3_adaptive_workers)
+              pytest tests/unit/test_analysis_tier3_workers.py tests/unit/test_hi09_enrichment_invalidation.py tests/unit/test_hi16_heavy_slot_watchdog.py -v --tb=short -x --junitxml=junit-${{ matrix.scenario }}.xml
+              ;;
+          esac
+
+      - name: Upload scenario results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: extreme-${{ matrix.scenario }}-results
+          path: junit-${{ matrix.scenario }}.xml
+
   # Tests de integración (requieren modelos NLP)
   integration-tests:
     name: Integration Tests
@@ -199,7 +244,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [unit-tests, lint, frontend-checks]
+    needs: [unit-tests, lint, frontend-checks, extreme-matrix]
     if: always()
 
     steps:
@@ -215,6 +260,10 @@ jobs:
           fi
           if [ "${{ needs.frontend-checks.result }}" == "failure" ]; then
             echo "Frontend checks failed"
+            exit 1
+          fi
+          if [ "${{ needs.extreme-matrix.result }}" == "failure" ]; then
+            echo "Extreme matrix failed"
             exit 1
           fi
           echo "All checks passed!"

@@ -305,6 +305,52 @@ class TestEntityScopedFallback:
         )
         assert use_granular is True
 
+    def test_planner_affected_entities_override_skips_derivation(self):
+        """Si planner pasa impacted_entity_ids, no debe recalcular desde capítulos."""
+        from routers._enrichment_phases import _run_entity_scoped_enrichment
+
+        entities = [SimpleNamespace(id=1), SimpleNamespace(id=2)]
+        computed: list[int] = []
+
+        def _compute(entity):
+            computed.append(entity.id)
+            return {"entity_id": entity.id, "computed": True}
+
+        def _cached(_db, _pid, _etype, entity_id):
+            if entity_id == 2:
+                return {"entity_id": 2, "computed": False}
+            return None
+
+        with patch(
+            "routers._enrichment_phases._get_affected_entity_ids",
+            side_effect=AssertionError("must not be called when planner override exists"),
+        ), patch(
+            "routers._enrichment_phases._get_cached_entity_result",
+            side_effect=_cached,
+        ), patch(
+            "routers._enrichment_phases._cache_entity_result",
+            return_value=None,
+        ), patch(
+            "routers._enrichment_phases._cache_result",
+            return_value=True,
+        ):
+            ok = _run_entity_scoped_enrichment(
+                db_session=object(),
+                project_id=1,
+                enrichment_type="character_timeline",
+                phase=10,
+                entities=entities,
+                changed_chapter_numbers=[1],
+                affected_entity_ids=[1],
+                compute_one_entity=_compute,
+                merge_fn=lambda per_ent: {"characters": list(per_ent.values())},
+                label="character_timeline",
+                ctx={},
+            )
+
+        assert ok is True
+        assert computed == [1]
+
 
 class TestAffectedEntityClosure:
     """Verifica expansión por vecinos (relaciones/interacciones)."""

@@ -1255,10 +1255,12 @@ Resultado:
 
 ### 21.6 Pendientes reales (no bloqueantes)
 
-- P1:
-  - E2E pipeline completo `PATCH settings -> run -> verificacion de artefactos/fases`.
-- P2:
-  - `CR-05`: incrementalidad fina por subgrafo entidad-relacion-accion.
+- No quedan pendientes abiertos de esta auditoria.
+- Cierres aplicados en esta iteracion:
+  - E2E pipeline completo `PATCH settings -> run -> verificacion de fase ejecutada/omitida` (CR-03).
+  - `CR-05` completo: subgrafo entidad-relacion-accion consumido en ejecucion incremental y persistido en trazas.
+  - `T-014`: concurrencia adaptativa Tier-3 segun CPU/RAM/presion de cola.
+  - `T-015`: matriz extrema automatizada en CI para escenarios criticos.
 
 ### 21.7 Estado de pruebas (revalidado)
 
@@ -1293,10 +1295,9 @@ Resultado:
 
 - P0 inmediato:
   - **Sin pendientes criticos abiertos.** Todos los P0 (T-003..T-006) y P1 priorizados (T-008..T-012) cerrados.
-- P1 restante:
-  - E2E de pipeline completo.
-- P2:
-  - CR-05 arquitectonico (incrementalidad fina).
+- P1/P2 restante:
+  - **Sin backlog obligatorio** derivado de esta auditoria.
+  - Mantener vigilancia de rendimiento con la nueva matriz extrema en CI.
 
 ### 21.11 Recomendacion de uso de documentos
 
@@ -1316,11 +1317,12 @@ Resultado:
   - Se agrega accion de reintento aislado desde la propia vista (`runPartialAnalysis(['timeline'])`), sin forzar reanalisis completo.
   - Archivo: `frontend/src/views/ProjectDetailView.vue`.
 
-- `CR-05`: MEJORA aplicada (no cierre total del objetivo arquitectonico):
-  - Se persiste contexto del planner incremental por corrida (`impacted_nodes`, `changed_chapter_numbers`, `incremental_reason`) en `analysis_progress.stats`.
-  - Se serializa el bloque `planner` en `analysis_runs.config_json` para trazabilidad de decisiones por run.
-  - Archivo: `api-server/routers/_analysis_phases.py`.
-  - Estado: **parcialmente cerrado** respecto al objetivo original de subgrafo entidad-relacion-accion completo.
+- `CR-05`: CERRADO (subgrafo entidad-relacion-accion):
+  - Planner incremental deriva y emite `seed_entity_ids`, `impacted_entity_ids`, `impacted_chapter_numbers`.
+  - Enrichment granular consume `impacted_entity_ids` como override explicito (sin recalcular solo por capitulo cuando ya hay subgrafo).
+  - Trazabilidad ampliada en `analysis_progress.stats` y `analysis_runs.config_json` con nodos/chapitulos/entidades impactadas.
+  - Archivos: `api-server/routers/_incremental_planner.py`, `api-server/routers/_enrichment_phases.py`, `api-server/routers/_analysis_phases.py`.
+  - Tests: `tests/unit/test_version_diff_and_planner.py`, `tests/unit/test_cr05_granular_incremental.py`.
 
 - `HI-16`: CERRADO con hardening adicional del watchdog heavy-slot:
   - Si detecta run stale real, marca error en memoria y sincroniza tambien `project.analysis_status=error` en BD.
@@ -1332,3 +1334,14 @@ Resultado:
   - Se elimina dependencia de indices hardcodeados en skips de fases y skips incrementales (`start_phase/end_phase` por `phase_key`).
   - Reduce riesgo de desalineacion futura al insertar/reordenar fases.
   - Archivo: `api-server/routers/analysis.py`.
+
+- `T-014`: CERRADO (paralelismo adaptativo Tier-3):
+  - Se reemplaza `max_workers=4` fijo por seleccion dinamica basada en CPU, RAM disponible y presion de cola.
+  - Evita saturacion en hardware modesto y mantiene throughput en equipos potentes.
+  - Archivo: `api-server/routers/analysis.py`.
+  - Tests: `tests/unit/test_analysis_tier3_workers.py`.
+
+- `T-015`: CERRADO (matriz extrema automatizada):
+  - Nuevo job `extreme-matrix` en CI con escenarios dedicados para CR-03 pipeline E2E, CR-05 subgrafo y T-014 adaptive workers.
+  - `test-summary` ahora falla si la matriz extrema falla.
+  - Archivo: `.github/workflows/ci.yml`.

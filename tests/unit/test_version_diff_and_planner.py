@@ -273,6 +273,96 @@ def test_incremental_plan_derives_stale_invalidations_from_cache(tmp_path):
     assert plan["run_voice"] is True
 
 
+def test_incremental_plan_emits_entity_subgraph_context(tmp_path):
+    db = Database(db_path=tmp_path / "plan_subgraph.db")
+    _insert_project(db)
+
+    with db.connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO chapters (id, project_id, chapter_number, title, content, start_char, end_char)
+            VALUES (10, 1, 1, 'Cap 1', 'Texto 1', 0, 7)
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO chapters (id, project_id, chapter_number, title, content, start_char, end_char)
+            VALUES (11, 1, 2, 'Cap 2', 'Texto 2', 8, 15)
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO entities (id, project_id, entity_type, canonical_name, mention_count, is_active)
+            VALUES (1, 1, 'character', 'Ana', 3, 1)
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO entities (id, project_id, entity_type, canonical_name, mention_count, is_active)
+            VALUES (2, 1, 'character', 'Beto', 2, 1)
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO entities (id, project_id, entity_type, canonical_name, mention_count, is_active)
+            VALUES (3, 1, 'character', 'Clara', 1, 1)
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO entity_mentions (entity_id, chapter_id, surface_form, start_char, end_char, source)
+            VALUES (1, 10, 'Ana', 0, 3, 'ner')
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO entity_mentions (entity_id, chapter_id, surface_form, start_char, end_char, source)
+            VALUES (2, 11, 'Beto', 0, 4, 'ner')
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO relationships (project_id, entity1_id, entity2_id, relation_type)
+            VALUES (1, 1, 2, 'ally')
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO narrative_events (project_id, chapter, event_type, tier, description, entity_ids)
+            VALUES (1, 1, 'ENCOUNTER', 2, 'Escena de prueba', '[1, 3]')
+            """
+        )
+
+    chapter_diff = ChapterDiffMetrics(
+        total_previous=10,
+        total_current=10,
+        modified=1,
+        added=0,
+        removed=0,
+        changed_ratio=0.05,
+        modified_chapters=frozenset({1}),
+    )
+
+    plan = build_incremental_plan(
+        db=db,
+        project_id=1,
+        snapshot_id=None,
+        chapters_data=[],
+        chapter_metrics=chapter_diff,
+        entity_changes={"has_ner_delta": True, "has_attribute_delta": False},
+        invalidations={},
+    )
+
+    assert plan["mode"] == "incremental"
+    assert plan["reason"] == "entity_subgraph_impact"
+    assert set(plan["seed_entity_ids"]) == {1, 3}
+    assert set(plan["impacted_entity_ids"]) == {1, 2, 3}
+    assert 1 in plan["impacted_chapter_numbers"]
+    assert 2 in plan["impacted_chapter_numbers"]
+    assert plan["run_relationships"] is True
+    assert plan["run_voice"] is True
+
+
 def test_projects_router_exposes_version_diff_endpoints():
     paths = [r.path for r in projects_router.routes]
     assert "/api/projects/{project_id}/versions/summary" in paths

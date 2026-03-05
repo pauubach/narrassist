@@ -2,6 +2,7 @@
 Router: analysis
 """
 
+import os
 from typing import Optional
 
 import deps
@@ -177,6 +178,130 @@ def _get_calibrated_weights(project_id: int, db_session: object) -> dict[str, fl
     except Exception as e:
         logger.debug(f"[Calibration] fallback to defaults: {e}")
         return dict(PHASE_WEIGHTS)
+
+
+def _get_available_memory_gb() -> float | None:
+    """Best-effort: memoria RAM disponible en GB."""
+    try:
+        import psutil  # type: ignore
+
+        return float(psutil.virtual_memory().available) / (1024**3)
+    except Exception:
+        return None
+
+
+def _estimate_tier3_pressure() -> tuple[int, int]:
+    """Retorna (queue_depth, active_tier3_runs) para ajustar paralelismo Tier-3."""
+    tier3_keys = {"relationships", "voice", "prose", "health"}
+    queue_depth = 0
+    active_tier3 = 0
+
+    with deps._progress_lock:
+        queue_depth = len(deps._heavy_analysis_queue)
+        for storage in deps.analysis_progress_storage.values():
+            if str(storage.get("status", "")).strip().lower() != "running":
+                continue
+
+            current_phase_id = None
+            phases = storage.get("phases")
+            if isinstance(phases, list):
+                for phase in phases:
+                    if isinstance(phase, dict) and phase.get("current"):
+                        current_phase_id = str(phase.get("id", "")).strip().lower()
+                        break
+
+            if current_phase_id in tier3_keys:
+                active_tier3 += 1
+                continue
+
+            # Fallback legacy: inferir por label cuando no hay id actual.
+            current_phase_label = str(storage.get("current_phase", "")).strip().lower()
+            if any(
+                token in current_phase_label
+                for token in (
+                    "relationships",
+                    "voice",
+                    "prose",
+                    "health",
+                    "relaciones",
+                    "voces",
+                    "salud narrativa",
+                )
+            ):
+                active_tier3 += 1
+
+    return queue_depth, active_tier3
+
+
+def _select_tier3_worker_count(
+    *,
+    run_relationships: bool,
+    run_voice: bool,
+    run_prose: bool,
+    run_health: bool,
+    cpu_count_override: int | None = None,
+    available_memory_gb_override: float | None = None,
+    queue_depth_override: int | None = None,
+    active_tier3_override: int | None = None,
+) -> int:
+    """Selecciona workers Tier-3 de forma adaptativa para evitar sobrecarga."""
+    enabled_phases = sum((run_relationships, run_voice, run_prose, run_health))
+    if enabled_phases <= 1:
+        return max(1, enabled_phases)
+
+    cpu_count = int(cpu_count_override or os.cpu_count() or 1)
+    if cpu_count <= 2:
+        cpu_cap = 1
+    elif cpu_count <= 4:
+        cpu_cap = 2
+    elif cpu_count <= 8:
+        cpu_cap = 3
+    else:
+        cpu_cap = 4
+
+    available_memory_gb = (
+        available_memory_gb_override
+        if available_memory_gb_override is not None
+        else _get_available_memory_gb()
+    )
+    memory_cap = 4
+    if available_memory_gb is not None:
+        if available_memory_gb < 2.0:
+            memory_cap = 1
+        elif available_memory_gb < 4.0:
+            memory_cap = 2
+        elif available_memory_gb < 8.0:
+            memory_cap = 3
+
+    if queue_depth_override is None or active_tier3_override is None:
+        queue_depth, active_tier3 = _estimate_tier3_pressure()
+    else:
+        queue_depth = max(0, int(queue_depth_override))
+        active_tier3 = max(0, int(active_tier3_override))
+
+    pressure_penalty = 0
+    if queue_depth > 0:
+        pressure_penalty += 1
+    if active_tier3 >= 1:
+        pressure_penalty += 1
+    if active_tier3 >= 3:
+        pressure_penalty += 1
+
+    workers = min(enabled_phases, cpu_cap, memory_cap, 4)
+    workers = max(1, workers - pressure_penalty)
+
+    # Evitar infra-utilización en máquinas potentes sin presión.
+    if (
+        workers == 1
+        and enabled_phases >= 2
+        and cpu_count >= 6
+        and (available_memory_gb is None or available_memory_gb >= 8.0)
+        and queue_depth == 0
+        and active_tier3 == 0
+    ):
+        workers = 2
+
+    return workers
 
 
 def _is_analysis_stuck(project_id: int) -> bool:
@@ -1087,7 +1212,34 @@ async def start_analysis(
                     tracker.set_action("Planner incremental: fase omitida por bajo impacto.")
                     tracker.end_phase(phase_key)
 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+                queue_depth, active_tier3 = _estimate_tier3_pressure()
+                available_memory_gb = _get_available_memory_gb()
+                tier3_workers = _select_tier3_worker_count(
+                    run_relationships=run_relationships,
+                    run_voice=run_voice,
+                    run_prose=run_prose,
+                    run_health=run_health,
+                    available_memory_gb_override=available_memory_gb,
+                    queue_depth_override=queue_depth,
+                    active_tier3_override=active_tier3,
+                )
+                logger.info(
+                    "[TIER3_POOL] project=%s workers=%s enabled=%s queue_depth=%s active_tier3=%s cpu=%s mem_gb=%s",
+                    project_id,
+                    tier3_workers,
+                    {
+                        "relationships": run_relationships,
+                        "voice": run_voice,
+                        "prose": run_prose,
+                        "health": run_health,
+                    },
+                    queue_depth,
+                    active_tier3,
+                    os.cpu_count() or 1,
+                    round(available_memory_gb, 2) if available_memory_gb is not None else "n/a",
+                )
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=tier3_workers) as pool:
                     futures = []
                     if run_relationships:
                         futures.append(pool.submit(run_relationships_enrichment, ctx, tracker))
