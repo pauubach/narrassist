@@ -538,7 +538,7 @@
               <div v-if="ltState === 'running'" class="ollama-ready-bar" style="margin-bottom: 0.75rem;">
                 <div class="ollama-ready-info">
                   <i class="pi pi-check-circle"></i>
-                  <span>Corrector avanzado activo (LanguageTool · +2000 reglas)</span>
+                  <span>Corrector avanzado activo (+2000 reglas)</span>
                 </div>
               </div>
               <div v-else class="ollama-action-card" :class="'ollama-state-' + (ltState === 'not_installed' ? 'not_installed' : ltState === 'installing' ? 'no_models' : 'not_running')" style="margin-bottom: 0.75rem;">
@@ -906,8 +906,8 @@
 
             <div class="setting-item">
               <div class="setting-info">
-                <label class="setting-label">Modelos NLP</label>
-                <p class="setting-description">Verificar y descargar modelos de análisis (spaCy, embeddings, NER)</p>
+                <label class="setting-label">Modelos de analisis del texto</label>
+                <p class="setting-description">Verificar y preparar los recursos de analisis necesarios</p>
               </div>
               <div class="setting-control">
                 <Button
@@ -1364,9 +1364,9 @@ async function redownloadNLPModels() {
   try {
     const ok = await systemStore.downloadModels(['spacy', 'embeddings', 'transformer_ner'])
     if (ok) {
-      toast.add({ severity: 'success', summary: 'Modelos verificados', detail: 'Todos los modelos NLP están disponibles.', life: 3000 })
+      toast.add({ severity: 'success', summary: 'Recursos verificados', detail: 'Los recursos de analisis estan disponibles.', life: 3000 })
     } else {
-      toast.add({ severity: 'error', summary: 'Error', detail: systemStore.modelsError || 'Error descargando modelos.', life: 5000 })
+      toast.add({ severity: 'error', summary: 'No se pudo completar', detail: systemStore.modelsError || 'No se pudieron preparar los recursos. El sistema puede seguir ocupado; espera unos segundos y reintenta.', life: 6000 })
     }
   } finally {
     nlpDownloading.value = false

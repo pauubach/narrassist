@@ -539,8 +539,8 @@ Lo positivo:
 
 Lo pendiente:
 
-- Reducir silencios (`except: pass` / catches vacios) en rutas criticas de instalacion/arranque.
-- Exponer al usuario causas y accion sugerida de forma no tecnica.
+- Actualizado 2026-03-05: los hallazgos criticos y prioritarios de esta auditoria fueron cerrados en la rama de trabajo.
+- Se mantiene como recomendacion de calidad seguir reduciendo silencios residuales y mantener mensajes accionables/no tecnicos en nuevas rutas.
 
 ## 8. Casos de test extremos recomendados (no implementados)
 
@@ -590,3 +590,15 @@ La aplicacion tiene una base solida para deteccion de capacidades, fallback y pr
 
 La mayor brecha no es de ausencia total de arquitectura incremental, sino de granularidad efectiva y de cierre de ramas silenciosas en setup/arranque/reintentos.
 
+## 11. Actualizacion de conformidad (2026-03-05)
+
+Estado actual consolidado:
+
+- CR-01, CR-02, CR-03: CERRADOS.
+- CR-07, CR-08: CERRADOS.
+- CR-05 (incrementalidad fina): CERRADO con subgrafo entidad-relacion-accion en planner y consumo en enrichment.
+- T-014 (concurrencia adaptativa Tier-3): CERRADO.
+- T-015 (matriz extrema automatizada CI): CERRADO.
+
+Por tanto, para el alcance de esta auditoria no quedan pendientes tecnicos abiertos.
+Las secciones de pruebas extremas siguen siendo recomendaciones para endurecimiento continuo, no deuda bloqueante.

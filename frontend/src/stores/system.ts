@@ -155,6 +155,9 @@ export const useSystemStore = defineStore('system', () => {
   // HI-03: LLM download visibility
   const isLlmDownloading = computed(() => llmDownloadingModels.value.length > 0)
   let llmHeartbeatTimer: ReturnType<typeof setInterval> | null = null
+  let llmHeartbeatWarned = false
+  let backendHealthWarned = false
+  let modelProgressPollErrorCount = 0
 
   function startLlmHeartbeat() {
     if (llmHeartbeatTimer) return
@@ -166,8 +169,14 @@ export const useSystemStore = defineStore('system', () => {
           llmDownloadingModels.value = []
           stopLlmHeartbeat()
         }
-      } catch {
-        // heartbeat is best-effort
+        llmHeartbeatWarned = false
+      } catch (error) {
+        if (!llmHeartbeatWarned) {
+          const msg = error instanceof Error ? error.message : String(error)
+          console.warn('[autoConfig] No se pudo comprobar el estado de los motores en segundo plano:', msg)
+          autoConfigErrors.value.push(`LLM heartbeat: ${msg}`)
+          llmHeartbeatWarned = true
+        }
       }
     }, 10000)
   }
@@ -222,6 +231,7 @@ export const useSystemStore = defineStore('system', () => {
         const data = await response.json()
         backendConnected.value = data.status === 'ok'
         backendVersion.value = data.version || 'unknown'
+        backendHealthWarned = false
         if (!backendReady.value) {
           backendReady.value = true
           backendStarting.value = false
@@ -230,8 +240,13 @@ export const useSystemStore = defineStore('system', () => {
       } else {
         backendConnected.value = false
       }
-    } catch (_error) {
+    } catch (error) {
       backendConnected.value = false
+      if (!backendHealthWarned) {
+        const msg = error instanceof Error ? error.message : String(error)
+        console.warn('[system] Health check no disponible, reintentando:', msg)
+        backendHealthWarned = true
+      }
     }
   }
 
@@ -248,6 +263,7 @@ export const useSystemStore = defineStore('system', () => {
     backendStartupError.value = null
     const startTime = Date.now()
     let delay = 500 // empezar con 500ms, incrementar hasta 2s
+    let warned = false
 
     while (Date.now() - startTime < timeoutMs) {
       try {
@@ -258,10 +274,16 @@ export const useSystemStore = defineStore('system', () => {
           backendVersion.value = data.version || 'unknown'
           backendReady.value = true
           backendStarting.value = false
+          warned = false
           return true
         }
-      } catch {
+      } catch (error) {
         // Backend no disponible todavia, reintentar
+        if (!warned) {
+          const msg = error instanceof Error ? error.message : String(error)
+          console.warn('[system] Esperando a que el motor de analisis responda:', msg)
+          warned = true
+        }
       }
       await new Promise(resolve => setTimeout(resolve, delay))
       delay = Math.min(delay + 250, 2000) // incrementar hasta 2s max
@@ -317,7 +339,21 @@ export const useSystemStore = defineStore('system', () => {
         model_sizes: Record<string, number>
       }>('/api/models/download/progress')
 
+      if (!response) {
+        modelProgressPollErrorCount += 1
+        if (modelProgressPollErrorCount === 1) {
+          console.warn('[models] El progreso de descarga no respondio, reintentando...')
+        }
+        if (modelProgressPollErrorCount >= 8) {
+          modelsError.value = 'No pudimos actualizar el progreso de la descarga. El sistema puede seguir ocupado; espera unos segundos y reintenta.'
+          stopPolling()
+          modelsDownloading.value = false
+        }
+        return
+      }
+
       if (response) {
+        modelProgressPollErrorCount = 0
         downloadProgress.value = response.active_downloads || {}
         if (response.model_sizes) {
           modelSizes.value = response.model_sizes
@@ -354,8 +390,17 @@ export const useSystemStore = defineStore('system', () => {
           }
         }
       }
-    } catch {
-      // Ignore errors in progress polling
+    } catch (error) {
+      modelProgressPollErrorCount += 1
+      if (modelProgressPollErrorCount === 1) {
+        const msg = error instanceof Error ? error.message : String(error)
+        console.warn('[models] No se pudo consultar el progreso de descarga:', msg)
+      }
+      if (modelProgressPollErrorCount >= 8) {
+        modelsError.value = 'No pudimos actualizar el progreso de la descarga. El sistema puede seguir ocupado; espera unos segundos y reintenta.'
+        stopPolling()
+        modelsDownloading.value = false
+      }
     }
   }
 
@@ -389,6 +434,7 @@ export const useSystemStore = defineStore('system', () => {
       clearInterval(progressPollInterval)
       progressPollInterval = null
     }
+    modelProgressPollErrorCount = 0
     downloadProgress.value = {}
   }
 
@@ -516,6 +562,9 @@ export const useSystemStore = defineStore('system', () => {
               return
             }
           } catch {
+            if (pollCount === 1) {
+              console.warn('[languagetool] Error temporal comprobando instalacion, reintentando...')
+            }
             // Show connection issue to user via progress UI
             if (pollCount > 5 && !ltInstallProgress.value) {
               ltInstallProgress.value = {
@@ -533,7 +582,16 @@ export const useSystemStore = defineStore('system', () => {
           }
         }, 1000)
       })
-    } catch {
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      console.warn('[languagetool] Error iniciando instalacion:', msg)
+      ltInstallProgress.value = {
+        phase: 'error',
+        phase_label: 'Error',
+        percentage: 0,
+        detail: 'No se pudo iniciar la instalacion del corrector avanzado. El sistema puede seguir ocupado; espera unos segundos y vuelve a intentarlo.',
+        error: 'install_start_failed',
+      }
       ltInstalling.value = false
       return false
     }
@@ -551,7 +609,9 @@ export const useSystemStore = defineStore('system', () => {
       await refreshCapabilities()
       // Verificar que realmente esté corriendo
       return systemCapabilities.value?.languagetool?.running ?? false
-    } catch {
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      console.warn('[languagetool] No se pudo iniciar el corrector avanzado:', msg)
       return false
     } finally {
       ltStarting.value = false

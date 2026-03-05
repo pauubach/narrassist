@@ -258,7 +258,9 @@ async function startLLMDownloadIfNeeded() {
     llmCurrentModel.value = null
     const allOk = llmModelsDownloaded.value.length === readiness.missing_models.length
     finishSetup(allOk)
-  } catch {
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.warn('[setup] No se pudieron completar los motores avanzados:', msg)
     // LLM download es best-effort — no bloquear
     finishSetup(false)
   }
@@ -480,7 +482,7 @@ async function recheckPython() {
           <h3>No se pudo iniciar</h3>
           <p class="error-message">{{ systemStore.backendStartupError || 'El motor de análisis no se inició a tiempo.' }}</p>
           <p class="error-hint">
-            Intenta cerrar y volver a abrir la aplicación. Si el problema persiste, verifica que no haya otra instancia ejecutándose.
+            El sistema puede seguir ocupado unos segundos. Espera un momento y reintenta. Si persiste, cierra y vuelve a abrir la aplicación.
           </p>
           <button class="retry-button" @click="retryStartup">
             <i class="pi pi-refresh"></i>
@@ -504,7 +506,7 @@ async function recheckPython() {
             <i class="pi pi-cog pi-spin download-icon"></i>
             <div>
               <h3>Instalando componentes</h3>
-              <p class="subtitle">Configurando dependencias de Python</p>
+              <p class="subtitle">Preparando componentes internos del analizador</p>
             </div>
           </div>
 
@@ -680,7 +682,7 @@ async function recheckPython() {
           <h3>Error en la descarga</h3>
           <p class="error-message">{{ systemStore.modelsError }}</p>
           <p class="error-hint">
-            Verifica tu conexión a internet e intenta de nuevo.
+            El sistema puede seguir ocupado unos segundos. Si tras reintentar vuelve a fallar, contacta con soporte.
           </p>
           <button class="retry-button" @click="retryDownload">
             <i class="pi pi-refresh"></i>

@@ -439,6 +439,39 @@ describe('systemStore', () => {
       expect(result).toBe(false)
       expect(store.modelsError).toBe('Download failed')
     })
+
+    it('should surface actionable error when progress polling keeps failing', async () => {
+      mockApi.post.mockResolvedValueOnce({})
+      mockApi.tryGet.mockResolvedValue(null)
+      mockApi.get.mockResolvedValue({
+        nlp_models: {},
+        ollama: { installed: false, models: [] },
+        all_required_installed: false,
+      })
+
+      const store = useSystemStore()
+      const result = await store.downloadModels(['spacy'])
+      expect(result).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(4500)
+
+      expect(store.modelsError).toContain('No pudimos actualizar el progreso de la descarga')
+      store.stopPolling()
+    })
+  })
+
+  describe('installLanguageTool', () => {
+    it('should expose actionable error if install startup fails', async () => {
+      mockApi.postRaw.mockRejectedValueOnce(new Error('Install start failed'))
+
+      const store = useSystemStore()
+      const result = await store.installLanguageTool()
+
+      expect(result).toBe(false)
+      expect(store.ltInstalling).toBe(false)
+      expect(store.ltInstallProgress?.error).toBe('install_start_failed')
+      expect(store.ltInstallProgress?.detail).toContain('El sistema puede seguir ocupado')
+    })
   })
 
   // ── stopPolling ────────────────────────────────────────
