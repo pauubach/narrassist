@@ -854,7 +854,7 @@ def get_analysis_status(project_id: int):
 @router.patch("/api/projects/{project_id}/settings", response_model=ApiResponse)
 def update_project_settings(
     project_id: int,
-    settings: dict = Body(...)
+    settings: dict = Body(...),  # noqa: B008
 ):
     """
     Actualiza configuración de análisis del proyecto (CR-03).

@@ -1,9 +1,9 @@
 """Tests para HI-09: enrichment invalidation granular."""
 
 import sqlite3
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-import sys
 
 import pytest
 

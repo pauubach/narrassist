@@ -65,9 +65,9 @@ def _run_nlp_download_jobs(jobs: list[_NlpDownloadJob], manager, force_download:
     su token para que actualizaciones tardias queden ignoradas.
     """
     from narrative_assistant.core.model_manager import (
+        _update_download_progress,
         bind_download_progress_session,
         rotate_download_progress_session,
-        _update_download_progress,
     )
 
     deadline_at = time.monotonic() + NLP_DOWNLOAD_DEADLINE_S
@@ -735,9 +735,9 @@ def download_models(request: DownloadModelsRequest):
         from narrative_assistant.core.model_manager import (
             KNOWN_MODELS,
             ModelType,
+            _update_download_progress,
             begin_download_progress_session,
             get_model_manager,
-            _update_download_progress,
         )
 
         manager = get_model_manager()

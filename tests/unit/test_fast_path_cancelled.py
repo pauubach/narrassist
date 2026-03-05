@@ -14,7 +14,6 @@ from routers.analysis import (  # noqa: E402
     _should_use_fast_path,
 )
 
-
 FP = "abc123def456"  # fingerprint de ejemplo
 
 

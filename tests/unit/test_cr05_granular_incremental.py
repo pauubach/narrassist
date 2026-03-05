@@ -9,10 +9,10 @@ _api_server = str(Path(__file__).resolve().parents[2] / "api-server")
 if _api_server not in sys.path:
     sys.path.insert(0, _api_server)
 
-from narrative_assistant.persistence.database import Database  # noqa: E402
-from narrative_assistant.persistence.version_diff import ChapterDiffMetrics  # noqa: E402
 from routers._incremental_planner import build_phase_plan  # noqa: E402
 
+from narrative_assistant.persistence.database import Database  # noqa: E402
+from narrative_assistant.persistence.version_diff import ChapterDiffMetrics  # noqa: E402
 
 # ============================================================================
 # Capa 1: ChapterDiffMetrics con IDs específicos + planner passthrough

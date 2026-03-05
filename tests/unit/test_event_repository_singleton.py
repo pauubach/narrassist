@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import narrative_assistant.persistence.event_repository as event_repo_module
 from narrative_assistant.persistence.event_repository import (
     EventRepository,
     get_event_repository,
 )
-import narrative_assistant.persistence.event_repository as event_repo_module
 
 
 class _DbWithPath:

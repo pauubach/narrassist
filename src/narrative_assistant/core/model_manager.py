@@ -17,15 +17,15 @@ Uso:
     embeddings_path = manager.ensure_model("embeddings")
 """
 
+import contextvars
 import hashlib
 import logging
 import os
 import shutil
 import socket
 import threading
-from contextlib import contextmanager
-import contextvars
 from collections.abc import Callable
+from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
 from itertools import count

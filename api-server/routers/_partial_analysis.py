@@ -738,6 +738,7 @@ def run_partial_analysis_thread(
             # Persistir run ledger parcial
             try:
                 import json
+
                 from narrative_assistant.persistence.analysis import AnalysisRepository
 
                 analysis_repo = AnalysisRepository(db_session)

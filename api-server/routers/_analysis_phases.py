@@ -2894,9 +2894,13 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                 CorefConfig,
                 CoreferenceChain,
                 CorefMethod,
-                Mention as CorefMention,
-                MentionType as CorefMentionType,
                 resolve_coreferences_voting,
+            )
+            from narrative_assistant.nlp.coreference_resolver import (
+                Mention as CorefMention,
+            )
+            from narrative_assistant.nlp.coreference_resolver import (
+                MentionType as CorefMentionType,
             )
 
             coref_method_map = {
@@ -3582,9 +3586,9 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
     """
     from narrative_assistant.persistence.timeline import TimelineRepository
     from narrative_assistant.temporal import (
+        TemporalConsistencyChecker,
         TemporalDetectionConfig,
         TemporalDetectionMethod,
-        TemporalConsistencyChecker,
         TemporalMarkerExtractor,
         TimelineBuilder,
         VotingTemporalChecker,
@@ -4829,8 +4833,8 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
         if not run_spelling_checks:
             raise _SkipSpellingChecks()
 
-        from narrative_assistant.corrections.base import CorrectionIssue
         from narrative_assistant.corrections import CorrectionConfig
+        from narrative_assistant.corrections.base import CorrectionIssue
         from narrative_assistant.corrections.orchestrator import CorrectionOrchestrator
         from narrative_assistant.nlp.orthography.voting_checker import VotingSpellingChecker
 
@@ -5176,7 +5180,8 @@ def _emit_grammar_alerts(ctx: dict, tracker: ProgressTracker):
                 logger.warning(f"Error creating correction alert: {e}")
 
     # No marcar fase aquí: run_alerts() gestiona el ciclo de la fase "alerts"
-    tracker.update_storage( metrics_update={"alerts_generated": alerts_created})
+    if tracker is not None:
+        tracker.update_storage(metrics_update={"alerts_generated": alerts_created})
     logger.info(f"Grammar alerts emitted: {alerts_created} alerts")
 
     ctx.setdefault("alerts_created", 0)

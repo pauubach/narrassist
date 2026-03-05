@@ -2,12 +2,12 @@
 
 from narrative_assistant.core.model_manager import (
     ModelType,
+    _clear_download_progress,
+    _update_download_progress,
     begin_download_progress_session,
     bind_download_progress_session,
     get_download_progress,
     rotate_download_progress_session,
-    _clear_download_progress,
-    _update_download_progress,
 )
 
 
