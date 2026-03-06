@@ -354,6 +354,7 @@ async fn backend_watchdog(app_handle: AppHandle) {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(BackendServer::new())
         .invoke_handler(tauri::generate_handler![
             start_backend_server,

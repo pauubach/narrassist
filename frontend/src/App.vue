@@ -60,11 +60,13 @@
 import { RouterView, useRouter, useRoute } from 'vue-router'
 import { onMounted, onBeforeUnmount, onErrorCaptured, ref, computed } from 'vue'
 import Toast from 'primevue/toast'
+import { useToast } from 'primevue/usetoast'
 import { backendDown, recoveryAttempts } from '@/services/apiClient'
 import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useNativeMenu } from './composables/useNativeMenu'
+import { useProjectFile } from './composables/useProjectFile'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useAnalysisStore } from '@/stores/analysis'
 import KeyboardShortcutsDialog from '@/components/KeyboardShortcutsDialog.vue'
@@ -79,6 +81,7 @@ import TierComparisonDialog from '@/components/license/TierComparisonDialog.vue'
 import { useSystemStore } from '@/stores/system'
 const router = useRouter()
 const route = useRoute()
+const toast = useToast()
 const appStore = useAppStore()
 const systemStore = useSystemStore()
 const themeStore = useThemeStore()
@@ -126,6 +129,9 @@ const hasMenuBar = computed(() => !isTauri.value)
 // Activar atajos de teclado globales
 useKeyboardShortcuts()
 
+// Guardar/Abrir proyecto .nra
+const { saveProject, openProjectFile } = useProjectFile()
+
 // Activar manejo de menú nativo de Tauri
 useNativeMenu({
   onNewProject: () => {
@@ -138,6 +144,38 @@ useNativeMenu({
   onOpenProject: () => {
     console.log('[Menu] Open project requested')
     router.push('/projects')
+  },
+  onSaveProject: async () => {
+    const projectId = Number(route.params.id)
+    if (!projectId) {
+      console.warn('[Menu] Save project ignored: no project view active')
+      return
+    }
+    try {
+      const ok = await saveProject(projectId, `proyecto_${projectId}`)
+      if (ok) {
+        toast.add({ severity: 'success', summary: 'Guardado', detail: 'Proyecto guardado correctamente', life: 3000 })
+      }
+    } catch (err) {
+      console.error('[Menu] Save project error:', err)
+      toast.add({ severity: 'error', summary: 'Error', detail: `Error al guardar: ${err}`, life: 5000 })
+    }
+  },
+  onOpenFile: async () => {
+    try {
+      const result = await openProjectFile()
+      if (result) {
+        toast.add({ severity: 'success', summary: 'Abierto', detail: `Proyecto "${result.projectName}" abierto`, life: 3000 })
+        // Mostrar warnings de importación (ej: schema version, datos parciales)
+        for (const warning of result.warnings) {
+          toast.add({ severity: 'warn', summary: 'Aviso', detail: warning, life: 8000 })
+        }
+        router.push({ name: 'project', params: { id: result.projectId } })
+      }
+    } catch (err) {
+      console.error('[Menu] Open file error:', err)
+      toast.add({ severity: 'error', summary: 'Error', detail: `Error al abrir: ${err}`, life: 5000 })
+    }
   },
   onSettings: () => { router.push('/settings') },
   onCloseProject: () => {

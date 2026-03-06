@@ -18,6 +18,8 @@ use tauri::{
 pub mod file_menu {
     pub const NEW_PROJECT: &str = "new_project";
     pub const OPEN_PROJECT: &str = "open_project";
+    pub const SAVE_PROJECT: &str = "save_project";
+    pub const OPEN_FILE: &str = "open_file";
     pub const CLOSE_PROJECT: &str = "close_project";
     pub const IMPORT: &str = "import";
     pub const UPDATE_MANUSCRIPT: &str = "update_manuscript";
@@ -61,6 +63,8 @@ pub mod help_menu {
 const ALL_MENU_IDS: &[&str] = &[
     file_menu::NEW_PROJECT,
     file_menu::OPEN_PROJECT,
+    file_menu::SAVE_PROJECT,
+    file_menu::OPEN_FILE,
     file_menu::CLOSE_PROJECT,
     file_menu::IMPORT,
     file_menu::UPDATE_MANUSCRIPT,
@@ -103,6 +107,20 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
         "Abrir proyecto...",
         true,
         Some("CmdOrCtrl+O"),
+    )?;
+    let save_project = MenuItem::with_id(
+        app,
+        file_menu::SAVE_PROJECT,
+        "Guardar proyecto...",
+        true,
+        Some("CmdOrCtrl+S"),
+    )?;
+    let open_file = MenuItem::with_id(
+        app,
+        file_menu::OPEN_FILE,
+        "Abrir archivo .nra...",
+        true,
+        Some("CmdOrCtrl+Shift+O"),
     )?;
     let close_project = MenuItem::with_id(
         app,
@@ -151,6 +169,8 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
         &[
             &new_project,
             &open_project,
+            &save_project,
+            &open_file,
             &close_project,
             &separator1,
             &import,
@@ -450,10 +470,10 @@ mod tests {
     /// (para detectar si se anade un item sin actualizar ALL_MENU_IDS)
     #[test]
     fn menu_ids_count_matches_expected() {
-        // 7 archivo + 12 ver + 1 analisis + 6 ayuda = 26
+        // 9 archivo + 12 ver + 1 analisis + 6 ayuda = 28
         assert_eq!(
             ALL_MENU_IDS.len(),
-            26,
+            28,
             "Se cambio el numero de items de menu. Actualizar ALL_MENU_IDS y este test."
         );
     }
@@ -467,6 +487,8 @@ mod tests {
         let frontend_expects = [
             "new_project",
             "open_project",
+            "save_project",
+            "open_file",
             "close_project",
             "import",
             "update_manuscript",
@@ -507,6 +529,8 @@ mod tests {
     fn file_menu_ids_correct() {
         assert_eq!(file_menu::NEW_PROJECT, "new_project");
         assert_eq!(file_menu::OPEN_PROJECT, "open_project");
+        assert_eq!(file_menu::SAVE_PROJECT, "save_project");
+        assert_eq!(file_menu::OPEN_FILE, "open_file");
         assert_eq!(file_menu::CLOSE_PROJECT, "close_project");
         assert_eq!(file_menu::IMPORT, "import");
         assert_eq!(file_menu::UPDATE_MANUSCRIPT, "update_manuscript");

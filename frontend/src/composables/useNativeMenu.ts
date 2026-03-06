@@ -34,6 +34,8 @@ if (isTauriEnv) {
 interface MenuEventHandlers {
   onNewProject?: () => void
   onOpenProject?: () => void
+  onSaveProject?: () => void
+  onOpenFile?: () => void
   onCloseProject?: () => void
   onImport?: () => void
   onExport?: () => void
@@ -87,6 +89,14 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
         } else {
           router.push('/projects')
         }
+        break
+
+      case 'save_project':
+        invoke('save_project', handlers.onSaveProject)
+        break
+
+      case 'open_file':
+        invoke('open_file', handlers.onOpenFile)
         break
 
       case 'close_project':

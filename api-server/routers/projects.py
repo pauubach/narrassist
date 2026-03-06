@@ -1936,3 +1936,98 @@ def validate_dialogue_style(
             f"Error validating dialogue style for project {project_id}: {e}", exc_info=True
         )
         return ApiResponse(success=False, error="Error interno del servidor")
+
+
+# ============================================================================
+# Guardar / Abrir proyecto (.nra)
+# ============================================================================
+
+
+@router.post("/api/projects/{project_id}/save-file", response_model=ApiResponse)
+def save_project_file(
+    project_id: int,
+    file_path: str = Body(..., embed=True),
+):
+    """
+    Guarda un proyecto como archivo .nra portátil.
+
+    Args:
+        project_id: ID del proyecto a exportar.
+        file_path: Ruta destino para el archivo .nra.
+
+    Returns:
+        ApiResponse con { path, size_bytes }
+    """
+    try:
+        from narrative_assistant.persistence.project_file import NraExporter
+
+        db = deps.get_database()
+        exporter = NraExporter(db)
+        result = exporter.export_project(project_id, Path(file_path))
+
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.error))
+
+        output_path = result.value
+        return ApiResponse(
+            success=True,
+            data={
+                "path": str(output_path),
+                "size_bytes": output_path.stat().st_size,
+            },
+            message="Proyecto guardado correctamente.",
+        )
+    except Exception as e:
+        logger.error(f"Error saving project {project_id} to file: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.post("/api/projects/open-file", response_model=ApiResponse)
+def open_project_file(
+    file_path: str = Body(..., embed=True),
+):
+    """
+    Abre un proyecto desde un archivo .nra.
+
+    Args:
+        file_path: Ruta al archivo .nra a importar.
+
+    Returns:
+        ApiResponse con { project_id, project_name, warnings }
+    """
+    try:
+        from narrative_assistant.persistence.project_file import NraImporter
+
+        nra_path = Path(file_path)
+
+        db = deps.get_database()
+        importer = NraImporter(db)
+        result = importer.import_project(nra_path)
+
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.error))
+
+        new_project_id = result.value
+        warnings = result.warnings or []
+
+        # Obtener nombre del proyecto importado
+        project_name = None
+        try:
+            row = db.fetchone("SELECT name FROM projects WHERE id = ?", (new_project_id,))
+            if row:
+                project_name = row["name"]
+        except Exception:
+            pass
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": new_project_id,
+                "project_name": project_name,
+                "warnings": warnings,
+            },
+            message="Proyecto abierto correctamente.",
+        )
+    except Exception as e:
+        logger.error(f"Error opening project file {file_path}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
