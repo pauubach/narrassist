@@ -2056,6 +2056,16 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones). Usa el nombre COMPLETO de 
                     start_char = text.find(evidence) if evidence else 0
                     end_char = start_char + len(evidence) if start_char >= 0 else 0
 
+                    # Guard: rechazar valores que expresan ausencia (alucinación LLM).
+                    # Ej: LLM dice profession="nunca se mencionó" → no es un valor real.
+                    raw_value = attr_data.get("value", "")
+                    if not self._validate_value(key, raw_value):
+                        logger.debug(
+                            f"LLM valor rechazado por _validate_value: "
+                            f"key={key}, value='{raw_value}'"
+                        )
+                        continue
+
                     # Guard: rechazar profesiones mal atribuidas por el LLM.
                     # Ej: "El médico forense determinó que Isabel..." → LLM dice
                     # Isabel.profession=médico, pero "El médico" es otro personaje.

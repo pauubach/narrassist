@@ -62,6 +62,16 @@ class AttributeEntityResolutionMixin:
 
         value_lower = value.lower()
 
+        # Rechazar valores que expresan ausencia/negación (alucinación LLM típica).
+        # Ej: "nunca se mencionó", "no se menciona", "desconocido", "no aplica"
+        _ABSENCE_MARKERS = (
+            "no se menciona", "nunca se mencion", "no aplica", "no tiene",
+            "desconocid", "no especificad", "sin especificar", "no indicad",
+            "no hay", "ningún", "ninguna", "no definid",
+        )
+        if any(marker in value_lower for marker in _ABSENCE_MARKERS):
+            return False
+
         if key == AttributeKey.EYE_COLOR:
             return value_lower in COLORS
 

@@ -187,5 +187,34 @@ class TestProfessionBug3ExactamenteAdverb:
         pass
 
 
+class TestAbsenceValueRejection:
+    """Valores de ausencia/negación generados por el LLM deben rechazarse."""
+
+    def test_validate_value_rejects_absence_phrases(self):
+        from narrative_assistant.nlp.attr_entity_resolution import AttributeEntityResolutionMixin
+
+        class DummyExtractor(AttributeEntityResolutionMixin):
+            pass
+
+        dummy = DummyExtractor()
+
+        # Frases de ausencia típicas de alucinación LLM
+        assert not dummy._validate_value(AttributeKey.PROFESSION, "nunca se mencionó")
+        assert not dummy._validate_value(AttributeKey.PROFESSION, "no se menciona")
+        assert not dummy._validate_value(AttributeKey.PROFESSION, "desconocido")
+        assert not dummy._validate_value(AttributeKey.PROFESSION, "no especificado")
+        assert not dummy._validate_value(AttributeKey.PROFESSION, "sin especificar")
+        assert not dummy._validate_value(AttributeKey.PROFESSION, "no aplica")
+        assert not dummy._validate_value(AttributeKey.PROFESSION, "no tiene profesión")
+
+        # También para otros tipos de atributo
+        assert not dummy._validate_value(AttributeKey.EYE_COLOR, "nunca se mencionó")
+        assert not dummy._validate_value(AttributeKey.PERSONALITY, "desconocido")
+
+        # Valores legítimos siguen pasando
+        assert dummy._validate_value(AttributeKey.PROFESSION, "médico")
+        assert dummy._validate_value(AttributeKey.PROFESSION, "carpintero")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
