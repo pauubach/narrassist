@@ -198,7 +198,7 @@ def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",
         (table_name,),
     ).fetchone()
-    return row[0] > 0 if row else False
+    return bool(row[0] > 0) if row else False
 
 
 def _get_columns(conn: sqlite3.Connection, table_name: str) -> list[str]:
@@ -503,9 +503,11 @@ class NraImporter:
         # Validar archivo
         validation = self._validate_file(nra_path)
         if validation.is_failure:
-            return validation
+            assert validation.error is not None  # guaranteed by is_failure
+            return Result.failure(validation.error)
 
-        metadata = validation.value
+        assert validation.value is not None  # guaranteed by is_success
+        metadata: NraMetadata = validation.value
         warnings: list[str] = []
 
         nra_schema = metadata.schema_version
@@ -677,7 +679,7 @@ class NraImporter:
 
         cols = _get_columns(nra_conn, "projects")
         values = dict(zip(cols, row, strict=False))
-        old_id = values["id"]
+        old_id: int = values["id"]
 
         # Limpiar campos que no aplican en la nueva máquina
         values.pop("id")
@@ -701,7 +703,7 @@ class NraImporter:
         cursor = dest_conn.execute(
             f"INSERT INTO projects ({col_names}) VALUES ({placeholders})", insert_values
         )
-        new_id = cursor.lastrowid
+        new_id: int = cursor.lastrowid  # type: ignore[assignment]  # lastrowid always set after INSERT
         id_map.projects[old_id] = new_id
 
         logger.debug(f"  Proyecto: old_id={old_id} → new_id={new_id}")
@@ -763,9 +765,9 @@ class NraImporter:
                 cursor = dest_conn.execute(
                     f"INSERT INTO {table} ({col_names}) VALUES ({placeholders})", values
                 )
-                new_id = cursor.lastrowid
-                if old_id is not None and table_id_map is not None:
-                    table_id_map[old_id] = new_id
+                new_row_id = cursor.lastrowid
+                if old_id is not None and table_id_map is not None and new_row_id is not None:
+                    table_id_map[old_id] = new_row_id
                 imported += 1
             except sqlite3.IntegrityError as e:
                 logger.debug(f"  Skip duplicate in {table}: {e}")
@@ -837,9 +839,9 @@ class NraImporter:
                     cursor = dest_conn.execute(
                         f"INSERT INTO {table} ({col_names}) VALUES ({placeholders})", values
                     )
-                    new_id = cursor.lastrowid
-                    if old_id is not None and table_id_map is not None:
-                        table_id_map[old_id] = new_id
+                    new_row_id = cursor.lastrowid
+                    if old_id is not None and table_id_map is not None and new_row_id is not None:
+                        table_id_map[old_id] = new_row_id
                     imported += 1
                 except sqlite3.IntegrityError:
                     pass
