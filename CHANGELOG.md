@@ -21,6 +21,26 @@ y este proyecto sigue [Versionado Semántico](https://semver.org/lang/es/).
 
 ---
 
+## [0.11.12] - 2026-03-07
+
+### Añadido
+- Test de migración de tema legacy (`narrative_assistant_theme` → `narrative_assistant_theme_config`)
+- Cobertura E2E de accesibilidad para los 6 presets soportados (`aura`, `lara`, `material`, `nora`, `grammarly`, `scrivener`)
+- Auditoría integral de estado actual en `docs/audits/2026-03-07_auditoria_integral_estado_actual.md`
+
+### Cambiado
+- `themeStore` pasa a ser la única fuente de verdad para el tema de la aplicación
+- `systemStore` usa el cliente API compartido para el health check del backend local
+- Documentación canónica sincronizada con la versión `0.11.12`, pipeline de 14 fases y schema `34`
+- Configuración de pytest consolidada en `pytest.ini`
+
+### Corregido
+- Duplicidad de lógica de tema en `appStore`, `HomeView` y `App.vue`
+- Listener Tauri robustecido para no perder eventos de `backend-status` durante imports dinámicos
+- Referencias documentales a `docs/_archive/...` que apuntaban a rutas inexistentes
+
+---
+
 ## [0.10.15] - 2026-02-15
 
 ### Añadido
@@ -195,7 +215,8 @@ y este proyecto sigue [Versionado Semántico](https://semver.org/lang/es/).
 - **Corregido**: Correcciones de bugs
 - **Seguridad**: Correcciones de seguridad
 
-[Unreleased]: https://github.com/pauubach/narrassist/compare/v0.10.15...HEAD
+[Unreleased]: https://github.com/pauubach/narrassist/compare/v0.11.12...HEAD
+[0.11.12]: https://github.com/pauubach/narrassist/compare/v0.10.15...v0.11.12
 [0.10.15]: https://github.com/pauubach/narrassist/compare/v0.10.14...v0.10.15
 [0.10.14]: https://github.com/pauubach/narrassist/compare/v0.10.11...v0.10.14
 [0.10.11]: https://github.com/pauubach/narrassist/compare/v0.10.9...v0.10.11

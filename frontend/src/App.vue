@@ -82,7 +82,7 @@ import { useSystemStore } from '@/stores/system'
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
-const appStore = useAppStore()
+useAppStore()
 const systemStore = useSystemStore()
 const themeStore = useThemeStore()
 const workspaceStore = useWorkspaceStore()
@@ -297,7 +297,7 @@ onMounted(() => {
   const version = systemStore.backendVersion || 'loading...'
   console.log(`Narrative Assistant UI - v${version}`)
   console.log('Vue 3.5 + PrimeVue 4')
-  console.log(`Tema: ${appStore.theme} | Modo oscuro: ${appStore.isDark}`)
+  console.log(`Tema: ${themeStore.config.mode} | Modo oscuro: ${themeStore.isDark}`)
   console.log(`Entorno Tauri: ${isTauri.value}`)
   console.log(`Ruta actual: ${route.fullPath}`)
 

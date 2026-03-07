@@ -31,9 +31,9 @@ Funciona 100 % en local: tus manuscritos **nunca salen de tu ordenador**.
 
 - [Endpoints HTTP](api-reference/http-endpoints.md) — API REST completa
 - [ADRs](adr/README.md) — Decisiones de arquitectura
-- [Changelog](CHANGELOG.md) — Historial de versiones
+- [Changelog](../CHANGELOG.md) — Historial de versiones
 
 ---
 
-**Versión**: 0.10.15
+**Versión**: 0.11.12
 **Repositorio**: [github.com/pauubach/narrassist](https://github.com/pauubach/narrassist)

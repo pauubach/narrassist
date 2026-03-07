@@ -414,7 +414,7 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
   })
 
   test.describe('Theme Presets Accessibility', () => {
-    const themes = ['aura', 'lara', 'grammarly', 'scrivener']
+    const themes = ['aura', 'lara', 'material', 'nora', 'grammarly', 'scrivener']
     const modes = ['light', 'dark']
 
     for (const theme of themes) {

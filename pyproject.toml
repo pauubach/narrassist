@@ -217,19 +217,6 @@ ignore_missing_imports = true
 exclude = ["tests", "docs"]
 
 # =============================================================================
-# Pytest
-# =============================================================================
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "-v --tb=short"
-markers = [
-    "slow: marks tests as slow (NLP integration)",
-]
-filterwarnings = [
-    "ignore::DeprecationWarning",
-]
-
-# =============================================================================
 # Coverage
 # =============================================================================
 [tool.coverage.run]

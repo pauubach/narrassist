@@ -1,6 +1,6 @@
 # Narrative Assistant - Documentación
 
-Ultima actualizacion: 2026-02-14 | Version: 0.9.5
+Ultima actualizacion: 2026-03-07 | Version: 0.11.12
 
 ## Documentos canónicos (mantener actualizados)
 
@@ -30,18 +30,17 @@ Ultima actualizacion: 2026-02-14 | Version: 0.9.5
 - `00-overview/`, `01-theory/`, `02-architecture/`, `04-references/`: base conceptual y técnica.
 - `api-reference/`: contratos y referencia de API.
 - `research/`, `ux/`, `testing/`: soporte y estudios especializados.
-- `_archive/`: histórico, no canónico para decisiones actuales.
+- `audits/`: auditorías activas e históricas mantenidas en el árbol principal.
 
 ## Política de mantenimiento documental
 
 - Todo documento operativo nuevo debe estar enlazado desde este `README.md`.
-- Si un documento queda obsoleto, se mueve a `docs/_archive/obsolete/`.
+- No referenciar rutas `docs/_archive/...` mientras ese directorio no exista en el repositorio.
 - Evitar duplicar “estado actual” en varios `.md`: usar `PROJECT_STATUS.md` como fuente única.
 - Evitar duplicar “siguiente trabajo” en varios `.md`: usar `ROADMAP.md` como fuente única.
 
 ## Cambios de curación aplicados
 
-- `PROJECT_STATUS.md` legacy movido a `docs/_archive/obsolete/PROJECT_STATUS_LEGACY_2026-02-13.md`.
-- `ROADMAP.md` legacy movido a `docs/_archive/obsolete/ROADMAP_LEGACY_2026-02-13.md`.
-- Auditorías cerradas movidas a `docs/_archive/audits/`.
-- Plan transicional movido a `docs/_archive/planning/IMPROVEMENT_PLAN_EXECUTION_READY_2026-02-13.md`.
+- Las referencias previas a `docs/_archive/...` ya no son válidas en el árbol actual.
+- Para auditorías activas e históricas usar `docs/audits/`.
+- Para contexto de planificación acumulado usar `docs/IMPROVEMENT_PLAN.md`.

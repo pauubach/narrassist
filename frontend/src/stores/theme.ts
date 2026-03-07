@@ -62,6 +62,7 @@ export interface ThemeConfig {
 // ============================================================================
 
 const STORAGE_KEY = 'narrative_assistant_theme_config'
+const LEGACY_MODE_KEY = 'narrative_assistant_theme'
 
 /** Info de un preset para UI */
 export interface PresetInfo {
@@ -548,6 +549,13 @@ export const useThemeStore = defineStore('theme', () => {
         console.warn('[Theme] Failed to parse theme config:', e)
         config.value = { ...DEFAULT_CONFIG }
       }
+      return
+    }
+
+    const legacyMode = safeGetItem(LEGACY_MODE_KEY)
+    if (legacyMode === 'light' || legacyMode === 'dark' || legacyMode === 'auto') {
+      config.value = { ...DEFAULT_CONFIG, mode: legacyMode }
+      saveConfig()
     }
   }
 

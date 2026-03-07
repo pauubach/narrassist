@@ -81,10 +81,10 @@ PRAGMA busy_timeout=5000;
 Ver:
 - `src/narrative_assistant/persistence/database.py` — configuración y conexión
 - `src/narrative_assistant/persistence/project.py` — repository pattern
-- Esquema actual: SCHEMA_VERSION = 29 (v0.10.15)
+- Esquema actual: SCHEMA_VERSION = 34 (v0.11.12)
 
 ## Referencias
 
 - [SQLite WAL Mode](https://www.sqlite.org/wal.html)
 - [When to Use SQLite](https://www.sqlite.org/whentouse.html)
-- Proyecto usa SQLite desde v0.1.0, con 30 migraciones hasta v0.10.15
+- Proyecto usa SQLite desde v0.1.0, con migraciones incrementales hasta v0.11.12

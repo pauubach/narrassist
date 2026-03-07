@@ -1,6 +1,6 @@
 # Estado Actual del Proyecto
 
-Fecha de verificación: 2026-02-14
+Fecha de verificación: 2026-03-07
 Fuente de verdad operativa: `docs/PLAN_ACTIVE.md`
 
 ## Resumen ejecutivo
@@ -22,7 +22,7 @@ con Stripe, bloqueado por infraestructura externa) y las ideas aparcadas.
 
 ## Hallazgos técnicos recientes
 
-1. Schema en v24 con `project_detector_weights` (pesos adaptativos nivel 3) y `version_metrics`.
+1. Schema actual en v34, manteniendo `project_detector_weights`, `version_metrics` y ampliaciones posteriores.
 2. `is_founding_member` se lee de `license.extra_data["founding_member"]` y se devuelve en `/api/license/status`.
 3. Quota warning banner aparece al 80/90/100% de uso, con días restantes del periodo.
 4. Tier comparison muestra precios founder vs. estándar según `is_founding_member`.
@@ -30,8 +30,8 @@ con Stripe, bloqueado por infraestructura externa) y las ideas aparcadas.
 ## Estado de riesgo (hoy)
 
 - Riesgo funcional: **bajo** (tests pasan, endpoints verificados).
-- Riesgo de evolución: **bajo** (schema versionado en v24, migraciones disciplinadas).
-- Riesgo de documentación: **bajo** (IMPROVEMENT_PLAN y PROJECT_STATUS sincronizados).
+- Riesgo de evolución: **medio-bajo** (schema versionado en v34, pero quedan áreas monolíticas a dividir).
+- Riesgo de documentación: **reducido** tras la sincronización documental del 2026-03-07.
 
 ## Próximos pasos
 
@@ -41,8 +41,6 @@ con Stripe, bloqueado por infraestructura externa) y las ideas aparcadas.
 
 ## Historial
 
-El estado largo y legacy anterior se movió a:
-- `docs/_archive/obsolete/PROJECT_STATUS_LEGACY_2026-02-13.md`
-
-El plan transicional usado para esta limpieza se archivó en:
-- `docs/_archive/planning/IMPROVEMENT_PLAN_EXECUTION_READY_2026-02-13.md`
+El repositorio actual no contiene `docs/_archive/`. Para contexto histórico y decisiones anteriores usa:
+- `docs/IMPROVEMENT_PLAN.md`
+- `docs/audits/`

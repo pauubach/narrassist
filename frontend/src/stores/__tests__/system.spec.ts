@@ -13,27 +13,21 @@ import { useSystemStore, type LTState as _LTState, type ModelsStatus, type Syste
 vi.mock('@/services/apiClient', () => ({
   api: {
     get: vi.fn(),
+    getRaw: vi.fn(),
     post: vi.fn(),
     postRaw: vi.fn(),
     tryGet: vi.fn(),
   },
 }))
 
-vi.mock('@/config/api', () => ({
-  apiUrl: (path: string) => `http://test${path}`,
-}))
-
 import { api } from '@/services/apiClient'
 const mockApi = api as unknown as {
   get: ReturnType<typeof vi.fn>
+  getRaw: ReturnType<typeof vi.fn>
   post: ReturnType<typeof vi.fn>
   postRaw: ReturnType<typeof vi.fn>
   tryGet: ReturnType<typeof vi.fn>
 }
-
-// Mock fetch for health check (uses raw fetch, not api client)
-const mockFetch = vi.fn()
-global.fetch = mockFetch
 
 // ── Tests ────────────────────────────────────────────────────
 
@@ -96,10 +90,7 @@ describe('systemStore', () => {
 
   describe('checkBackendStatus', () => {
     it('should set connected on successful health check', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ status: 'ok', version: '0.7.22' }),
-      })
+      mockApi.getRaw.mockResolvedValueOnce({ status: 'ok', version: '0.7.22' })
 
       const store = useSystemStore()
       await store.checkBackendStatus()
@@ -111,7 +102,7 @@ describe('systemStore', () => {
     })
 
     it('should set disconnected on failed health check', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Connection refused'))
+      mockApi.getRaw.mockRejectedValueOnce(new Error('Connection refused'))
 
       const store = useSystemStore()
       await store.checkBackendStatus()
@@ -119,8 +110,8 @@ describe('systemStore', () => {
       expect(store.backendConnected).toBe(false)
     })
 
-    it('should set disconnected on non-ok response', async () => {
-      mockFetch.mockResolvedValueOnce({ ok: false, status: 503 })
+    it('should set disconnected on non-ok health payload', async () => {
+      mockApi.getRaw.mockResolvedValueOnce({ status: 'error' })
 
       const store = useSystemStore()
       await store.checkBackendStatus()
@@ -129,10 +120,7 @@ describe('systemStore', () => {
     })
 
     it('should handle missing version in response', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ status: 'ok' }),
-      })
+      mockApi.getRaw.mockResolvedValueOnce({ status: 'ok' })
 
       const store = useSystemStore()
       await store.checkBackendStatus()

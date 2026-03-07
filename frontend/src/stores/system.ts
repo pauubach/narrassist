@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { apiUrl } from '@/config/api'
 import { api } from '@/services/apiClient'
 
 export interface ModelStatus {
@@ -106,6 +105,13 @@ export interface LLMReadiness {
   missing_models: string[]
   available_models: string[]
   has_any_model: boolean
+}
+
+interface BackendHealthStatus {
+  status: string
+  version?: string
+  backend_loaded?: boolean
+  timestamp?: string
 }
 
 export interface NLPMethod {
@@ -224,22 +230,21 @@ export const useSystemStore = defineStore('system', () => {
   const pythonVersion = computed(() => modelsStatus.value?.python_version ?? null)
   const pythonError = computed(() => modelsStatus.value?.python_error ?? null)
 
+  function applyBackendHealthStatus(data: BackendHealthStatus) {
+    backendConnected.value = data.status === 'ok'
+    backendVersion.value = data.version || 'unknown'
+    backendHealthWarned = false
+    if (backendConnected.value) {
+      backendReady.value = true
+      backendStarting.value = false
+      backendStartupError.value = null
+    }
+  }
+
   async function checkBackendStatus() {
     try {
-      const response = await fetch(apiUrl('/api/health'))
-      if (response.ok) {
-        const data = await response.json()
-        backendConnected.value = data.status === 'ok'
-        backendVersion.value = data.version || 'unknown'
-        backendHealthWarned = false
-        if (!backendReady.value) {
-          backendReady.value = true
-          backendStarting.value = false
-          backendStartupError.value = null
-        }
-      } else {
-        backendConnected.value = false
-      }
+      const data = await api.getRaw<BackendHealthStatus>('/api/health', { timeout: 5000 })
+      applyBackendHealthStatus(data)
     } catch (error) {
       backendConnected.value = false
       if (!backendHealthWarned) {
@@ -267,16 +272,10 @@ export const useSystemStore = defineStore('system', () => {
 
     while (Date.now() - startTime < timeoutMs) {
       try {
-        const response = await fetch(apiUrl('/api/health'))
-        if (response.ok) {
-          const data = await response.json()
-          backendConnected.value = data.status === 'ok'
-          backendVersion.value = data.version || 'unknown'
-          backendReady.value = true
-          backendStarting.value = false
-          warned = false
-          return true
-        }
+        const data = await api.getRaw<BackendHealthStatus>('/api/health', { timeout: 5000 })
+        applyBackendHealthStatus(data)
+        warned = false
+        return backendConnected.value
       } catch (error) {
         // Backend no disponible todavia, reintentar
         if (!warned) {

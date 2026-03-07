@@ -71,4 +71,4 @@ Si es tu primera vez, lee [Correcciones y Riesgos](./corrections-and-risks.md) p
 
 Luego, consulta [PROJECT_STATUS.md](../PROJECT_STATUS.md) para ver el estado actual del proyecto.
 
-> **Nota**: Las especificaciones originales de implementación (STEPs) están archivadas en [docs/_archive/steps/](../_archive/steps/).
+> **Nota**: No existe un directorio `docs/_archive/steps/` en el árbol actual. Para decisiones de diseño y evolución usa `../design/`, `../audits/` y `../PLAN_ACTIVE.md`.

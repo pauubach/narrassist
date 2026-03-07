@@ -1,6 +1,6 @@
 # Narrative Assistant
 
-[![Versión](https://img.shields.io/badge/versión-0.10.15-blue.svg)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versión-0.11.12-blue.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11+-brightgreen.svg)](https://www.python.org/)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-24C8DB.svg)](https://tauri.app/)
 [![Licencia](https://img.shields.io/badge/licencia-MIT-green.svg)](LICENSE)
@@ -79,14 +79,22 @@ Puedes ajustar el análisis con **presets por género**:
 - Corrección editorial
 
 ### 2. Análisis automático
-El sistema ejecuta **6 fases de análisis**:
+El sistema ejecuta **14 fases de análisis**:
 
-1. **Extracción de entidades** — personajes, lugares, objetos (NER multi-modelo)
-2. **Resolución de correferencias** — identifica menciones del mismo personaje (votación 4 métodos)
-3. **Extracción de atributos** — género, edad, descripción física, rasgos psicológicos
-4. **Análisis de relaciones** — familiares, románticas, profesionales, conflictos
-5. **Línea temporal** — eventos, inconsistencias temporales, anacronismos
-6. **Detección de problemas** — estilo, gramática, coherencia narrativa
+1. **Parsing** — lectura del documento y preparación del texto
+2. **Clasificación** — tipología del documento y contexto editorial
+3. **Estructura** — capítulos, bloques y organización narrativa
+4. **NER** — personajes, lugares, objetos y otras entidades (multi-método)
+5. **Fusión** — deduplicación y consolidación de entidades
+6. **Timeline** — marcadores temporales, eventos y cronología
+7. **Atributos** — rasgos físicos, psicológicos y metadata narrativa
+8. **Consistencia** — contradicciones, continuidad y conocimiento imposible
+9. **Gramática** — gramática, ortografía y redacción
+10. **Alertas** — consolidación y priorización de hallazgos
+11. **Relaciones** — vínculos familiares, románticos, profesionales y de conflicto
+12. **Voz** — perfilado de habla, registro y diferenciación de personajes
+13. **Prosa** — estilo, ritmo, repeticiones y calidad textual
+14. **Health** — métricas globales y chequeos de salud narrativa
 
 > 💡 Ver detalles en [Manual: Primer Análisis](docs_site/user-manual/first-analysis.md)
 
@@ -226,7 +234,7 @@ Ver [BUILD_AND_DEPLOY.md](docs/BUILD_AND_DEPLOY.md) para construcción y [PYTHON
 | Documento | Descripción |
 |-----------|-------------|
 | 📖 [Manual de Usuario](docs_site/user-manual/introduction.md) | Guía completa en 8 capítulos (también disponible dentro de la app) |
-| 📝 [CHANGELOG.md](CHANGELOG.md) | Historial de cambios de v0.1.0 a v0.10.15 |
+| 📝 [CHANGELOG.md](CHANGELOG.md) | Historial de cambios de v0.1.0 a v0.11.12 |
 | 🏗️ [Docs Técnicas](docs/) | Arquitectura, API reference, ADRs, build process |
 | 🚀 [BUILD_AND_DEPLOY.md](docs/BUILD_AND_DEPLOY.md) | Guía para construcción y despliegue |
 | 🐍 [PYTHON_EMBED.md](docs/PYTHON_EMBED.md) | Estrategia de empaquetado multi-plataforma |
@@ -239,7 +247,7 @@ Ver [BUILD_AND_DEPLOY.md](docs/BUILD_AND_DEPLOY.md) para construcción y [PYTHON
 ### Tests
 
 ```bash
-# Tests ligeros (~1231 tests, ~3 min)
+# Tests ligeros
 pytest -v
 
 # Tests pesados (requieren modelos NLP + Ollama)
@@ -316,7 +324,7 @@ ollama serve
 
 ## Versión y Licencia
 
-**Versión actual**: [0.10.15](CHANGELOG.md) — 2026-02-15
+**Versión actual**: [0.11.12](CHANGELOG.md) — 2026-03-07
 
 **Licencia**: MIT — ver [LICENSE](LICENSE)
 

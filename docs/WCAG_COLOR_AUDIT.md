@@ -1,8 +1,10 @@
 # WCAG 2.1 AA Color Contrast Audit - Narrative Assistant
 
 **Fecha:** 2026-02-04
-**Versión:** v0.4.45
+**Versión auditada:** v0.4.45
 **Estándar:** WCAG 2.1 Level AA
+
+> **Nota de vigencia (2026-03-07):** este documento conserva las tablas y ratios medidos en la auditoría original. Sigue siendo útil como referencia histórica y técnica, pero **necesita revalidación completa** contra el estado actual de la app (`v0.11.12`). La aplicación incluye verificación automatizada parcial y hardening activo de accesibilidad, pero este documento ya no debe interpretarse como certificación global del estado presente.
 
 ## Requisitos WCAG 2.1 AA
 
@@ -254,9 +256,9 @@ Añadidas en `accessibility.css`:
 | Focus Indicators | PASS | PASS | 2px outline visible |
 | Text Utility Classes | **PASS** | **PASS** | ✓ Corregido: usa --ds-text-* |
 
-**Estado General: CUMPLE WCAG 2.1 AA ✓**
+**Estado General: verificación automatizada parcial + hardening activo; requiere revalidación completa sobre el estado actual**
 
-Todas las correcciones críticas han sido aplicadas.
+Las correcciones críticas identificadas en esta auditoría se utilizaron para endurecer el sistema, pero el cumplimiento global debe reevaluarse con el código, temas y tests actuales.
 
 ---
 

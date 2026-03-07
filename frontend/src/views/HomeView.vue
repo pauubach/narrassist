@@ -5,10 +5,10 @@
       <div class="top-actions">
         <Button
           v-tooltip.bottom="'Cambiar tema'"
-          :icon="appStore.isDark ? 'pi pi-sun' : 'pi pi-moon'"
+          :icon="themeStore.isDark ? 'pi pi-sun' : 'pi pi-moon'"
           text
           rounded
-          @click="appStore.toggleTheme"
+          @click="themeStore.toggleMode"
         />
         <Button
           v-tooltip.bottom="'Configuración'"
@@ -128,14 +128,14 @@ import ErrorBoundary from '../components/ErrorBoundary.vue'
 
 import { onMounted, computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAppStore } from '@/stores/app'
 import { useSystemStore } from '@/stores/system'
+import { useThemeStore } from '@/stores/theme'
 import { useGlobalStats } from '@/composables/useGlobalStats'
 import Button from 'primevue/button'
 
 const router = useRouter()
-const appStore = useAppStore()
 const systemStore = useSystemStore()
+const themeStore = useThemeStore()
 const { globalMetrics } = useGlobalStats()
 
 const backendStatus = computed(() => systemStore.backendConnected)
