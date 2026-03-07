@@ -27,6 +27,17 @@ const mockApiClient = api as unknown as {
   postRaw: ReturnType<typeof vi.fn>
 }
 
+const READY_OK = {
+  ready: true,
+  ollama_running: true,
+  has_any_model: true,
+  missing_models: [],
+}
+
+function mockReadinessOk() {
+  mockApiClient.get.mockResolvedValueOnce(READY_OK)
+}
+
 // Mock de fetch global (para tests legacy que usan fetch directamente)
 const mockFetch = vi.fn()
 global.fetch = mockFetch
@@ -199,6 +210,7 @@ describe('analysisStore', () => {
       const store = useAnalysisStore()
       store.setActiveProjectId(1)
 
+      mockReadinessOk()
       mockApiClient.postForm.mockResolvedValueOnce({
         project_id: 1,
         status: 'running',
@@ -215,6 +227,7 @@ describe('analysisStore', () => {
       const store = useAnalysisStore()
       store.setActiveProjectId(1)
 
+      mockReadinessOk()
       mockApiClient.postForm.mockRejectedValueOnce(new Error('Failed to start'))
 
       const result = await store.startAnalysis(1)
@@ -222,6 +235,22 @@ describe('analysisStore', () => {
       expect(result).toBe(false)
       expect(store.error).toBe('Failed to start')
       expect(store.isAnalyzing).toBe(false)
+    })
+
+    it('should clear stale warning when starting a new full analysis', async () => {
+      const store = useAnalysisStore()
+      store.setActiveProjectId(1)
+      store.setWarning(1, 'old warning')
+
+      mockReadinessOk()
+      mockApiClient.postForm.mockResolvedValueOnce({
+        project_id: 1,
+        status: 'running',
+      })
+
+      await store.startAnalysis(1)
+
+      expect(store.warning).toBeNull()
     })
 
   })
@@ -256,6 +285,18 @@ describe('analysisStore', () => {
       // Si el POST falla, el estado se limpia inmediatamente
       expect(store.isProjectAnalyzing(1)).toBe(false)
       expect(store.error).toBe('Network error')
+    })
+
+    it('should clear stale warning when starting partial analysis', async () => {
+      const store = useAnalysisStore()
+      store.setActiveProjectId(1)
+      store.setWarning(1, 'old warning')
+
+      mockApiClient.post.mockResolvedValueOnce({})
+
+      await store.runPartialAnalysis(1, ['timeline'])
+
+      expect(store.warning).toBeNull()
     })
 
     it('should isolate running phases between projects', async () => {
@@ -311,7 +352,40 @@ describe('analysisStore', () => {
       // Project 2 should still be analyzing
       expect(store.isProjectAnalyzing(2)).toBe(true)
     })
+
+    it('should clear warning when clearAnalysis is called', () => {
+      const store = useAnalysisStore()
+      store.setActiveProjectId(1)
+      store.setWarning(1, 'old warning')
+
+      store.clearAnalysis(1)
+
+      expect(store.warning).toBeNull()
+    })
   })
+
+describe('warning lifecycle', () => {
+  it('should clear stale warning when setAnalyzing(true) starts a new run', () => {
+      const store = useAnalysisStore()
+      store.setActiveProjectId(1)
+      store.setWarning(1, 'old warning')
+
+      store.setAnalyzing(1, true)
+
+      expect(store.warning).toBeNull()
+    })
+
+    it('should preserve current warning when setAnalyzing(false) stops a run', () => {
+      const store = useAnalysisStore()
+      store.setActiveProjectId(1)
+
+      store.setAnalyzing(1, true)
+      store.setWarning(1, 'capacidad reducida')
+      store.setAnalyzing(1, false)
+
+    expect(store.warning).toBe('capacidad reducida')
+  })
+})
 
 })
 
@@ -600,6 +674,7 @@ describe('Queued States', () => {
     const store = useAnalysisStore()
     store.setActiveProjectId(1)
 
+    mockReadinessOk()
     mockApiClient.postForm.mockResolvedValueOnce({
       project_id: 1,
       status: 'queued',
@@ -782,5 +857,107 @@ describe('checkAnalysisStatus', () => {
     const isActive = await store.checkAnalysisStatus(1)
 
     expect(isActive).toBe(false)
+  })
+
+  it('should preserve startAnalysis inflight state when backend still reports idle', async () => {
+    const store = useAnalysisStore()
+    store.setActiveProjectId(1)
+
+    mockReadinessOk()
+    // Create a deferred promise so postForm stays pending
+    let resolvePostForm!: (value: unknown) => void
+    const deferredPost = new Promise(resolve => { resolvePostForm = resolve })
+    mockApiClient.postForm.mockReturnValueOnce(deferredPost)
+
+    // Launch startAnalysis — it sets _analyzing and _startInflight,
+    // then awaits postForm which stays pending
+    const startPromise = store.startAnalysis(1)
+    await Promise.resolve()
+    await Promise.resolve() // let readiness resolve and postForm remain pending
+
+    expect(store.isProjectAnalyzing(1)).toBe(true)
+
+    // Meanwhile, checkAnalysisStatus polls and backend says idle
+    // (it hasn't received the analyze request yet)
+    mockApiClient.get.mockResolvedValueOnce({
+      project_id: 1,
+      status: 'idle',
+      progress: 0,
+      current_phase: '',
+      phases: [],
+    })
+
+    const isActive = await store.checkAnalysisStatus(1)
+
+    // _startInflight protects the state — must NOT clear
+    expect(isActive).toBe(true)
+    expect(store.isProjectAnalyzing(1)).toBe(true)
+
+    // Resolve the inflight request
+    resolvePostForm({ project_id: 1, status: 'running' })
+    await startPromise
+
+    expect(store.isProjectAnalyzing(1)).toBe(true)
+  })
+
+  it('should clear even inflight state on backend error (Tauri: backend local no disponible)', async () => {
+    const store = useAnalysisStore()
+    store.setActiveProjectId(1)
+
+    mockReadinessOk()
+    // Create a deferred promise so postForm stays pending
+    let resolvePostForm!: (value: unknown) => void
+    const deferredPost = new Promise(resolve => { resolvePostForm = resolve })
+    mockApiClient.postForm.mockReturnValueOnce(deferredPost)
+
+    // Launch startAnalysis — sets _startInflight
+    const startPromise = store.startAnalysis(1)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(store.isProjectAnalyzing(1)).toBe(true)
+
+    // Backend is unreachable — catch branch fires
+    mockApiClient.get.mockRejectedValueOnce(new Error('Backend not available'))
+
+    const isActive = await store.checkAnalysisStatus(1)
+
+    // Tauri policy: backend local down → clear everything, including inflight
+    expect(isActive).toBe(false)
+    expect(store.isProjectAnalyzing(1)).toBe(false)
+
+    // Verify _startInflight was actually cleaned: a second checkAnalysisStatus
+    // with backend responding idle should NOT preserve state (no inflight left)
+    mockApiClient.get.mockResolvedValueOnce({
+      project_id: 1,
+      status: 'idle',
+      progress: 0,
+      current_phase: '',
+      phases: [],
+    })
+    const isActiveAgain = await store.checkAnalysisStatus(1)
+    expect(isActiveAgain).toBe(false)
+
+    // Clean up the dangling promise
+    resolvePostForm({ project_id: 1, status: 'running' })
+    await startPromise.catch(() => {})
+  })
+
+  it('should clear trusted local active state on backend error (Tauri policy)', async () => {
+    const store = useAnalysisStore()
+    // Simulate a confirmed running analysis in local state
+    store.setAnalyzing(1, true)
+
+    expect(store.isProjectAnalyzing(1)).toBe(true)
+
+    // Backend is unreachable
+    mockApiClient.get.mockRejectedValueOnce(new Error('Backend crashed'))
+
+    const isActive = await store.checkAnalysisStatus(1)
+
+    // Tauri policy: if we can't talk to our own local backend,
+    // any local state is suspect — clear aggressively
+    expect(isActive).toBe(false)
+    expect(store.isProjectAnalyzing(1)).toBe(false)
   })
 })

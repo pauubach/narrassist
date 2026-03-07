@@ -175,8 +175,8 @@ export const KEYBOARD_SHORTCUTS = [
     shortcuts: [
       { keys: ['F8'], description: 'Siguiente alerta' },
       { keys: ['Shift', 'F8'], description: 'Alerta anterior' },
-      { keys: ['Enter'], description: 'Resolver alerta seleccionada' },
-      { keys: ['Delete'], description: 'Descartar alerta seleccionada' },
+      { keys: ['Enter'], description: 'Marcar alerta como resuelta' },
+      { keys: ['Delete'], description: 'Marcar alerta como descartada' },
     ]
   },
   {
@@ -215,8 +215,8 @@ export const KEYBOARD_SHORTCUTS = [
     shortcuts: [
       { keys: ['→', 'N'], description: 'Siguiente alerta' },
       { keys: ['←', 'P'], description: 'Alerta anterior' },
-      { keys: ['A', 'Enter'], description: 'Aceptar (resolver)' },
-      { keys: ['D'], description: 'Descartar' },
+      { keys: ['A', 'Enter'], description: 'Resuelta' },
+      { keys: ['D'], description: 'Descartada' },
       { keys: ['S'], description: 'Saltar' },
       { keys: ['F'], description: 'Marcar para revisar' },
       { keys: ['Ctrl/Cmd', 'Z'], description: 'Deshacer' },

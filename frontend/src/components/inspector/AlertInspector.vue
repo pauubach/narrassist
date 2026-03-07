@@ -45,7 +45,7 @@ const emit = defineEmits<{
   (e: 'navigateToPosition', startChar: number, endChar: number, text?: string): void
   /** Marcar como resuelta */
   (e: 'resolve'): void
-  /** Descartar alerta */
+  /** Marcar como descartada */
   (e: 'dismiss'): void
   /** Cerrar el inspector */
   (e: 'close'): void
@@ -385,7 +385,7 @@ function resolveAsUnassigned() {
       <!-- Botones estándar -->
       <div v-else class="action-row">
         <Button
-          label="Resolver"
+          label="Resuelta"
           icon="pi pi-check"
           size="small"
           severity="success"
@@ -394,7 +394,7 @@ function resolveAsUnassigned() {
           @click="emit('resolve')"
         />
         <Button
-          label="Descartar"
+          label="Descartada"
           icon="pi pi-times"
           size="small"
           severity="secondary"

@@ -266,11 +266,11 @@ function getAlertMessage(alert: Alert): string {
           @click="handleResolveAlert"
         >
           <i class="pi pi-check" />
-          Marcar resuelta
+          Resuelta
         </button>
         <button type="button" class="detail-panel__action-btn" @click="handleDismissAlert">
           <i class="pi pi-times" />
-          Descartar
+          Descartada
         </button>
       </div>
     </div>

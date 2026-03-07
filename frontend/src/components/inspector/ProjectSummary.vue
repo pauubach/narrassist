@@ -172,20 +172,20 @@ function handleAlertAction(alert: Alert, action: 'accept' | 'reject') {
           <button
             type="button"
             class="action-btn action-btn--accept"
-            title="Aceptar sugerencia"
+            title="Marcar como resuelta"
             @click="handleAlertAction(nextPendingAlert, 'accept')"
           >
             <i class="pi pi-check"></i>
-            Aceptar
+            Resuelta
           </button>
           <button
             type="button"
             class="action-btn action-btn--reject"
-            title="Rechazar alerta"
+            title="Marcar como descartada"
             @click="handleAlertAction(nextPendingAlert, 'reject')"
           >
             <i class="pi pi-times"></i>
-            Rechazar
+            Descartada
           </button>
           <button
             type="button"

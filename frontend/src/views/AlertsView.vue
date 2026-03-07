@@ -23,7 +23,7 @@
           @click="exportAlerts"
         />
         <Button
-          label="Resolver todas"
+          label="Todas resueltas"
           icon="pi pi-check-circle"
           :disabled="openAlertsCount === 0"
           @click="resolveAll"
@@ -215,7 +215,7 @@
           <div class="detail-actions">
             <Button
               v-if="isAlertOpenStatus(selectedAlert.status)"
-              label="Marcar como resuelta"
+              label="Resuelta"
               icon="pi pi-check"
               severity="success"
               class="w-full"
@@ -223,7 +223,7 @@
             />
             <Button
               v-if="isAlertOpenStatus(selectedAlert.status)"
-              label="Descartar alerta"
+              label="Descartada"
               icon="pi pi-times"
               severity="secondary"
               outlined
@@ -247,7 +247,7 @@
     <Dialog
       v-model:visible="showResolveAllDialog"
       modal
-      header="Resolver todas las alertas"
+      header="Marcar todas como resueltas"
       :style="{ width: '500px' }"
     >
       <p>
@@ -265,7 +265,7 @@
           @click="showResolveAllDialog = false"
         />
         <Button
-          label="Resolver todas"
+          label="Sí, todas resueltas"
           icon="pi pi-check"
           severity="success"
           @click="confirmResolveAll"

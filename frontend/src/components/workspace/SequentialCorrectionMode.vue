@@ -11,8 +11,8 @@
  * Atajos de teclado:
  * - ← / P: Anterior
  * - → / N: Siguiente
- * - A / Enter: Aceptar (resolver)
- * - D: Descartar
+ * - A / Enter: Resuelta
+ * - D: Descartada
  * - S: Saltar
  * - F: Marcar para revisar
  * - Ctrl+Z: Deshacer
@@ -186,8 +186,8 @@ const contextLines = computed(() => {
 const shortcuts = [
   { key: '←/P', action: 'Anterior' },
   { key: '→/N', action: 'Siguiente' },
-  { key: 'A/Enter', action: 'Aceptar' },
-  { key: 'D', action: 'Descartar' },
+  { key: 'A/Enter', action: 'Resuelta' },
+  { key: 'D', action: 'Descartada' },
   { key: 'S', action: 'Saltar' },
   { key: 'F', action: 'Marcar' },
   { key: 'Ctrl+Z', action: 'Deshacer' },
@@ -204,7 +204,7 @@ function formatActionTime(date: Date): string {
 
 function getActionLabel(action: string): string {
   switch (action) {
-    case 'resolve': return 'Aceptada'
+    case 'resolve': return 'Resuelta'
     case 'dismiss': return 'Descartada'
     case 'skip': return 'Saltada'
     case 'flag': return 'Marcada'
@@ -410,8 +410,8 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
       <section class="action-section" aria-label="Acciones">
         <div class="primary-actions">
           <Button
-            v-tooltip.bottom="'Aceptar corrección (A)'"
-            label="Aceptar"
+            v-tooltip.bottom="'Marcar como resuelta (A)'"
+            label="Resuelta"
             icon="pi pi-check"
             severity="success"
             :disabled="updating || isResolved"
@@ -421,8 +421,8 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
           />
 
           <Button
-            v-tooltip.bottom="'Descartar alerta (D)'"
-            label="Descartar"
+            v-tooltip.bottom="'Marcar como descartada (D)'"
+            label="Descartada"
             icon="pi pi-times"
             severity="warn"
             :disabled="updating || isDismissed"

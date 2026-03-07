@@ -227,7 +227,7 @@ function getAlertMessage(alert: Alert): string {
             <button
               type="button"
               class="alert-panel__action-btn"
-              title="Descartar"
+              title="Marcar alerta como descartada"
               @click="handleDismiss($event, alert)"
             >
               <i class="pi pi-times" />
@@ -235,7 +235,7 @@ function getAlertMessage(alert: Alert): string {
             <button
               type="button"
               class="alert-panel__action-btn alert-panel__action-btn--resolve"
-              title="Marcar como resuelta"
+              title="Marcar alerta como resuelta"
               @click="handleResolve($event, alert)"
             >
               <i class="pi pi-check" />

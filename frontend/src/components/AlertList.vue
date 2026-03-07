@@ -203,7 +203,7 @@
                 />
                 <Button
                   v-if="isAlertOpenStatus(alert.status)"
-                  label="Resolver"
+                  label="Resuelta"
                   icon="pi pi-check"
                   text
                   size="small"
@@ -211,7 +211,7 @@
                 />
                 <Button
                   v-if="isAlertOpenStatus(alert.status)"
-                  label="Descartar"
+                  label="Descartada"
                   icon="pi pi-times"
                   text
                   size="small"
@@ -329,7 +329,7 @@
               />
               <Button
                 v-if="isAlertOpenStatus(alert.status)"
-                label="Resolver"
+                label="Resuelta"
                 icon="pi pi-check"
                 text
                 size="small"
@@ -337,7 +337,7 @@
               />
               <Button
                 v-if="isAlertOpenStatus(alert.status)"
-                label="Descartar"
+                label="Descartada"
                 icon="pi pi-times"
                 text
                 size="small"

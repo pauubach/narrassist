@@ -208,6 +208,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const _analyzing = ref<Record<number, boolean>>({})
   const _errors = ref<Record<number, string | null>>({})
   const _warnings = ref<Record<number, string | null>>({})
+  /** Project IDs where startAnalysis() API request is in flight (file upload pending). */
+  const _startInflight = ref<Set<number>>(new Set())
   const _activeProjectId = ref<number | null>(null)
 
   /**
@@ -295,6 +297,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
     // Guard: prevent duplicate concurrent requests for the same project
     if (_analyzing.value[projectId]) return false
 
+    delete _errors.value[projectId]
+    delete _warnings.value[projectId]
+
     // Pre-flight: verificar que los motores de análisis están listos
     // Solo si el backend está conectado — evita 404 ruidosos en consola
     if (!backendDown.value) try {
@@ -327,7 +332,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     }
 
     _analyzing.value[projectId] = true
-    delete _errors.value[projectId]
+    _startInflight.value.add(projectId)
     // Limpiar fases ejecutadas para que los ticks se reseteen
     executedPhases.value[projectId] = {}
 
@@ -341,6 +346,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
       }
 
       const response = await api.postForm<{ project_id: number; status: string }>(`/api/projects/${projectId}/analyze`, formData)
+      _startInflight.value.delete(projectId)
       const isQueued = response?.status === 'queued'
       // Re-assert _analyzing after await (checkAnalysisStatus may have cleared it during the await)
       _analyzing.value[projectId] = true
@@ -353,6 +359,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
       }
       return true
     } catch (err) {
+      _startInflight.value.delete(projectId)
       _errors.value[projectId] = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
       _analyzing.value[projectId] = false
       console.error('Failed to start analysis:', err)
@@ -364,6 +371,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     try {
       await api.postRaw<{ success: boolean }>(`/api/projects/${projectId}/analysis/cancel`, {})
       _analyzing.value[projectId] = false
+      _startInflight.value.delete(projectId)
       if (_analyses.value[projectId]) {
         _analyses.value[projectId].status = 'idle'
         _analyses.value[projectId].current_phase = 'Análisis cancelado'
@@ -420,6 +428,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
       delete _analyses.value[id]
       delete _analyzing.value[id]
       delete _errors.value[id]
+      delete _warnings.value[id]
+      _startInflight.value.delete(id)
       _clearRunningPhases(id)
     }
   }
@@ -438,10 +448,12 @@ export const useAnalysisStore = defineStore('analysis', () => {
         phases: []
       }
       delete _errors.value[projectId]
+      delete _warnings.value[projectId]
       // Limpiar fases ejecutadas para que los ticks se reseteen
       executedPhases.value[projectId] = {}
     } else {
       delete _analyses.value[projectId]
+      _startInflight.value.delete(projectId)
       _clearRunningPhases(projectId)
     }
   }
@@ -465,15 +477,19 @@ export const useAnalysisStore = defineStore('analysis', () => {
         return true
       }
 
-      // Backend explicitly says no analysis running — clear stale state.
-      // This handles the case where the backend was restarted and the
-      // frontend still has _analyzing=true from a previous session.
+      // Backend says no analysis running.  If startAnalysis() has an API
+      // request in flight (file upload pending), the backend hasn't received
+      // it yet — preserve the inflight state instead of clearing.
+      if (_startInflight.value.has(projectId)) {
+        return true
+      }
+      // Otherwise, backend is authoritative — clear stale state.
       clearAnalysis(projectId)
       return false
     } catch {
-      if (_analyzing.value[projectId] === true) {
-        return true
-      }
+      // Tauri policy: backend local no disponible / reiniciándose.
+      // Si no podemos hablar con nuestro propio backend, cualquier estado
+      // local (incluido _startInflight) es sospechoso — limpiar siempre.
       clearAnalysis(projectId)
       return false
     }
@@ -536,6 +552,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
     const projectRunningPhases = _ensureRunningPhases(projectId)
     phases.forEach(p => projectRunningPhases.add(p))
 
+    delete _errors.value[projectId]
+    delete _warnings.value[projectId]
     _analyzing.value[projectId] = true
     _analyses.value[projectId] = {
       project_id: projectId,
@@ -549,7 +567,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
         current: p === phases[0]
       }))
     }
-    delete _errors.value[projectId]
 
     try {
       await api.post(`/api/projects/${projectId}/analyze/partial`, { phases, force })

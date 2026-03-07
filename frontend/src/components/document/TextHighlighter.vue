@@ -457,7 +457,7 @@ function handleMouseUp() {
         <div class="popup-actions">
           <button class="popup-btn popup-btn--secondary" @click="handleIgnoreError">
             <i class="pi pi-ban"></i>
-            Ignorar
+            Ignorada
           </button>
           <button
             v-if="activeErrorPopup.alert.category !== 'grammar'"

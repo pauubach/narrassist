@@ -5,40 +5,21 @@
  * sin montar el componente (evita dependencias de PrimeVue, Tauri, etc.)
  */
 
+import {
+  STATUSBAR_PHASES,
+  STATUSBAR_STEP_LABELS,
+  calculateStatusBarPhaseProgress,
+} from '@/config/analysisProgress'
+
 
 // ── Phase Progress Logic ─────────────────────────────────────
 // Replica la lógica de calculatePhaseProgress y steps del StatusBar
 // para testar sin montar el componente.
 
-interface PhaseDefinition {
-  id: string
-  name: string
-  range: [number, number]
-}
-
-const allPhases: PhaseDefinition[] = [
-  { id: 'parsing', name: 'Lectura del documento', range: [0, 1] },
-  { id: 'classification', name: 'Clasificando documento', range: [1, 2] },
-  { id: 'structure', name: 'Identificando capítulos', range: [2, 3] },
-  { id: 'ner', name: 'Buscando personajes y lugares', range: [3, 34] },
-  { id: 'fusion', name: 'Unificando entidades', range: [34, 49] },
-  { id: 'attributes', name: 'Analizando características', range: [49, 57] },
-  { id: 'consistency', name: 'Verificando coherencia', range: [57, 60] },
-  { id: 'grammar', name: 'Revisando gramática y ortografía', range: [60, 66] },
-  { id: 'alerts', name: 'Preparando observaciones', range: [66, 70] },
-  { id: 'relationships', name: 'Analizando relaciones', range: [70, 78] },
-  { id: 'voice', name: 'Perfilando voces', range: [78, 86] },
-  { id: 'prose', name: 'Evaluando escritura', range: [86, 94] },
-  { id: 'health', name: 'Salud narrativa', range: [94, 100] },
-]
+const allPhases = STATUSBAR_PHASES
 
 function calculatePhaseProgress(phaseId: string, totalProgress: number): number {
-  const phase = allPhases.find(p => p.id === phaseId)
-  if (!phase) return 0
-  const [start, end] = phase.range
-  if (totalProgress < start) return 0
-  if (totalProgress >= end) return 100
-  return Math.round(((totalProgress - start) / (end - start)) * 100)
+  return calculateStatusBarPhaseProgress(phaseId, totalProgress)
 }
 
 function calculateSteps(currentProgress: number) {
@@ -69,22 +50,7 @@ function formatNumber(num: number): string {
   return num.toString()
 }
 
-const stepLabels: Record<string, string> = {
-  'parsing': 'Lectura del documento',
-  'classification': 'Clasificando documento',
-  'structure': 'Identificando capítulos',
-  'ner': 'Buscando personajes y lugares',
-  'fusion': 'Unificando entidades',
-  'attributes': 'Analizando características',
-  'consistency': 'Verificando coherencia',
-  'grammar': 'Revisando gramática',
-  'alerts': 'Preparando observaciones',
-  'relationships': 'Analizando relaciones',
-  'voice': 'Perfilando voces',
-  'prose': 'Evaluando escritura',
-  'health': 'Salud narrativa',
-  'complete': 'Análisis completado',
-}
+const stepLabels = STATUSBAR_STEP_LABELS
 
 // ── Tests ────────────────────────────────────────────────────
 
@@ -94,14 +60,14 @@ describe('StatusBar: calculatePhaseProgress', () => {
   })
 
   it('should return 100 for progress at or after phase end', () => {
-    expect(calculatePhaseProgress('ner', 34)).toBe(100)
+    expect(calculatePhaseProgress('ner', 24)).toBe(100)
     expect(calculatePhaseProgress('ner', 50)).toBe(100)
   })
 
   it('should calculate mid-phase progress correctly', () => {
-    // NER: range [3, 34], span = 31
-    // At progress 18.5: (18.5 - 3) / 31 = 0.5 = 50%
-    expect(calculatePhaseProgress('ner', 18.5)).toBe(50)
+    // NER: range [3, 24], span = 21
+    // At progress 13.5: (13.5 - 3) / 21 = 0.5 = 50%
+    expect(calculatePhaseProgress('ner', 13.5)).toBe(50)
   })
 
   it('should return 0 for unknown phase', () => {
@@ -118,6 +84,12 @@ describe('StatusBar: calculatePhaseProgress', () => {
     expect(calculatePhaseProgress('health', 93)).toBe(0)
     expect(calculatePhaseProgress('health', 97)).toBe(50)
     expect(calculatePhaseProgress('health', 100)).toBe(100)
+  })
+
+  it('should handle timeline phase (49-53 range)', () => {
+    expect(calculatePhaseProgress('timeline', 48)).toBe(0)
+    expect(calculatePhaseProgress('timeline', 51)).toBe(50)
+    expect(calculatePhaseProgress('timeline', 53)).toBe(100)
   })
 })
 
@@ -142,7 +114,7 @@ describe('StatusBar: calculateSteps', () => {
     const steps = calculateSteps(50)
     const inProgress = steps.filter(s => s.status === 'in_progress')
     expect(inProgress).toHaveLength(1)
-    expect(inProgress[0].id).toBe('attributes') // range [49, 57]
+    expect(inProgress[0].id).toBe('timeline') // range [49, 53]
   })
 
   it('should mark phases before current as completed', () => {
@@ -161,9 +133,13 @@ describe('StatusBar: calculateSteps', () => {
     expect(pending.map(s => s.id)).toContain('health')
   })
 
-  it('should return 13 phases total', () => {
+  it('should return 14 phases total', () => {
     const steps = calculateSteps(0)
-    expect(steps).toHaveLength(13)
+    expect(steps).toHaveLength(14)
+  })
+
+  it('should include timeline in fallback phases', () => {
+    expect(allPhases.some(phase => phase.id === 'timeline')).toBe(true)
   })
 
   it('should have contiguous ranges (no gaps)', () => {
@@ -207,6 +183,7 @@ describe('StatusBar: stepLabels', () => {
 
   it('should map known steps to Spanish labels', () => {
     expect(stepLabels['ner']).toBe('Buscando personajes y lugares')
+    expect(stepLabels['timeline']).toBe('Construyendo línea temporal')
     expect(stepLabels['grammar']).toBe('Revisando gramática')
     expect(stepLabels['health']).toBe('Salud narrativa')
   })
@@ -232,6 +209,7 @@ describe('StatusBar: analysisStatus logic', () => {
     isAnalyzing: boolean
     status?: string
     error?: string | null
+    warning?: string | null
     analysisError?: boolean
     hasAnalysis?: boolean
   }) {
@@ -246,6 +224,9 @@ describe('StatusBar: analysisStatus logic', () => {
     if (opts.error || opts.analysisError) {
       const detail = opts.error ? formatAnalysisErrorText(opts.error) : 'Error en análisis'
       return { icon: 'pi-times-circle', text: detail, class: 'status-error' }
+    }
+    if (opts.warning && opts.hasAnalysis) {
+      return { icon: 'pi-exclamation-triangle', text: 'Análisis completado con capacidad reducida', class: 'status-warning' }
     }
     if (opts.hasAnalysis) {
       return { icon: 'pi-check-circle', text: 'Análisis completado', class: 'status-completed' }
@@ -303,6 +284,26 @@ describe('StatusBar: analysisStatus logic', () => {
     const result = getAnalysisStatus({ isAnalyzing: false, hasAnalysis: true })
     expect(result?.class).toBe('status-completed')
     expect(result?.text).toBe('Análisis completado')
+  })
+
+  it('should show warning when analysis completed with reduced capability', () => {
+    const result = getAnalysisStatus({
+      isAnalyzing: false,
+      warning: 'capacidad reducida',
+      hasAnalysis: true,
+    })
+    expect(result?.class).toBe('status-warning')
+    expect(result?.text).toBe('Análisis completado con capacidad reducida')
+  })
+
+  it('should not show completed warning before analysis exists', () => {
+    const result = getAnalysisStatus({
+      isAnalyzing: false,
+      warning: 'capacidad reducida',
+      hasAnalysis: false,
+    })
+    expect(result?.class).toBe('status-pending')
+    expect(result?.text).toBe('Sin analizar')
   })
 
   it('should show pending when nothing', () => {

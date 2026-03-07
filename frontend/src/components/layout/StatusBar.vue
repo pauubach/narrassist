@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import {
+  STATUSBAR_PHASES,
+  STATUSBAR_STEP_LABELS,
+  calculateStatusBarPhaseProgress,
+} from '@/config/analysisProgress'
 import { useAnalysisStore } from '@/stores/analysis'
 import { useSystemStore } from '@/stores/system'
 import ProgressBar from 'primevue/progressbar'
@@ -78,34 +83,13 @@ const showDetails = ref(false)
 const analysisTriggerRef = ref<HTMLElement | null>(null)
 const detailsPanelRef = ref<HTMLElement | null>(null)
 
-// Definición de todas las fases del análisis con sus rangos de progreso
-interface PhaseDefinition {
-  id: string
-  name: string
-  range: [number, number]
-}
-
-// Rangos alineados con los pesos del backend (13 fases):
+// Rangos fallback alineados con los pesos del backend (14 fases).
+// Incluye timeline entre fusion y attributes para reflejar PHASE_ORDER real.
 // Tier 1 (rápido): parsing+classification+structure ~3%
-// Tier 2 (NLP pesado): ner+fusion ~50% (fusion incluye correferencias LLM)
+// Tier 2 (NLP pesado): ner+fusion ~46%, timeline ~4%
 // Tier 3 (análisis): attributes..alerts ~19%
 // Tier 4 (enriquecimiento paralelo): relationships..health ~28%
-// Nota: pesos auto-calibrados por proyecto en el backend
-const allPhases: PhaseDefinition[] = [
-  { id: 'parsing', name: 'Lectura del documento', range: [0, 1] },
-  { id: 'classification', name: 'Clasificando documento', range: [1, 2] },
-  { id: 'structure', name: 'Identificando capítulos', range: [2, 3] },
-  { id: 'ner', name: 'Buscando personajes y lugares', range: [3, 25] },
-  { id: 'fusion', name: 'Unificando entidades', range: [25, 53] },
-  { id: 'attributes', name: 'Analizando características', range: [53, 60] },
-  { id: 'consistency', name: 'Verificando coherencia', range: [60, 63] },
-  { id: 'grammar', name: 'Revisando gramática y ortografía', range: [63, 69] },
-  { id: 'alerts', name: 'Preparando observaciones', range: [69, 72] },
-  { id: 'relationships', name: 'Analizando relaciones', range: [72, 80] },
-  { id: 'voice', name: 'Perfilando voces', range: [80, 87] },
-  { id: 'prose', name: 'Evaluando escritura', range: [87, 94] },
-  { id: 'health', name: 'Salud narrativa', range: [94, 100] },
-]
+// Nota: pesos auto-calibrados por proyecto en el backend.
 
 // Computed - usando propiedades reales del store
 const isAnalyzing = computed(() => analysisStore.isAnalyzing)
@@ -136,13 +120,13 @@ const steps = computed(() => {
       name: phase.name,
       status: phase.completed ? 'completed' : phase.current ? 'in_progress' : 'pending',
       duration: phase.duration,
-      progress: phase.current ? calculatePhaseProgress(phase.id, currentProgress) : (phase.completed ? 100 : 0)
+      progress: phase.current ? calculateStatusBarPhaseProgress(phase.id, currentProgress) : (phase.completed ? 100 : 0)
     }))
   }
 
   // Si es un análisis completado sin detalles (recargó la página), mostrar todas las fases como completadas
   if (isCompletedWithoutDetails.value) {
-    return allPhases.map(phase => ({
+    return STATUSBAR_PHASES.map(phase => ({
       id: phase.id,
       name: phase.name,
       status: 'completed' as const,
@@ -152,7 +136,7 @@ const steps = computed(() => {
   }
 
   // Si no hay fases del backend, calcular basado en el progreso
-  return allPhases.map(phase => {
+  return STATUSBAR_PHASES.map(phase => {
     const [start, end] = phase.range
     let status: 'completed' | 'in_progress' | 'pending'
     let phaseProgress = 0
@@ -178,36 +162,9 @@ const steps = computed(() => {
   })
 })
 
-// Calcular progreso dentro de una fase específica
-function calculatePhaseProgress(phaseId: string, totalProgress: number): number {
-  const phase = allPhases.find(p => p.id === phaseId)
-  if (!phase) return 0
-  const [start, end] = phase.range
-  if (totalProgress < start) return 0
-  if (totalProgress >= end) return 100
-  return Math.round(((totalProgress - start) / (end - start)) * 100)
-}
-
-// Mapeo de pasos a textos legibles (para compatibilidad)
-const stepLabels: Record<string, string> = {
-  'parsing': 'Lectura del documento',
-  'classification': 'Clasificando documento',
-  'structure': 'Identificando capítulos',
-  'ner': 'Buscando personajes y lugares',
-  'fusion': 'Unificando entidades',
-  'attributes': 'Analizando características',
-  'consistency': 'Verificando coherencia',
-  'grammar': 'Revisando gramática',
-  'alerts': 'Preparando observaciones',
-  'relationships': 'Analizando relaciones',
-  'voice': 'Perfilando voces',
-  'prose': 'Evaluando escritura',
-  'health': 'Salud narrativa',
-  'complete': 'Análisis completado'
-}
-
+// Mapeo de pasos a textos legibles (compatibilidad con current_phase del backend)
 const currentStepLabel = computed(() => {
-  return stepLabels[currentStep.value] || currentStep.value || 'Procesando...'
+  return STATUSBAR_STEP_LABELS[currentStep.value] || currentStep.value || 'Procesando...'
 })
 
 function formatAnalysisErrorText(rawError: string): string {

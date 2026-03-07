@@ -354,7 +354,7 @@ defineExpose({ focusSearch })
 
         <Button
           v-if="ambiguousWithSuggestion.length > 0"
-          v-tooltip="`Resolver ${ambiguousWithSuggestion.length} ambiguas con sugerencia`"
+          v-tooltip="`Marcar ${ambiguousWithSuggestion.length} ambiguas como resueltas`"
           icon="pi pi-bolt"
           text
           rounded
@@ -364,7 +364,7 @@ defineExpose({ focusSearch })
         />
 
         <Button
-          v-tooltip="'Resolver todas las activas'"
+          v-tooltip="'Marcar todas como resueltas'"
           icon="pi pi-check-circle"
           text
           rounded
@@ -449,7 +449,7 @@ defineExpose({ focusSearch })
     <!-- Diálogo de confirmación para resolver todas -->
     <Dialog
       :visible="showResolveAllDialog"
-      header="Resolver todas las alertas"
+      header="Marcar todas como resueltas"
       :modal="true"
       :style="{ width: '400px' }"
       @update:visible="showResolveAllDialog = $event"
@@ -463,14 +463,14 @@ defineExpose({ focusSearch })
       </p>
       <template #footer>
         <Button label="Cancelar" text @click="showResolveAllDialog = false" />
-        <Button label="Resolver todas" severity="success" @click="confirmResolveAll" />
+        <Button label="Sí, todas resueltas" severity="success" @click="confirmResolveAll" />
       </template>
     </Dialog>
 
     <!-- Diálogo de batch resolve ambiguous -->
     <Dialog
       :visible="showBatchAmbiguousDialog"
-      header="Resolver alertas ambiguas con sugerencia"
+      header="Marcar ambiguas como resueltas (con sugerencia)"
       :modal="true"
       :style="{ width: '450px' }"
       @update:visible="showBatchAmbiguousDialog = $event"
@@ -484,7 +484,7 @@ defineExpose({ focusSearch })
       </p>
       <template #footer>
         <Button label="Cancelar" text @click="showBatchAmbiguousDialog = false" />
-        <Button label="Resolver con sugerencia" severity="warn" icon="pi pi-bolt" @click="confirmBatchResolveAmbiguous" />
+        <Button label="Sí, marcar resueltas" severity="warn" icon="pi pi-bolt" @click="confirmBatchResolveAmbiguous" />
       </template>
     </Dialog>
 

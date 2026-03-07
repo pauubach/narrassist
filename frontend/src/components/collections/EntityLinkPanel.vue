@@ -69,7 +69,7 @@
             <template #body="{ data }">
               <div class="action-buttons">
                 <Button
-                  v-tooltip="'Aceptar enlace'"
+                  v-tooltip="'Enlace aceptado'"
                   icon="pi pi-check"
                   text
                   rounded
@@ -78,7 +78,7 @@
                   @click="acceptSuggestion(data)"
                 />
                 <Button
-                  v-tooltip="'Descartar'"
+                  v-tooltip="'Enlace descartado'"
                   icon="pi pi-times"
                   text
                   rounded

@@ -572,7 +572,7 @@ defineExpose({ focusSearch })
               severity="secondary"
               text
               size="small"
-              title="Ignorar"
+              title="Marcar sugerencia como ignorada"
               @click="dismissSuggestion(suggestion)"
             />
           </div>

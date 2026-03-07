@@ -311,14 +311,14 @@ function resolveAsUnassigned() {
         <!-- Botones estándar -->
         <div v-else-if="isActive" class="action-buttons">
           <Button
-            label="Descartar"
+            label="Descartada"
             icon="pi pi-times"
             severity="secondary"
             text
             @click="emit('dismiss')"
           />
           <Button
-            label="Resolver"
+            label="Resuelta"
             icon="pi pi-check"
             severity="success"
             @click="emit('resolve')"
