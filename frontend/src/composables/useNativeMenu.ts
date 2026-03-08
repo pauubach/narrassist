@@ -63,7 +63,7 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
     if (handler) {
       handler()
     } else {
-      console.warn(`[Menu] No handler for '${name}' — event dropped`)
+      logWarn('Menu', `No handler for '${name}' - event dropped`)
     }
   }
 
@@ -206,7 +206,7 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
         break
 
       default:
-        console.warn('[Menu] Unknown event ID:', eventId)
+        logWarn('Menu', 'Unknown event ID:', eventId)
         break
     }
   }

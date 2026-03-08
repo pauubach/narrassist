@@ -396,6 +396,7 @@ import MultiSelect from 'primevue/multiselect'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import { api } from '@/services/apiClient'
+import { logError, logWarn } from '@/services/logger'
 import {
   useRelationshipGraphStore,
   type RelationshipValence,
@@ -1028,7 +1029,7 @@ const loadRelationships = async () => {
       relationshipData.value = result.data
     }
   } catch (err) {
-    console.error('Error loading relationships:', err)
+    logError('RelationshipGraph', 'Error loading relationships:', err)
   } finally {
     loading.value = false
   }
@@ -1042,7 +1043,7 @@ const initializeGraph = () => {
 
   // Verificar que entities existe
   if (!data.entities || !Array.isArray(data.entities)) {
-    console.warn('RelationshipGraph: data.entities is missing or not an array')
+    logWarn('RelationshipGraph', 'data.entities is missing or not an array')
     return
   }
 
@@ -1059,7 +1060,7 @@ const initializeGraph = () => {
 
     // Validar que tanto source como target existen en las entidades
     if (!validEntityIds.has(rel.source_id) || !validEntityIds.has(rel.target_id)) {
-      console.warn('RelationshipGraph: Skipping edge with invalid entity ID:', rel)
+      logWarn('RelationshipGraph', 'RelationshipGraph: Skipping edge with invalid entity ID:', rel)
       return false
     }
 

@@ -204,6 +204,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 const props = defineProps<{
   projectId: number
@@ -265,7 +266,7 @@ async function analyze() {
       throw new Error(data.error || 'Error al analizar')
     }
   } catch (error) {
-    console.error('Error analyzing sticky sentences:', error)
+    logError('StickySentencesTab', 'Error analyzing sticky sentences:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',

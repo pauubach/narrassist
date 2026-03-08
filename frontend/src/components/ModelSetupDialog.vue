@@ -8,6 +8,7 @@ import { api } from '@/services/apiClient'
 import { createEnsureAutoConfig } from '@/components/modelSetupAutoConfig'
 import Dialog from 'primevue/dialog'
 import DsDownloadProgress from '@/components/ds/DsDownloadProgress.vue'
+import { logWarn } from '@/services/logger'
 
 const props = withDefaults(defineProps<{
   /** Cuando true, el diálogo no se muestra pero el backend sigue trabajando */
@@ -260,7 +261,7 @@ async function startLLMDownloadIfNeeded() {
     finishSetup(allOk)
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
-    console.warn('[setup] No se pudieron completar los motores avanzados:', msg)
+    logWarn('ModelSetupDialog', '[setup] No se pudieron completar los motores avanzados:', msg)
     // LLM download es best-effort — no bloquear
     finishSetup(false)
   }

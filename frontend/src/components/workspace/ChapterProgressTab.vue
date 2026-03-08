@@ -416,6 +416,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import ProgressBar from 'primevue/progressbar'
 import { useToast } from 'primevue/usetoast'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 interface NarrativeEvent {
   event_type: string
@@ -563,7 +564,7 @@ async function loadReport() {
       error.value = data.error || 'Error al cargar el análisis'
     }
   } catch (err) {
-    console.error('Error loading chapter progress:', err)
+    logError('ChapterProgressTab', 'Error loading chapter progress:', err)
     error.value = 'No se pudo cargar el análisis de progreso. Si persiste, reinicia la aplicación.'
   } finally {
     loading.value = false

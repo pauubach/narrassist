@@ -909,6 +909,7 @@ import { api } from '@/services/apiClient'
 
 // Tipos importados de corrections.ts
 import type { DetailedCorrectionConfig, EditorialRule } from '@/types'
+import { logError } from '@/services/logger'
 
 // Alias local para facilitar migración
 type CorrectionConfig = DetailedCorrectionConfig
@@ -1268,7 +1269,7 @@ const loadConfig = async () => {
     await nextTick()
     await nextTick()
   } catch (err) {
-    console.error('Error loading correction config:', err)
+    logError('CorrectionConfigModal', 'Error loading correction config:', err)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -1341,7 +1342,7 @@ const saveConfig = async () => {
       throw new Error(data.error || 'Error guardando')
     }
   } catch (err) {
-    console.error('Error saving correction config:', err)
+    logError('CorrectionConfigModal', 'Error saving correction config:', err)
     toast.add({
       severity: 'error',
       summary: 'Error',

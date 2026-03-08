@@ -449,6 +449,7 @@ import ProgressBar from 'primevue/progressbar'
 import InputText from 'primevue/inputtext'
 import type { Entity } from '@/types'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 // Interfaces para similitud por nombre
 interface NameSimilarity {
@@ -695,7 +696,7 @@ const loadSimilarity = async () => {
       similarityData.value = result.data
     }
   } catch (error) {
-    console.error('Error loading similarity:', error)
+    logError('MergeEntitiesDialog', 'Error loading similarity:', error)
   } finally {
     loadingSimilarity.value = false
   }
@@ -731,7 +732,7 @@ const loadPreviewMerge = async () => {
       }
     }
   } catch (error) {
-    console.error('Error loading preview merge:', error)
+    logError('MergeEntitiesDialog', 'Error loading preview merge:', error)
     // Fallback a endpoint de similitud simple
     await loadSimilarity()
   } finally {

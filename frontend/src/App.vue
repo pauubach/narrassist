@@ -81,6 +81,7 @@ import ModelSetupDialog from '@/components/ModelSetupDialog.vue'
 import QuotaWarningBanner from '@/components/license/QuotaWarningBanner.vue'
 import TierComparisonDialog from '@/components/license/TierComparisonDialog.vue'
 import { useSystemStore } from '@/stores/system'
+import { logError, logWarn } from '@/services/logger'
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
@@ -103,7 +104,10 @@ const showBackendDownBanner = computed(() => {
 
 // ── Global error boundary ───────────────────────────────────
 onErrorCaptured((err, instance, info) => {
-  console.error(`[ErrorBoundary] ${info}:`, err, instance?.$options?.name || instance?.$options?.__name)
+  logError('App', `[ErrorBoundary] ${info}:`, {
+    error: err,
+    component: instance?.$options?.name || instance?.$options?.__name,
+  })
   // Don't swallow the error — let Vue's default handler log it too
   return true
 })
@@ -148,7 +152,7 @@ useNativeMenu({
   onSaveProject: async () => {
     const projectId = Number(route.params.id)
     if (!projectId) {
-      console.warn('[Menu] Save project ignored: no project view active')
+      logWarn('App', '[Menu] Save project ignored: no project view active')
       return
     }
     try {
@@ -157,7 +161,7 @@ useNativeMenu({
         toast.add({ severity: 'success', summary: 'Guardado', detail: 'Proyecto guardado correctamente', life: 3000 })
       }
     } catch (err) {
-      console.error('[Menu] Save project error:', err)
+      logError('App', '[Menu] Save project error:', err)
       toast.add({ severity: 'error', summary: 'Error', detail: `Error al guardar: ${err}`, life: 5000 })
     }
   },
@@ -173,7 +177,7 @@ useNativeMenu({
         router.push({ name: 'project', params: { id: result.projectId } })
       }
     } catch (err) {
-      console.error('[Menu] Open file error:', err)
+      logError('App', '[Menu] Open file error:', err)
       toast.add({ severity: 'error', summary: 'Error', detail: `Error al abrir: ${err}`, life: 5000 })
     }
   },
@@ -189,7 +193,7 @@ useNativeMenu({
   },
   onUpdateManuscript: () => {
     if (route.name !== 'project') {
-      console.warn('[Menu] Update manuscript ignored: no project view active')
+      logWarn('App', '[Menu] Update manuscript ignored: no project view active')
       return
     }
     window.dispatchEvent(new CustomEvent('menubar:update-manuscript'))
@@ -287,6 +291,15 @@ onMounted(() => {
   if (typeof window !== 'undefined') {
     isTauri.value = '__TAURI__' in window || '__TAURI_INTERNALS__' in window
   }
+
+  // Hacer un health check inicial también en entorno web/E2E.
+  // En desktop Tauri esto converge con los eventos del sidecar; en web
+  // evita dejar stores bloqueados esperando backendReady sin sondear nunca.
+  void systemStore.checkBackendStatus().then(() => {
+    if (!systemStore.backendReady) {
+      systemStore.startRetrying()
+    }
+  })
 
   // Mostrar tutorial inmediatamente si corresponde (modelos se instalan en background)
   const shouldShowTutorial = checkTutorialStatus()

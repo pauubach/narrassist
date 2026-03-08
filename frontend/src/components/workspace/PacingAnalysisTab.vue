@@ -315,6 +315,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 const props = defineProps<{
   projectId: number
@@ -377,7 +378,7 @@ async function analyze() {
       throw new Error(data.error || 'Error al analizar')
     }
   } catch (error) {
-    console.error('Error analyzing pacing:', error)
+    logError('PacingAnalysisTab', 'Error analyzing pacing:', error)
     analysisError.value = error instanceof Error ? error.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
     toast.add({
       severity: 'error',
@@ -403,7 +404,7 @@ async function loadGenreComparison() {
       genreComparison.value = data.data.comparison
     }
   } catch (error) {
-    console.error('Error loading genre comparison:', error)
+    logError('PacingAnalysisTab', 'Error loading genre comparison:', error)
   } finally {
     genreLoading.value = false
   }

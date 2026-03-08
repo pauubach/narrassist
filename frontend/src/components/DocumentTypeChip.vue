@@ -160,6 +160,7 @@ interface TypeInfo {
 
 // Importar tipo desde corrections.ts
 import type { DetailedCorrectionConfig as CorrectionConfig } from '@/types'
+import { logError } from '@/services/logger'
 
 const props = defineProps<{
   projectId: number
@@ -222,7 +223,7 @@ const selectType = async (typeCode: string) => {
       loadCorrectionConfig()
     }
   } catch (err) {
-    console.error('Error updating document type:', err)
+    logError('DocumentTypeChip', 'Error updating document type:', err)
   } finally {
     loading.value = false
   }
@@ -246,7 +247,7 @@ const selectSubtype = async (subtypeCode: string | null) => {
       loadCorrectionConfig()
     }
   } catch (err) {
-    console.error('Error updating document subtype:', err)
+    logError('DocumentTypeChip', 'Error updating document subtype:', err)
   } finally {
     loading.value = false
   }
@@ -265,7 +266,7 @@ const loadDocumentType = async () => {
       selectedSubtype.value = data.data.subtype
     }
   } catch (err) {
-    console.error('Error loading document type:', err)
+    logError('DocumentTypeChip', 'Error loading document type:', err)
   }
 }
 
@@ -284,7 +285,7 @@ const loadDocumentTypes = async () => {
         documentTypes.value = data.data
       }
     } catch (fallbackErr) {
-      console.error('Error loading document types:', fallbackErr)
+      logError('DocumentTypeChip', 'Error loading document types:', fallbackErr)
     }
   }
 }
@@ -304,7 +305,7 @@ const loadCorrectionConfig = async () => {
       correctionConfig.value = data.data
     }
   } catch (err) {
-    console.error('Error loading correction config:', err)
+    logError('DocumentTypeChip', 'Error loading correction config:', err)
   }
 }
 

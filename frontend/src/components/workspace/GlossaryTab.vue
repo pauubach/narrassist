@@ -27,6 +27,7 @@ import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import DsEmptyState from '@/components/ds/DsEmptyState.vue'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 interface GlossaryEntry {
   id: number
@@ -182,7 +183,7 @@ async function loadEntries() {
       entries.value = data.data.entries
     }
   } catch (error) {
-    console.error('Error loading glossary:', error)
+    logError('GlossaryTab', 'Error loading glossary:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -364,7 +365,7 @@ async function loadSuggestions() {
       throw new Error(data.error)
     }
   } catch (error: any) {
-    console.error('Error loading suggestions:', error)
+    logError('GlossaryTab', 'Error loading suggestions:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',

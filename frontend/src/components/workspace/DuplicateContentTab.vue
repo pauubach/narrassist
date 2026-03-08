@@ -197,6 +197,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 const props = defineProps<{
   projectId: number
@@ -263,7 +264,7 @@ async function analyze() {
       throw new Error(data.error || 'Error al analizar')
     }
   } catch (error) {
-    console.error('Error analyzing duplicate content:', error)
+    logError('DuplicateContentTab', 'Error analyzing duplicate content:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',

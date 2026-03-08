@@ -285,6 +285,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 interface Declaration {
   id: number
@@ -424,7 +425,7 @@ async function loadDeclarations() {
       declarations.value = data.data.declarations || []
     }
   } catch (e) {
-    console.error('Error loading focalizations:', e)
+    logError('FocalizationTab', 'Error loading focalizations:', e)
   }
 }
 
@@ -438,7 +439,7 @@ async function loadChapters() {
       }))
     }
   } catch (e) {
-    console.error('Error loading chapters:', e)
+    logError('FocalizationTab', 'Error loading chapters:', e)
   }
 }
 
@@ -451,7 +452,7 @@ async function loadCharacters() {
         .map((e: any) => ({ id: e.id, name: e.canonical_name || e.name }))
     }
   } catch (e) {
-    console.error('Error loading characters:', e)
+    logError('FocalizationTab', 'Error loading characters:', e)
   }
 }
 
@@ -470,7 +471,7 @@ async function detectViolations() {
       })
     }
   } catch (e) {
-    console.error('Error detecting violations:', e)
+    logError('FocalizationTab', 'Error detecting violations:', e)
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron detectar violaciones', life: 3000 })
   } finally {
     detectingViolations.value = false
@@ -487,7 +488,7 @@ async function suggestFocalization(chapterNum: number) {
       openDeclarationDialog({ number: chapterNum, title: chapter?.title || '', declaration: null })
     }
   } catch (e) {
-    console.error('Error suggesting focalization:', e)
+    logError('FocalizationTab', 'Error suggesting focalization:', e)
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo obtener sugerencia', life: 3000 })
   } finally {
     suggestingChapter.value = null
@@ -549,7 +550,7 @@ async function saveDeclaration() {
       toast.add({ severity: 'error', summary: 'Error', detail: data.error, life: 3000 })
     }
   } catch (e) {
-    console.error('Error saving declaration:', e)
+    logError('FocalizationTab', 'Error saving declaration:', e)
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo guardar', life: 3000 })
   } finally {
     saving.value = false
@@ -564,7 +565,7 @@ async function deleteDeclaration(id: number) {
       await loadDeclarations()
     }
   } catch (e) {
-    console.error('Error deleting declaration:', e)
+    logError('FocalizationTab', 'Error deleting declaration:', e)
   }
 }
 

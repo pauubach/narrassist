@@ -14,6 +14,7 @@ import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
 import { api } from '@/services/apiClient'
 import AnalysisErrorState from '@/components/shared/AnalysisErrorState.vue'
+import { logError } from '@/services/logger'
 
 const props = defineProps<{
   projectId: number
@@ -68,7 +69,7 @@ async function analyze() {
       errorMsg.value = data.error || 'Error al evaluar la salud narrativa'
     }
   } catch (error) {
-    console.error('Error checking narrative health:', error)
+    logError('NarrativeHealthTab', 'Error checking narrative health:', error)
     errorMsg.value = error instanceof Error ? error.message : 'No se pudo evaluar la salud narrativa. Si persiste, reinicia la aplicación.'
   } finally {
     loading.value = false

@@ -104,6 +104,7 @@ import { useProjectsStore } from '@/stores/projects'
 import { useCollectionsStore } from '@/stores/collections'
 import type { CollectionDetail, CollectionProject } from '@/types'
 import { useAppConfirm } from '@/composables/useAppConfirm'
+import { logError } from '@/services/logger'
 
 const props = defineProps<{
   collection: CollectionDetail
@@ -160,7 +161,7 @@ async function moveProject(projectId: number, newOrder: number) {
     await collectionsStore.removeProject(props.collection.id, projectId)
     await collectionsStore.addProject(props.collection.id, projectId, newOrder)
   } catch (err) {
-    console.error('Failed to reorder project:', err)
+    logError('CollectionBookList', 'Failed to reorder project:', err)
   }
 }
 

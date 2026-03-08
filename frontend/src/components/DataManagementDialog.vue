@@ -15,6 +15,7 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
+import { logError } from '@/services/logger'
 
 interface DataCategory {
   id: string
@@ -72,7 +73,7 @@ async function loadCategories() {
     const { invoke } = await import('@tauri-apps/api/core')
     categories.value = await invoke<DataCategory[]>('get_data_categories')
   } catch (err) {
-    console.error('Error loading data categories:', err)
+    logError('DataManagementDialog', 'Error loading data categories:', err)
     // Fallback: mostrar mensaje si Tauri no está disponible (dev mode)
     toast.add({
       severity: 'warn',

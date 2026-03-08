@@ -231,6 +231,7 @@ import { useCollectionsStore } from '@/stores/collections'
 import { api } from '@/services/apiClient'
 import type { CollectionProject, LinkSuggestion } from '@/types'
 import { useAppConfirm } from '@/composables/useAppConfirm'
+import { logError } from '@/services/logger'
 
 const props = defineProps<{
   collectionId: number
@@ -323,7 +324,7 @@ async function loadProjectEntities(side: 'source' | 'target', projectId: number 
       targetEntities.value = list
     }
   } catch (err) {
-    console.error('Failed to load entities:', err)
+    logError('EntityLinkPanel', 'Failed to load entities:', err)
   }
 }
 

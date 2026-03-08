@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import Button from 'primevue/button'
 import type { ChatReference } from '@/types'
+import { logWarn } from '@/services/logger'
 import { renderAssistantMarkdown } from '@/utils/renderAssistantMarkdown'
 
 /**
@@ -130,7 +131,7 @@ function handleContentClick(event: MouseEvent) {
   if (ref) {
     emit('navigate-reference', ref)
   } else {
-    console.warn('[ChatMessageContent] No ref found for id:', refId)
+    logWarn('ChatMessageContent', 'No ref found for id:', refId)
   }
 }
 

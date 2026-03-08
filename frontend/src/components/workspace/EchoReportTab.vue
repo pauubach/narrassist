@@ -202,6 +202,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 import { sanitizeHtml } from '@/utils/sanitizeHtml'
 
 const props = defineProps<{
@@ -267,7 +268,7 @@ async function analyze() {
       throw new Error(data.error || 'Error al analizar')
     }
   } catch (error) {
-    console.error('Error analyzing echo report:', error)
+    logError('EchoReportTab', 'Error analyzing echo report:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',

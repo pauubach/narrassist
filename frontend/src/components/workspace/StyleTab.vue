@@ -34,6 +34,7 @@ import CharacterArchetypesTab from './CharacterArchetypesTab.vue'
 import DuplicateContentTab from './DuplicateContentTab.vue'
 import ProlepisTab from './ProlepisTab.vue'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 type CategoryId = 'narrative' | 'style' | 'consistency'
 
@@ -195,7 +196,7 @@ async function loadFeatureAvailability() {
       hasScenes.value = data.data.has_scenes || false
     }
   } catch (error) {
-    console.error('Error loading feature availability:', error)
+    logError('StyleTab', 'Error loading feature availability:', error)
   }
 }
 </script>

@@ -13,6 +13,7 @@ import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
 import { api } from '@/services/apiClient'
 import AnalysisErrorState from '@/components/shared/AnalysisErrorState.vue'
+import { logError } from '@/services/logger'
 
 const props = defineProps<{
   projectId: number
@@ -74,7 +75,7 @@ async function analyze() {
       errorMsg.value = data.error || 'Error al analizar arquetipos'
     }
   } catch (error) {
-    console.error('Error analyzing character archetypes:', error)
+    logError('CharacterArchetypesTab', 'Error analyzing character archetypes:', error)
     errorMsg.value = error instanceof Error ? error.message : 'No se pudo analizar los arquetipos. Si persiste, reinicia la aplicación.'
   } finally {
     loading.value = false

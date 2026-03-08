@@ -94,7 +94,7 @@ function playSound(severity: NotificationSeverity = 'success'): void {
  */
 async function requestPermission(): Promise<boolean> {
   if (!('Notification' in window)) {
-    console.warn('Browser does not support notifications')
+    logWarn('Notifications', 'Browser does not support notifications')
     return false
   }
 

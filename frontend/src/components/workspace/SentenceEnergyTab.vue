@@ -18,6 +18,7 @@ import AccordionContent from 'primevue/accordioncontent'
 import Message from 'primevue/message'
 import { api } from '@/services/apiClient'
 import AnalysisErrorState from '@/components/shared/AnalysisErrorState.vue'
+import { logError } from '@/services/logger'
 
 const props = defineProps<{
   projectId: number
@@ -106,7 +107,7 @@ async function analyze() {
       errorMsg.value = data.error || 'Error al analizar energía de oraciones'
     }
   } catch (error) {
-    console.error('Error analyzing sentence energy:', error)
+    logError('SentenceEnergyTab', 'Error analyzing sentence energy:', error)
     errorMsg.value = error instanceof Error ? error.message : 'No se pudo analizar la energía de las frases. Si persiste, reinicia la aplicación.'
   } finally {
     loading.value = false

@@ -558,6 +558,7 @@ import MethodVotingBar from '@/components/shared/MethodVotingBar.vue'
 import { useVoiceAndStyleStore } from '@/stores/voiceAndStyle'
 import type { VoiceProfile } from '@/types'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 interface BehaviorProfile {
   character_id: number
@@ -724,7 +725,7 @@ const checkLLMStatus = async () => {
       availableMethods.value = data.data?.available_methods || []
     }
   } catch (err) {
-    console.error('Error checking LLM status:', err)
+    logError('BehaviorExpectations', 'Error checking LLM status:', err)
     llmAvailable.value = false
   } finally {
     checking.value = false
@@ -742,10 +743,10 @@ const analyzeCharacter = async () => {
       profile.value = data.data
       emit('profileLoaded', data.data)
     } else {
-      console.error('Error analyzing character:', data.error)
+      logError('BehaviorExpectations', 'Error analyzing character:', data.error)
     }
   } catch (err) {
-    console.error('Error analyzing character:', err)
+    logError('BehaviorExpectations', 'Error analyzing character:', err)
   } finally {
     analyzing.value = false
   }
@@ -762,10 +763,10 @@ const detectViolations = async () => {
       violations.value = data.data?.violations || []
       emit('violationsFound', violations.value)
     } else {
-      console.error('Error detecting violations:', data.error)
+      logError('BehaviorExpectations', 'Error detecting violations:', data.error)
     }
   } catch (err) {
-    console.error('Error detecting violations:', err)
+    logError('BehaviorExpectations', 'Error detecting violations:', err)
   } finally {
     detectingViolations.value = false
   }

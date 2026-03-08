@@ -240,6 +240,7 @@ import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 const props = defineProps<{
   projectId: number
@@ -289,7 +290,7 @@ async function analyze() {
       throw new Error(data.error || 'Error al analizar')
     }
   } catch (error) {
-    console.error('Error analyzing age readability:', error)
+    logError('AgeReadabilityTab', 'Error analyzing age readability:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',

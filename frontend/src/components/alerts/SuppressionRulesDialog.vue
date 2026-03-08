@@ -17,6 +17,7 @@ import { api } from '@/services/apiClient'
 import { useToast } from 'primevue/usetoast'
 import type { ApiResponse } from '@/types/api'
 import type { SuppressionRuleType, SuppressionRule } from '@/types'
+import { logError } from '@/services/logger'
 
 interface Props {
   visible: boolean
@@ -85,7 +86,7 @@ async function loadRules() {
       rules.value = (res.data as Record<string, unknown>[]).map(transformRule)
     }
   } catch (e) {
-    console.error('Error loading suppression rules:', e)
+    logError('SuppressionRulesDialog', 'Error loading suppression rules:', e)
   } finally {
     loading.value = false
   }

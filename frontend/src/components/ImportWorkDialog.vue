@@ -36,6 +36,7 @@
           @click="emit('update:visible', false)"
         />
         <Button
+          data-testid="import-preview-button"
           label="Analizar archivo"
           icon="pi pi-search"
           :loading="loadingPreview"
@@ -159,6 +160,7 @@
           @click="step = 'upload'"
         />
         <Button
+          data-testid="import-confirm-button"
           label="Aplicar cambios"
           icon="pi pi-check"
           :loading="loadingConfirm"
@@ -187,6 +189,7 @@
         </p>
       </div>
       <Button
+        data-testid="import-close-button"
         label="Cerrar"
         @click="closeAndReset"
       />
@@ -203,6 +206,7 @@ import FileUpload from 'primevue/fileupload'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 const props = defineProps<{
   visible: boolean
@@ -295,7 +299,7 @@ async function uploadAndPreview() {
     importData.value = data.import_data
     step.value = 'preview'
   } catch (error) {
-    console.error('Error previewing import:', error)
+    logError('ImportWorkDialog', 'Error previewing import:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -326,7 +330,7 @@ async function confirmImport() {
     step.value = 'done'
     emit('imported')
   } catch (error) {
-    console.error('Error confirming import:', error)
+    logError('ImportWorkDialog', 'Error confirming import:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',

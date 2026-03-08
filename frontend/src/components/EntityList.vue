@@ -358,6 +358,7 @@ import Dialog from 'primevue/dialog'
 import type { Entity } from '@/types'
 import { debounce } from '@/composables'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 // Umbral para activar virtualización (más de 50 items)
 const VIRTUALIZATION_THRESHOLD = 50
@@ -641,7 +642,7 @@ const loadMergeHistory = async () => {
       mergeHistory.value = data.data.merges || []
     }
   } catch (error) {
-    console.error('Error loading merge history:', error)
+    logError('EntityList', 'Error loading merge history:', error)
   } finally {
     loadingMergeHistory.value = false
   }

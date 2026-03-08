@@ -183,6 +183,7 @@ import type { Chapter } from '@/types'
 import type { ApiChapter } from '@/types/api/projects'
 import { transformChapters } from '@/types/transformers/projects'
 import { api } from '@/services/apiClient'
+import { logError, logWarn } from '@/services/logger'
 import { sanitizeHtml } from '@/utils/sanitizeHtml'
 import { useSelectionStore } from '@/stores/selection'
 import { useDocumentViewerExport } from '@/components/document-viewer/useDocumentViewerExport'
@@ -190,6 +191,7 @@ import { useDocumentViewerPreferences } from '@/components/document-viewer/useDo
 import { useDocumentViewerData } from '@/components/document-viewer/useDocumentViewerData'
 import { useDocumentViewerDialogues } from '@/components/document-viewer/useDocumentViewerDialogues'
 import { useDocumentViewerInteractions } from '@/components/document-viewer/useDocumentViewerInteractions'
+import { useDocumentViewerKeyboardNavigation } from '@/components/document-viewer/useDocumentViewerKeyboardNavigation'
 import {
   cleanExcerptForSearch,
   detectSectionHeading,
@@ -453,7 +455,7 @@ const setupIntersectionObserver = () => {
             }
           }
         } catch (err) {
-          console.error('Error in IntersectionObserver callback:', err)
+          logError('DocumentViewer', 'Error in IntersectionObserver callback:', err)
         }
       })
     },
@@ -773,7 +775,7 @@ const scrollToChapter = async (chapterId: number) => {
   // Encontrar el índice del capítulo objetivo
   const targetIndex = chapters.value.findIndex(ch => ch.id === chapterId)
   if (targetIndex === -1) {
-    console.warn(`Chapter ${chapterId} not found`)
+    logWarn('DocumentViewer', `Chapter ${chapterId} not found`)
     return
   }
 
@@ -815,9 +817,6 @@ let highlightTimer: ReturnType<typeof setTimeout> | null = null
 // Tracking de timers activos para cleanup (Fix #2: memory leak prevention)
 const activeScrollTimers = new Set<ReturnType<typeof setTimeout>>()
 let scrollAbortController: AbortController | null = null
-
-// Keyboard navigation state (Mejora #7)
-const currentHighlightIndex = ref<number>(-1)
 
 // Helper functions (Refactor #14: reduce duplication)
 const MAX_RETRIES = 3
@@ -897,27 +896,9 @@ const cleanupScrollTimers = () => {
   }
 }
 
-// Keyboard navigation (Mejora #7)
-const navigateToNextHighlight = () => {
-  if (!props.alertHighlightRanges || props.alertHighlightRanges.length === 0) return
-
-  const nextIndex = (currentHighlightIndex.value + 1) % props.alertHighlightRanges.length
-  navigateToHighlight(nextIndex)
-}
-
-const navigateToPrevHighlight = () => {
-  if (!props.alertHighlightRanges || props.alertHighlightRanges.length === 0) return
-
-  const prevIndex = currentHighlightIndex.value <= 0
-    ? props.alertHighlightRanges.length - 1
-    : currentHighlightIndex.value - 1
-  navigateToHighlight(prevIndex)
-}
-
 const navigateToHighlight = (index: number) => {
   if (!props.alertHighlightRanges || index < 0 || index >= props.alertHighlightRanges.length) return
 
-  currentHighlightIndex.value = index
   const range = props.alertHighlightRanges[index]
 
   if (range.chapterId) {
@@ -931,34 +912,19 @@ const navigateToHighlight = (index: number) => {
   }
 }
 
-const handleKeyDown = (event: KeyboardEvent) => {
-  // Ignorar si el usuario está escribiendo en un input/textarea
-  const target = event.target as HTMLElement
-  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-    return
-  }
-
-  switch (event.key) {
-    case 'ArrowDown':
-      if (props.alertHighlightRanges && props.alertHighlightRanges.length > 0) {
-        event.preventDefault()
-        navigateToNextHighlight()
-      }
-      break
-    case 'ArrowUp':
-      if (props.alertHighlightRanges && props.alertHighlightRanges.length > 0) {
-        event.preventDefault()
-        navigateToPrevHighlight()
-      }
-      break
-    case 'Escape':
-      if (showDialoguePanel.value) {
-        event.preventDefault()
-        showDialoguePanel.value = false
-      }
-      break
-  }
-}
+const {
+  currentHighlightIndex,
+  navigateToNextHighlight,
+  navigateToPrevHighlight,
+  handleKeyDown,
+} = useDocumentViewerKeyboardNavigation({
+  getRanges: () => props.alertHighlightRanges,
+  isDialoguePanelOpen: () => showDialoguePanel.value,
+  closeDialoguePanel: () => {
+    showDialoguePanel.value = false
+  },
+  navigateToHighlight,
+})
 
 const applyHighlightFromRange = (range: Range) => {
   clearTemporaryMentionHighlights()
@@ -1064,7 +1030,7 @@ const createRangeFromCharacterOffsets = (
     range.setEnd(endNode, endOffset)
     return range
   } catch (err) {
-    console.error('Error creating range:', err)
+    logError('DocumentViewer', 'Error creating range:', err)
     return null
   }
 }
@@ -1099,8 +1065,11 @@ const scrollToMention = async (target: ScrollTarget) => {
   // Encontrar el índice del capítulo objetivo
   const targetIndex = chapters.value.findIndex(ch => ch.id === target.chapterId)
   if (targetIndex === -1) {
-    console.warn(`Chapter with ID ${target.chapterId} not found. Available chapters:`,
-      chapters.value.map(ch => ({ id: ch.id, number: ch.chapterNumber })))
+    logWarn(
+      'DocumentViewer',
+      `Chapter with ID ${target.chapterId} not found. Available chapters:`,
+      chapters.value.map(ch => ({ id: ch.id, number: ch.chapterNumber }))
+    )
     return
   }
 
@@ -1155,7 +1124,7 @@ const scrollToMention = async (target: ScrollTarget) => {
 
   const chapterElement = getChapterElement(target.chapterId)
   if (!chapterElement) {
-    console.warn(`Chapter element not found for ${target.chapterId}`)
+    logWarn('DocumentViewer', `Chapter element not found for ${target.chapterId}`)
     return
   }
 
@@ -1262,7 +1231,7 @@ const highlightTextInChapter = async (chapterElement: Element, text: string, pos
 
   const contentElement = chapterElement.querySelector('.chapter-text')
   if (!contentElement) {
-    console.warn('No .chapter-text element found in chapter')
+    logWarn('DocumentViewer', 'No .chapter-text element found in chapter')
     return false
   }
 
@@ -1284,7 +1253,7 @@ const highlightTextInChapter = async (chapterElement: Element, text: string, pos
   // Limpiar el texto de búsqueda
   const cleanText = cleanExcerptForSearch(text)
   if (!cleanText) {
-    console.warn('Empty search text after cleaning')
+    logWarn('DocumentViewer', 'Empty search text after cleaning')
     return false
   }
 
@@ -1331,7 +1300,7 @@ const highlightTextInChapter = async (chapterElement: Element, text: string, pos
       return highlightTextInChapter(chapterElement, text, position, retryCount + 1)
     }
 
-    console.warn(`Text "${cleanText}" not found in chapter after ${MAX_RETRIES} retries.`)
+    logWarn('DocumentViewer', `Text "${cleanText}" not found in chapter after ${MAX_RETRIES} retries.`)
     return false
   }
 
@@ -1472,10 +1441,6 @@ watch(() => props.projectId, () => {
   loadDocument()
 })
 
-// Mejora #7: Resetear índice de navegación cuando cambien los highlights
-watch(() => props.alertHighlightRanges, () => {
-  currentHighlightIndex.value = -1
-}, { deep: true })
 
 // Watch para capítulos externos (cuando el padre los actualiza durante análisis)
 watch(() => props.externalChapters, (newChapters) => {

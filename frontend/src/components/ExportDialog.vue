@@ -130,6 +130,7 @@
 
           <div class="export-actions">
             <Button
+              data-testid="document-preview-button"
               label="Vista previa"
               icon="pi pi-eye"
               severity="secondary"
@@ -138,6 +139,7 @@
               @click="loadDocumentPreview"
             />
             <Button
+              data-testid="document-export-button"
               label="Exportar documento"
               icon="pi pi-download"
               :loading="loadingDocument"
@@ -479,6 +481,7 @@
 
           <div class="editorial-work-actions">
             <Button
+              data-testid="editorial-export-button"
               label="Exportar trabajo (.narrassist)"
               icon="pi pi-upload"
               :loading="loadingEditorialExport"
@@ -486,6 +489,7 @@
               @click="exportEditorialWork"
             />
             <Button
+              data-testid="editorial-import-button"
               label="Importar trabajo"
               icon="pi pi-download"
               severity="secondary"
@@ -556,6 +560,7 @@ import {
 } from '@/services/projectExports'
 import { decodeBase64ToBlob, downloadBlob, downloadTextFile } from '@/utils/fileDownload'
 import ImportWorkDialog from './ImportWorkDialog.vue'
+import { logError } from '@/services/logger'
 
 const props = defineProps<{
   visible: boolean
@@ -706,7 +711,7 @@ const loadDocumentPreview = async () => {
       throw new Error(data.error || 'No se pudo completar la operación. Si persiste, reinicia la aplicación.')
     }
   } catch (error) {
-    console.error('Error loading document preview:', error)
+    logError('ExportDialog', 'Error loading document preview:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -752,7 +757,7 @@ const exportDocument = async () => {
       life: 3000
     })
   } catch (error) {
-    console.error('Error exporting document:', error)
+    logError('ExportDialog', 'Error exporting document:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -790,7 +795,7 @@ const exportReport = async () => {
       throw new Error(data.error || 'No se pudo completar la operación. Si persiste, reinicia la aplicación.')
     }
   } catch (error) {
-    console.error('Error exporting report:', error)
+    logError('ExportDialog', 'Error exporting report:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -835,7 +840,7 @@ const exportCharacterSheets = async () => {
       throw new Error(data.error || 'No se pudo completar la operación. Si persiste, reinicia la aplicación.')
     }
   } catch (error) {
-    console.error('Error exporting character sheets:', error)
+    logError('ExportDialog', 'Error exporting character sheets:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -859,7 +864,7 @@ const loadStylePreview = async () => {
       throw new Error(data.error || 'No se pudo completar la operación. Si persiste, reinicia la aplicación.')
     }
   } catch (error) {
-    console.error('Error loading style preview:', error)
+    logError('ExportDialog', 'Error loading style preview:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -927,7 +932,7 @@ const exportStyleGuide = async () => {
       }
     }
   } catch (error) {
-    console.error('Error exporting style guide:', error)
+    logError('ExportDialog', 'Error exporting style guide:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -971,7 +976,7 @@ const exportAlerts = async () => {
       throw new Error(data.error || 'No se pudo completar la operación. Si persiste, reinicia la aplicación.')
     }
   } catch (error) {
-    console.error('Error exporting alerts:', error)
+    logError('ExportDialog', 'Error exporting alerts:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -1011,7 +1016,7 @@ async function exportCorrected() {
       life: 3000,
     })
   } catch (error) {
-    console.error('Error exporting corrected document:', error)
+    logError('ExportDialog', 'Error exporting corrected document:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -1048,7 +1053,7 @@ async function exportScrivener() {
       life: 3000,
     })
   } catch (error) {
-    console.error('Error exporting to Scrivener:', error)
+    logError('ExportDialog', 'Error exporting to Scrivener:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -1074,7 +1079,7 @@ async function exportEditorialWork() {
       life: 3000,
     })
   } catch (error) {
-    console.error('Error exporting editorial work:', error)
+    logError('ExportDialog', 'Error exporting editorial work:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',

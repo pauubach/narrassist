@@ -97,6 +97,7 @@ import { useToast } from 'primevue/usetoast'
 import type { Entity, MergeHistoryEntry } from '@/types'
 import { transformMergeHistoryEntry } from '@/types/transformers'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 const toast = useToast()
 
@@ -145,7 +146,7 @@ const loadMergeHistory = async () => {
       }
     }
   } catch (error) {
-    console.error('Error loading merge history:', error)
+    logError('UndoMergeDialog', 'Error loading merge history:', error)
   } finally {
     loading.value = false
   }
@@ -169,11 +170,11 @@ const confirmUndo = async () => {
         detail: { projectId: props.projectId, entryId: mergeHistory.value?.id },
       }))
     } else {
-      console.error('Error undoing merge:', data.error)
+      logError('UndoMergeDialog', 'Error undoing merge:', data.error)
       toast.add({ severity: 'error', summary: 'Error', detail: `Error al deshacer fusión: ${data.error}`, life: 5000 })
     }
   } catch (error) {
-    console.error('Error undoing merge:', error)
+    logError('UndoMergeDialog', 'Error undoing merge:', error)
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo deshacer la fusión', life: 5000 })
   } finally {
     undoing.value = false

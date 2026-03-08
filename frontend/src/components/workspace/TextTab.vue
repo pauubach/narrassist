@@ -4,6 +4,7 @@ import DocumentViewer from '@/components/DocumentViewer.vue'
 import TextFindBar from '@/components/workspace/TextFindBar.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { META_CATEGORIES, type MetaCategoryKey } from '@/composables/useAlertUtils'
+import { logError, logWarn } from '@/services/logger'
 import type { Alert, Chapter, DialogueAttribution } from '@/types'
 
 const workspaceStore = useWorkspaceStore()
@@ -144,7 +145,7 @@ const alertsByChapter = computed(() => {
       grouped.set(chapterNum, list)
     } else {
       withoutChapter++
-      console.warn(`[TextTab] Alert sin capítulo ni posición:`, alert.title, alert)
+      logWarn('TextTab', 'Alert sin cap?tulo ni posici?n:', { title: alert.title, alert })
     }
   }
 
@@ -183,7 +184,7 @@ function computeGutterMarkers() {
     for (const alert of chapterAlerts) {
       // Skip si no tiene categoría
       if (!alert.category) {
-        console.warn(`[TextTab] Alert ${alert.id} sin categoría:`, alert.title)
+        logWarn('TextTab', `Alert ${alert.id} sin categor?a:`, alert.title)
         continue
       }
 
@@ -199,7 +200,7 @@ function computeGutterMarkers() {
 
       // Fallback a 'suggestions' si no encontró meta-categoría
       if (!metaKey) {
-        console.warn(`[TextTab] Alert "${alert.title}" category="${alert.category}" no mapeó a ninguna meta-categoría, fallback a suggestions`)
+        logWarn('TextTab', `Alert "${alert.title}" category="${alert.category}" no mape? a ninguna meta-categor?a, fallback a suggestions`)
         metaKey = 'suggestions'
       }
 
@@ -218,13 +219,13 @@ function computeGutterMarkers() {
 
       const meta = META_CATEGORIES[metaKey]
       if (!meta) {
-        console.warn(`[TextTab] No meta-category config for key: ${metaKey}`)
+        logWarn('TextTab', `No meta-category config for key: ${metaKey}`)
         continue
       }
 
       const count = alertsList.length
       if (typeof count !== 'number' || isNaN(count)) {
-        console.error(`[TextTab] Invalid count for ${metaKey}:`, count, alertsList)
+        logError('TextTab', `Invalid count for ${metaKey}:`, { count, alertsList })
         continue
       }
 

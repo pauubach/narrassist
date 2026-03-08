@@ -202,6 +202,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 interface Incoherence {
   entity_name: string
@@ -320,7 +321,7 @@ async function analyze() {
       throw new Error(data.error || 'Error al analizar')
     }
   } catch (error) {
-    console.error('Error analyzing emotional coherence:', error)
+    logError('EmotionalAnalysisTab', 'Error analyzing emotional coherence:', error)
     analysisError.value = error instanceof Error ? error.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
     toast.add({
       severity: 'error',

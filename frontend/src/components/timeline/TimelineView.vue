@@ -528,6 +528,7 @@ import { transformTimeline } from '@/types/transformers'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import { api } from '@/services/apiClient'
 import { fetchProjectEventStats } from '@/services/eventStats'
+import { logError } from '@/services/logger'
 import { formatTemporalInstance } from '@/utils/temporal'
 import type {
   Timeline,
@@ -727,12 +728,12 @@ const loadTimeline = async () => {
       // ME-01: Data successfully loaded — clear stale signal
       analysisStore.clearTabStale(props.projectId, 'timeline')
     } else {
-      console.error('Error loading timeline:', data.error)
+      logError('TimelineView', 'Error loading timeline:', data.error)
       error.value = data.error || 'Error al cargar el timeline'
       timeline.value = null
     }
   } catch (err) {
-    console.error('Error fetching timeline:', err)
+    logError('TimelineView', 'Error fetching timeline:', err)
     error.value = err instanceof Error ? err.message : 'No se pudo cargar la línea temporal. Si persiste, reinicia la aplicación.'
     timeline.value = null
   } finally {
@@ -1041,7 +1042,7 @@ async function loadEventDensity() {
       total: chapter.total,
     }))
   } catch (error) {
-    console.error('Error loading event density:', error)
+    logError('TimelineView', 'Error loading event density:', error)
   }
 }
 

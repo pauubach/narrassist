@@ -93,6 +93,7 @@ import InputNumber from 'primevue/inputnumber'
 import { useToast } from 'primevue/usetoast'
 import { api } from '@/services/apiClient'
 import { exportEventsBlob } from '@/services/projectExports'
+import { logError } from '@/services/logger'
 import { downloadBlob, downloadJsonFile } from '@/utils/fileDownload'
 
 const props = defineProps<{
@@ -179,7 +180,7 @@ async function handleExport() {
 
     visible.value = false
   } catch (error) {
-    console.error('Error exporting events:', error)
+    logError('EventsExportDialog', 'Error exporting events:', error)
     toast.add({
       severity: 'error',
       summary: 'Error al exportar',

@@ -17,6 +17,7 @@ import AccordionHeader from 'primevue/accordionheader'
 import AccordionContent from 'primevue/accordioncontent'
 import { api } from '@/services/apiClient'
 import AnalysisErrorState from '@/components/shared/AnalysisErrorState.vue'
+import { logError } from '@/services/logger'
 
 const props = defineProps<{
   projectId: number
@@ -84,7 +85,7 @@ async function analyze() {
       errorMsg.value = data.error || 'Error al analizar plantillas narrativas'
     }
   } catch (error) {
-    console.error('Error analyzing narrative templates:', error)
+    logError('NarrativeTemplatesTab', 'Error analyzing narrative templates:', error)
     errorMsg.value = error instanceof Error ? error.message : 'No se pudo analizar las plantillas narrativas. Si persiste, reinicia la aplicación.'
   } finally {
     loading.value = false

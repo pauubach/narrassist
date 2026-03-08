@@ -165,6 +165,23 @@ async function fulfillJson(route: Route, body: unknown, status = 200) {
   })
 }
 
+async function fulfillDownload(
+  route: Route,
+  body: string,
+  filename: string,
+  contentType: string,
+  status = 200,
+) {
+  await route.fulfill({
+    status,
+    headers: {
+      'Content-Type': contentType,
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    },
+    body,
+  })
+}
+
 function parseJsonBody<T>(route: Route): T | null {
   try {
     return route.request().postDataJSON() as T
@@ -1135,10 +1152,221 @@ export async function setupMockApi(page: Page, options: MockApiOptions = {}): Pr
 
     const styleGuideMatch = path.match(/^\/api\/projects\/(\d+)\/style-guide$/)
     if (styleGuideMatch && method === 'GET') {
+      const format = url.searchParams.get('format')
+      const isPreview = url.searchParams.get('preview') === 'true'
+
+      if (isPreview) {
+        await fulfillJson(route, {
+          success: true,
+          data: {
+            preview: {
+              total_characters: 3,
+              total_spelling_variants: 2,
+              canonical_forms_count: 4,
+              consistency_issues_count: 1,
+              recommendations_count: 3,
+              characters_preview: [
+                { name: 'Juan Pérez', importance: 'main', aliases_count: 1 },
+                { name: 'Ana', importance: 'secondary', aliases_count: 0 },
+              ],
+              style_summary: 'Registro narrativo estable con algunas grafías preferidas que conviene fijar.',
+            },
+          },
+        })
+        return
+      }
+
+      if (format === 'json') {
+        await fulfillJson(route, {
+          success: true,
+          data: {
+            format: 'json',
+            content: {
+              canonical_names: ['Juan Pérez', 'Ana'],
+              spelling_preferences: ['solo', 'aún'],
+            },
+          },
+        })
+        return
+      }
+
+      if (format === 'pdf') {
+        await fulfillJson(route, {
+          success: true,
+          data: {
+            format: 'pdf',
+            content: 'JVBERi0xLjQgbW9jayBzdHlsZSBndWlkZQ==',
+          },
+        })
+        return
+      }
+
       await fulfillJson(route, {
         success: true,
         data: {
+          format: 'markdown',
           content: '# Guia de estilo mock\n\n- Consistencia de nombres\n- Tono narrativo estable\n',
+        },
+      })
+      return
+    }
+
+    const exportDocumentPreviewMatch = path.match(/^\/api\/projects\/(\d+)\/export\/document\/preview$/)
+    if (exportDocumentPreviewMatch && method === 'GET') {
+      await fulfillJson(route, {
+        success: true,
+        data: {
+          estimated_pages: 18,
+          sections: {
+            characters: { count: 3 },
+            alerts: { count: 2 },
+            timeline: { event_count: 5 },
+            relationships: { count: 4 },
+          },
+        },
+      })
+      return
+    }
+
+    const exportDocumentMatch = path.match(/^\/api\/projects\/(\d+)\/export\/document$/)
+    if (exportDocumentMatch && method === 'GET') {
+      const format = url.searchParams.get('format') || 'docx'
+      const projectId = Number(exportDocumentMatch[1])
+      const filename = format === 'pdf'
+        ? `informe_Proyecto_${projectId}.pdf`
+        : `informe_Proyecto_${projectId}.docx`
+      const contentType = format === 'pdf'
+        ? 'application/pdf'
+        : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      await fulfillDownload(route, `mock-${format}-content`, filename, contentType)
+      return
+    }
+
+    const exportReportMatch = path.match(/^\/api\/projects\/(\d+)\/export\/report$/)
+    if (exportReportMatch && method === 'GET') {
+      const format = url.searchParams.get('format') || 'markdown'
+      if (format === 'json') {
+        await fulfillJson(route, {
+          success: true,
+          data: {
+            project: exportReportMatch[1],
+            alerts: [{ id: 1, title: 'Inconsistencia temporal' }],
+          },
+        })
+      } else {
+        await fulfillJson(route, {
+          success: true,
+          data: {
+            content: '# Informe de análisis mock\n\n- Alertas: 2\n- Personajes: 3\n',
+          },
+        })
+      }
+      return
+    }
+
+    const exportCharactersMatch = path.match(/^\/api\/projects\/(\d+)\/export\/characters$/)
+    if (exportCharactersMatch && method === 'GET') {
+      const format = url.searchParams.get('format') || 'markdown'
+      if (format === 'json') {
+        await fulfillJson(route, {
+          success: true,
+          data: [
+            { name: 'Juan Pérez', type: 'character', attributes: ['edad: 35'], mentions: 12 },
+          ],
+        })
+      } else {
+        await fulfillJson(route, {
+          success: true,
+          data: {
+            content: '# Fichas de personajes\n\n## Juan Pérez\n- Edad: 35\n',
+          },
+        })
+      }
+      return
+    }
+
+    const exportAlertsMatch = path.match(/^\/api\/projects\/(\d+)\/export\/alerts$/)
+    if (exportAlertsMatch && method === 'GET') {
+      const format = url.searchParams.get('format') || 'json'
+      if (format === 'csv') {
+        await fulfillJson(route, {
+          success: true,
+          data: {
+            content: 'severity,title,chapter\nwarning,Inconsistencia temporal,2\n',
+          },
+        })
+      } else {
+        await fulfillJson(route, {
+          success: true,
+          data: [
+            { id: 1, severity: 'warning', title: 'Inconsistencia temporal', chapter: 2 },
+          ],
+        })
+      }
+      return
+    }
+
+    const exportCorrectedMatch = path.match(/^\/api\/projects\/(\d+)\/export\/corrected$/)
+    if (exportCorrectedMatch && method === 'GET') {
+      const projectId = Number(exportCorrectedMatch[1])
+      await fulfillDownload(
+        route,
+        'mock-corrected-docx',
+        `Proyecto_${projectId}_corregido.docx`,
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      )
+      return
+    }
+
+    const exportScrivenerMatch = path.match(/^\/api\/projects\/(\d+)\/export\/scrivener$/)
+    if (exportScrivenerMatch && method === 'GET') {
+      const projectId = Number(exportScrivenerMatch[1])
+      await fulfillDownload(route, 'mock-scrivener-zip', `Proyecto_${projectId}.scriv.zip`, 'application/zip')
+      return
+    }
+
+    const exportWorkMatch = path.match(/^\/api\/projects\/(\d+)\/export-work$/)
+    if (exportWorkMatch && method === 'POST') {
+      const projectId = Number(exportWorkMatch[1])
+      await fulfillDownload(route, 'mock-narrassist-binary', `trabajo_editorial_proyecto_${projectId}.narrassist`, 'application/octet-stream')
+      return
+    }
+
+    const importWorkPreviewMatch = path.match(/^\/api\/projects\/(\d+)\/import-work\/preview$/)
+    if (importWorkPreviewMatch && method === 'POST') {
+      await fulfillJson(route, {
+        success: true,
+        data: {
+          project_fingerprint_match: true,
+          warnings: ['Se importarán solo decisiones editoriales, nunca el manuscrito.'],
+          entity_merges: { to_apply: 2, already_done: 1, conflicts: 0 },
+          alert_decisions: { to_apply: 1, already_done: 0, conflicts: 0 },
+          verified_attributes: { to_apply: 3, already_done: 1, conflicts: 1 },
+          suppression_rules: { to_add: 1, already_exist: 0 },
+          conflicts: [],
+          total_to_apply: 7,
+          total_conflicts: 0,
+          import_data: {
+            merges: [1, 2],
+            alerts: [10],
+            attributes: [21, 22, 23],
+            suppression_rules: ['style:redundancy'],
+          },
+        },
+      })
+      return
+    }
+
+    const importWorkConfirmMatch = path.match(/^\/api\/projects\/(\d+)\/import-work\/confirm$/)
+    if (importWorkConfirmMatch && method === 'POST') {
+      await fulfillJson(route, {
+        success: true,
+        data: {
+          entity_merges_applied: 2,
+          alert_decisions_applied: 1,
+          verified_attributes_applied: 3,
+          suppression_rules_added: 1,
+          conflicts_resolved: 0,
         },
       })
       return

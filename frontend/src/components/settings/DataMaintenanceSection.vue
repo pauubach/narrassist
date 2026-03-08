@@ -135,6 +135,7 @@ import Divider from 'primevue/divider'
 import { api } from '@/services/apiClient'
 import { useToast } from 'primevue/usetoast'
 import { useSystemStore } from '@/stores/system'
+import { logError } from '@/services/logger'
 
 defineProps<{
   dataLocation: string
@@ -171,7 +172,7 @@ async function clearCache() {
     await api.postRaw('/api/maintenance/clear-cache')
     toast.add({ severity: 'success', summary: 'Caché limpiado', detail: 'Los archivos temporales se han eliminado', life: 3000 })
   } catch (error) {
-    console.error('Error clearing cache:', error)
+    logError('DataMaintenanceSection', 'Error clearing cache:', error)
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo limpiar el caché', life: 3000 })
   }
 }
@@ -213,7 +214,7 @@ async function removeRejection(rejection: UserRejection) {
       })
     }
   } catch (e) {
-    console.error('Error removing rejection:', e)
+    logError('DataMaintenanceSection', 'Error removing rejection:', e)
     toast.add({
       severity: 'error',
       summary: 'Error',

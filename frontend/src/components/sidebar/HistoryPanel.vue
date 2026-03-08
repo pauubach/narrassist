@@ -7,6 +7,7 @@ import { api } from '@/services/apiClient'
 import SelectButton from 'primevue/selectbutton'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
+import { logError } from '@/services/logger'
 
 /**
  * HistoryPanel - Panel de historial de acciones en el sidebar.
@@ -135,7 +136,7 @@ async function handleRestoreAll() {
           life: 4000,
         })
       } catch (error) {
-        console.error('Error restaurando todo:', error)
+        logError('HistoryPanel', 'Error restaurando todo:', error)
         toast.add({
           severity: 'error',
           summary: 'No se pudo restaurar el historial',

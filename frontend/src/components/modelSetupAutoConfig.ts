@@ -1,3 +1,4 @@
+import { logWarn } from '@/services/logger'
 /**
  * Crea una función "ensure" para auto-configuración de arranque.
  *
@@ -29,7 +30,7 @@ export function createEnsureAutoConfig(
       await pending
     } catch (e) {
       // HI-02: Best-effort, but log for diagnostics
-      console.warn('[autoConfig] ensureAutoConfig failed:', e)
+      logWarn('modelSetupAutoConfig', '[autoConfig] ensureAutoConfig failed:', e)
     }
   }
 }

@@ -94,6 +94,7 @@ import Tag from 'primevue/tag'
 import Chip from 'primevue/chip'
 import ProgressSpinner from 'primevue/progressspinner'
 import { fetchProjectEventStats } from '@/services/eventStats'
+import { logError } from '@/services/logger'
 
 interface EventStats {
   projectId: number
@@ -142,7 +143,7 @@ async function loadStats() {
       })),
     }
   } catch (error) {
-    console.error('Error loading event stats:', error)
+    logError('EventStatsCard', 'Error loading event stats:', error)
   } finally {
     loading.value = false
   }

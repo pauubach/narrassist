@@ -27,6 +27,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import { useSelectionStore } from '@/stores/selection'
 import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
+import { logError, logWarn } from '@/services/logger'
 
 /**
  * EntitiesTab - Pestaña completa de gestión de entidades
@@ -350,7 +351,7 @@ async function handleRejectEntity(scope: 'project' | 'global', reason: string) {
       })
 
       if (!globalData.success) {
-        console.warn('No se pudo añadir a filtros globales:', globalData.error)
+        logWarn('EntitiesTab', 'No se pudo añadir a filtros globales:', globalData.error)
       }
     } else {
       // Añadir a overrides del proyecto
@@ -362,7 +363,7 @@ async function handleRejectEntity(scope: 'project' | 'global', reason: string) {
       })
 
       if (!projectData.success) {
-        console.warn('No se pudo añadir a filtros del proyecto:', projectData.error)
+        logWarn('EntitiesTab', 'No se pudo añadir a filtros del proyecto:', projectData.error)
       }
     }
 
@@ -380,7 +381,7 @@ async function handleRejectEntity(scope: 'project' | 'global', reason: string) {
       life: 4000
     })
   } catch (err) {
-    console.error('Error rejecting entity:', err)
+    logError('EntitiesTab', 'Error rejecting entity:', err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo rechazar la entidad', life: 5000 })
   } finally {
     entityToReject.value = null
@@ -408,7 +409,7 @@ async function onMergeEntities(primaryEntityId: number, entityIdsToMerge: number
       toast.add({ severity: 'error', summary: 'Error', detail: `Error al fusionar: ${data.error}`, life: 5000 })
     }
   } catch (err) {
-    console.error('Error merging entities:', err)
+    logError('EntitiesTab', 'Error merging entities:', err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo fusionar las entidades', life: 5000 })
   }
 }

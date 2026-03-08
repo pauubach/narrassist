@@ -36,6 +36,7 @@ const toast = useToast()
 
 // Types importados
 import type { CorrectionConfig, CorrectionPreset } from '@/types'
+import { logError } from '@/services/logger'
 
 // Alias local para Preset
 type Preset = CorrectionPreset
@@ -182,7 +183,7 @@ async function loadPresets() {
       presets.value = data.data.presets
     }
   } catch (error) {
-    console.error('Error loading presets:', error)
+    logError('CorrectionConfigPanel', 'Error loading presets:', error)
   }
 }
 
@@ -209,7 +210,7 @@ async function loadConfig() {
       }
     }
   } catch (error) {
-    console.error('Error loading config:', error)
+    logError('CorrectionConfigPanel', 'Error loading config:', error)
     // Keep default config on error
   } finally {
     loading.value = false
@@ -225,7 +226,7 @@ async function detectProfile() {
       showDetectionBanner.value = true
     }
   } catch (error) {
-    console.error('Error detecting profile:', error)
+    logError('CorrectionConfigPanel', 'Error detecting profile:', error)
   } finally {
     detecting.value = false
   }
@@ -282,7 +283,7 @@ async function saveConfig() {
       })
     }
   } catch (error) {
-    console.error('Error saving config:', error)
+    logError('CorrectionConfigPanel', 'Error saving config:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -309,7 +310,7 @@ async function resetConfig() {
       })
     }
   } catch (error) {
-    console.error('Error resetting config:', error)
+    logError('CorrectionConfigPanel', 'Error resetting config:', error)
   }
 }
 

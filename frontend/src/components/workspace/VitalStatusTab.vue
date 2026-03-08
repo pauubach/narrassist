@@ -209,6 +209,7 @@ import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 interface DeathEvent {
   entity_id: number
@@ -282,7 +283,7 @@ async function analyze() {
       throw new Error(data.error || 'Error al analizar')
     }
   } catch (error: any) {
-    console.error('Error analyzing vital status:', error)
+    logError('VitalStatusTab', 'Error analyzing vital status:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -313,7 +314,7 @@ async function generateAlerts() {
       throw new Error(data.error)
     }
   } catch (error: any) {
-    console.error('Error generating alerts:', error)
+    logError('VitalStatusTab', 'Error generating alerts:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',

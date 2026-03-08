@@ -191,6 +191,7 @@ import {
   getRegionLabel,
 } from '@/utils/settingsLabels'
 import type { CorrectionConfig } from '@/types'
+import { logError } from '@/services/logger'
 
 interface CorrectionPresetLocal {
   id: string
@@ -251,7 +252,7 @@ async function loadCorrectionPresets() {
       useLLMReview.value = safeGetItem('useLLMReview') === 'true'
     }
   } catch (error) {
-    console.error('Error loading correction presets:', error)
+    logError('CorrectionsSection', 'Error loading correction presets:', error)
   }
 }
 

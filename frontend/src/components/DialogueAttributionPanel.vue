@@ -148,6 +148,7 @@ import { useVoiceAndStyleStore } from '@/stores/voiceAndStyle'
 import { useToast } from 'primevue/usetoast'
 import { api } from '@/services/apiClient'
 import type { DialogueAttribution, DialogueAttributionStats } from '@/types'
+import { logError } from '@/services/logger'
 
 interface SpeakerEntity {
   id: number
@@ -421,7 +422,7 @@ async function saveCorrection(attr: DialogueAttribution & { chapterNumber?: numb
       toast.add({ severity: 'error', summary: 'Error', detail: data.error || 'No se pudo guardar', life: 4000 })
     }
   } catch (err) {
-    console.error('Error saving speaker correction:', err)
+    logError('DialogueAttributionPanel', 'Error saving speaker correction:', err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'Error al guardar la corrección', life: 4000 })
   } finally {
     savingCorrection.value = false

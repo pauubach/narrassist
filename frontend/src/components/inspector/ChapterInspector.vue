@@ -11,6 +11,7 @@ import { getChapterEvents, type ChapterEventsResponse } from '@/services/events'
 import EventsExportDialog from '@/components/events/EventsExportDialog.vue'
 import EventStatsCard from '@/components/events/EventStatsCard.vue'
 import type { ChapterSummaryData } from '@/composables/useProjectData'
+import { logError } from '@/services/logger'
 
 /**
  * ChapterInspector - Panel de detalles de capítulo para el inspector.
@@ -86,7 +87,7 @@ async function loadChapterEvents() {
     chapterEvents.value = data
     eventsCache.value.set(props.chapter.chapterNumber, data)
   } catch (err) {
-    console.error('Error loading chapter events:', err)
+    logError('ChapterInspector', 'Error loading chapter events:', err)
     eventsError.value = 'Error al cargar eventos'
   } finally {
     eventsLoading.value = false

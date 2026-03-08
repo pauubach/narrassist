@@ -8,6 +8,7 @@ import DsEmptyState from '@/components/ds/DsEmptyState.vue'
 import { searchSimilarText, type SemanticMatch } from '@/services/semanticSearch'
 import { useSystemStore } from '@/stores/system'
 import type { Chapter } from '@/types'
+import { logError } from '@/services/logger'
 
 /**
  * SemanticSearchPanel - Panel de búsqueda semántica
@@ -82,7 +83,7 @@ async function performSearch() {
       errorMessage.value = 'No se encontraron fragmentos similares. Intenta con otro texto.'
     }
   } catch (err: any) {
-    console.error('Error en búsqueda semántica:', err)
+    logError('SemanticSearchPanel', 'Error en búsqueda semántica:', err)
     errorMessage.value = err?.message || 'Error al buscar. Intenta nuevamente.'
   } finally {
     loading.value = false

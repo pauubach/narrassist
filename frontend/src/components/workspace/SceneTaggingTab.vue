@@ -379,6 +379,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import SceneCardsView from './SceneCardsView.vue'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 const props = defineProps<{
   projectId: number
@@ -504,7 +505,7 @@ async function loadScenes() {
       stats.value = data.data.stats || stats.value
     }
   } catch (error) {
-    console.error('Error loading scenes:', error)
+    logError('SceneTaggingTab', 'Error loading scenes:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -526,7 +527,7 @@ async function loadEntities() {
       locationEntities.value = entities.filter((e: any) => e.entity_type === 'LOC')
     }
   } catch (error) {
-    console.error('Error loading entities:', error)
+    logError('SceneTaggingTab', 'Error loading entities:', error)
   }
 }
 
@@ -566,7 +567,7 @@ async function saveSceneTags() {
       throw new Error(data.error)
     }
   } catch (error: any) {
-    console.error('Error saving tags:', error)
+    logError('SceneTaggingTab', 'Error saving tags:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -610,7 +611,7 @@ async function saveCustomTag() {
       throw new Error(data.error)
     }
   } catch (error: any) {
-    console.error('Error adding custom tag:', error)
+    logError('SceneTaggingTab', 'Error adding custom tag:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -638,7 +639,7 @@ async function removeCustomTag(sceneId: number, tagName: string) {
       await loadScenes()
     }
   } catch (error) {
-    console.error('Error removing tag:', error)
+    logError('SceneTaggingTab', 'Error removing tag:', error)
   }
 }
 

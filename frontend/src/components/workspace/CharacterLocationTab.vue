@@ -214,6 +214,7 @@ import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 interface LocationEvent {
   entity_id: number
@@ -290,7 +291,7 @@ async function analyze() {
       throw new Error(data.error || 'Error al analizar')
     }
   } catch (error: any) {
-    console.error('Error analyzing character locations:', error)
+    logError('CharacterLocationTab', 'Error analyzing character locations:', error)
     toast.add({
       severity: 'error',
       summary: 'Error',

@@ -263,6 +263,7 @@ import AccordionHeader from 'primevue/accordionheader'
 import AccordionContent from 'primevue/accordioncontent'
 import { api } from '@/services/apiClient'
 import AnalysisErrorState from '@/components/shared/AnalysisErrorState.vue'
+import { logError } from '@/services/logger'
 
 const props = defineProps<{
   projectId: number
@@ -369,7 +370,7 @@ async function analyze() {
       errorMsg.value = json.error || 'Error al analizar reporte sensorial'
     }
   } catch (e) {
-    console.error('Sensory report error:', e)
+    logError('SensoryReportTab', 'Sensory report error:', e)
     errorMsg.value = e instanceof Error ? e.message : 'No se pudo generar el informe sensorial. Si persiste, reinicia la aplicación.'
   } finally {
     loading.value = false

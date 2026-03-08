@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import Button from 'primevue/button'
 import type { Entity } from '@/types'
+import { logError } from '@/services/logger'
 
 /**
  * TextSelectionInspector - Panel de información sobre texto seleccionado.
@@ -78,7 +79,7 @@ async function copyToClipboard() {
   try {
     await navigator.clipboard.writeText(props.selection.text)
   } catch (err) {
-    console.error('Error copying to clipboard:', err)
+    logError('TextSelectionInspector', 'Error copying to clipboard:', err)
   }
 }
 

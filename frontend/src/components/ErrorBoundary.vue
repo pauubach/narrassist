@@ -35,6 +35,7 @@
 import { ref, onErrorCaptured } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import { logError } from '@/services/logger'
 
 const router = useRouter()
 
@@ -60,7 +61,7 @@ onErrorCaptured((err, instance, info) => {
   errorDetails.value = `Error: ${err.message}\nStack: ${err.stack}\nInfo: ${info}`
 
   // Log en consola
-  console.error('[ErrorBoundary]', {
+  logError('ErrorBoundary', 'Captured component error', {
     error: err,
     component: instance,
     info,

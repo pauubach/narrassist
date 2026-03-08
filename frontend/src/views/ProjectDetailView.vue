@@ -53,7 +53,7 @@
             aria-label="Exportar Guía de Estilo"
             @click="quickExportStyleGuide"
           />
-          <Button label="Exportar" icon="pi pi-download" outlined @click="openExportDialog" />
+          <Button data-testid="open-export-dialog" label="Exportar" icon="pi pi-download" outlined @click="openExportDialog" />
           <Button
             v-if="isAnalyzing"
             label="Cancelar análisis"
@@ -639,6 +639,7 @@ import { useProjectDetailAnalysis } from '@/views/project-detail/useProjectDetai
 import { useProjectDetailExports } from '@/views/project-detail/useProjectDetailExports'
 import { useProjectDetailAlerts } from '@/views/project-detail/useProjectDetailAlerts'
 import { useProjectDetailLifecycle } from '@/views/project-detail/useProjectDetailLifecycle'
+import { useProjectDetailNavigation } from '@/views/project-detail/useProjectDetailNavigation'
 import { initializeProjectDetail, parsePositiveInt } from '@/views/project-detail/projectDetailBootstrap'
 import { useToast } from 'primevue/usetoast'
 
@@ -890,6 +891,55 @@ const currentChapter = computed(() => {
   return chaptersById.value.get(activeChapterId.value) || null
 })
 
+const {
+  goBack,
+  onChapterSelect,
+  onSectionSelect,
+  onChapterVisible,
+  onEntityClick,
+  onEntitySelect,
+  onEntityEdit,
+  onAlertSelect,
+  onAlertClickFromText,
+  onAlertNavigate,
+  onAlertNavigateToPosition,
+  navigateToAlerts,
+  handleFilterSeverity,
+  handleStatClick,
+  handleViewAlerts,
+  handleFilterAlerts,
+  onAlertClick,
+  handleGoToMentions,
+  onBackToDocumentSummary,
+  onGoToChapterStart,
+  onViewChapterAlerts,
+  onNavigateToChapter,
+  onNavigateToEvent,
+  onInspectorDialogueSelected,
+  onSearchSimilarText,
+  onSearchResultNavigate,
+  onAskAiAboutSelection,
+  onChatReferenceNavigate,
+  handleNavigateToCharacter,
+} = useProjectDetailNavigation({
+  router,
+  chapters,
+  entities,
+  rightInspectorTab,
+  activeChapterId,
+  highlightedEntityId,
+  scrollToChapterId,
+  initialEntityId,
+  sidebarTab,
+  searchQuery,
+  currentChapter,
+  workspaceStore,
+  selectionStore,
+  scrollToDialogue: (attribution) => {
+    textTabRef.value?.scrollToDialogue(attribution)
+  },
+})
+
 watch(
   [() => rightInspectorTab.value, () => workspaceStore.activeTab, () => chapters.value.length],
   ([inspectorTab, activeTab]) => {
@@ -1131,283 +1181,6 @@ onUnmounted(() => {
 
 // ── Navigation & handlers ──────────────────────────────────
 
-const goBack = () => {
-  router.push({ name: 'projects' })
-}
-
-// Navegación y sincronización
-const onChapterSelect = (chapterId: number) => {
-  scrollToChapterId.value = chapterId
-  activeChapterId.value = chapterId
-  workspaceStore.setActiveTab('text')
-  setTimeout(() => { scrollToChapterId.value = null }, 500)
-}
-
-const onSectionSelect = (chapterId: number, _sectionId: number, startChar: number) => {
-  activeChapterId.value = chapterId
-  // Usar la función del store para navegar a la posición
-  workspaceStore.navigateToTextPosition(startChar)
-}
-
-// Debounce para cambios de capítulo visible (evita actualizaciones rápidas durante scroll)
-let chapterVisibleTimeout: ReturnType<typeof setTimeout> | null = null
-const onChapterVisible = (chapterId: number) => {
-  // Clear pending timeout
-  if (chapterVisibleTimeout) {
-    clearTimeout(chapterVisibleTimeout)
-  }
-  // Debounce 400ms para evitar cambios rápidos durante scroll
-  chapterVisibleTimeout = setTimeout(() => {
-    activeChapterId.value = chapterId
-    workspaceStore.setCurrentChapter(chapterId)
-  }, 400)
-}
-
-const onEntityClick = (entityId: number) => {
-  highlightedEntityId.value = entityId
-  const entity = entities.value.find(e => e.id === entityId)
-  if (entity) {
-    selectionStore.selectEntity(entity)
-  }
-}
-
-const onEntitySelect = (entityOrId: Entity | number) => {
-  const entityId = typeof entityOrId === 'number' ? entityOrId : entityOrId.id
-  const entity = typeof entityOrId === 'number'
-    ? entities.value.find(e => e.id === entityOrId)
-    : entityOrId
-
-  highlightedEntityId.value = entityId
-  if (entity) {
-    selectionStore.selectEntity(entity)
-  }
-}
-
-const onEntityEdit = (entity: Entity) => {
-  // Navegar a la pestaña de entidades con esta entidad seleccionada
-  initialEntityId.value = entity.id
-  workspaceStore.setActiveTab('entities')
-}
-
-const onAlertSelect = (alert: Alert) => {
-  selectionStore.selectAlert(alert)
-}
-
-const onAlertClickFromText = (alert: Alert) => {
-  // Seleccionar la alerta en el store
-  selectionStore.selectAlert(alert)
-  // Asegurar que el inspector derecho esté abierto
-  rightInspectorTab.value = 'contextual'
-}
-
-/**
- * Navega al texto de una alerta.
- * Si hay múltiples sources (inconsistencias), resalta todas las ubicaciones.
- * Si se proporciona un source específico, navega solo a esa ubicación.
- */
-const onAlertNavigate = (alert: Alert, source?: AlertSource) => {
-  // Convertir chapter NUMBER a chapter ID si es necesario
-  const getChapterId = (chapterNumber: number | undefined | null): number | null => {
-    if (chapterNumber === undefined || chapterNumber === null) return null
-    const chapter = chapters.value.find(c => c.chapterNumber === chapterNumber)
-    return chapter?.id ?? null
-  }
-
-  // Si hay múltiples sources y no se especifica uno concreto, resaltar todos
-  const sources = alert.extraData?.sources
-  if (sources && sources.length > 1 && !source) {
-    // Colores para distinguir los sources (valor1 vs valor2)
-    const colors = ['#ef4444', '#3b82f6'] // rojo y azul
-
-    const ranges = sources.map((s: AlertSource, idx: number) => ({
-      startChar: s.startChar,
-      endChar: s.endChar,
-      text: s.excerpt,
-      chapterId: getChapterId(s.chapter),
-      color: colors[idx % colors.length],
-      label: s.value
-    }))
-
-    workspaceStore.highlightAlertSources(alert.id, ranges)
-    return
-  }
-
-  // Si hay un source específico, usar sus datos de ubicación
-  const targetChapter = source?.chapter ?? alert.chapter
-  const targetPosition = source?.startChar ?? alert.spanStart
-  const targetExcerpt = source?.excerpt ?? alert.excerpt
-
-  // Navegar al texto con posición precisa si está disponible
-  if (targetPosition !== undefined) {
-    // Obtener el ID del capítulo a partir del número
-    const chapterId = getChapterId(targetChapter)
-
-    // Limpiar highlights anteriores y usar navegación simple
-    workspaceStore.clearAlertHighlights()
-    workspaceStore.navigateToTextPosition(
-      targetPosition,
-      targetExcerpt || undefined,
-      chapterId
-    )
-  } else if (targetChapter !== undefined && targetChapter !== null) {
-    // Fallback: solo navegar al capítulo si no hay posición exacta
-    const chapter = chapters.value.find(c => c.chapterNumber === targetChapter)
-    if (chapter) {
-      scrollToChapterId.value = chapter.id
-      activeChapterId.value = chapter.id
-      workspaceStore.setActiveTab('text')
-      setTimeout(() => { scrollToChapterId.value = null }, 500)
-    }
-  }
-}
-
-/**
- * Navega a una ocurrencia específica de una alerta (repeticiones, ecos).
- */
-const onAlertNavigateToPosition = (alert: Alert | null, startChar: number, endChar: number, text?: string) => {
-  if (!alert) return
-
-  const getChapterId = (chapterNumber: number | undefined | null): number | null => {
-    if (chapterNumber === undefined || chapterNumber === null) return null
-    const chapter = chapters.value.find(c => c.chapterNumber === chapterNumber)
-    return chapter?.id ?? null
-  }
-
-  const chapterId = getChapterId(alert.chapter)
-  workspaceStore.clearAlertHighlights()
-  workspaceStore.navigateToTextPosition(startChar, text, chapterId)
-}
-
-const navigateToAlerts = () => {
-  workspaceStore.setActiveTab('alerts')
-}
-
-const handleFilterSeverity = (severity: string) => {
-  workspaceStore.setAlertSeverityFilter(severity)
-  workspaceStore.setActiveTab('alerts')
-}
-
-const handleStatClick = (stat: 'words' | 'chapters' | 'entities' | 'alerts') => {
-  switch (stat) {
-    case 'entities':
-      workspaceStore.setActiveTab('entities')
-      break
-    case 'alerts':
-      workspaceStore.setActiveTab('alerts')
-      break
-    case 'chapters':
-      // Mantener en text tab y mostrar capítulos en sidebar
-      workspaceStore.setActiveTab('text')
-      sidebarTab.value = 'chapters'
-      break
-    default:
-      // words - ir al texto
-      workspaceStore.setActiveTab('text')
-  }
-}
-
-// ProjectSummary handlers (panel derecho optimizado)
-const handleViewAlerts = () => {
-  workspaceStore.setActiveTab('alerts')
-}
-
-const handleFilterAlerts = (category: Alert['category']) => {
-  workspaceStore.setAlertCategoryFilter(category)
-  workspaceStore.setActiveTab('alerts')
-}
-
-const onAlertClick = (alert: Alert) => {
-  // Seleccionar la alerta en el inspector
-  selectionStore.selectAlert(alert)
-  // Asegurar que estamos en la pestaña de texto y en el inspector derecho
-  workspaceStore.setActiveTab('text')
-  rightInspectorTab.value = 'contextual'
-}
-
-const handleGoToMentions = (entity: Entity) => {
-  workspaceStore.navigateToEntityMentions(entity.id)
-  highlightedEntityId.value = entity.id
-}
-
-// ChapterInspector handlers
-const onBackToDocumentSummary = () => {
-  // Clear the active chapter to show document summary
-  activeChapterId.value = null
-  workspaceStore.setCurrentChapter(null)
-}
-
-const onGoToChapterStart = () => {
-  // Scroll to the start of the current chapter
-  if (currentChapter.value) {
-    scrollToChapterId.value = currentChapter.value.id
-    setTimeout(() => { scrollToChapterId.value = null }, 500)
-  }
-}
-
-const onViewChapterAlerts = () => {
-  // Open left sidebar with alerts panel filtered by chapter
-  sidebarTab.value = 'alerts'
-  if (!workspaceStore.leftPanel.expanded) {
-    workspaceStore.toggleLeftPanel()
-  }
-  // The AlertsPanel will show alerts, user can filter by chapter if needed
-}
-
-const onNavigateToChapter = (chapterNumber: number) => {
-  // Find chapter by number and navigate to it
-  const chapter = chapters.value.find(c => c.chapterNumber === chapterNumber)
-  if (chapter) {
-    scrollToChapterId.value = chapter.id
-    activeChapterId.value = chapter.id
-    workspaceStore.setActiveTab('text')
-    setTimeout(() => { scrollToChapterId.value = null }, 500)
-  }
-}
-
-const onNavigateToEvent = (startChar: number, endChar: number) => {
-  // Navigate to event position in current chapter
-  if (!currentChapter.value) return
-
-  const chapterId = currentChapter.value.id
-
-  // Clear existing highlights and navigate to event position
-  workspaceStore.clearAlertHighlights()
-  workspaceStore.navigateToTextPosition(startChar, undefined, chapterId)
-}
-
-const onInspectorDialogueSelected = (attribution: DialogueAttribution) => {
-  workspaceStore.setActiveTab('text')
-  rightInspectorTab.value = 'dialogue'
-  textTabRef.value?.scrollToDialogue(attribution)
-}
-
-// TextSelectionInspector handlers
-const onSearchSimilarText = (text: string) => {
-  // Establecer query y abrir panel de búsqueda
-  searchQuery.value = text
-  sidebarTab.value = 'search'
-  // Mantener la selección visible mientras se busca
-}
-
-const onSearchResultNavigate = (position: number, text: string, chapterId?: number) => {
-  // Navegar a la posición del resultado en el texto
-  workspaceStore.navigateToTextPosition(position, text, chapterId)
-}
-
-const onAskAiAboutSelection = (_text: string) => {
-  // Switch to assistant tab — the selection stays in selectionStore
-  // and AssistantPanel reads it from there
-  sidebarTab.value = 'assistant'
-}
-
-// Chat reference navigation (same pattern as alert navigation)
-const onChatReferenceNavigate = (ref: ChatReference) => {
-  const chapter = chapters.value.find(c => c.chapterNumber === ref.chapter)
-  const chapterId = chapter?.id ?? null
-  workspaceStore.clearAlertHighlights()
-  workspaceStore.navigateToTextPosition(ref.startChar, ref.excerpt, chapterId)
-}
-
 const handleExportStyleGuide = () => {
   openExportDialog()
 }
@@ -1440,11 +1213,6 @@ const {
   },
   addToast: toast.add,
 })
-
-const handleNavigateToCharacter = (entityId: number) => {
-  initialEntityId.value = entityId
-  workspaceStore.setActiveTab('entities')
-}
 
 const { onAnalysisCompleted } = useProjectDetailLifecycle({
   project,
