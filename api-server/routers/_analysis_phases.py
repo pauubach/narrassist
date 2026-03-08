@@ -30,9 +30,30 @@ from routers._analysis_structure_helpers import (
     find_chapter_id_for_position as resolve_chapter_id_for_position,
     initialize_dialogue_style_preference,
 )
+from routers._alert_emission import (
+    emit_consistency_alerts as _emit_consistency_alerts,
+    emit_grammar_alerts as _emit_grammar_alerts,
+)
+from routers._analysis_restoration import (
+    apply_saved_dismissals as _apply_saved_dismissals,
+    reapply_user_merges as _reapply_user_merges,
+    restore_verified_attributes as _restore_verified_attributes,
+)
 from routers._analysis_runtime import (
     _filter_nlp_methods_by_runtime_capabilities,
     _get_runtime_service_capabilities,
+)
+from routers._consistency_subphases import (
+    analyze_anachronisms_subphase,
+    analyze_chapter_progress_subphase,
+    analyze_character_locations_subphase,
+    analyze_classical_spanish_subphase,
+    analyze_ooc_subphase,
+    analyze_speech_tracking_subphase,
+    analyze_vital_status_subphase,
+    build_temporal_map,
+    prepare_chapters_for_analysis,
+    prepare_entities_for_analysis,
 )
 
 from narrative_assistant.entities.clustering import compute_reduced_pairs_from_clusters
@@ -3671,9 +3692,9 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     entities = ctx["entities"]
     attributes = ctx["attributes"]
     analysis_config = ctx["analysis_config"]
+    db_session = ctx["db_session"]
 
     tracker.start_phase("consistency", "Verificando la coherencia del relato...")
-
     cons_pct_start, cons_pct_end = tracker.get_phase_progress_range("consistency")
 
     # Consistencia de atributos
@@ -3684,473 +3705,77 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
         if check_result.is_success:
             inconsistencies = check_result.value or []
 
-    # Sub-fase 7.1: Estado vital (0-33%)
-    vital_status_report = None
-    location_report = None
-    chapter_progress_report = None
+    # Preparar datos comunes para sub-fases
+    chapters_for_analysis = prepare_chapters_for_analysis(chapters_data)
+    entities_for_analysis = prepare_entities_for_analysis(entities)
+    temporal_map = build_temporal_map(ctx)
 
-    sub_progress = cons_pct_start + int((cons_pct_end - cons_pct_start) * 0.0)
+    # Sub-fase 7.1: Estado vital (0-33%)
     tracker.update_storage(
         current_action="Verificando estado vital de personajes...",
-        progress=sub_progress
+        progress=cons_pct_start + int((cons_pct_end - cons_pct_start) * 0.0),
     )
     tracker.update_time_remaining()
 
-    # Preparar datos para sub-fases
-    chapters_for_analysis = [
-        {
-            "number": ch["chapter_number"],
-            "content": ch["content"],
-            "text": ch["content"],
-            "start_char": ch["start_char"],
-        }
-        for ch in chapters_data
-    ]
-
-    entities_for_analysis = [
-        {
-            "id": e.id,
-            "canonical_name": e.canonical_name,
-            "entity_type": (
-                e.entity_type.value if hasattr(e.entity_type, "value") else str(e.entity_type)
-            ),
-            "aliases": e.aliases if hasattr(e, "aliases") else [],
-        }
-        for e in entities
-    ]
-
-    # BK-08: Construir TemporalMap para narrativas no lineales
-    temporal_map = None
-    try:
-        from narrative_assistant.temporal.temporal_map import TemporalMap
-
-        timeline = ctx.get("timeline")
-        if timeline is not None:
-            temporal_map = TemporalMap.from_timeline(timeline)
-            logger.info(f"Built TemporalMap with {len(temporal_map._slices)} slices")
-    except Exception as e:
-        logger.warning(f"Failed to build TemporalMap: {e}. Falling back to chapter comparison.")
-
-    try:
-        from narrative_assistant.analysis.vital_status import analyze_vital_status
-
-        vital_result = analyze_vital_status(
-            project_id=project_id,
-            chapters=chapters_for_analysis,
-            entities=entities_for_analysis,
-            temporal_map=temporal_map,
-        )
-
-        if vital_result.is_success:
-            vital_status_report = vital_result.value
-            logger.info(
-                f"Vital status analysis: {len(vital_status_report.death_events)} deaths, "  # type: ignore[union-attr]
-                f"{len(vital_status_report.post_mortem_appearances)} post-mortem appearances"  # type: ignore[union-attr]
-            )
-
-            # S8a-03: Persist vital status events to DB
-            try:
-                db = ctx["db_session"]
-                with db.connection() as conn:
-                    # Limpiar eventos anteriores
-                    conn.execute(
-                        "DELETE FROM vital_status_events WHERE project_id = ?",
-                        (project_id,),
-                    )
-                    # Insertar death events
-                    for de in vital_status_report.death_events:  # type: ignore[union-attr]
-                        conn.execute(
-                            """INSERT INTO vital_status_events
-                            (project_id, entity_id, entity_name, event_type,
-                             chapter, start_char, end_char, excerpt,
-                             confidence, death_type)
-                            VALUES (?, ?, ?, 'death', ?, ?, ?, ?, ?, ?)""",
-                            (
-                                project_id,
-                                de.entity_id,
-                                de.entity_name,
-                                de.chapter,
-                                de.start_char,
-                                de.end_char,
-                                de.excerpt,
-                                de.confidence,
-                                de.death_type,
-                            ),
-                        )
-                    # Insertar post-mortem appearances
-                    for pm in vital_status_report.post_mortem_appearances:  # type: ignore[union-attr]
-                        conn.execute(
-                            """INSERT INTO vital_status_events
-                            (project_id, entity_id, entity_name, event_type,
-                             chapter, start_char, end_char, excerpt,
-                             confidence, death_chapter, appearance_type, is_valid)
-                            VALUES (?, ?, ?, 'post_mortem_appearance', ?, ?, ?, ?, ?, ?, ?, ?)""",
-                            (
-                                project_id,
-                                pm.entity_id,
-                                pm.entity_name,
-                                pm.appearance_chapter,
-                                pm.appearance_start_char,
-                                pm.appearance_end_char,
-                                pm.appearance_excerpt,
-                                pm.confidence,
-                                pm.death_chapter,
-                                pm.appearance_type,
-                                1 if pm.is_valid else 0,
-                            ),
-                        )
-                persisted = len(vital_status_report.death_events) + len(  # type: ignore[union-attr]
-                    vital_status_report.post_mortem_appearances  # type: ignore[union-attr]
-                )
-                logger.info(f"Persisted {persisted} vital status events to DB")
-            except Exception as persist_err:
-                logger.warning(f"Error persisting vital status (continuing): {persist_err}")
-
-        else:
-            logger.warning(f"Vital status analysis failed: {vital_result.error}")
-
-    except ImportError as e:
-        logger.warning(f"Vital status module not available: {e}")
-    except Exception as e:
-        logger.warning(f"Error in vital status analysis: {e}", exc_info=True)
+    vital_status_report = analyze_vital_status_subphase(
+        project_id, chapters_for_analysis, entities_for_analysis, temporal_map, db_session,
+    )
 
     tracker.check_cancelled()
 
     # Sub-fase 7.2: Ubicaciones (33-66%)
-    sub_progress = cons_pct_start + int((cons_pct_end - cons_pct_start) * 0.33)
     tracker.update_storage(
         current_action="Verificando ubicaciones de personajes...",
-        progress=sub_progress
+        progress=cons_pct_start + int((cons_pct_end - cons_pct_start) * 0.33),
     )
     tracker.update_time_remaining()
 
-    try:
-        from narrative_assistant.analysis.character_location import (
-            analyze_character_locations,
-        )
-
-        location_result = analyze_character_locations(
-            project_id=project_id,
-            chapters=chapters_for_analysis,
-            entities=entities_for_analysis,
-        )
-
-        if location_result.is_success:
-            location_report = location_result.value
-            inconsistency_count = (
-                len(location_report.inconsistencies)  # type: ignore[union-attr]
-                if hasattr(location_report, "inconsistencies")
-                else 0
-            )
-            logger.info(
-                f"Character location analysis: {len(location_report.location_events)} events, "  # type: ignore[union-attr]
-                f"{inconsistency_count} inconsistencies"
-            )
-
-            # S8a-04: Persist character location events to DB
-            try:
-                db = ctx["db_session"]
-                with db.connection() as conn:
-                    conn.execute(
-                        "DELETE FROM character_location_events WHERE project_id = ?",
-                        (project_id,),
-                    )
-                    for le in location_report.location_events:  # type: ignore[union-attr]
-                        conn.execute(
-                            """INSERT INTO character_location_events
-                            (project_id, entity_id, entity_name, location_name,
-                             chapter, start_char, end_char, excerpt,
-                             change_type, confidence)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                            (
-                                project_id,
-                                le.entity_id,
-                                le.entity_name,
-                                le.location_name,
-                                le.chapter,
-                                le.start_char,
-                                le.end_char,
-                                le.excerpt,
-                                le.change_type.value
-                                if hasattr(le.change_type, "value")
-                                else str(le.change_type),
-                                le.confidence,
-                            ),
-                        )
-                logger.info(
-                    f"Persisted {len(location_report.location_events)} "  # type: ignore[union-attr]
-                    f"character location events to DB"
-                )
-            except Exception as persist_err:
-                logger.warning(f"Error persisting character locations (continuing): {persist_err}")
-
-        else:
-            logger.warning(f"Character location analysis failed: {location_result.error}")
-
-    except ImportError as e:
-        logger.warning(f"Character location module not available: {e}")
-    except Exception as e:
-        logger.warning(f"Error in character location analysis: {e}", exc_info=True)
+    location_report = analyze_character_locations_subphase(
+        project_id, chapters_for_analysis, entities_for_analysis, db_session,
+    )
 
     tracker.check_cancelled()
 
     # Sub-fase 7.3: Resumen por capítulo (66-100%)
-    sub_progress = cons_pct_start + int((cons_pct_end - cons_pct_start) * 0.66)
     tracker.update_storage(
         current_action="Generando resumen de avance narrativo...",
-        progress=sub_progress
+        progress=cons_pct_start + int((cons_pct_end - cons_pct_start) * 0.66),
     )
     tracker.update_time_remaining()
 
-    try:
-        from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
-
-        chapter_progress_report = analyze_chapter_progress(
-            project_id=project_id,
-            db_path=None,
-            mode="basic",
-        )
-
-        if chapter_progress_report:
-            logger.info(
-                f"Chapter progress analysis: "
-                f"{len(chapter_progress_report.chapters)} chapters analyzed"
-            )
-
-    except ImportError as e:
-        logger.warning(f"Chapter summary module not available: {e}")
-    except Exception as e:
-        logger.warning(f"Error in chapter progress analysis: {e}", exc_info=True)
+    chapter_progress_report = analyze_chapter_progress_subphase(project_id)
 
     tracker.check_cancelled()
 
     # Sub-fase 7.4: Out-of-character
     ooc_report = None
     if analysis_config.run_ooc_detection:
-        tracker.update_storage(
-            current_action="Detectando comportamiento fuera de personaje...",
-        )
-        try:
-            from narrative_assistant.analysis.character_profiling import CharacterProfiler
-            from narrative_assistant.analysis.out_of_character import OutOfCharacterDetector
-
-            profiler = CharacterProfiler()
-            character_entities = [
-                e
-                for e in entities
-                if (
-                    hasattr(e.entity_type, "value")
-                    and e.entity_type.value in ("character", "PER", "PERSON")
-                )
-                or (
-                    isinstance(e.entity_type, str)
-                    and e.entity_type in ("character", "PER", "PERSON")
-                )
-            ]
-            if character_entities:
-                chapter_texts = {ch["chapter_number"]: ch["content"] for ch in chapters_data}
-                profiles = profiler.build_profiles(character_entities, chapters_data, chapter_texts)  # type: ignore[arg-type]
-                if profiles:
-                    # Check run_ooc_detection flag
-                    analysis_config = ctx.get("analysis_config")
-                    if not analysis_config or analysis_config.run_ooc_detection:
-                        ooc_detector = OutOfCharacterDetector()
-                        ooc_report = ooc_detector.detect(
-                            profiles=profiles,
-                            chapter_texts=chapter_texts,
-                        )
-                        logger.info(f"OOC detection: {len(ooc_report.events)} events found")
-                    else:
-                        logger.info("OOC detection omitida por configuración")
-                        ooc_report = None
-
-                    # S8a-05: Persist OOC events to DB
-                    if ooc_report:
-                        try:
-                            db = ctx["db_session"]
-                            with db.connection() as conn:
-                                conn.execute(
-                                    "DELETE FROM ooc_events WHERE project_id = ?",
-                                    (project_id,),
-                                )
-                                for ev in ooc_report.events:
-                                    conn.execute(
-                                        """INSERT INTO ooc_events
-                                        (project_id, entity_id, entity_name,
-                                         deviation_type, severity, description,
-                                         expected, actual, chapter, excerpt,
-                                         confidence, is_intentional)
-                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                                        (
-                                            project_id,
-                                            ev.entity_id,
-                                            ev.entity_name,
-                                            ev.deviation_type.value
-                                            if hasattr(ev.deviation_type, "value")
-                                            else str(ev.deviation_type),
-                                            ev.severity.value
-                                            if hasattr(ev.severity, "value")
-                                            else str(ev.severity),
-                                            ev.description,
-                                            ev.expected,
-                                            ev.actual,
-                                            ev.chapter,
-                                            ev.excerpt,
-                                            ev.confidence,
-                                            1 if ev.is_intentional else 0,
-                                        ),
-                                    )
-                            logger.info(f"Persisted {len(ooc_report.events)} OOC events to DB")
-                        except Exception as persist_err:
-                            logger.warning(f"Error persisting OOC events (continuing): {persist_err}")
-
-        except ImportError as e:
-            logger.warning(f"OOC detection module not available: {e}")
-        except Exception as e:
-            logger.warning(f"Error in OOC detection: {e}", exc_info=True)
-
+        tracker.update_storage(current_action="Detectando comportamiento fuera de personaje...")
+        ooc_report = analyze_ooc_subphase(project_id, entities, chapters_data, db_session)
         tracker.check_cancelled()
 
     # Sub-fase 7.5: Anacronismos
     anachronism_report = None
     if analysis_config.run_anachronism_detection:
-        tracker.update_storage( current_action="Detectando anacronismos...")
-        try:
-            from narrative_assistant.temporal.anachronisms import AnachronismDetector
-
-            anach_detector = AnachronismDetector()
-            anachronism_report = anach_detector.detect(full_text)
-            if anachronism_report and anachronism_report.anachronisms:
-                logger.info(
-                    f"Anachronism detection: "
-                    f"{len(anachronism_report.anachronisms)} anachronisms found"
-                )
-            else:
-                logger.info(
-                    "Anachronism detection: no anachronisms found (period may not be detected)"
-                )
-        except ImportError as e:
-            logger.warning(f"Anachronism detection module not available: {e}")
-        except Exception as e:
-            logger.warning(f"Error in anachronism detection: {e}", exc_info=True)
-
+        tracker.update_storage(current_action="Detectando anacronismos...")
+        anachronism_report = analyze_anachronisms_subphase(full_text)
         tracker.check_cancelled()
 
     # Sub-fase 7.6: Español clásico
     classical_normalization = None
     if analysis_config.run_classical_spanish:
-        tracker.update_storage( current_action="Detectando español clásico...")
-        try:
-            from narrative_assistant.nlp.classical_spanish import ClassicalSpanishNormalizer
-
-            normalizer = ClassicalSpanishNormalizer()
-            period = normalizer.detect_period(full_text)
-            if period != "modern":
-                classical_normalization = normalizer.normalize(full_text)
-                logger.info(
-                    f"Classical Spanish: period={period}, "
-                    f"{len(classical_normalization.replacements)} normalizations"
-                )
-            else:
-                logger.debug("Classical Spanish: modern text, skipping normalization")
-        except ImportError as e:
-            logger.warning(f"Classical Spanish module not available: {e}")
-        except Exception as e:
-            logger.warning(f"Error in classical Spanish detection: {e}", exc_info=True)
-
+        tracker.update_storage(current_action="Detectando español clásico...")
+        classical_normalization = analyze_classical_spanish_subphase(full_text)
         tracker.check_cancelled()
 
-    # Sub-fase 7.7: Speech consistency tracking (v0.10.14)
+    # Sub-fase 7.7: Speech consistency tracking
     speech_change_count = 0
     if analysis_config.run_speech_tracking:
-        tracker.update_storage( current_action="Analizando consistencia del habla...")
-        try:
-            from narrative_assistant.analysis.speech_tracking import (
-                ContextualAnalyzer,
-                SpeechTracker,
-            )
-            from narrative_assistant.entities.models import EntityType
-
-            tracker_speech = SpeechTracker(
-                window_size=3,  # 3 capítulos por ventana
-                overlap=1,  # Solapamiento de 1 capítulo
-                min_words_per_window=200,  # Mínimo 200 palabras
-                min_confidence=0.6,  # Confianza mínima 60%
-            )
-
-            context_analyzer = ContextualAnalyzer()
-
-            # Filtrar solo personajes principales (>50 palabras de diálogo total)
-            main_characters = []
-            for entity in entities:
-                if entity.entity_type not in (
-                    EntityType.CHARACTER,
-                    EntityType.ANIMAL,
-                    EntityType.CREATURE,
-                ):
-                    continue
-
-                # Estimar palabras totales de diálogo
-                total_mentions = entity.mention_count or 0
-                estimated_dialogue_words = total_mentions * 10  # ~10 palabras por mención
-
-                if estimated_dialogue_words >= 50:
-                    main_characters.append(entity)
-
-            logger.info(
-                f"Speech tracking: analyzing {len(main_characters)} main characters "
-                f"(of {len(entities)} total)"
-            )
-
-            # Analizar cada personaje
-            all_speech_alerts = []
-            for entity in main_characters:
-                try:
-                    # Obtener spaCy NLP si está disponible
-                    spacy_nlp = ctx.get("spacy_nlp")
-
-                    # Obtener document fingerprint
-                    # Obtener fingerprint del proyecto (campo de BD, NO de ctx)
-                    _fp_project = ctx.get("project")
-                    document_fingerprint = (
-                        getattr(_fp_project, "document_fingerprint", "") if _fp_project else ""
-                    )
-
-                    speech_alerts = tracker_speech.detect_changes(
-                        character_id=entity.id,
-                        character_name=entity.canonical_name,
-                        chapters=chapters_data,
-                        spacy_nlp=spacy_nlp,
-                        narrative_context_analyzer=context_analyzer,
-                        document_fingerprint=document_fingerprint,
-                    )
-
-                    all_speech_alerts.extend(speech_alerts)
-
-                    if speech_alerts:
-                        logger.info(
-                            f"Speech tracking: {entity.canonical_name} → "
-                            f"{len(speech_alerts)} change(s) detected"
-                        )
-
-                except Exception as e:
-                    logger.warning(f"Speech tracking failed for {entity.canonical_name}: {e}")
-                    continue
-
-            speech_change_count = len(all_speech_alerts)
-            logger.info(
-                f"Speech tracking: {speech_change_count} total changes detected "
-                f"across {len(main_characters)} characters"
-            )
-
-            # Guardar alertas en contexto
-            ctx["speech_change_alerts"] = all_speech_alerts
-
-        except ImportError as e:
-            logger.debug(f"Speech tracking module not available: {e}")
-        except Exception as e:
-            logger.warning(f"Speech consistency tracking failed: {e}", exc_info=True)
-
+        tracker.update_storage(current_action="Analizando consistencia del habla...")
+        speech_change_count, speech_alerts = analyze_speech_tracking_subphase(
+            entities, chapters_data, ctx,
+        )
+        ctx["speech_change_alerts"] = speech_alerts
         tracker.check_cancelled()
 
     # Guardar métricas
@@ -4171,7 +3796,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     )
 
     tracker.end_phase("consistency")
-    tracker.update_storage( metrics_update={"inconsistencies_found": len(inconsistencies)})
+    tracker.update_storage(metrics_update={"inconsistencies_found": len(inconsistencies)})
     logger.info(f"Consistency analysis complete: {len(inconsistencies)} inconsistencies")
 
     ctx["inconsistencies"] = inconsistencies
@@ -4638,348 +4263,6 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
 # ============================================================================
 
 
-def _emit_grammar_alerts(ctx: dict, tracker: ProgressTracker):
-    """Emite alertas de gramática y correcciones editoriales (parcial, tras run_grammar)."""
-    from narrative_assistant.alerts.engine import get_alert_engine
-
-    project_id = ctx["project_id"]
-    chapters_data = ctx.get("chapters_data", [])
-    grammar_issues = ctx.get("grammar_issues", [])
-    correction_issues = ctx.get("correction_issues", [])
-
-    alerts_created = 0
-    alert_engine = get_alert_engine()
-
-    # Alertas de errores gramaticales
-    if grammar_issues:
-        for issue in grammar_issues:
-            try:
-                issue_chapter = _to_optional_int(getattr(issue, "chapter", None))
-                if issue_chapter is None:
-                    issue_chapter = _find_chapter_number_for_position(
-                        chapters_data,
-                        _to_optional_int(getattr(issue, "start_char", None)),
-                    )
-
-                alert_result = alert_engine.create_from_grammar_issue(
-                    project_id=project_id,
-                    text=issue.text,
-                    start_char=issue.start_char,
-                    end_char=issue.end_char,
-                    sentence=issue.sentence,
-                    error_type=(
-                        issue.error_type.value
-                        if hasattr(issue.error_type, "value")
-                        else str(issue.error_type)
-                    ),
-                    suggestion=issue.suggestion,
-                    confidence=issue.confidence,
-                    explanation=issue.explanation,
-                    rule_id=issue.rule_id if hasattr(issue, "rule_id") else "",
-                    chapter=issue_chapter,
-                )
-                if alert_result.is_success:
-                    alerts_created += 1
-            except Exception as e:
-                logger.warning(f"Error creating grammar alert: {e}")
-
-    # Alertas de correcciones editoriales
-    if correction_issues:
-        for issue in correction_issues:
-            try:
-                issue_chapter = _to_optional_int(getattr(issue, "chapter_index", None))
-                if issue_chapter is None:
-                    issue_chapter = _find_chapter_number_for_position(
-                        chapters_data,
-                        _to_optional_int(getattr(issue, "start_char", None)),
-                    )
-
-                alert_result = alert_engine.create_from_correction_issue(
-                    project_id=project_id,
-                    category=issue.category,
-                    issue_type=issue.issue_type,
-                    text=issue.text,
-                    start_char=issue.start_char,
-                    end_char=issue.end_char,
-                    explanation=issue.explanation,
-                    suggestion=issue.suggestion,
-                    confidence=issue.confidence,
-                    context=issue.context,
-                    chapter=issue_chapter,
-                    rule_id=issue.rule_id or "",
-                    extra_data=issue.extra_data,
-                )
-                if alert_result.is_success:
-                    alerts_created += 1
-            except Exception as e:
-                logger.warning(f"Error creating correction alert: {e}")
-
-    # No marcar fase aquí: run_alerts() gestiona el ciclo de la fase "alerts"
-    if tracker is not None:
-        tracker.update_storage(metrics_update={"alerts_generated": alerts_created})
-    logger.info(f"Grammar alerts emitted: {alerts_created} alerts")
-
-    ctx.setdefault("alerts_created", 0)
-    ctx["alerts_created"] += alerts_created
-    ctx["_grammar_alerts_emitted"] = True
-
-
-def _emit_consistency_alerts(ctx: dict, tracker: ProgressTracker):
-    """Emite alertas de consistencia narrativa (tras run_consistency)."""
-    from narrative_assistant.alerts.engine import AlertCategory, AlertSeverity, get_alert_engine
-
-    project_id = ctx["project_id"]
-    chapters_data = ctx.get("chapters_data", [])
-    inconsistencies = ctx.get("inconsistencies", [])
-    vital_status_report = ctx.get("vital_status_report")
-    location_report = ctx.get("location_report")
-    ooc_report = ctx.get("ooc_report")
-    anachronism_report = ctx.get("anachronism_report")
-
-    alerts_created = 0
-    alert_engine = get_alert_engine()
-
-    def _build_attr_source(
-        value: Any,
-        chapter: Any,
-        excerpt: Any,
-        start_char: Any,
-    ) -> dict[str, Any]:
-        normalized_start = _to_optional_int(start_char) or 0
-        normalized_chapter = _to_optional_int(chapter)
-        if normalized_chapter is None:
-            normalized_chapter = _find_chapter_number_for_position(chapters_data, normalized_start)
-
-        normalized_excerpt = str(excerpt or "")
-        excerpt_window = len(normalized_excerpt.strip()) or 80
-
-        return {
-            "chapter": normalized_chapter,
-            "start_char": normalized_start,
-            "end_char": normalized_start + excerpt_window,
-            "excerpt": normalized_excerpt,
-            "value": str(value or ""),
-        }
-
-    # Alertas de inconsistencias de atributos
-    if inconsistencies:
-        for inc in inconsistencies:
-            try:
-                def _inc_field(field_name: str, default: Any = None, _inc: Any = inc) -> Any:
-                    if isinstance(_inc, dict):
-                        return _inc.get(field_name, default)
-                    return getattr(_inc, field_name, default)
-
-                sources: list[dict[str, Any]] = []
-
-                conflicting_values = _inc_field("conflicting_values", []) or []
-                if isinstance(conflicting_values, list):
-                    for cv in conflicting_values:
-                        if isinstance(cv, dict):
-                            cv_value = cv.get("value", "")
-                            cv_chapter = cv.get("chapter")
-                            cv_excerpt = cv.get("excerpt", "")
-                            cv_position = cv.get("position", 0)
-                        else:
-                            cv_value = getattr(cv, "value", "")
-                            cv_chapter = getattr(cv, "chapter", None)
-                            cv_excerpt = getattr(cv, "excerpt", "")
-                            cv_position = getattr(cv, "position", 0)
-
-                        sources.append(
-                            _build_attr_source(
-                                value=cv_value,
-                                chapter=cv_chapter,
-                                excerpt=cv_excerpt,
-                                start_char=cv_position,
-                            )
-                        )
-
-                sources.sort(
-                    key=lambda source: (
-                        source.get("chapter") is None,
-                        _to_optional_int(source.get("chapter")) or 10**9,
-                        _to_optional_int(source.get("start_char")) or 10**9,
-                    )
-                )
-
-                deduped_sources: list[dict[str, Any]] = []
-                seen_source_keys = set()
-                for source in sources:
-                    key = (
-                        str(source.get("value", "")).strip().lower(),
-                        _to_optional_int(source.get("chapter")),
-                        _to_optional_int(source.get("start_char")),
-                    )
-                    if key in seen_source_keys:
-                        continue
-                    seen_source_keys.add(key)
-                    deduped_sources.append(source)
-                sources = deduped_sources
-
-                fallback_value1_source = _build_attr_source(
-                    value=_inc_field("value1", ""),
-                    chapter=_inc_field("value1_chapter"),
-                    excerpt=_inc_field("value1_excerpt", ""),
-                    start_char=_inc_field("value1_position", 0),
-                )
-                fallback_value2_source = _build_attr_source(
-                    value=_inc_field("value2", ""),
-                    chapter=_inc_field("value2_chapter"),
-                    excerpt=_inc_field("value2_excerpt", ""),
-                    start_char=_inc_field("value2_position", 0),
-                )
-
-                if len(sources) < 2:
-                    sources = [fallback_value1_source, fallback_value2_source]
-
-                value1_source = sources[0] if sources else fallback_value1_source
-                value2_source = (
-                    sources[1]
-                    if len(sources) > 1
-                    else fallback_value2_source
-                )
-                attr_key = _inc_field("attribute_key")
-
-                alert_result = alert_engine.create_from_attribute_inconsistency(
-                    project_id=project_id,
-                    entity_name=_inc_field("entity_name", ""),
-                    entity_id=_to_optional_int(_inc_field("entity_id")) or 0,
-                    attribute_key=(
-                        attr_key.value
-                        if hasattr(attr_key, "value")
-                        else str(attr_key or "")
-                    ),
-                    value1=str(_inc_field("value1", "")),
-                    value2=str(_inc_field("value2", "")),
-                    value1_source=value1_source,
-                    value2_source=value2_source,
-                    explanation=str(_inc_field("explanation", "")),
-                    confidence=float(_inc_field("confidence", 0.8)),
-                    sources=sources,
-                )
-                if alert_result.is_success:
-                    alerts_created += 1
-            except Exception as e:
-                logger.warning(f"Error creating attribute inconsistency alert: {e}")
-
-    # Alertas de estado vital
-    if vital_status_report and hasattr(vital_status_report, "post_mortem_appearances"):
-        for appearance in vital_status_report.post_mortem_appearances:
-            if appearance.is_valid:
-                continue
-            try:
-                alert_result = alert_engine.create_from_deceased_reappearance(
-                    project_id=project_id,
-                    entity_id=appearance.entity_id,
-                    entity_name=appearance.entity_name,
-                    death_chapter=appearance.death_chapter,
-                    appearance_chapter=appearance.appearance_chapter,
-                    appearance_start_char=appearance.appearance_start_char,
-                    appearance_end_char=appearance.appearance_end_char,
-                    appearance_excerpt=appearance.appearance_excerpt,
-                    appearance_type=appearance.appearance_type,
-                    confidence=appearance.confidence,
-                )
-                if alert_result.is_success:
-                    alerts_created += 1
-            except Exception as e:
-                logger.warning(f"Error creating deceased reappearance alert: {e}")
-
-    # Alertas de inconsistencias de ubicación
-    if location_report and hasattr(location_report, "inconsistencies"):
-        for loc_inc in location_report.inconsistencies:
-            try:
-                location_chapter = _to_optional_int(getattr(loc_inc, "location2_chapter", None))
-                if location_chapter is None:
-                    location_chapter = _to_optional_int(getattr(loc_inc, "location1_chapter", None))
-
-                alert_result = alert_engine.create_alert(
-                    project_id=project_id,
-                    category=AlertCategory.CONSISTENCY,
-                    severity=AlertSeverity.WARNING,
-                    alert_type="location_inconsistency",
-                    title=f"Inconsistencia de ubicación: {loc_inc.entity_name}",
-                    description=(
-                        f"{loc_inc.entity_name} aparece en {loc_inc.location1_name} "
-                        f"(cap {loc_inc.location1_chapter}) "
-                        f"y en {loc_inc.location2_name} "
-                        f"(cap {loc_inc.location2_chapter})"
-                    ),
-                    explanation=loc_inc.explanation,
-                    confidence=loc_inc.confidence,
-                    chapter=location_chapter,
-                    excerpt=getattr(loc_inc, "location2_excerpt", "")
-                    or getattr(loc_inc, "location1_excerpt", ""),
-                )
-                if alert_result.is_success:
-                    alerts_created += 1
-            except Exception as e:
-                logger.warning(f"Error creating location inconsistency alert: {e}")
-
-    # Alertas OOC
-    if ooc_report and hasattr(ooc_report, "events"):
-        for event in ooc_report.events:
-            try:
-                severity = (
-                    AlertSeverity.WARNING if event.severity.value == "high" else AlertSeverity.INFO
-                )
-                alert_result = alert_engine.create_alert(
-                    project_id=project_id,
-                    category=AlertCategory.CONSISTENCY,
-                    severity=severity,
-                    alert_type="out_of_character",
-                    title=f"Comportamiento atípico: {event.character_name}",
-                    description=event.description,
-                    explanation=event.explanation,
-                    confidence=event.confidence,
-                    chapter=(event.chapter_number if hasattr(event, "chapter_number") else None),
-                )
-                if alert_result.is_success:
-                    alerts_created += 1
-            except Exception as e:
-                logger.warning(f"Error creating OOC alert: {e}")
-
-    # Alertas de anacronismos
-    if anachronism_report and anachronism_report.anachronisms:
-        for anach in anachronism_report.anachronisms:
-            try:
-                anach_position = _to_optional_int(getattr(anach, "position", None))
-                anach_chapter = _find_chapter_number_for_position(chapters_data, anach_position)
-                anach_term = str(getattr(anach, "term", ""))
-
-                alert_result = alert_engine.create_alert(
-                    project_id=project_id,
-                    category=AlertCategory.TIMELINE_ISSUE,
-                    severity=AlertSeverity.WARNING,
-                    alert_type="anachronism",
-                    title=f"Posible anacronismo: {anach.term}",
-                    description=(
-                        f"'{anach.term}' aparece en un contexto temporal donde no existía "
-                        f"({anach.expected_period})"
-                    ),
-                    explanation=anach.explanation,
-                    confidence=anach.confidence,
-                    chapter=anach_chapter,
-                    start_char=anach_position,
-                    end_char=((anach_position or 0) + max(len(anach_term), 1))
-                    if anach_position is not None
-                    else None,
-                    excerpt=getattr(anach, "context", ""),
-                )
-                if alert_result.is_success:
-                    alerts_created += 1
-            except Exception as e:
-                logger.warning(f"Error creating anachronism alert: {e}")
-
-    # No marcar fase aquí: run_alerts() gestiona el ciclo de la fase "alerts"
-
-    ctx.setdefault("alerts_created", 0)
-    ctx["alerts_created"] += alerts_created
-    ctx["_consistency_alerts_emitted"] = True
-    logger.info(f"Consistency alerts emitted: {alerts_created} alerts")
-
-
 def run_alerts(ctx: dict, tracker: ProgressTracker):
     """Fase 9: Finaliza emisión de alertas y aplica reglas post-procesamiento."""
     project_id = ctx["project_id"]
@@ -5001,213 +4284,6 @@ def run_alerts(ctx: dict, tracker: ProgressTracker):
 
     # SP-1: Auto-descartar alertas que el usuario ya había descartado
     _apply_saved_dismissals(project_id)
-
-
-def _restore_verified_attributes(ctx: dict):
-    """
-    SP-1: Restaura is_verified=1 en atributos que el usuario había verificado.
-
-    Busca en los atributos recién creados aquellos que coinciden con los
-    que el usuario verificó en el análisis anterior (guardados en ctx por run_cleanup).
-    """
-    verified_attrs = ctx.get("_sp1_verified_attrs")
-    if not verified_attrs:
-        return
-
-    project_id = ctx["project_id"]
-    try:
-        from narrative_assistant.persistence.database import get_database
-
-        db = get_database()
-        restored = 0
-
-        for va in verified_attrs:
-            entity_name = va["entity_name"]
-            attr_key = va["attribute_key"]
-            attr_value = va["attribute_value"]
-
-            with db.connection() as conn:
-                # Buscar el atributo recién creado que coincida
-                row = conn.execute(
-                    "SELECT ea.id FROM entity_attributes ea "
-                    "JOIN entities e ON ea.entity_id = e.id "
-                    "WHERE e.project_id = ? AND e.canonical_name = ? "
-                    "AND ea.attribute_key = ? AND ea.attribute_value = ? "
-                    "AND ea.is_verified = 0 "
-                    "LIMIT 1",
-                    (project_id, entity_name, attr_key, attr_value),
-                ).fetchone()
-
-            if row:
-                with db.transaction() as conn:
-                    conn.execute(
-                        "UPDATE entity_attributes SET is_verified = 1 WHERE id = ?",
-                        (row["id"],),
-                    )
-                restored += 1
-
-        if restored > 0:
-            logger.info(
-                f"SP-1: Restored is_verified on {restored}/{len(verified_attrs)} attributes"
-            )
-
-    except Exception as e:
-        logger.warning(f"SP-1: Error restoring verified attributes: {e}")
-
-
-def _reapply_user_merges(project_id: int, entity_repo, entities: list):
-    """
-    SP-1: Re-aplica fusiones de usuario preservadas en review_history.
-
-    Después de NER + fusión automática, verifica si hay merges de usuario
-    previos (action_type='entity_merged') que la fusión automática no descubrió.
-    Si ambas entidades existen con sus canonical_names originales, las fusiona.
-    """
-    try:
-        from narrative_assistant.persistence.database import get_database
-
-        db = get_database()
-        with db.connection() as conn:
-            rows = conn.execute(
-                "SELECT old_value_json, new_value_json, note FROM review_history "
-                "WHERE project_id = ? AND action_type = 'entity_merged' "
-                "ORDER BY created_at ASC",
-                (project_id,),
-            ).fetchall()
-
-        if not rows:
-            return
-
-        # Construir índice de entidades actuales por nombre
-        entities_by_name = {}
-        for ent in entities:
-            if ent.canonical_name:
-                entities_by_name[ent.canonical_name.lower()] = ent
-
-        reapplied = 0
-        for row in rows:
-            try:
-                # SP-1: Saltar fusiones deshechas por el usuario
-                note = row["note"] or ""
-                if "[UNDONE" in note:
-                    logger.debug(f"SP-1: Skipping undone merge: {note}")
-                    continue
-
-                old_data = json.loads(row["old_value_json"])
-                names_before = old_data.get("canonical_names_before", [])
-
-                if len(names_before) < 2:
-                    continue
-
-                # Buscar si las entidades que fueron fusionadas antes existen ahora
-                # como entidades separadas (la fusión automática no las unió)
-                primary_name = names_before[0].lower()
-                primary = entities_by_name.get(primary_name)
-
-                for secondary_name_raw in names_before[1:]:
-                    secondary_name = secondary_name_raw.lower()
-                    secondary = entities_by_name.get(secondary_name)
-
-                    if not primary or not secondary or primary.id == secondary.id:
-                        continue
-
-                    # Verificar que la fusión automática no las unió ya
-                    if secondary.canonical_name in (primary.aliases or []):
-                        continue
-
-                    # Re-aplicar el merge
-                    if primary.aliases is None:
-                        primary.aliases = []
-                    if secondary.canonical_name not in primary.aliases:
-                        primary.aliases.append(secondary.canonical_name)
-
-                    if primary.merged_from_ids is None:
-                        primary.merged_from_ids = []
-                    if secondary.id and secondary.id not in primary.merged_from_ids:
-                        primary.merged_from_ids.append(secondary.id)
-
-                    entity_repo.update_entity(
-                        entity_id=primary.id,
-                        aliases=primary.aliases,
-                        merged_from_ids=primary.merged_from_ids,
-                    )
-                    entity_repo.move_mentions(secondary.id, primary.id)
-                    entity_repo.delete_entity(secondary.id, hard_delete=False)
-
-                    # Remover del índice
-                    entities_by_name.pop(secondary_name, None)
-
-                    logger.info(
-                        f"SP-1: Re-applied user merge: '{secondary.canonical_name}' → "
-                        f"'{primary.canonical_name}'"
-                    )
-                    reapplied += 1
-
-            except (json.JSONDecodeError, KeyError, TypeError) as e:
-                logger.debug(f"SP-1: Skip malformed merge history entry: {e}")
-
-        if reapplied > 0:
-            logger.info(f"SP-1: Re-applied {reapplied} user merges from previous analysis")
-
-    except Exception as e:
-        logger.warning(f"SP-1: Error reapplying user merges: {e}")
-
-
-def _apply_saved_dismissals(project_id: int):
-    """Aplica dismissals y suppression rules guardados a alertas recién generadas."""
-    try:
-        from narrative_assistant.alerts.repository import get_alert_repository
-        from narrative_assistant.persistence.dismissal_repository import get_dismissal_repository
-
-        alert_repo = get_alert_repository()
-        dismissal_repo = get_dismissal_repository()
-
-        # 1. Aplicar dismissals por content_hash
-        result = alert_repo.apply_dismissals(project_id)
-        if result.is_success and result.value > 0:  # type: ignore[operator]
-            logger.info(f"SP-1: Auto-dismissed {result.value} alerts from saved dismissals")
-
-        # 2. Aplicar suppression rules
-        from narrative_assistant.persistence.database import get_database
-
-        db = get_database()
-        rules_result = dismissal_repo.get_suppression_rules(project_id, active_only=True)
-        if rules_result.is_failure:
-            return
-
-        rules = rules_result.value
-        if not rules:
-            return
-
-        # Obtener alertas activas y comprobar contra reglas
-        suppressed_count = 0
-        with db.connection() as conn:
-            rows = conn.execute(
-                "SELECT id, alert_type, source_module, content_hash FROM alerts "
-                "WHERE project_id = ? AND status NOT IN ('dismissed', 'resolved', 'auto_resolved')",
-                (project_id,),
-            ).fetchall()
-
-        for row in rows:
-            if dismissal_repo.is_suppressed(
-                project_id,
-                alert_type=row["alert_type"] or "",
-                source_module=row["source_module"] or "",
-            ):
-                with db.transaction() as conn:
-                    conn.execute(
-                        "UPDATE alerts SET status = 'dismissed', "
-                        "resolution_note = 'Auto-suprimida por regla de supresión' "
-                        "WHERE id = ?",
-                        (row["id"],),
-                    )
-                suppressed_count += 1
-
-        if suppressed_count > 0:
-            logger.info(f"SP-1: Suppressed {suppressed_count} alerts from active rules")
-
-    except Exception as e:
-        logger.warning(f"SP-1: Error applying saved dismissals: {e}")
 
 
 # ============================================================================
