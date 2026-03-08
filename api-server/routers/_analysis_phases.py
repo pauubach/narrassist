@@ -7,8 +7,6 @@ Las fases mutan el contexto añadiendo resultados que fases posteriores necesita
 S8a-14: Refactor monolito → funciones standalone.
 """
 
-import contextlib
-import hashlib
 import json
 import threading
 import time
@@ -17,6 +15,25 @@ from typing import Any
 
 import deps
 from deps import generate_person_aliases, logger
+from routers._analysis_cache_helpers import (
+    _chapter_text_hash,
+    _restore_chapter_mentions_from_cache,
+    _restore_coref_result_from_cache,
+    _restore_entities_from_cache,
+    _serialize_chapter_mentions_for_cache,
+    _serialize_coref_result_for_cache,
+    _serialize_entities_for_cache,
+)
+from routers._analysis_structure_helpers import (
+    compute_and_persist_chapter_metrics,
+    detect_and_persist_dialogues,
+    find_chapter_id_for_position as resolve_chapter_id_for_position,
+    initialize_dialogue_style_preference,
+)
+from routers._analysis_runtime import (
+    _filter_nlp_methods_by_runtime_capabilities,
+    _get_runtime_service_capabilities,
+)
 
 from narrative_assistant.entities.clustering import compute_reduced_pairs_from_clusters
 
@@ -76,419 +93,6 @@ def _find_chapter_number_for_position(
 
     candidates.sort(key=lambda item: item[0])
     return candidates[0][1]
-
-
-# Mapa de requisitos de servicio por método NLP (consistente con projects.py).
-_METHOD_SERVICE_REQUIREMENTS: dict[tuple[str, str], str] = {
-    ("coreference", "llm"): "ollama",
-    ("ner", "llm"): "ollama",
-    ("grammar", "llm"): "ollama",
-    ("spelling", "llm_arbitrator"): "ollama",
-    ("character_knowledge", "llm"): "ollama",
-    ("character_knowledge", "hybrid"): "ollama",
-    ("grammar", "languagetool"): "languagetool",
-    ("spelling", "languagetool"): "languagetool",
-    ("spelling", "beto"): "gpu",
-}
-
-
-def _get_runtime_service_capabilities() -> dict[str, bool]:
-    """Obtiene disponibilidad runtime de servicios para validación estricta."""
-    caps = {
-        "ollama": False,
-        "languagetool": False,
-        "gpu": False,
-    }
-
-    try:
-        from narrative_assistant.llm.ollama_manager import is_ollama_available
-
-        caps["ollama"] = bool(is_ollama_available())
-    except Exception:
-        pass
-
-    try:
-        caps["languagetool"] = bool(deps._check_languagetool_available())
-    except Exception:
-        pass
-
-    try:
-        import torch
-
-        caps["gpu"] = bool(torch.cuda.is_available())
-    except Exception:
-        pass
-
-    return caps
-
-
-def _filter_nlp_methods_by_runtime_capabilities(
-    selected_methods: dict[str, list[str]],
-) -> tuple[dict[str, list[str]], list[str]]:
-    """
-    Filtra métodos NLP no viables en runtime antes de ejecutar fases.
-
-    Devuelve:
-    - métodos filtrados (bloqueo estricto de combinaciones inviables)
-    - warnings legibles para logs/UI
-    """
-    runtime_caps = _get_runtime_service_capabilities()
-    filtered: dict[str, list[str]] = {}
-    warnings: list[str] = []
-
-    for category, methods in selected_methods.items():
-        if not isinstance(category, str) or not isinstance(methods, list):
-            continue
-
-        allowed: list[str] = []
-        for method in methods:
-            if not isinstance(method, str):
-                continue
-            normalized_method = method.strip()
-            if not normalized_method:
-                continue
-
-            service = _METHOD_SERVICE_REQUIREMENTS.get((category, normalized_method))
-            if service and not runtime_caps.get(service, False):
-                warnings.append(
-                    f"Método '{normalized_method}' en '{category}' no está disponible ahora y se omitirá."
-                )
-                continue
-            allowed.append(normalized_method)
-
-        filtered[category] = allowed
-
-    return filtered, warnings
-
-
-# ============================================================================
-# Cache Serialization/Deserialization Helpers
-# ============================================================================
-
-
-def _serialize_entities_for_cache(entities: list, entity_repo) -> str:
-    """
-    Serializa entidades + menciones a JSON para cache.
-
-    Args:
-        entities: Lista de Entity objects
-        entity_repo: Repositorio de entidades para obtener menciones
-
-    Returns:
-        JSON string con [{entity_data, mentions: [...]}]
-    """
-    cache_data = []
-
-    for entity in entities:
-        # Obtener menciones de DB.
-        # EntityRepository expone get_mentions_by_entity(); mantener
-        # este nombre evita fallos silenciosos de escritura de cache.
-        mentions = entity_repo.get_mentions_by_entity(entity.id)
-
-        entity_dict = {
-            "id": entity.id,
-            "canonical_name": entity.canonical_name,
-            "entity_type": entity.entity_type.value
-            if hasattr(entity.entity_type, "value")
-            else str(entity.entity_type),
-            "aliases": entity.aliases if entity.aliases else [],
-            "importance": entity.importance.value
-            if hasattr(entity.importance, "value")
-            else str(entity.importance),
-            "first_appearance_char": entity.first_appearance_char,
-            "mention_count": entity.mention_count,
-            "mentions": [
-                {
-                    "surface_form": m.surface_form,
-                    "start_char": m.start_char,
-                    "end_char": m.end_char,
-                    "chapter_id": m.chapter_id,
-                    "confidence": m.confidence,
-                    "source": m.source,
-                }
-                for m in mentions
-            ],
-        }
-
-        cache_data.append(entity_dict)
-
-    return json.dumps(cache_data, ensure_ascii=False)
-
-
-def _restore_entities_from_cache(
-    entities_json: str,
-    project_id: int,
-    find_chapter_id_for_position,
-) -> list:
-    """
-    Restaura entidades + menciones desde JSON de cache.
-
-    Args:
-        entities_json: JSON string de entidades serializadas
-        project_id: ID del proyecto
-        find_chapter_id_for_position: Función para mapear char → chapter_id
-
-    Returns:
-        Lista de Entity objects con menciones creadas en DB
-    """
-    from narrative_assistant.entities.models import (
-        Entity,
-        EntityImportance,
-        EntityMention,
-        EntityType,
-    )
-    from narrative_assistant.entities.repository import get_entity_repository
-
-    cache_data = json.loads(entities_json)
-    entity_repo = get_entity_repository()
-    entities = []
-
-    for entity_dict in cache_data:
-        # Restaurar entity
-        entity_type_str = entity_dict["entity_type"]
-        try:
-            entity_type = EntityType(entity_type_str)
-        except ValueError:
-            entity_type = EntityType.CONCEPT  # Fallback
-
-        importance_str = entity_dict["importance"]
-        try:
-            importance = EntityImportance(importance_str)
-        except ValueError:
-            importance = EntityImportance.MINIMAL
-
-        entity = Entity(
-            id=None,  # Will be assigned by DB
-            project_id=project_id,
-            canonical_name=entity_dict["canonical_name"],
-            entity_type=entity_type,
-            aliases=entity_dict.get("aliases", []),
-            importance=importance,
-            first_appearance_char=entity_dict.get("first_appearance_char", 0),
-            mention_count=entity_dict.get("mention_count", 0),
-            description=None,
-            merged_from_ids=[],
-            is_active=True,
-        )
-
-        # Crear en DB
-        entity_id = entity_repo.create_entity(entity)
-        entity.id = entity_id
-
-        # Restaurar menciones
-        mentions_to_create = []
-        for mention_dict in entity_dict.get("mentions", []):
-            start_char = mention_dict["start_char"]
-            # chapter_id cacheado puede quedar obsoleto porque run_structure
-            # recrea capítulos en cada análisis (IDs nuevos). Remapear por posición.
-            chapter_id = mention_dict.get("chapter_id")
-            if callable(find_chapter_id_for_position):
-                with contextlib.suppress(Exception):
-                    chapter_id = find_chapter_id_for_position(start_char)
-
-            mention = EntityMention(
-                entity_id=entity_id,
-                surface_form=mention_dict["surface_form"],
-                start_char=start_char,
-                end_char=mention_dict["end_char"],
-                chapter_id=chapter_id,
-                confidence=mention_dict.get("confidence", 0.9),
-                source=mention_dict.get("source", "cache"),
-            )
-            mentions_to_create.append(mention)
-
-        if mentions_to_create:
-            entity_repo.create_mentions_batch(mentions_to_create)
-
-        entities.append(entity)
-
-    return entities
-
-
-def _chapter_text_hash(text: str) -> str:
-    """Hash determinístico del texto de un capítulo para cache incremental."""
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-def _serialize_chapter_mentions_for_cache(raw_mentions: list, chapter_start: int) -> str:
-    """
-    Serializa menciones NER con offsets locales al capítulo.
-
-    Guardar offsets locales permite reutilizar cache aunque cambie la
-    posición global del capítulo en el documento.
-    """
-    payload: list[dict[str, Any]] = []
-    for ent in raw_mentions:
-        local_start = max(0, int(ent.start_char) - chapter_start)
-        local_end = max(local_start, int(ent.end_char) - chapter_start)
-        payload.append(
-            {
-                "text": ent.text,
-                "label": ent.label.value if hasattr(ent.label, "value") else str(ent.label),
-                "start_char": local_start,
-                "end_char": local_end,
-                "confidence": float(ent.confidence),
-                "source": ent.source,
-            }
-        )
-    return json.dumps(payload, ensure_ascii=False)
-
-
-def _restore_chapter_mentions_from_cache(mentions_json: str, chapter_start: int) -> list:
-    """Restaura menciones NER cacheadas y vuelve a offsets globales."""
-    from narrative_assistant.nlp.ner import EntityLabel, ExtractedEntity
-
-    data = json.loads(mentions_json) if mentions_json else []
-    restored: list[ExtractedEntity] = []
-    for item in data:
-        label_raw = item.get("label", "MISC")
-        try:
-            label = EntityLabel(label_raw)
-        except ValueError:
-            label = EntityLabel.MISC
-
-        start_char = chapter_start + int(item.get("start_char", 0))
-        end_char = chapter_start + int(item.get("end_char", 0))
-        if end_char < start_char:
-            end_char = start_char
-
-        restored.append(
-            ExtractedEntity(
-                text=item.get("text", ""),
-                label=label,
-                start_char=start_char,
-                end_char=end_char,
-                confidence=float(item.get("confidence", 0.8)),
-                source=item.get("source", "chapter_cache"),
-            )
-        )
-
-    return restored
-
-
-# ============================================================================
-# Coreference Cache Serialization
-# ============================================================================
-
-
-def _serialize_coref_result_for_cache(coref_result) -> str:
-    """Serializa CorefResult a JSON para cache.
-
-    Usa posiciones de carácter (no IDs de DB) para que los datos
-    sobrevivan al cleanup que recrea entidades con IDs nuevos.
-    """
-    data: dict[str, Any] = {
-        "chains": [],
-        "unresolved": [],
-        "method_contributions": {},
-        "voting_details": [],
-        "processing_time_ms": coref_result.processing_time_ms,
-    }
-
-    for chain in coref_result.chains:
-        chain_dict = {
-            "main_mention": chain.main_mention,
-            "entity_id": chain.entity_id,
-            "confidence": chain.confidence,
-            "methods_agreed": [m.value for m in chain.methods_agreed],
-            "mentions": [
-                {
-                    "text": m.text,
-                    "start_char": m.start_char,
-                    "end_char": m.end_char,
-                    "mention_type": m.mention_type.value,
-                    "gender": m.gender.value,
-                    "number": m.number.value,
-                    "sentence_idx": m.sentence_idx,
-                    "chapter_idx": m.chapter_idx,
-                    "head_text": m.head_text,
-                    "context": m.context,
-                }
-                for m in chain.mentions
-            ],
-        }
-        data["chains"].append(chain_dict)
-
-    for m in coref_result.unresolved:
-        data["unresolved"].append({
-            "text": m.text,
-            "start_char": m.start_char,
-            "end_char": m.end_char,
-            "mention_type": m.mention_type.value,
-        })
-
-    for method, count in coref_result.method_contributions.items():
-        data["method_contributions"][method.value] = count
-
-    for detail in coref_result.voting_details.values():
-        data["voting_details"].append(detail.to_dict())
-
-    return json.dumps(data, ensure_ascii=False)
-
-
-def _restore_coref_result_from_cache(chains_json: str):
-    """Restaura CorefResult desde JSON de cache."""
-    from narrative_assistant.nlp.coreference_resolver import (
-        CoreferenceChain,
-        CorefMethod,
-        CorefResult,
-        Gender,
-        Mention,
-        MentionType,
-        MentionVotingDetail,
-        Number,
-    )
-
-    data = json.loads(chains_json)
-    result = CorefResult()
-
-    for chain_dict in data.get("chains", []):
-        chain = CoreferenceChain()
-        chain.main_mention = chain_dict.get("main_mention")
-        chain.entity_id = chain_dict.get("entity_id")
-        chain.confidence = chain_dict.get("confidence", 0.0)
-        chain.methods_agreed = [
-            CorefMethod(v) for v in chain_dict.get("methods_agreed", [])
-        ]
-        for m_dict in chain_dict.get("mentions", []):
-            mention = Mention(
-                text=m_dict["text"],
-                start_char=m_dict["start_char"],
-                end_char=m_dict["end_char"],
-                mention_type=MentionType(m_dict["mention_type"]),
-                gender=Gender(m_dict.get("gender", "unknown")),
-                number=Number(m_dict.get("number", "unknown")),
-                sentence_idx=m_dict.get("sentence_idx", 0),
-                chapter_idx=m_dict.get("chapter_idx"),
-                head_text=m_dict.get("head_text"),
-                context=m_dict.get("context"),
-            )
-            chain.mentions.append(mention)
-        result.chains.append(chain)
-
-    for m_dict in data.get("unresolved", []):
-        result.unresolved.append(Mention(
-            text=m_dict["text"],
-            start_char=m_dict["start_char"],
-            end_char=m_dict["end_char"],
-            mention_type=MentionType(m_dict["mention_type"]),
-            gender=Gender(m_dict.get("gender", "unknown")),
-            number=Number(m_dict.get("number", "unknown")),
-        ))
-
-    for method_str, count in data.get("method_contributions", {}).items():
-        try:
-            result.method_contributions[CorefMethod(method_str)] = count
-        except ValueError:
-            pass
-
-    for detail_dict in data.get("voting_details", []):
-        detail = MentionVotingDetail.from_dict(detail_dict)
-        key = (detail.anaphor_start, detail.anaphor_end)
-        result.voting_details[key] = detail
-
-    result.processing_time_ms = data.get("processing_time_ms", 0.0)
-    return result
 
 
 # ============================================================================
@@ -1252,8 +856,10 @@ def apply_license_and_settings(ctx: dict, tracker: ProgressTracker):
                         if method_value and method_value not in normalized:
                             normalized.append(method_value)
                 normalized_nlp_methods[category] = normalized
+        runtime_service_capabilities = _get_runtime_service_capabilities()
         filtered_nlp_methods, runtime_method_warnings = _filter_nlp_methods_by_runtime_capabilities(
-            normalized_nlp_methods
+            normalized_nlp_methods,
+            runtime_caps=runtime_service_capabilities,
         )
         ctx["selected_nlp_methods"] = filtered_nlp_methods
         if runtime_method_warnings:
@@ -1563,105 +1169,34 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
     chapters_with_ids = chapter_repo.get_by_project(project_id)
 
     def find_chapter_id_for_position(start_char: int) -> int | None:
-        """Busca el chapter_id para una posición de carácter dada."""
-        for ch in chapters_with_ids:
-            if ch.start_char <= start_char < ch.end_char:
-                return ch.id
-        # Fallback: capítulo más cercano
-        if chapters_with_ids:
-            closest = min(chapters_with_ids, key=lambda c: abs(c.start_char - start_char))
-            return closest.id
-        return None
+        return resolve_chapter_id_for_position(chapters_with_ids, start_char)
 
     # S8a-02: Compute and persist chapter metrics (lightweight, regex-based)
     try:
-        from narrative_assistant.persistence.chapter import compute_chapter_metrics
-
-        metrics_computed = 0
-        for ch_db in chapters_with_ids:
-            ch_data = next(
-                (c for c in chapters_data if c["chapter_number"] == ch_db.chapter_number),
-                None,
-            )
-            if ch_data and ch_data.get("content"):
-                metrics = compute_chapter_metrics(ch_data["content"])
-                if metrics:
-                    chapter_repo.update_metrics(ch_db.id, metrics)  # type: ignore[arg-type]
-                    metrics_computed += 1
-        logger.info(f"Chapter metrics computed for {metrics_computed}/{chapters_count} chapters")
+        compute_and_persist_chapter_metrics(
+            chapters_data,
+            chapters_with_ids,
+            chapter_repo,
+            chapters_count,
+            logger,
+        )
     except Exception as e:
         logger.warning(f"Error computing chapter metrics (continuing): {e}")
 
     # S16: Detect and persist dialogues
     try:
-        from narrative_assistant.nlp.dialogue import detect_dialogues
-        from narrative_assistant.persistence.dialogue import DialogueData, get_dialogue_repository
-
-        dialogue_repo = get_dialogue_repository(db_session)
-        # Limpiar diálogos anteriores (en caso de re-análisis)
-        dialogue_repo.delete_by_project(project_id)
-
-        dialogues_total = 0
-        for ch_db in chapters_with_ids:
-            ch_data = next(
-                (c for c in chapters_data if c["chapter_number"] == ch_db.chapter_number),
-                None,
-            )
-            if ch_data and ch_data.get("content"):
-                dialogue_result = detect_dialogues(ch_data["content"])
-                if dialogue_result.is_success and dialogue_result.value.dialogues:
-                    # Convertir DialogueSpan a DialogueData
-                    dialogues_to_save = []
-                    for dlg_span in dialogue_result.value.dialogues:
-                        dialogue_data = DialogueData(
-                            id=None,
-                            project_id=project_id,
-                            chapter_id=ch_db.id,
-                            start_char=dlg_span.start_char,
-                            end_char=dlg_span.end_char,
-                            text=dlg_span.text,
-                            dialogue_type=dlg_span.dialogue_type.value,
-                            original_format=dlg_span.original_format,
-                            attribution_text=dlg_span.attribution_text,
-                            speaker_hint=dlg_span.speaker_hint,
-                            confidence=dlg_span.confidence,
-                        )
-                        dialogues_to_save.append(dialogue_data)
-
-                    dialogue_repo.create_batch(dialogues_to_save)
-                    dialogues_total += len(dialogues_to_save)
-
-        logger.info(
-            f"Dialogues detected and persisted: {dialogues_total} dialogues across {chapters_count} chapters"
+        detect_and_persist_dialogues(
+            project_id,
+            chapters_data,
+            chapters_with_ids,
+            db_session,
+            chapters_count,
+            logger,
         )
 
         # S16b: Inicializar dialogue_style_preference desde correction_config
         try:
-            from narrative_assistant.nlp.dialogue_config_mapper import (
-                map_correction_config_to_dialogue_preference,
-            )
-            from narrative_assistant.persistence.project import ProjectManager
-
-            proj_manager = ProjectManager(db_session)
-            project = proj_manager.get_by_id(project_id)
-
-            if project and project.settings_json:
-                correction_config = project.settings_json.get("correction_config", {})
-                dialogue_dash = correction_config.get("dialogue_dash")
-                quote_style = correction_config.get("quote_style")
-
-                # Mapear a preferencia de diálogo
-                preference = map_correction_config_to_dialogue_preference(
-                    dialogue_dash, quote_style
-                )
-
-                # Guardar en settings
-                if "dialogue_style_preference" not in project.settings_json:
-                    project.settings_json["dialogue_style_preference"] = preference
-                    proj_manager.update(project)
-                    logger.info(
-                        f"Initialized dialogue_style_preference={preference} from correction_config"
-                    )
+            initialize_dialogue_style_preference(project_id, db_session, logger)
         except Exception as pref_err:
             logger.warning(f"Error initializing dialogue_style_preference (continuing): {pref_err}")
     except Exception as e:

@@ -1,33 +1,43 @@
-# Seguimiento de deuda estructural
+﻿# Seguimiento de deuda estructural
 
 Fecha: 2026-03-08
 Estado: seguimiento activo posterior a las auditorias del 2026-03-07
-Alcance: frontend desktop Tauri, shell de arranque, transporte HTTP, UX de confirmacion y deuda de mantenibilidad
+Alcance: frontend desktop Tauri, shell de arranque, smoke desktop, transporte HTTP y troceado progresivo de monolitos frontend/backend
 
 ## 1. Resumen ejecutivo
 
-Entre el 2026-03-07 y el 2026-03-08 se ha cerrado la mayor parte de la deuda estructural inmediata del frontend:
+Entre el 2026-03-07 y el 2026-03-08 se ha cerrado la mayor parte de la deuda estructural inmediata y se ha avanzado un tramo real del refactor de monolitos.
+
+Cierres y avances ya materializados:
 
 - `fetch()` directo en producto: cerrado
-- transporte HTTP de bajo nivel compartido (`apiClient` + `logger`): cerrado
-- dialogos nativos `alert/confirm/prompt`: cerrados
+- transporte HTTP de bajo nivel compartido (`apiClient` + `logger` + `httpTransport`): cerrado
+- dialogos nativos `alert/confirm/prompt`: cerrados en `frontend/src`
 - acciones placeholder visibles en menu/contexto principal: cerradas
 - `console.log/debug` de producto: cerrados en `frontend/src`
 - smoke test desktop MVP del shell Tauri: cerrado a nivel de store/eventos
-- smoke reproducible sobre binario desktop construido: disponible
-- smoke de binario construido integrado en CI para Windows y macOS: cerrado
-- refactor de `SettingsView` cubierto con smoke test y tests por seccion: cerrado
-- flujo `.nra` (dialogo Tauri + backend): cubierto con tests de composable
+- smoke reproducible sobre binario construido: cerrado
+- smoke reproducible sobre instalador NSIS y DMG final: cerrado a nivel de script, tests y workflow
+- `SettingsView` troceado y cubierto: cerrado en este tramo
+- flujo `.nra` y flujo editorial: cubiertos con tests de composable/dialogos
+- `ProjectDetailView` con bootstrap, analisis, alertas, exportaciones y lifecycle extraidos: avance solido
+- `DocumentViewer` con exportacion, preferencias, datos, dialogos y helpers puros extraidos: avance solido
+- `_analysis_phases.py` con helpers runtime/cache/structure extraidos: avance solido
+- `analysis_pipeline.py` con modelos, temporal y dialogo/voz extraidos: avance solido
 
-El sistema queda mas consistente y menos propenso a divergencias entre vistas, stores y servicios compartidos.
+Resultado global:
+
+- menos duplicacion de infraestructura
+- menos IO incrustada en vistas grandes
+- mas cobertura especifica de flujos reales
+- menos riesgo de regresion silenciosa en desktop
+- monolitos sensiblemente mas pequeños y con responsabilidades mejor separadas
 
 ## 2. Cambios estructurales cerrados
 
 ### 2.1 Transporte HTTP centralizado
 
-Se ha consolidado el transporte de producto sobre `apiClient` y servicios compartidos.
-
-Piezas nuevas o reforzadas:
+Piezas consolidadas:
 
 - `frontend/src/services/apiClient.ts`
 - `frontend/src/services/httpTransport.ts`
@@ -36,44 +46,17 @@ Piezas nuevas o reforzadas:
 - `frontend/src/utils/fileDownload.ts`
 - `frontend/src/services/logger.ts`
 
-Migraciones relevantes:
-
-- `frontend/src/components/ExportDialog.vue`
-- `frontend/src/components/ImportWorkDialog.vue`
-- `frontend/src/components/events/EventStatsCard.vue`
-- `frontend/src/components/events/EventsExportDialog.vue`
-- `frontend/src/components/timeline/TimelineView.vue`
-- `frontend/src/components/DocumentViewer.vue`
-- `frontend/src/views/ProjectDetailView.vue`
-- `frontend/src/composables/useFeatureProfile.ts`
-- `frontend/src/composables/useMentionNavigation.ts`
-- `frontend/src/composables/useSequentialMode.ts`
-- `frontend/src/composables/useGlobalUndo.ts`
-
 Resultado verificado:
 
 - en `frontend/src` ya no quedan `fetch()` directos de producto
 - `fetch()` queda encapsulado en `frontend/src/services/httpTransport.ts`
-- `apiClient` y `logger` comparten ese transporte de bajo nivel sin dependencia circular
+- `apiClient` y `logger` comparten el mismo transporte de bajo nivel
 
 ### 2.2 Dialogos nativos eliminados
 
-Se ha extraido una capa comun de confirmacion:
+Capa comun:
 
 - `frontend/src/composables/useAppConfirm.ts`
-
-Migraciones aplicadas en CRUD y flujos de gestion:
-
-- `frontend/src/views/CollectionsView.vue`
-- `frontend/src/views/CollectionDetailView.vue`
-- `frontend/src/views/CharacterView.vue`
-- `frontend/src/components/collections/CollectionBookList.vue`
-- `frontend/src/components/collections/EntityLinkPanel.vue`
-- `frontend/src/composables/useEntityCrud.ts`
-- `frontend/src/composables/useProjectFile.ts`
-- `frontend/src/components/sidebar/HistoryPanel.vue`
-- `frontend/src/components/workspace/GlossaryTab.vue`
-- `frontend/src/App.vue` (ConfirmDialog global)
 
 Resultado verificado:
 
@@ -81,220 +64,250 @@ Resultado verificado:
 
 ### 2.3 Placeholders visibles cerrados
 
-Se han eliminado acciones visibles que antes no hacian nada o solo escribian en consola.
+Puntos principales saneados:
 
 - `frontend/src/views/ProjectsView.vue`
-  - `Re-analizar` abre el proyecto y despacha `menubar:run-analysis`
-  - `Exportar` abre el proyecto y despacha `menubar:export`
 - `frontend/src/composables/useNativeMenu.ts`
 - `frontend/src/App.vue`
-  - `check_updates` deja de ser un placeholder silencioso y responde con mensaje explicito al usuario
 
 ### 2.4 Limpieza de logging de depuracion
 
-Se ha eliminado el logging de depuracion (`console.log` / `console.debug`) de `frontend/src`.
+Resultado verificado:
 
-Archivos limpiados en esta pasada:
+- `console.log/debug` de producto: 0
+- se conservan `console.warn` y `console.error` donde aportan diagnostico real
 
-- `frontend/src/App.vue`
-- `frontend/src/stores/app.ts`
-- `frontend/src/stores/theme.ts`
-- `frontend/src/composables/useNativeMenu.ts`
-- `frontend/src/composables/useProjectData.ts`
-- `frontend/src/composables/useMentionNavigation.ts`
-- `frontend/src/components/sidebar/ChatMessageContent.vue`
-- `frontend/src/components/sidebar/AssistantPanel.vue`
-- `frontend/src/components/workspace/TextTab.vue`
-- `frontend/src/components/DocumentViewer.vue`
-- `frontend/src/components/RelationshipGraph.vue`
-- `frontend/src/views/SettingsView.vue`
+### 2.5 Smoke test desktop MVP del shell Tauri
 
-Se conservan `console.warn` y `console.error` donde siguen aportando diagnostico real.
+Cobertura reforzada en `frontend/src/stores/__tests__/app.spec.ts`:
 
-### 2.5 Smoke test desktop MVP
-
-Se ha reforzado `frontend/src/stores/__tests__/app.spec.ts` con un caso de ciclo completo del shell Tauri:
-
-- arranque
 - `starting`
 - `running`
 - `restarting`
-- `running`
 - `error`
-
-Este smoke test no sustituye una prueba sobre binario empaquetado, pero si cierra el hueco de regresion obvia en el flujo de eventos del sidecar local.
 
 ### 2.6 Refactor de SettingsView blindado
 
-El troceado de `frontend/src/views/SettingsView.vue` ya no queda sin red de seguridad.
-
-Cobertura nueva:
+Cobertura:
 
 - `frontend/src/components/settings/SettingsSections.spec.ts`
-  - valida wiring de `AnalysisSection`, `SemanticAnalyzerSection`, `DetectionMethodsSection`,
-    `CorrectionsSection`, `DataMaintenanceSection` y `LicenseSection`
 - `frontend/src/views/SettingsView.spec.ts`
-  - smoke test del contenedor
-  - validacion de `provide/inject` indirecta via montaje
-  - carga inicial de settings/capabilities/proyecto
-  - apertura de dialogos y enrutado de eventos de secciones
-
-Resultado:
-
-- el refactor deja de estar cubierto solo "por inspeccion"
-- hay red de seguridad para futuras extracciones del monolito
 
 ### 2.7 Flujo de archivos `.nra` blindado
 
-Se ha añadido cobertura especifica para el composable de archivo de proyecto:
+Cobertura:
 
 - `frontend/src/composables/useProjectFile.spec.ts`
 
-Casos cubiertos:
-
-- guardado con sanitizacion del nombre por defecto
-- cancelacion del dialogo de guardado
-- apertura con normalizacion de `warnings` y nombre por defecto
-- error explicito fuera de entorno Tauri
-
 ### 2.8 Importacion de trabajo editorial blindada
 
-Se ha añadido cobertura funcional del dialogo de importacion editorial:
+Cobertura:
 
 - `frontend/src/components/ImportWorkDialog.spec.ts`
 
-Casos cubiertos:
-
-- seleccion de archivo y preview via `postForm`
-- confirmacion de importacion con payload correcto
-- cierre y reset del flujo tras completar
-- error de preview con toast accionable para el usuario
-
 ### 2.9 Smoke desktop sobre binario construido
 
-Se ha anadido un smoke runner reproducible para la app desktop ya construida:
+Piezas:
 
 - `scripts/smoke_desktop_app.py`
 - `tests/scripts/test_smoke_desktop_app.py`
 
 Cobertura:
 
-- autodeteccion de binario release cuando existe
+- autodeteccion de binario release
 - arranque del binario desktop
-- polling de `http://127.0.0.1:8008/api/health`
-- requisito de readiness real si el payload expone `backend_loaded`
+- polling de `/api/health`
+- comprobacion de `backend_loaded` cuando existe
 - cierre del proceso al finalizar o en error
 
-Limite actual:
+### 2.10 Smoke desktop sobre instalador NSIS y DMG final
 
-- no sustituye una prueba sobre instalador/DMG final
-- pero elimina el hueco de "no hay script reproducible para comprobar el binario"
-- el script queda integrado en workflows de Windows y macOS tras `cargo tauri build`
+El smoke runner cubre tambien:
 
-### 2.10 Extraccion del flujo de exportacion en DocumentViewer
+- modo `windows-installer`
+- modo `macos-dmg`
 
-Se ha separado la logica de exportacion del visor de documento en un composable dedicado:
+Integracion:
+
+- `.github/workflows/build-release.yml`
+- `.github/workflows/release.yml`
+
+Cobertura nueva:
+
+- descubrimiento del instalador NSIS o del DMG
+- instalacion silenciosa temporal en Windows y arranque de la app instalada
+- montaje temporal del DMG en macOS y arranque desde el bundle
+- limpieza posterior del directorio o punto de montaje temporal
+
+### 2.11 Extraccion funcional de DocumentViewer
+
+Slices ya extraidos:
 
 - `frontend/src/components/document-viewer/useDocumentViewerExport.ts`
-- `frontend/src/components/document-viewer/useDocumentViewerExport.spec.ts`
 - `frontend/src/components/document-viewer/useDocumentViewerPreferences.ts`
-- `frontend/src/components/document-viewer/useDocumentViewerPreferences.spec.ts`
+- `frontend/src/components/document-viewer/useDocumentViewerData.ts`
+- `frontend/src/components/document-viewer/useDocumentViewerDialogues.ts`
+- `frontend/src/components/document-viewer/documentViewerText.ts`
+- `frontend/src/components/document-viewer/useDocumentViewerInteractions.ts`
+
+Cobertura asociada:
+
+- `useDocumentViewerExport.spec.ts`
+- `useDocumentViewerPreferences.spec.ts`
+- `useDocumentViewerData.spec.ts`
+- `useDocumentViewerDialogues.spec.ts`
+- `documentViewerText.spec.ts`
+- `useDocumentViewerInteractions.spec.ts`
+- `DocumentViewer.spec.ts`
 
 Resultado:
 
-- `DocumentViewer.vue` deja de mezclar estado visual con exportacion JSON/binaria
-- las preferencias de apariencia y visibilidad de errores salen del componente principal
-- el flujo de exportacion queda testeado de forma aislada
-- el componente principal reduce tamaño y superficie de regresion (~2146 lineas)
+- `DocumentViewer.vue` reduce IO, helpers puros, interaccion de seleccion/click y estado mezclado
+- el componente principal baja a ~1922 lineas
+- la logica de exportacion, datos, dialogos, preferencias y texto queda testeada por separado
 
-### 2.11 Extraccion de exportaciones y acciones de alertas en ProjectDetailView
+### 2.12 Extraccion funcional de ProjectDetailView
 
-Se han separado dos bloques funcionales del detalle de proyecto:
+Slices ya extraidos:
 
 - `frontend/src/views/project-detail/useProjectDetailExports.ts`
-- `frontend/src/views/project-detail/useProjectDetailExports.spec.ts`
 - `frontend/src/views/project-detail/useProjectDetailAlerts.ts`
-- `frontend/src/views/project-detail/useProjectDetailAlerts.spec.ts`
+- `frontend/src/views/project-detail/projectDetailBootstrap.ts`
+- `frontend/src/views/project-detail/useProjectDetailAnalysis.ts`
+- `frontend/src/views/project-detail/useProjectDetailLifecycle.ts`
 
-Bloques extraidos:
+Cobertura asociada:
 
-- apertura y estado del dialogo de exportacion
-- exportacion rapida de guia de estilo
-- exportacion de documento corregido
-- resolucion/descarte de alertas
-- resolucion batch de ambiguas
-- cambio de estado de alerta con notificacion a historial
+- `useProjectDetailExports.spec.ts`
+- `useProjectDetailAlerts.spec.ts`
+- `projectDetailBootstrap.spec.ts`
+- `useProjectDetailAnalysis.spec.ts`
+- `useProjectDetailLifecycle.spec.ts`
 
 Resultado:
 
-- `ProjectDetailView.vue` baja a ~2.1K lineas
-- la IO y los toasts de alertas/exportaciones dejan de vivir incrustados en la vista
-- el refactor queda blindado con tests especificos y no solo con smoke del contenedor
-- los caminos batch (`resolve-all`, `batch-resolve-attributes`) tambien quedan cubiertos
+- `ProjectDetailView.vue` reduce bootstrap incrustado, reanalisis, toasts, recargas reactivas y wiring de tabs
+- la carrera inicial de `?alert=` queda corregida y testeada
+- el componente principal baja a ~1865 lineas
+
+### 2.13 Primer troceado de monolitos backend
+
+Modulos nuevos en routers:
+
+- `api-server/routers/_analysis_runtime.py`
+- `api-server/routers/_analysis_cache_helpers.py`
+- `api-server/routers/_analysis_structure_helpers.py`
+
+Responsabilidades extraidas:
+
+- capabilities runtime y filtrado de metodos NLP
+- serializacion/restauracion de cache de entidades, menciones y coreferencia
+- metricas ligeras por capitulo
+- deteccion/persistencia de dialogos
+- inicializacion de `dialogue_style_preference`
+
+Cobertura asociada:
+
+- `tests/unit/test_cr03_runtime_settings.py`
+- `tests/unit/test_analysis_cache_roundtrip.py`
+- `tests/unit/test_analysis_structure_helpers.py`
+
+Resultado:
+
+- `_analysis_phases.py` baja a ~4968 lineas
+- se mantiene compatibilidad con los puntos de monkeypatch historicos de la suite
+
+### 2.14 Primer troceado del pipeline legacy
+
+Modulos nuevos:
+
+- `src/narrative_assistant/pipelines/analysis_pipeline_models.py`
+- `src/narrative_assistant/pipelines/analysis_pipeline_temporal.py`
+- `src/narrative_assistant/pipelines/analysis_pipeline_dialogue.py`
+
+Responsabilidades extraidas:
+
+- modelos/dataclasses del pipeline
+- analisis temporal y persistencia de timeline
+- extraccion de dialogos por capitulo
+- conversion de dialogos para analisis emocional
+- analisis legacy de voz
+
+Cobertura asociada:
+
+- `tests/unit/test_analysis_pipeline_dialogue.py`
+- `tests/unit/test_temporal_entity_mentions_integration.py`
+
+Resultado:
+
+- `analysis_pipeline.py` baja a ~1995 lineas
+- la logica de dialogo/voz deja de vivir incrustada en el pipeline principal
 
 ## 3. Reutilizacion y centralizacion logradas
 
-La pasada deja cuatro piezas reutilizables nuevas o consolidadas:
+Piezas reutilizables nuevas o consolidadas:
 
 1. `apiClient` como transporte unico de producto.
-2. `projectExports` como capa comun de exportaciones binarias.
-3. `fileDownload` como utilitario comun de descarga y conversion de blobs/base64.
-4. `useAppConfirm` como confirmacion comun, desacoplada de componentes concretos.
-
-Esto reduce duplicacion y baja el coste de seguir troceando vistas monoliticas.
+2. `httpTransport` como unico punto de salida HTTP de bajo nivel.
+3. `projectExports` como capa comun de exportaciones binarias.
+4. `fileDownload` como utilitario comun de descarga y conversion de blobs/base64.
+5. `useAppConfirm` como confirmacion comun desacoplada de componentes concretos.
+6. `projectDetailBootstrap` como bootstrap reutilizable y testeable del detalle.
+7. `useProjectDetailAnalysis` como slice reutilizable del flujo de analisis del detalle.
+8. `useProjectDetailLifecycle` como sincronizacion reactiva reutilizable del detalle.
+9. `documentViewerText` como modulo puro reutilizable para transformaciones textuales del visor.
+10. `analysis_pipeline_dialogue` como modulo reutilizable de dialogo/voz para el pipeline legacy.
+11. `_analysis_structure_helpers` como capa reutilizable de estructura persistida en router.
 
 ## 4. Lo que sigue pendiente de verdad
 
-### 4.1 Smoke test desktop empaquetado
+### 4.1 Release testing final sobre artefactos empaquetados
 
-Pendiente:
+Ya no falta soporte tecnico. Lo pendiente es operativo:
 
-- verificacion de bootstrap real fuera del entorno de desarrollo
-- validacion de sidecar + ventana + backend ya compilados
+- ejecutar sistematicamente el smoke sobre artefactos generados en runners/plataformas reales
+- convertirlo en puerta formal de release, no solo en script/workflow disponible
+- añadir validacion final de ventana visible y sidecar en entorno empaquetado real cuando aplique
 
-Estado:
-
-- cerrado para binario construido en CI Windows/macOS
-- pendiente solo el ultimo tramo sobre instalador/DMG empaquetado final
-
-### 4.2 Monolitos grandes
+### 4.2 Monolitos grandes restantes
 
 Siguen siendo la deuda de mantenibilidad mas costosa:
 
 - `frontend/src/views/SettingsView.vue` (~1630 lineas)
-- `frontend/src/views/ProjectDetailView.vue` (~2126 lineas)
-- `frontend/src/components/DocumentViewer.vue` (~2146 lineas)
-- `api-server/routers/_analysis_phases.py`
-- `src/narrative_assistant/pipelines/analysis_pipeline.py`
+- `frontend/src/views/ProjectDetailView.vue` (~1865 lineas)
+- `frontend/src/components/DocumentViewer.vue` (~1922 lineas)
+- `api-server/routers/_analysis_phases.py` (~4968 lineas)
+- `src/narrative_assistant/pipelines/analysis_pipeline.py` (~1995 lineas)
 
 Prioridad recomendada:
 
-1. `ProjectDetailView.vue`
-2. `DocumentViewer.vue`
+1. `DocumentViewer.vue`
+2. `ProjectDetailView.vue`
 3. `_analysis_phases.py`
 4. `analysis_pipeline.py`
 
-Nota:
-
-- `SettingsView.vue` sigue siendo grande, pero ya esta parcialmente troceado y cubierto
-- `ProjectDetailView.vue` y `DocumentViewer.vue` ya tienen slices funcionales extraidos, pero siguen siendo monolitos
-- la prioridad se desplaza al siguiente troceado util de esas dos vistas y a los monolitos backend
-
-### 4.3 Cobertura funcional E2E de exportaciones e importaciones
-
-Aunque las rutas y componentes ya usan capas comunes, sigue faltando blindaje E2E especifico para:
-
-- exportaciones DOCX/PDF/Scrivener/editorial
-- importacion de trabajo editorial
-- errores de permisos o cancelacion en dialogos Tauri
+### 4.3 Cobertura E2E de export/import en desktop real
 
 Cobertura ya cerrada a nivel unit/integration:
 
 - `projectExports.spec.ts`
 - `useProjectFile.spec.ts`
 - `ImportWorkDialog.spec.ts`
+- `ExportDialog.spec.ts`
 
-Lo pendiente aqui es el salto a flujo empaquetado real o Playwright desktop, no la ausencia total de tests.
+Lo pendiente aqui es el salto a flujo desktop real o Playwright/Tauri real para:
+
+- exportaciones DOCX/PDF/Scrivener/editorial
+- importacion de trabajo editorial
+- errores de permisos o cancelacion en dialogos Tauri
+
+### 4.4 Politica global de logging de error
+
+Ya no queda ruido de depuracion basico, pero sigue faltando decidir una politica comun para `console.error` / `console.warn` residuales:
+
+- que se conserva como diagnostico local legitimo
+- que debe pasar por logger estructurado
+- que debe degradarse a toast, telemetry o silence controlado
 
 ## 5. Validacion realizada
 
@@ -304,11 +317,14 @@ Frontend:
 - `npm run test:run -- src/stores/__tests__/app.spec.ts src/stores/__tests__/system.spec.ts src/stores/__tests__/theme.spec.ts src/stores/__tests__/analysis.spec.ts src/components/layout/__tests__/StatusBar.spec.ts`
 - `npm run test:run -- src/components/settings/SettingsSections.spec.ts src/views/SettingsView.spec.ts src/composables/useProjectFile.spec.ts src/components/ImportWorkDialog.spec.ts src/services/httpTransport.spec.ts`
 - `npm run test:run -- src/services/projectExports.spec.ts src/components/ExportDialog.spec.ts`
-- `npm run test:run -- src/components/document-viewer/useDocumentViewerExport.spec.ts src/components/document-viewer/useDocumentViewerPreferences.spec.ts src/views/project-detail/useProjectDetailExports.spec.ts src/views/project-detail/useProjectDetailAlerts.spec.ts`
+- `npm run test:run -- src/views/project-detail/useProjectDetailExports.spec.ts src/views/project-detail/useProjectDetailAlerts.spec.ts src/views/project-detail/projectDetailBootstrap.spec.ts src/views/project-detail/useProjectDetailAnalysis.spec.ts src/views/project-detail/useProjectDetailLifecycle.spec.ts`
+- `npm run test:run -- src/components/document-viewer/useDocumentViewerExport.spec.ts src/components/document-viewer/useDocumentViewerPreferences.spec.ts src/components/document-viewer/useDocumentViewerData.spec.ts src/components/document-viewer/useDocumentViewerDialogues.spec.ts src/components/document-viewer/documentViewerText.spec.ts src/components/document-viewer/useDocumentViewerInteractions.spec.ts src/components/DocumentViewer.spec.ts`
 
 Backend / scripts:
 
 - `pytest tests/scripts/test_smoke_desktop_app.py -q`
+- `pytest tests/unit/test_cr03_runtime_settings.py tests/unit/test_analysis_cache_roundtrip.py tests/unit/test_analysis_structure_helpers.py tests/unit/test_analysis_pipeline_dialogue.py tests/unit/test_temporal_entity_mentions_integration.py -q`
+- `python -m compileall api-server/routers/_analysis_runtime.py api-server/routers/_analysis_cache_helpers.py api-server/routers/_analysis_structure_helpers.py src/narrative_assistant/pipelines/analysis_pipeline.py src/narrative_assistant/pipelines/analysis_pipeline_models.py src/narrative_assistant/pipelines/analysis_pipeline_temporal.py src/narrative_assistant/pipelines/analysis_pipeline_dialogue.py`
 
 Comprobaciones de estructura:
 
@@ -319,19 +335,18 @@ Comprobaciones de estructura:
 Resultado:
 
 - `type-check`: OK
-- tests: OK
+- tests del bloque nuevo: OK
 - `fetch()` directo de producto: 0
-- `fetch()` compartido encapsulado en `httpTransport`: 1 punto de salida controlado
 - dialogos nativos: 0
 - `console.log/debug` de producto: 0
 
 ## 6. Veredicto
 
-La deuda estructural inmediata del frontend queda mayoritariamente cerrada.
+La deuda estructural inmediata de este bloque queda ampliamente cerrada.
 
-Lo pendiente ya no es un problema de higiene basica, sino de siguientes capas de calidad:
+Lo pendiente ya no es higiene basica ni soporte tecnico faltante, sino trabajo de siguiente escala:
 
-- release testing final sobre instalador/DMG
-- refactor por slices de archivos monoliticos
-- cobertura E2E especifica de export/import
-- continuar troceando vistas grandes ya con cobertura incremental
+- release testing final sobre artefactos empaquetados
+- siguiente troceado de monolitos grandes
+- cobertura desktop real de export/import
+- politica transversal de logging de error

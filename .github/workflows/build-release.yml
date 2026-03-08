@@ -140,6 +140,9 @@ jobs:
 
       - name: Smoke test built desktop app (Windows)
         run: python scripts/smoke_desktop_app.py
+
+      - name: Smoke test Windows installer artifact
+        run: python scripts/smoke_desktop_app.py --mode windows-installer
       
       - name: Upload Windows Installer
         uses: actions/upload-artifact@v4
@@ -289,6 +292,9 @@ jobs:
 
       - name: Smoke test built desktop app (macOS)
         run: python3 scripts/smoke_desktop_app.py
+
+      - name: Smoke test macOS DMG artifact
+        run: python3 scripts/smoke_desktop_app.py --mode macos-dmg
       
       - name: Upload macOS DMG
         uses: actions/upload-artifact@v4

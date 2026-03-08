@@ -187,6 +187,20 @@ import { sanitizeHtml } from '@/utils/sanitizeHtml'
 import { useSelectionStore } from '@/stores/selection'
 import { useDocumentViewerExport } from '@/components/document-viewer/useDocumentViewerExport'
 import { useDocumentViewerPreferences } from '@/components/document-viewer/useDocumentViewerPreferences'
+import { useDocumentViewerData } from '@/components/document-viewer/useDocumentViewerData'
+import { useDocumentViewerDialogues } from '@/components/document-viewer/useDocumentViewerDialogues'
+import { useDocumentViewerInteractions } from '@/components/document-viewer/useDocumentViewerInteractions'
+import {
+  cleanExcerptForSearch,
+  detectSectionHeading,
+  escapeHtml,
+  escapeRegex,
+  findClosestTextOccurrence,
+  getTitleOffset,
+  hexToRgba,
+  removeLeadingTitle,
+  replaceOutsideHtmlTags,
+} from '@/components/document-viewer/documentViewerText'
 
 const toast = useToast()
 const selectionStore = useSelectionStore()
@@ -381,37 +395,22 @@ watch([showSpellingErrors, showGrammarErrors, showDialoguePanel, showDialogueHig
   }
 })
 
-const loadChapterDialogues = async (chapterNumber: number) => {
-  if (chapterDialogues.value.has(chapterNumber)) return
+const { loadChapterDialogues } = useDocumentViewerDialogues({
+  projectId: props.projectId,
+  chapterDialogues,
+  chaptersLoadingDialogues,
+  mapDialogue: (dialogue, chapterNumber) => ({
+    text: dialogue.text,
+    speakerName: dialogue.speaker_name ?? null,
+    speakerId: dialogue.speaker_id ?? null,
+    confidence: dialogue.confidence ?? 'unknown',
+    method: dialogue.method ?? 'none',
+    startChar: dialogue.start_char,
+    endChar: dialogue.end_char,
+    chapterNumber,
+  }),
+})
 
-  // Mejora #8: Indicador de loading granular
-  chaptersLoadingDialogues.value.add(chapterNumber)
-
-  try {
-    const data = await api.getRaw<{ success: boolean; data?: any }>(`/api/projects/${props.projectId}/chapters/${chapterNumber}/dialogue-attributions`)
-
-    if (data.success && data.data?.attributions) {
-      // Transformar snake_case (API) → camelCase (frontend DialogueAttr)
-      const transformed: DialogueAttr[] = data.data.attributions.map((a: any) => ({
-        text: a.text,
-        speakerName: a.speaker_name ?? null,
-        speakerId: a.speaker_id ?? null,
-        confidence: a.confidence ?? 'unknown',
-        method: a.method ?? 'none',
-        startChar: a.start_char,
-        endChar: a.end_char,
-        chapterNumber: chapterNumber,
-      }))
-      chapterDialogues.value.set(chapterNumber, transformed)
-    }
-  } catch (err) {
-    console.error(`Error loading dialogue attributions for chapter ${chapterNumber}:`, err)
-  } finally {
-    chaptersLoadingDialogues.value.delete(chapterNumber)
-  }
-}
-
-// Función para establecer referencia a elementos de capítulo
 const setChapterRef = (el: Element | ComponentPublicInstance | null, chapterId: number) => {
   if (el && el instanceof Element) {
     chapterRefs.set(chapterId, el)
@@ -483,196 +482,27 @@ const totalWords = computed(() => {
 })
 
 // Cargar documento
-const loadDocument = async () => {
-  loading.value = true
-  error.value = null
-
-  // Resetear estado de lazy loading
-  loadedChapters.value.clear()
-  visibleChapters.value.clear()
-  chapterAccessOrder.value = []
-  chapterAnnotations.value.clear()
-  chapterDialogues.value.clear()
-  highlightedContentCache.value.clear()
-  chapterRefs.clear()
-
-  try {
-    // Si hay capítulos externos, usarlos directamente
-    if (props.externalChapters && props.externalChapters.length > 0) {
-      chapters.value = props.externalChapters
-    } else {
-      // Cargar capítulos del API
-      const chaptersData = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${props.projectId}/chapters`)
-
-      if (!chaptersData.success) {
-        throw new Error('Error cargando capítulos')
-      }
-
-      // Transformar de snake_case (API) a camelCase (domain)
-      const apiChapters: ApiChapter[] = chaptersData.data || []
-      chapters.value = transformChapters(apiChapters)
-    }
-
-    // Pre-cargar el primer capítulo para que se muestre inmediatamente
-    if (chapters.value.length > 0) {
-      loadedChapters.value.add(chapters.value[0].id)
-    }
-
-    // Cargar entidades
-    const entitiesData = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${props.projectId}/entities`)
-
-    if (entitiesData.success) {
-      entities.value = entitiesData.data || []
-    }
-
-    // Configurar observer después de renderizar
-    nextTick(() => {
-      setupIntersectionObserver()
-    })
-
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Error cargando documento'
-    console.error('Error loading document:', err)
-  } finally {
-    loading.value = false
-  }
-}
-
-// Cargar anotaciones de gramática/ortografía para un capítulo
-const loadChapterAnnotations = async (chapterNumber: number, forceReload = false) => {
-  if (!forceReload && chapterAnnotations.value.has(chapterNumber)) return
-
-  // Mejora #8: Indicador de loading granular
-  chaptersLoadingAnnotations.value.add(chapterNumber)
-
-  try {
-    const data = await api.getRaw<{ success: boolean; data?: any }>(`/api/projects/${props.projectId}/chapters/${chapterNumber}/annotations`)
-
-    if (data.success && data.data?.annotations) {
-      chapterAnnotations.value.set(chapterNumber, data.data.annotations)
-    }
-  } catch (err) {
-    console.error(`Error loading annotations for chapter ${chapterNumber}:`, err)
-  } finally {
-    chaptersLoadingAnnotations.value.delete(chapterNumber)
-  }
-}
-
-const refreshVisibleChapterAnnotations = async () => {
-  const chapterNumbers = chapters.value
-    .filter(ch => loadedChapters.value.has(ch.id))
-    .map(ch => ch.chapterNumber)
-
-  if (chapterNumbers.length === 0) return
-
-  highlightedContentCache.value.clear()
-  await Promise.all(chapterNumbers.map(chNum => loadChapterAnnotations(chNum, true)))
-}
-
-// Calcular cuántos caracteres se eliminan del título
-const getTitleOffset = (content: string, title: string): number => {
-  if (!content || !title) return 0
-
-  // Extraer primera línea del contenido
-  const firstNewline = content.indexOf('\n')
-  if (firstNewline === -1) return 0
-
-  const firstLine = content.substring(0, firstNewline).trim()
-
-  // Si la primera línea es muy larga, probablemente no es un título
-  if (firstLine.length > 100) return 0
-
-  // Normalizar para comparación (minúsculas, sin acentos, sin puntuación extra)
-  const normalize = (s: string) => s.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Quitar acentos
-    .replace(/[^a-z0-9\s]/g, '') // Solo alfanuméricos y espacios
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  const normalizedTitle = normalize(title)
-  const normalizedFirstLine = normalize(firstLine)
-
-  // Patrones que indican que la primera línea es un título de capítulo
-  const isTitleLine =
-    // La primera línea contiene el título
-    normalizedFirstLine.includes(normalizedTitle) ||
-    // La primera línea ES el título (o muy similar)
-    normalizedTitle.includes(normalizedFirstLine) ||
-    // Empieza con "Capítulo X" o variantes
-    /^cap[ií]tulo\s+\d+/i.test(firstLine) ||
-    /^chapter\s+\d+/i.test(firstLine) ||
-    /^parte\s+\d+/i.test(firstLine) ||
-    // Numeración romana al inicio
-    /^[IVXLCDM]+[.:\s]/i.test(firstLine) ||
-    // Número seguido de punto y texto corto (ej: "1. El Despertar")
-    /^\d+\.\s+\S/.test(firstLine)
-
-  if (isTitleLine) {
-    // Calcular offset: posición del newline + newlines eliminados después
-    let offset = firstNewline
-    // Contar newlines consecutivos después
-    let i = firstNewline
-    while (i < content.length && content[i] === '\n') {
-      offset++
-      i++
-    }
-    return offset
-  }
-
-  return 0
-}
-
-// Eliminar título duplicado del contenido si existe
-const removeLeadingTitle = (content: string, title: string): string => {
-  const offset = getTitleOffset(content, title)
-  if (offset > 0) {
-    return content.substring(offset)
-  }
-  return content
-}
-
-const findClosestTextOccurrence = (
-  haystack: string,
-  needle: string,
-  expectedIndex?: number
-): number => {
-  if (!needle) return -1
-
-  const firstIndex = haystack.indexOf(needle)
-  if (firstIndex === -1) return -1
-  if (expectedIndex === undefined || expectedIndex < 0) return firstIndex
-
-  let bestIndex = firstIndex
-  let bestDistance = Math.abs(firstIndex - expectedIndex)
-  let currentIndex = firstIndex
-
-  while (currentIndex !== -1) {
-    const distance = Math.abs(currentIndex - expectedIndex)
-    if (distance < bestDistance) {
-      bestDistance = distance
-      bestIndex = currentIndex
-    }
-    currentIndex = haystack.indexOf(needle, currentIndex + 1)
-  }
-
-  return bestIndex
-}
-
-const replaceOutsideHtmlTags = (
-  input: string,
-  pattern: RegExp,
-  replacer: (match: string) => string
-): string => {
-  const segments = input.split(/(<[^>]+>)/g)
-  return segments
-    .map(segment => {
-      if (!segment) return segment
-      if (segment.startsWith('<') && segment.endsWith('>')) return segment
-      const safePattern = new RegExp(pattern.source, pattern.flags)
-      return segment.replace(safePattern, replacer)
-    })
-    .join('')
-}
+const {
+  loadDocument,
+  loadChapterAnnotations,
+  refreshVisibleChapterAnnotations,
+} = useDocumentViewerData({
+  projectId: props.projectId,
+  externalChapters: props.externalChapters,
+  chapters,
+  entities,
+  loadedChapters,
+  visibleChapters,
+  chapterAccessOrder,
+  chapterAnnotations,
+  chapterDialogues,
+  highlightedContentCache,
+  chaptersLoadingAnnotations,
+  loading,
+  error,
+  chapterRefs,
+  setupIntersectionObserver,
+})
 
 // Resaltar entidades en el contenido (memoized, performance optimization #1)
 const getHighlightedContent = (chapter: Chapter): string => {
@@ -926,74 +756,6 @@ const getHighlightedContent = (chapter: Chapter): string => {
  * Detecta si un bloque de texto es un encabezado de sección
  * Retorna el nivel del encabezado (h2, h3, h4, h5) o null si no es encabezado
  */
-function detectSectionHeading(text: string): { level: 'h2' | 'h3' | 'h4' | 'h5' } | null {
-  const trimmed = text.trim()
-
-  // No considerar líneas muy cortas (< 3 chars) o muy largas (> 70 chars)
-  if (trimmed.length < 3 || trimmed.length > 70) return null
-
-  // No considerar líneas que terminan en punto, coma, etc. (probablemente son oraciones)
-  if (/[.,;:!?]$/.test(trimmed)) return null
-
-  // No considerar líneas que empiezan con minúscula (probablemente continuación)
-  if (/^[a-záéíóúñ]/.test(trimmed)) return null
-
-  // Patrones para H2 (secciones principales)
-  // - "PARTE I", "PARTE PRIMERA", "SECCIÓN 1", etc.
-  // - "I. Titulo", "II. Titulo" (numeración romana)
-  // - Todo en mayúsculas
-  if (
-    /^(PARTE|SECCIÓN|SECCION|LIBRO|ACTO|CAPÍTULO|CAPITULO)\s+/i.test(trimmed) ||
-    /^[IVXLCDM]+[.:\s]/i.test(trimmed) ||
-    (trimmed === trimmed.toUpperCase() && trimmed.length > 3 && /[A-Z]/.test(trimmed))
-  ) {
-    return { level: 'h2' }
-  }
-
-  // Patrones para H3 (subsecciones)
-  // - "1. Titulo", "2. Titulo" (numeración arábiga)
-  // - "1.1 Titulo", "1.2 Titulo" (numeración decimal simple)
-  // - Líneas cortas que empiezan con mayúscula y tienen estructura de título
-  if (
-    /^\d+\.\s+[A-ZÁÉÍÓÚÑ]/.test(trimmed) ||
-    /^\d+\.\d+\s+[A-ZÁÉÍÓÚÑ]/.test(trimmed)
-  ) {
-    return { level: 'h3' }
-  }
-
-  // Patrones para H4 (sub-subsecciones)
-  // - "a) Titulo", "b) Titulo"
-  // - "1.1.1 Titulo" (numeración decimal doble)
-  // - Líneas cortas con guion inicial
-  if (
-    /^[a-z]\)\s+[A-ZÁÉÍÓÚÑ]/.test(trimmed) ||
-    /^\d+\.\d+\.\d+\s+/.test(trimmed) ||
-    /^[-–—]\s+[A-ZÁÉÍÓÚÑ]/.test(trimmed)
-  ) {
-    return { level: 'h4' }
-  }
-
-  // Patrones para H5 (nivel más bajo)
-  // - "i) Titulo", "ii) Titulo" (numeración romana minúscula)
-  // - Numeración más profunda
-  if (
-    /^[ivx]+\)\s+/i.test(trimmed) ||
-    /^\d+\.\d+\.\d+\.\d+\s+/.test(trimmed)
-  ) {
-    return { level: 'h5' }
-  }
-
-  return null
-}
-
-// Helpers
-const escapeHtml = (text: string): string => {
-  const div = document.createElement('div')
-  div.textContent = text
-  return div.innerHTML
-}
-
-// Etiqueta legible para métodos de atribución de diálogo
 const getDialogueMethodLabel = (method: string): string => {
   const labels: Record<string, string> = {
     explicit_verb: 'Verbo explícito',
@@ -1005,10 +767,6 @@ const getDialogueMethodLabel = (method: string): string => {
   return labels[method] || method
 }
 
-const escapeRegex = (text: string | undefined | null): string => {
-  if (!text) return ''
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
 
 // Scroll a capítulo específico
 const scrollToChapter = async (chapterId: number) => {
@@ -1494,19 +1252,6 @@ const scrollToMention = async (target: ScrollTarget) => {
   }
 }
 
-// Limpia el texto de excerpt para buscar en el documento
-// Elimina elipsis, contexto extra, y normaliza espacios
-const cleanExcerptForSearch = (text: string): string => {
-  return text
-    // Eliminar elipsis al inicio y final
-    .replace(/^[.…]+\s*/g, '')
-    .replace(/\s*[.…]+$/g, '')
-    // Eliminar comillas tipográficas que pueden no coincidir
-    .replace(/[""''«»]/g, '"')
-    // Normalizar espacios múltiples
-    .replace(/\s+/g, ' ')
-    .trim()
-}
 
 // Resalta un texto específico dentro del capítulo
 // position: posición de caracteres donde debería estar el texto (para desambiguar)
@@ -1698,101 +1443,17 @@ const {
   addToast: toast.add,
 })
 
-// Captura de selección de texto para el asistente
-const handleMouseUp = () => {
-  const selection = window.getSelection()
-  if (!selection || selection.isCollapsed) {
-    // No hay selección - limpiar
-    selectionStore.setTextSelection(null)
-    return
-  }
-
-  const selectedText = selection.toString().trim()
-  if (!selectedText) {
-    selectionStore.setTextSelection(null)
-    return
-  }
-
-  // Calcular posiciones
-  const range = selection.getRangeAt(0)
-  const container = range.commonAncestorContainer
-
-  // Encontrar el capítulo y calcular offset
-  let chapterElement: HTMLElement | null = null
-  let node: Node | null = container
-  while (node && node !== viewerContainer.value) {
-    if (node instanceof HTMLElement && node.classList.contains('chapter-section')) {
-      chapterElement = node
-      break
-    }
-    node = node.parentNode
-  }
-
-  if (!chapterElement) {
-    // No se pudo determinar el capítulo
-    selectionStore.setTextSelection(null)
-    return
-  }
-
-  const chapterId = parseInt(chapterElement.dataset.chapterId || '0')
-  const chapter = chapters.value.find(c => c.id === chapterId)
-
-  if (!chapter) {
-    selectionStore.setTextSelection(null)
-    return
-  }
-
-  // Calcular offset desde el inicio del capítulo
-  // Crear un rango desde el inicio del capítulo hasta el inicio de la selección
-  const chapterTextElement = chapterElement.querySelector('.chapter-text')
-  if (!chapterTextElement) {
-    selectionStore.setTextSelection(null)
-    return
-  }
-
-  const rangeToStart = document.createRange()
-  rangeToStart.setStart(chapterTextElement, 0)
-  rangeToStart.setEnd(range.startContainer, range.startOffset)
-
-  const textBeforeSelection = rangeToStart.toString()
-  const offsetInChapter = textBeforeSelection.length
-
-  // Las posiciones globales se calculan sumando el positionStart del capítulo
-  const globalStart = (chapter.positionStart ?? 0) + offsetInChapter
-  const globalEnd = globalStart + selectedText.length
-
-  // Guardar selección en el store
-  selectionStore.setTextSelection({
-    start: globalStart,
-    end: globalEnd,
-    text: selectedText,
-    chapter: chapter.title,
-    chapterNumber: chapter.chapterNumber
-  })
-}
-
-// Event delegation para clicks en entidades y alertas (evita onclick inline y window pollution)
-const handleDocumentClick = (event: MouseEvent) => {
-  const target = event.target as HTMLElement
-
-  // Verificar si el click fue en una entidad resaltada
-  if (target.classList.contains('entity-highlight')) {
-    const entityId = target.dataset.entityId
-    if (entityId) {
-      emit('entityClick', parseInt(entityId, 10))
-    }
-    return
-  }
-
-  // Verificar si el click fue en una alerta de ortografía/gramática
-  if (target.classList.contains('annotation')) {
-    const annotationId = target.dataset.annotationId
-    if (annotationId) {
-      emit('annotationClick', parseInt(annotationId, 10))
-    }
-    return
-  }
-}
+const { handleMouseUp, handleDocumentClick } = useDocumentViewerInteractions({
+  viewerContainer,
+  chapters,
+  selectionStore,
+  emitEntityClick: (entityId) => {
+    emit('entityClick', entityId)
+  },
+  emitAnnotationClick: (annotationId) => {
+    emit('annotationClick', annotationId)
+  },
+})
 
 // Watchers
 watch(() => props.scrollToChapterId, (chapterId) => {
@@ -1881,22 +1542,6 @@ watch(() => props.alertHighlightRanges, async (ranges) => {
   }
 }, { deep: true })
 
-// Convertir hex a rgba
-const hexToRgba = (hex: string, alpha: number): string => {
-  // Remover # si existe
-  const cleanHex = hex.replace('#', '')
-
-  // Expandir hex corto (3 chars) a largo (6 chars)
-  const fullHex = cleanHex.length === 3
-    ? cleanHex.split('').map(c => c + c).join('')
-    : cleanHex
-
-  const r = parseInt(fullHex.substring(0, 2), 16)
-  const g = parseInt(fullHex.substring(2, 4), 16)
-  const b = parseInt(fullHex.substring(4, 6), 16)
-
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
-}
 
 // Escuchar cambios de configuración (evento personalizado desde SettingsView)
 const handleSettingsChange = () => {

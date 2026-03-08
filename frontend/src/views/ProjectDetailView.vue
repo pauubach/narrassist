@@ -631,13 +631,15 @@ import CorrectionConfigModal from '@/components/workspace/CorrectionConfigModal.
 import type { SidebarTab } from '@/stores/workspace'
 import type { Entity, Alert, AlertSource, ChatReference, DialogueAttribution } from '@/types'
 import { resetGlobalHighlight } from '@/composables/useHighlight'
-import { api } from '@/services/apiClient'
 import { useNotifications } from '@/composables/useNotifications'
 import { useGlobalUndo } from '@/composables/useGlobalUndo'
 import { updateProjectStats } from '@/composables/useGlobalStats'
 import { waitForPendingAnalysisSettingsSync } from '@/composables/useSettingsPersistence'
+import { useProjectDetailAnalysis } from '@/views/project-detail/useProjectDetailAnalysis'
 import { useProjectDetailExports } from '@/views/project-detail/useProjectDetailExports'
 import { useProjectDetailAlerts } from '@/views/project-detail/useProjectDetailAlerts'
+import { useProjectDetailLifecycle } from '@/views/project-detail/useProjectDetailLifecycle'
+import { initializeProjectDetail, parsePositiveInt } from '@/views/project-detail/projectDetailBootstrap'
 import { useToast } from 'primevue/usetoast'
 
 const route = useRoute()
@@ -733,7 +735,6 @@ const {
 const replaceDocumentInputRef = ref<HTMLInputElement | null>(null)
 const showReanalyzeDialog = ref(false)
 const correctionConfigModalRef = ref<InstanceType<typeof CorrectionConfigModal> | null>(null)
-const reanalyzing = ref(false)
 const selectedAnalysisMode = ref('auto')
 const analysisModeOptions = [
   { label: 'Auto', value: 'auto', description: 'Ajusta según tamaño del documento' },
@@ -742,7 +743,6 @@ const analysisModeOptions = [
   { label: 'Estándar', value: 'standard', description: 'Análisis completo' },
   { label: 'Profundo', value: 'deep', description: 'Todo incluido (requiere más recursos)' },
 ]
-const retryingTimeline = ref(false)
 
 // Estados de carga individuales vienen de useProjectData()
 // loadingEntities, loadingAlerts, loadingRelationships
@@ -1050,10 +1050,8 @@ const handleUndoComplete = async () => {
 // ── Lifecycle ──────────────────────────────────────────────
 
 onMounted(async () => {
-  const projectId = parseInt(route.params.id as string)
-
-  if (isNaN(projectId)) {
-    error.value = 'ID de proyecto inválido'
+  if (parsePositiveInt(route.params.id as string | undefined) === null) {
+    error.value = 'ID de proyecto invalido'
     loading.value = false
     return
   }
@@ -1077,111 +1075,38 @@ onMounted(async () => {
   window.addEventListener('sidebar:set-tab', handleSidebarSetTab)
   window.addEventListener('history:undo-complete', handleUndoComplete)
 
-  try {
-    analysisStore.setActiveProjectId(projectId)
-    workspaceStore.reset()
-
-    const tabParam = route.query.tab as string
-    if (tabParam && ['text', 'entities', 'relationships', 'alerts', 'timeline', 'style', 'glossary', 'summary'].includes(tabParam)) {
-      workspaceStore.setActiveTab(tabParam as any)
-    }
-
-    const entityParam = route.query.entity as string
-    if (entityParam) {
-      initialEntityId.value = parseInt(entityParam)
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // FASE 1: Carga crítica - Datos necesarios para mostrar UI
-    // ═══════════════════════════════════════════════════════════
-    await Promise.all([
-      projectsStore.fetchProject(projectId),
-      analysisStore.loadExecutedPhases(projectId),
-      loadChapters(projectId, project.value ?? undefined),
-    ])
-
-    // Mostrar UI inmediatamente
-    loading.value = false
-
-    // ═══════════════════════════════════════════════════════════
-    // FASE 2: Carga prioritaria - Según tab activo
-    // ═══════════════════════════════════════════════════════════
-    const activeTab = workspaceStore.activeTab
-
-    if (activeTab === 'alerts') {
-      // Si está en Alertas, cargar alertas primero
-      await loadAlerts(projectId)
-      // Luego entidades y relaciones en segundo plano
-      Promise.all([
-        loadEntities(projectId),
-        loadRelationships(projectId),
-        loadChapterSummaries(projectId),
-      ])
-    } else if (activeTab === 'entities') {
-      // Si está en Entidades, cargar entidades primero
-      await loadEntities(projectId)
-      // Luego alertas y relaciones en segundo plano
-      Promise.all([
-        loadAlerts(projectId),
-        loadRelationships(projectId),
-        loadChapterSummaries(projectId),
-      ])
-    } else if (activeTab === 'relationships') {
-      // Si está en Relaciones, cargar entidades y relaciones primero
-      await Promise.all([loadEntities(projectId), loadRelationships(projectId)])
-      // Luego alertas y resúmenes en segundo plano
-      Promise.all([
-        loadAlerts(projectId),
-        loadChapterSummaries(projectId),
-      ])
-    } else {
-      // Para otras tabs (text, timeline, style, summary), cargar todo en paralelo
-      Promise.all([
-        loadEntities(projectId),
-        loadAlerts(projectId),
-        loadRelationships(projectId),
-        loadChapterSummaries(projectId),
-      ])
-    }
-
-    // Check for alert query parameter (para navegación desde AlertsView)
-    const alertParam = route.query.alert as string
-    if (alertParam) {
-      const alertId = parseInt(alertParam)
-      const targetAlert = alerts.value.find(a => a.id === alertId)
-      if (targetAlert && targetAlert.spanStart !== undefined) {
-        const targetChapter = chapters.value.find(c => c.chapterNumber === targetAlert.chapter)
-        const chapterId = targetChapter?.id ?? null
-        workspaceStore.navigateToTextPosition(
-          targetAlert.spanStart,
-          targetAlert.excerpt || undefined,
-          chapterId
-        )
-        selectionStore.selectAlert(targetAlert)
-      }
-    }
-
-    // Check for scrollPos query parameter (para navegación desde RevisionView)
-    const scrollPosParam = route.query.scrollPos as string
-    if (scrollPosParam) {
-      const pos = parseInt(scrollPosParam)
-      if (!isNaN(pos)) {
-        const chapterNum = route.query.scrollChapter ? parseInt(route.query.scrollChapter as string) : undefined
-        const chapter = chapterNum ? chapters.value.find(c => c.chapterNumber === chapterNum) : undefined
-        workspaceStore.navigateToTextPosition(pos, undefined, chapter?.id ?? null)
-      }
-    }
-
-    const hasActiveAnalysis = await analysisStore.checkAnalysisStatus(projectId)
-    if (hasActiveAnalysis) {
-      startAnalysisPolling()
-    }
-
-    loading.value = false
-  } catch (_err) {
-    error.value = projectsStore.error || 'Error cargando proyecto'
-    loading.value = false
-  }
+  await initializeProjectDetail({
+    projectIdParam: route.params.id as string | undefined,
+    query: {
+      tab: route.query.tab as string | undefined,
+      entity: route.query.entity as string | undefined,
+      alert: route.query.alert as string | undefined,
+      scrollPos: route.query.scrollPos as string | undefined,
+      scrollChapter: route.query.scrollChapter as string | undefined,
+    },
+    getProject: () => project.value,
+    getAlerts: () => alerts.value,
+    getChapters: () => chapters.value,
+    setError: (message) => {
+      error.value = message
+    },
+    setLoading: (isLoading) => {
+      loading.value = isLoading
+    },
+    setInitialEntityId: (entityId) => {
+      initialEntityId.value = entityId
+    },
+    projectsStore,
+    analysisStore,
+    workspaceStore,
+    selectionStore,
+    loadChapters,
+    loadEntities,
+    loadAlerts,
+    loadRelationships,
+    loadChapterSummaries,
+    startAnalysisPolling,
+  })
 })
 
 onUnmounted(() => {
@@ -1487,181 +1412,54 @@ const handleExportStyleGuide = () => {
   openExportDialog()
 }
 
+const {
+  reanalyzing,
+  retryingTimeline,
+  retryTimelinePhase,
+  startReanalysis,
+  openUpdateDocumentDialog,
+  onReplaceDocumentSelected,
+} = useProjectDetailAnalysis({
+  project,
+  showReanalyzeDialog,
+  selectedAnalysisMode,
+  entities,
+  alerts,
+  isAnalyzing,
+  replaceDocumentInputRef,
+  analysisStore,
+  projectsStore,
+  stopAnalysisPolling,
+  loadEntities,
+  loadAlerts,
+  loadChapters,
+  waitForPendingAnalysisSettingsSync,
+  requestNotificationPermission,
+  setError: (message) => {
+    error.value = message
+  },
+  addToast: toast.add,
+})
+
 const handleNavigateToCharacter = (entityId: number) => {
   initialEntityId.value = entityId
   workspaceStore.setActiveTab('entities')
 }
 
-/**
- * Handler cuando un análisis parcial se completa (desde AnalysisRequired).
- * Recarga los datos relevantes para la tab actual.
- */
-const onAnalysisCompleted = async () => {
-  if (!project.value) return
-
-  // Recargar fases ejecutadas
-  await analysisStore.loadExecutedPhases(project.value.id)
-
-  // Recargar datos según el tab activo
-  const activeTab = workspaceStore.activeTab
-  if (activeTab === 'entities') {
-    await loadEntities(project.value.id)
-    analysisStore.clearTabStale(project.value.id, 'entities')
-  } else if (activeTab === 'relationships') {
-    await loadEntities(project.value.id)
-    await loadRelationships(project.value.id)
-    analysisStore.clearTabStale(project.value.id, 'relationships')
-  } else if (activeTab === 'alerts') {
-    await loadAlerts(project.value.id)
-    analysisStore.clearTabStale(project.value.id, 'alerts')
-  }
-  // Timeline y Style cargan sus propios datos y limpian stale internamente
-}
-
-const retryTimelinePhase = async () => {
-  if (!project.value || retryingTimeline.value) return
-
-  if (isAnalyzing.value) {
-    toast.add({
-      severity: 'info',
-      summary: 'Análisis en curso',
-      detail: 'Espera a que termine el análisis actual para reintentar la cronología.',
-      life: 3500,
-    })
-    return
-  }
-
-  retryingTimeline.value = true
-  try {
-    const settingsSyncOk = await waitForPendingAnalysisSettingsSync(project.value.id)
-    if (!settingsSyncOk) {
-      toast.add({
-        severity: 'warn',
-        summary: 'Configuración pendiente',
-        detail: 'No se pudo confirmar la última configuración. Se usará la configuración guardada disponible.',
-        life: 4000,
-      })
-    }
-
-    const started = await analysisStore.runPartialAnalysis(project.value.id, ['timeline'], true)
-    if (started) {
-      toast.add({
-        severity: 'info',
-        summary: 'Cronología en actualización',
-        detail: 'Estamos reconstruyendo la línea temporal con los datos más recientes.',
-        life: 3500,
-      })
-    } else {
-      toast.add({
-        severity: 'warn',
-        summary: 'No se pudo iniciar',
-        detail: analysisStore.error || 'No se pudo iniciar el reanálisis de cronología. Inténtalo de nuevo.',
-        life: 4000,
-      })
-    }
-  } catch (err) {
-    const detail = err instanceof Error
-      ? err.message
-      : 'No se pudo reintentar la cronología. Si persiste, reinicia la aplicación.'
-    toast.add({
-      severity: 'error',
-      summary: 'Error al reintentar',
-      detail,
-      life: 4500,
-    })
-  } finally {
-    retryingTimeline.value = false
-  }
-}
-
-// Reload stale data when switching to tabs that depend on analysis
-watch(() => workspaceStore.activeTab, async (newTab) => {
-  if (!project.value) return
-
-  if (newTab !== 'text') {
-    rightInspectorTab.value = 'summary'
-  }
-
-  // Si navegamos a 'text' y hay un scroll pendiente, asegurar que los capítulos estén cargados
-  if (newTab === 'text' && workspaceStore.scrollToPosition !== null) {
-    await loadChapters(project.value.id, project.value)  // Usa cache si ya están cargados
-  }
-
-  // Cambiar sidebar a 'alerts' cuando entramos en el tab de alertas
-  if (newTab === 'alerts') {
-    sidebarTab.value = 'alerts'
-  }
-
-  // Cargas lazy con cache para otros tabs
-  if (newTab === 'relationships') {
-    await loadEntities(project.value.id)  // Usa cache si ya están cargadas
-    await loadRelationships(project.value.id)  // Usa cache si ya están cargadas
-    // ME-01: Clear stale only after successful data reload
-    analysisStore.clearTabStale(project.value.id, 'relationships')
-  }
-
-  // ME-01: Tabs that self-load (timeline, style, glossary, summary, entities, alerts)
-  // clear their stale signal via component mount/reload hooks below.
-  // Text tab never has stale data (always shows live document).
-})
-
-// Cachear stats de alertas para métricas globales (HomeView)
-// Guard: solo watch el length, no el array completo (performance optimization)
-// Debounce: evitar localStorage.setItem repetidos si se resuelven muchas alertas seguidas
-let _statsDebounce: ReturnType<typeof setTimeout> | null = null
-watch(() => alerts.value.length, (newLength, oldLength) => {
-  if (project.value && newLength > 0 && newLength !== oldLength) {
-    if (_statsDebounce) clearTimeout(_statsDebounce)
-    _statsDebounce = setTimeout(() => {
-      if (project.value) {
-        updateProjectStats(project.value.id, project.value.name, alerts.value)
-      }
-    }, 500)
-  }
-})
-
-// Reload summaries when analysis finishes
-watch(isAnalyzing, (analyzing, wasAnalyzing) => {
-  if (wasAnalyzing && !analyzing && project.value) {
-    loadChapterSummaries(project.value.id, true)
-  }
-})
-
-// Auto-reload alerts when settings change (e.g., dialogue dash style)
-const handleSettingsChange = async () => {
-  if (!project.value) return
-  await loadAlerts(project.value.id, true) // Force reload
-}
-
-onMounted(() => {
-  window.addEventListener('settings-changed', handleSettingsChange)
-
-  // Idle-prefetch: pre-cargar tabs en background para que estén listos
-  // cuando el usuario cambie de pestaña (sin flash de carga)
-  const prefetch = () => {
-    import('@/components/workspace/AlertsDashboard.vue')
-    import('@/components/workspace/EntitiesTab.vue')
-    import('@/components/workspace/RelationsTab.vue')
-    import('@/components/workspace/StyleTab.vue')
-    import('@/components/workspace/GlossaryTab.vue')
-    import('@/components/workspace/ResumenTab.vue')
-    import('@/components/timeline/TimelineView.vue')
-    import('@/components/inspector/AlertInspector.vue')
-    import('@/components/inspector/ChapterInspector.vue')
-    import('@/components/inspector/TextSelectionInspector.vue')
-    import('@/components/sidebar/AssistantPanel.vue')
-    import('@/components/sidebar/HistoryPanel.vue')
-    import('@/components/sidebar/SemanticSearchPanel.vue')
-  }
-  if ('requestIdleCallback' in window) {
-    requestIdleCallback(prefetch)
-  } else {
-    setTimeout(prefetch, 200)
-  }
-})
-
-onUnmounted(() => {
-  window.removeEventListener('settings-changed', handleSettingsChange)
+const { onAnalysisCompleted } = useProjectDetailLifecycle({
+  project,
+  workspaceStore,
+  analysisStore,
+  rightInspectorTab,
+  sidebarTab,
+  alerts,
+  isAnalyzing,
+  loadEntities,
+  loadRelationships,
+  loadAlerts,
+  loadChapters,
+  loadChapterSummaries,
+  updateProjectStats,
 })
 
 const onDocumentTypeChanged = async (_type: string, _subtype: string | null) => {
@@ -1671,103 +1469,6 @@ const onDocumentTypeChanged = async (_type: string, _subtype: string | null) => 
   }
 }
 
-const startReanalysis = async () => {
-  if (!project.value) return
-  reanalyzing.value = true
-  showReanalyzeDialog.value = false
-
-  // Request notification permission on first analysis (non-blocking)
-  requestNotificationPermission()
-
-  // Resetear contadores inmediatamente para mostrar 0 durante el análisis
-  entities.value = []
-  alerts.value = []
-
-  // Pausar el polling ANTES de llamar al API para evitar que capture
-  // el estado "cancelled" del análisis anterior (race condition).
-  stopAnalysisPolling()
-
-  try {
-    const settingsSyncOk = await waitForPendingAnalysisSettingsSync(project.value.id)
-    if (!settingsSyncOk) {
-      toast.add({
-        severity: 'warn',
-        summary: 'Configuración pendiente',
-        detail: 'No se pudo confirmar la última configuración. Se iniciará el análisis con la configuración guardada disponible.',
-        life: 4000,
-      })
-    }
-
-    const modeParam = selectedAnalysisMode.value !== 'auto' ? `?mode=${selectedAnalysisMode.value}` : ''
-    const data = await api.postRaw<{ success: boolean; error?: string }>(`/api/projects/${project.value.id}/reanalyze${modeParam}`)
-
-    if (data.success) {
-      // Backend ya creó el nuevo storage con status "running" →
-      // ahora es seguro activar el polling
-      analysisStore.setAnalyzing(project.value.id, true)
-      await projectsStore.fetchProject(project.value.id)
-      // No cargar entidades/alertas aquí - se cargarán cuando termine el análisis
-    } else {
-      error.value = data.error || 'Error al re-analizar'
-      // En caso de error, recargar los datos originales
-      await loadEntities(project.value.id)
-      await loadAlerts(project.value.id)
-    }
-  } catch (_err) {
-    error.value = 'No se pudo re-analizar el documento. Si persiste, reinicia la aplicación.'
-    // En caso de error, recargar los datos originales
-    if (project.value) {
-      await loadEntities(project.value.id)
-      await loadAlerts(project.value.id)
-    }
-  } finally {
-    reanalyzing.value = false
-  }
-}
-
-const openUpdateDocumentDialog = () => {
-  replaceDocumentInputRef.value?.click()
-}
-
-const onReplaceDocumentSelected = async (event: Event) => {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file || !project.value) return
-
-  try {
-    const formData = new FormData()
-    formData.append('file', file)
-    const result = await api.postForm<{
-      project_id: number
-      classification: string
-      confidence: number
-      recommended_full_run: boolean
-    }>(`/api/projects/${project.value.id}/document/replace`, formData, { timeout: 120000 })
-
-    toast.add({
-      severity: 'success',
-      summary: 'Manuscrito actualizado',
-      detail: `Clasificación: ${result.classification}. Ejecuta un nuevo análisis.`,
-      life: 4000,
-    })
-    await projectsStore.fetchProject(project.value.id)
-    await loadChapters(project.value.id, project.value)
-    entities.value = []
-    alerts.value = []
-  } catch (err) {
-    const detail = err instanceof Error
-      ? err.message
-      : 'No se pudo actualizar el manuscrito. Crea un proyecto nuevo para este archivo.'
-    toast.add({
-      severity: 'error',
-      summary: 'Actualización bloqueada',
-      detail,
-      life: 5000,
-    })
-  } finally {
-    input.value = ''
-  }
-}
 </script>
 
 <style scoped>
