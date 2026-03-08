@@ -12,7 +12,7 @@
 
 import { ref, computed, watch, onUnmounted } from 'vue'
 import type { Alert, AlertStatus, AlertSeverity } from '@/types'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 export interface SequentialFilters {
   statuses: AlertStatus[]
@@ -286,34 +286,27 @@ export function useSequentialMode(
   ): Promise<boolean> {
     updating.value = true
     try {
-      const response = await fetch(
-        apiUrl(`/api/projects/${projectId()}/alerts/${alert.id}/status`),
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: newStatus }),
-        }
-      )
+      await api.putRaw(`/api/projects/${projectId()}/alerts/${alert.id}/status`, {
+        status: newStatus,
+      })
 
-      if (response.ok) {
-        // Record action for undo
-        actionHistory.value.push({
-          alertId: alert.id,
-          action: newStatus === 'resolved' ? 'resolve' : newStatus === 'dismissed' ? 'dismiss' : 'flag',
-          previousStatus: alert.status,
-          timestamp: new Date(),
-        })
+      // Record action for undo
+      actionHistory.value.push({
+        alertId: alert.id,
+        action: newStatus === 'resolved' ? 'resolve' : newStatus === 'dismissed' ? 'dismiss' : 'flag',
+        previousStatus: alert.status,
+        timestamp: new Date(),
+      })
 
-        // Trim history if needed
-        if (actionHistory.value.length > MAX_UNDO_HISTORY) {
-          actionHistory.value = actionHistory.value.slice(-MAX_UNDO_HISTORY)
-        }
-
-        // Notify parent
-        onAlertStatusChanged?.(alert.id, newStatus)
-
-        return true
+      // Trim history if needed
+      if (actionHistory.value.length > MAX_UNDO_HISTORY) {
+        actionHistory.value = actionHistory.value.slice(-MAX_UNDO_HISTORY)
       }
+
+      // Notify parent
+      onAlertStatusChanged?.(alert.id, newStatus)
+
+      return true
     } catch (error) {
       console.error('Error updating alert status:', error)
     } finally {
@@ -411,20 +404,13 @@ export function useSequentialMode(
     // Restore previous status
     updating.value = true
     try {
-      const response = await fetch(
-        apiUrl(`/api/projects/${projectId()}/alerts/${lastAction.alertId}/status`),
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: lastAction.previousStatus }),
-        }
-      )
+      await api.putRaw(`/api/projects/${projectId()}/alerts/${lastAction.alertId}/status`, {
+        status: lastAction.previousStatus,
+      })
 
-      if (response.ok) {
-        onAlertStatusChanged?.(lastAction.alertId, lastAction.previousStatus)
-        goToAlert(lastAction.alertId)
-        return true
-      }
+      onAlertStatusChanged?.(lastAction.alertId, lastAction.previousStatus)
+      goToAlert(lastAction.alertId)
+      return true
     } catch (error) {
       console.error('Error undoing action:', error)
       // Put the action back

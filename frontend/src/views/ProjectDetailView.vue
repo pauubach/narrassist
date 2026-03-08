@@ -632,10 +632,12 @@ import type { SidebarTab } from '@/stores/workspace'
 import type { Entity, Alert, AlertSource, ChatReference, DialogueAttribution } from '@/types'
 import { resetGlobalHighlight } from '@/composables/useHighlight'
 import { api } from '@/services/apiClient'
+import { exportCorrectedDocumentBlob } from '@/services/projectExports'
 import { useNotifications } from '@/composables/useNotifications'
 import { useGlobalUndo } from '@/composables/useGlobalUndo'
 import { updateProjectStats } from '@/composables/useGlobalStats'
 import { waitForPendingAnalysisSettingsSync } from '@/composables/useSettingsPersistence'
+import { downloadBlob, downloadTextFile } from '@/utils/fileDownload'
 import { useToast } from 'primevue/usetoast'
 
 const route = useRoute()
@@ -1567,15 +1569,8 @@ const onAskAiAboutSelection = (_text: string) => {
 
 // Chat reference navigation (same pattern as alert navigation)
 const onChatReferenceNavigate = (ref: ChatReference) => {
-  console.log('[ProjectDetailView] onChatReferenceNavigate called with:', ref)
   const chapter = chapters.value.find(c => c.chapterNumber === ref.chapter)
-  console.log('[ProjectDetailView] Found chapter:', chapter)
   const chapterId = chapter?.id ?? null
-  console.log('[ProjectDetailView] Calling navigateToTextPosition with:', {
-    position: ref.startChar,
-    excerpt: ref.excerpt,
-    chapterId
-  })
   workspaceStore.clearAlertHighlights()
   workspaceStore.navigateToTextPosition(ref.startChar, ref.excerpt, chapterId)
 }
@@ -1593,37 +1588,11 @@ const handleExportCorrected = async () => {
   if (!project.value) return
 
   try {
-    // Descargar documento con correcciones como Track Changes
-    const url = `/api/projects/${project.value.id}/export/corrected?min_confidence=0.5&as_track_changes=true`
-
-    const response = await fetch(url)
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || 'Error al exportar documento corregido')
-    }
-
-    // Obtener el blob del documento
-    const blob = await response.blob()
-
-    // Obtener nombre del archivo del header o usar default
-    const contentDisposition = response.headers.get('Content-Disposition')
-    let filename = 'documento_corregido.docx'
-    if (contentDisposition) {
-      const match = contentDisposition.match(/filename="?([^"]+)"?/)
-      if (match) filename = match[1]
-    }
-
-    // Descargar
-    const downloadUrl = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = downloadUrl
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(downloadUrl)
-
+    const { blob, filename } = await exportCorrectedDocumentBlob(project.value.id, {
+      min_confidence: 0.5,
+      as_track_changes: true,
+    })
+    downloadBlob(blob, filename || 'documento_corregido.docx')
   } catch (err) {
     console.error('Error exporting corrected document:', err)
     toast.add({
@@ -1647,17 +1616,7 @@ const quickExportStyleGuide = async () => {
     if (data.success) {
       const content = data.data.content
       const filename = `guia_estilo_${project.value.name}_${Date.now()}.md`
-
-      // Descargar archivo
-      const blob = new Blob([content], { type: 'text/markdown' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      downloadTextFile(content, filename, 'text/markdown')
     } else {
       throw new Error(data.error || 'No se pudo completar la operación. Si persiste, reinicia la aplicación.')
     }
@@ -1761,7 +1720,6 @@ watch(() => workspaceStore.activeTab, async (newTab) => {
 
   // Si navegamos a 'text' y hay un scroll pendiente, asegurar que los capítulos estén cargados
   if (newTab === 'text' && workspaceStore.scrollToPosition !== null) {
-    console.log('[ProjectDetailView] Navigating to text with pending scroll, ensuring chapters loaded...')
     await loadChapters(project.value.id, project.value)  // Usa cache si ya están cargados
   }
 
@@ -1808,7 +1766,6 @@ watch(isAnalyzing, (analyzing, wasAnalyzing) => {
 // Auto-reload alerts when settings change (e.g., dialogue dash style)
 const handleSettingsChange = async () => {
   if (!project.value) return
-  console.log('[ProjectDetailView] Settings changed, reloading alerts...')
   await loadAlerts(project.value.id, true) // Force reload
 }
 

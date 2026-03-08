@@ -23,7 +23,6 @@ import InputChips from 'primevue/inputchips'
 import Checkbox from 'primevue/checkbox'
 import Tag from 'primevue/tag'
 // import Message from 'primevue/message'  // Reserved
-import ConfirmDialog from 'primevue/confirmdialog'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import DsEmptyState from '@/components/ds/DsEmptyState.vue'
@@ -439,8 +438,6 @@ defineExpose({ focusSearch })
 
 <template>
   <div class="glossary-tab">
-    <ConfirmDialog />
-
     <!-- Header con estadísticas y acciones -->
     <div class="glossary-tab__header">
       <div class="glossary-tab__stats">

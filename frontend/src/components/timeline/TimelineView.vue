@@ -527,6 +527,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import { transformTimeline } from '@/types/transformers'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import { api } from '@/services/apiClient'
+import { fetchProjectEventStats } from '@/services/eventStats'
 import { formatTemporalInstance } from '@/utils/temporal'
 import type {
   Timeline,
@@ -1031,18 +1032,14 @@ const exportTimeline = () => {
 /** Cargar datos de densidad de eventos narrativos */
 async function loadEventDensity() {
   try {
-    const response = await fetch(`/api/projects/${props.projectId}/events/stats`)
-    const data = await response.json()
-
-    if (data.success) {
-      eventDensityData.value = data.data.density_by_chapter.map((ch: any) => ({
-        chapter: ch.chapter,
-        tier1: ch.tier1,
-        tier2: ch.tier2,
-        tier3: ch.tier3,
-        total: ch.total
-      }))
-    }
+    const data = await fetchProjectEventStats(props.projectId)
+    eventDensityData.value = data.density_by_chapter.map((chapter) => ({
+      chapter: chapter.chapter,
+      tier1: chapter.tier1,
+      tier2: chapter.tier2,
+      tier3: chapter.tier3,
+      total: chapter.total,
+    }))
   } catch (error) {
     console.error('Error loading event density:', error)
   }

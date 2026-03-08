@@ -547,8 +547,14 @@ import Checkbox from 'primevue/checkbox'
 import Slider from 'primevue/slider'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
-import { apiUrl } from '@/config/api'
 import { api } from '@/services/apiClient'
+import {
+  exportCorrectedDocumentBlob,
+  exportDocumentBlob,
+  exportEditorialWorkBlob,
+  exportScrivenerBlob,
+} from '@/services/projectExports'
+import { decodeBase64ToBlob, downloadBlob, downloadTextFile } from '@/utils/fileDownload'
 import ImportWorkDialog from './ImportWorkDialog.vue'
 
 const props = defineProps<{
@@ -679,29 +685,6 @@ const alertOptions = ref({
   includeResolved: false
 })
 
-const downloadFile = (content: string, filename: string, mimeType: string) => {
-  const blob = new Blob([content], { type: mimeType })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
-}
-
-const downloadBlob = (blob: Blob, filename: string) => {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
-}
-
 const loadDocumentPreview = async () => {
   loadingDocPreview.value = true
   try {
@@ -749,28 +732,18 @@ const exportDocument = async () => {
       only_open_alerts: documentOptions.value.onlyOpenAlerts.toString()
     })
 
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/export/document?${params}`))
+    const { blob, filename } = await exportDocumentBlob(props.projectId, {
+      format: documentFormat.value,
+      include_characters: documentOptions.value.includeCharacters,
+      include_alerts: documentOptions.value.includeAlerts,
+      include_timeline: documentOptions.value.includeTimeline,
+      include_relationships: documentOptions.value.includeRelationships,
+      include_style_guide: documentOptions.value.includeStyleGuide,
+      only_main_characters: documentOptions.value.onlyMainCharacters,
+      only_open_alerts: documentOptions.value.onlyOpenAlerts,
+    })
 
-    if (!response.ok) {
-      // Intentar leer el error como JSON
-      const errorData = await response.json().catch(() => null)
-      throw new Error(errorData?.error || 'Error al exportar documento')
-    }
-
-    // El servidor devuelve el archivo directamente como blob
-    const blob = await response.blob()
-
-    // Obtener nombre del archivo del header Content-Disposition
-    const contentDisposition = response.headers.get('Content-Disposition')
-    let filename = `informe_${props.projectName}.${documentFormat.value}`
-    if (contentDisposition) {
-      const match = contentDisposition.match(/filename="?([^"]+)"?/)
-      if (match) {
-        filename = match[1]
-      }
-    }
-
-    downloadBlob(blob, filename)
+    downloadBlob(blob, filename || `informe_${props.projectName}.${documentFormat.value}`)
 
     toast.add({
       severity: 'success',
@@ -805,7 +778,7 @@ const exportReport = async () => {
       const mimeType = reportFormat.value === 'json' ? 'application/json' : 'text/markdown'
       const filename = `informe_${props.projectName}_${Date.now()}.${extension}`
 
-      downloadFile(content, filename, mimeType)
+      downloadTextFile(content, filename, mimeType)
 
       toast.add({
         severity: 'success',
@@ -850,7 +823,7 @@ const exportCharacterSheets = async () => {
       const mimeType = characterFormat.value === 'json' ? 'application/json' : 'text/markdown'
       const filename = `fichas_personajes_${props.projectName}_${Date.now()}.${extension}`
 
-      downloadFile(content, filename, mimeType)
+      downloadTextFile(content, filename, mimeType)
 
       toast.add({
         severity: 'success',
@@ -909,21 +882,8 @@ const exportStyleGuide = async () => {
       if (format === 'pdf') {
         // PDF viene como base64, decodificar y descargar
         const pdfContent = data.data.content
-        const byteCharacters = atob(pdfContent)
-        const byteNumbers = new Array(byteCharacters.length)
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i)
-        }
-        const byteArray = new Uint8Array(byteNumbers)
-        const blob = new Blob([byteArray], { type: 'application/pdf' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `guia_estilo_${props.projectName}_${Date.now()}.pdf`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
+        const blob = decodeBase64ToBlob(pdfContent, 'application/pdf')
+        downloadBlob(blob, `guia_estilo_${props.projectName}_${Date.now()}.pdf`)
 
         toast.add({
           severity: 'success',
@@ -941,7 +901,7 @@ const exportStyleGuide = async () => {
         const mimeType = format === 'markdown' ? 'text/markdown' : 'application/json'
         const filename = `guia_estilo_${props.projectName}_${Date.now()}.${extension}`
 
-        downloadFile(content, filename, mimeType)
+        downloadTextFile(content, filename, mimeType)
 
         toast.add({
           severity: 'success',
@@ -961,7 +921,7 @@ const exportStyleGuide = async () => {
         })
 
         const filename = `guia_estilo_${props.projectName}_${Date.now()}.md`
-        downloadFile(data.data.content, filename, 'text/markdown')
+        downloadTextFile(data.data.content, filename, 'text/markdown')
       } else {
         throw new Error(data.error || 'No se pudo completar la operación. Si persiste, reinicia la aplicación.')
       }
@@ -999,7 +959,7 @@ const exportAlerts = async () => {
       const mimeType = alertFormat.value === 'json' ? 'application/json' : 'text/csv'
       const filename = `alertas_${props.projectName}_${Date.now()}.${extension}`
 
-      downloadFile(content, filename, mimeType)
+      downloadTextFile(content, filename, mimeType)
 
       toast.add({
         severity: 'success',
@@ -1034,24 +994,15 @@ async function exportCorrected() {
       params.set('categories', correctedOptions.value.categories.join(','))
     }
 
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/export/corrected?${params}`)
-    )
+    const { blob, filename } = await exportCorrectedDocumentBlob(props.projectId, {
+      min_confidence: correctedOptions.value.minConfidence / 100,
+      as_track_changes: correctedOptions.value.asTrackChanges,
+      categories: correctedOptions.value.categories.length < correctionCategories.length
+        ? correctedOptions.value.categories
+        : undefined,
+    })
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `HTTP ${response.status}`)
-    }
-
-    const blob = await response.blob()
-    const contentDisposition = response.headers.get('Content-Disposition')
-    let filename = `${props.projectName}_corregido.docx`
-    if (contentDisposition) {
-      const match = contentDisposition.match(/filename="?([^"]+)"?/)
-      if (match) filename = match[1]
-    }
-
-    downloadBlob(blob, filename)
+    downloadBlob(blob, filename || `${props.projectName}_corregido.docx`)
 
     toast.add({
       severity: 'success',
@@ -1081,24 +1032,14 @@ async function exportScrivener() {
       include_entity_keywords: String(scrivenerOptions.value.includeEntityKeywords),
     })
 
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/export/scrivener?${params}`)
-    )
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
-
-    const blob = await response.blob()
     const safeName = props.projectName.replace(/[^a-zA-Z0-9 _.-]/g, '').trim() || 'Proyecto'
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${safeName}.scriv.zip`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    const { blob, filename } = await exportScrivenerBlob(props.projectId, {
+      include_character_notes: scrivenerOptions.value.includeCharacterNotes,
+      include_alerts_as_notes: scrivenerOptions.value.includeAlertsAsNotes,
+      include_entity_keywords: scrivenerOptions.value.includeEntityKeywords,
+    })
+
+    downloadBlob(blob, filename || `${safeName}.scriv.zip`)
 
     toast.add({
       severity: 'success',
@@ -1122,25 +1063,9 @@ async function exportScrivener() {
 async function exportEditorialWork() {
   loadingEditorialExport.value = true
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/export-work`),
-      { method: 'POST' }
-    )
+    const { blob, filename } = await exportEditorialWorkBlob(props.projectId)
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `HTTP ${response.status}`)
-    }
-
-    const blob = await response.blob()
-    const contentDisposition = response.headers.get('Content-Disposition')
-    let filename = `trabajo_editorial_${props.projectName}.narrassist`
-    if (contentDisposition) {
-      const match = contentDisposition.match(/filename="?([^"]+)"?/)
-      if (match) filename = match[1]
-    }
-
-    downloadBlob(blob, filename)
+    downloadBlob(blob, filename || `trabajo_editorial_${props.projectName}.narrassist`)
 
     toast.add({
       severity: 'success',

@@ -121,6 +121,68 @@ describe('appStore', () => {
     expect(retrySpy).toHaveBeenCalledTimes(1)
   })
 
+  it('covers the desktop shell lifecycle from startup to restart and terminal failure', async () => {
+    let handler: ((event: { payload: unknown }) => void) | undefined
+    listenMock.mockImplementation(async (_event: string, cb: (event: { payload: unknown }) => void) => {
+      handler = cb
+      return () => {}
+    })
+    invokeMock.mockResolvedValue('Backend server started successfully')
+
+    const { appStore, systemStore } = await loadStores()
+    const retrySpy = vi.spyOn(systemStore, 'startRetrying').mockImplementation(() => {})
+
+    const startResult = await appStore.startBackendServer()
+    expect(startResult).toBe('Backend server started successfully')
+    expect(handler).toBeTypeOf('function')
+
+    handler!({
+      payload: {
+        status: 'starting',
+        message: 'Iniciando...',
+      } satisfies BackendStatusPayload,
+    })
+    expect(systemStore.backendConnected).toBe(false)
+    expect(systemStore.backendStartupError).toBeNull()
+
+    handler!({
+      payload: {
+        status: 'running',
+        message: 'Servidor listo',
+      } satisfies BackendStatusPayload,
+    })
+    expect(systemStore.backendConnected).toBe(true)
+    expect(systemStore.backendStartupError).toBeNull()
+
+    handler!({
+      payload: {
+        status: 'restarting',
+        message: 'Reiniciando...',
+      } satisfies BackendStatusPayload,
+    })
+    expect(systemStore.backendConnected).toBe(false)
+    expect(systemStore.backendStartupError).toBeNull()
+
+    handler!({
+      payload: {
+        status: 'running',
+        message: 'Servidor listo',
+      } satisfies BackendStatusPayload,
+    })
+    expect(systemStore.backendConnected).toBe(true)
+    expect(systemStore.backendStartupError).toBeNull()
+
+    handler!({
+      payload: {
+        status: 'error',
+        message: 'Backend detenido inesperadamente',
+      } satisfies BackendStatusPayload,
+    })
+    expect(systemStore.backendConnected).toBe(false)
+    expect(systemStore.backendStartupError).toBe('Backend detenido inesperadamente')
+    expect(retrySpy).toHaveBeenCalledTimes(1)
+  })
+
   it('invokes the Tauri command to start the backend server', async () => {
     listenMock.mockResolvedValue(() => {})
     invokeMock.mockResolvedValue('Backend server started successfully')

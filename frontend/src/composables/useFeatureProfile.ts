@@ -6,7 +6,7 @@
  */
 
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 export type FeatureAvailability = 'enabled' | 'optional' | 'disabled'
 
@@ -145,15 +145,7 @@ export function useFeatureProfile(
     error.value = null
 
     try {
-      const response = await fetch(apiUrl(`/api/projects/${id}/feature-profile`))
-      const data = await response.json()
-
-      if (data.success) {
-        profile.value = data.data
-      } else {
-        error.value = data.error || 'Error loading feature profile'
-        profile.value = null
-      }
+      profile.value = await api.getChecked<FeatureProfile>(`/api/projects/${id}/feature-profile`)
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Error de comunicación interna'
       profile.value = null

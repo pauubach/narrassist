@@ -93,6 +93,7 @@ import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Chip from 'primevue/chip'
 import ProgressSpinner from 'primevue/progressspinner'
+import { fetchProjectEventStats } from '@/services/eventStats'
 
 interface EventStats {
   projectId: number
@@ -125,24 +126,20 @@ const stats = ref<EventStats | null>(null)
 async function loadStats() {
   loading.value = true
   try {
-    const response = await fetch(`/api/projects/${props.projectId}/events/stats`)
-    const data = await response.json()
-
-    if (data.success) {
-      stats.value = {
-        projectId: data.data.project_id,
-        totalEvents: data.data.total_events,
-        criticalUnresolved: {
-          count: data.data.critical_unresolved.count,
-          byType: data.data.critical_unresolved.by_type
-        },
-        emptyChapters: data.data.empty_chapters,
-        eventClusters: data.data.event_clusters.map((c: any) => ({
-          eventType: c.event_type,
-          chapter: c.chapter,
-          count: c.count
-        }))
-      }
+    const data = await fetchProjectEventStats(props.projectId)
+    stats.value = {
+      projectId: data.project_id,
+      totalEvents: data.total_events,
+      criticalUnresolved: {
+        count: data.critical_unresolved.count,
+        byType: data.critical_unresolved.by_type,
+      },
+      emptyChapters: data.empty_chapters,
+      eventClusters: data.event_clusters.map((cluster) => ({
+        eventType: cluster.event_type,
+        chapter: cluster.chapter,
+        count: cluster.count,
+      })),
     }
   } catch (error) {
     console.error('Error loading event stats:', error)

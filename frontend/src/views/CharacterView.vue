@@ -260,11 +260,13 @@ import type { Entity, CharacterAttribute, CharacterRelationship } from '@/types'
 import { transformEntity, transformEntities } from '@/types/transformers'
 import { api } from '@/services/apiClient'
 import { getAttributeCategoriesForEntityType } from '@/config/attributes'
+import { useAppConfirm } from '@/composables/useAppConfirm'
 
 const route = useRoute()
 const router = useRouter()
 const projectsStore = useProjectsStore()
 const toast = useToast()
+const appConfirm = useAppConfirm()
 
 // Estado
 const loading = ref(true)
@@ -426,7 +428,7 @@ const saveCharacter = async () => {
       if (character.value) {
         character.value = { ...editingCharacter.value }
       }
-      console.log('Character updated successfully:', data.message)
+      toast.add({ severity: 'success', summary: 'Actualizado', detail: data.message || 'Ficha actualizada correctamente', life: 3000 })
     } else {
       console.error('Failed to update character:', data.error)
       toast.add({ severity: 'error', summary: 'Error', detail: `Error al guardar: ${data.error}`, life: 5000 })
@@ -474,7 +476,7 @@ const saveAttribute = async () => {
         name: newAttribute.value.name,
         value: newAttribute.value.value,
       })
-      console.log('Attribute created successfully:', data.message)
+      toast.add({ severity: 'success', summary: 'Atributo creado', detail: data.message || 'Atributo añadido correctamente', life: 3000 })
     } else {
       console.error('Failed to create attribute:', data.error)
       toast.add({ severity: 'error', summary: 'Error', detail: `Error al crear atributo: ${data.error}`, life: 5000 })
@@ -488,8 +490,12 @@ const saveAttribute = async () => {
 const onDeleteAttribute = async (attributeId: number | undefined) => {
   if (!attributeId) return
 
-  // Pedir confirmación
-  if (!confirm('¿Seguro que deseas eliminar este atributo?')) {
+  const accepted = await appConfirm.confirmDanger(
+    'Eliminar atributo',
+    '¿Seguro que deseas eliminar este atributo?',
+    'Eliminar',
+  )
+  if (!accepted) {
     return
   }
 
@@ -552,7 +558,12 @@ const saveRelationship = async () => {
 const onDeleteRelationship = async (relationshipId: number | string | undefined) => {
   if (!relationshipId) return
 
-  if (!confirm('¿Eliminar esta relación?')) return
+  const accepted = await appConfirm.confirmDanger(
+    'Eliminar relación',
+    '¿Eliminar esta relación?',
+    'Eliminar',
+  )
+  if (!accepted) return
 
   try {
     const data = await api.del<{ success: boolean; error?: string }>(`/api/projects/${projectId.value}/relationships/${relationshipId}`)

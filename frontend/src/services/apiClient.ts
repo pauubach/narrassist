@@ -105,6 +105,12 @@ interface RequestOptions {
   retries?: number
 }
 
+export interface BlobResponse {
+  blob: Blob
+  filename?: string
+  response: Response
+}
+
 /**
  * Wrapper de fetch que alimenta el monitor de conexión.
  * Si backendDown=true, los componentes pueden mostrar un banner
@@ -201,6 +207,45 @@ async function parseRawResponse<T>(response: Response): Promise<T> {
     )
   }
   return await response.json()
+}
+
+function extractFilenameFromDisposition(contentDisposition: string | null): string | undefined {
+  if (!contentDisposition) return undefined
+
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1])
+    } catch {
+      return utf8Match[1]
+    }
+  }
+
+  const plainMatch = contentDisposition.match(/filename="?([^";]+)"?/i)
+  return plainMatch?.[1]
+}
+
+async function parseBlobResponse(response: Response): Promise<BlobResponse> {
+  if (!response.ok) {
+    let detail: string | undefined
+    try {
+      const errorData = await response.json()
+      detail = errorData.detail || errorData.error || undefined
+    } catch {
+      // Ignore non-JSON error bodies
+    }
+    throw new ApiError(
+      detail || `HTTP ${response.status}: ${response.statusText}`,
+      response.status,
+      detail,
+    )
+  }
+
+  return {
+    blob: await response.blob(),
+    filename: extractFilenameFromDisposition(response.headers.get('Content-Disposition')),
+    response,
+  }
 }
 
 /**
@@ -439,6 +484,55 @@ async function del<T>(
   return parseRawResponse<T>(response)
 }
 
+async function getBlob(
+  path: string,
+  options: RequestOptions = {},
+): Promise<BlobResponse> {
+  const { timeout = 60000, headers = {}, signal, retries = 0 } = options
+
+  const response = retries > 0
+    ? await monitoredFetchWithRetry(apiUrl(path), { method: 'GET', headers }, retries, timeout, signal)
+    : await monitoredFetch(apiUrl(path), {
+        method: 'GET',
+        headers,
+        signal: createTimeoutSignal(timeout, signal),
+      })
+
+  return parseBlobResponse(response)
+}
+
+async function postBlob(
+  path: string,
+  body?: Record<string, unknown> | FormData,
+  options: RequestOptions = {},
+): Promise<BlobResponse> {
+  const { timeout = 60000, headers = {}, signal, retries = 0 } = options
+
+  const isFormData = body instanceof FormData
+  const requestHeaders = isFormData || body === undefined
+    ? headers
+    : { 'Content-Type': 'application/json', ...headers }
+
+  const requestInit: RequestInit = {
+    method: 'POST',
+    headers: requestHeaders,
+    body: body === undefined
+      ? undefined
+      : isFormData
+        ? body
+        : JSON.stringify(body),
+  }
+
+  const response = retries > 0
+    ? await monitoredFetchWithRetry(apiUrl(path), requestInit, retries, timeout, signal)
+    : await monitoredFetch(apiUrl(path), {
+        ...requestInit,
+        signal: createTimeoutSignal(timeout, signal),
+      })
+
+  return parseBlobResponse(response)
+}
+
 /**
  * GET con check de envelope { success, data, error }.
  * Reemplaza el patrón repetido:
@@ -508,9 +602,11 @@ async function patchChecked<T>(
 export const api = {
   get,
   getRaw,
+  getBlob,
   getChecked,
   post,
   postForm,
+  postBlob,
   postRaw,
   postChecked,
   tryGet,

@@ -63,13 +63,11 @@ export function useProjectData() {
   async function loadEntities(projectId: number, forceReload = false) {
     // Cache: si ya están cargadas para este proyecto, no recargar
     if (!forceReload && entitiesLoaded.value && lastLoadedProjectId.value === projectId && entities.value.length > 0) {
-      console.log('[useProjectData] Entities already loaded from cache')
       return
     }
 
     // Si ya está cargando, esperar
     if (loadingEntities.value) {
-      console.log('[useProjectData] Entities already loading, waiting...')
       while (loadingEntities.value) {
         await new Promise(resolve => setTimeout(resolve, 50))
       }
@@ -83,7 +81,6 @@ export function useProjectData() {
         entities.value = transformEntities(data.data || [])
         entitiesLoaded.value = true
         lastLoadedProjectId.value = projectId
-        console.log('[useProjectData] Entities loaded successfully:', entities.value.length)
       }
     } catch (err) {
       console.error('Error loading entities:', err)
@@ -101,7 +98,6 @@ export function useProjectData() {
 
     // Si ya está cargando, esperar
     if (loadingAlerts.value) {
-      console.log('[useProjectData] Alerts already loading, waiting...')
       while (loadingAlerts.value) {
         await new Promise(resolve => setTimeout(resolve, 50))
       }
@@ -116,7 +112,6 @@ export function useProjectData() {
         alerts.value = transformAlerts(data.data || [])
         alertsLoaded.value = true
         lastLoadedProjectId.value = projectId
-        console.log('[useProjectData] Alerts loaded successfully:', alerts.value.length)
       }
     } catch (err) {
       console.error('Error loading alerts:', err)
@@ -129,13 +124,11 @@ export function useProjectData() {
   async function loadChapters(projectId: number, fallbackProject?: { wordCount: number; chapterCount: number }, forceReload = false) {
     // Cache: si ya están cargados para este proyecto, no recargar
     if (!forceReload && chaptersLoaded.value && lastLoadedProjectId.value === projectId && chapters.value.length > 0) {
-      console.log('[useProjectData] Chapters already loaded from cache')
       return
     }
 
     // Si ya está cargando, esperar
     if (loadingChapters.value) {
-      console.log('[useProjectData] Chapters already loading, waiting...')
       // Esperar a que termine la carga actual
       while (loadingChapters.value) {
         await new Promise(resolve => setTimeout(resolve, 50))
@@ -150,7 +143,6 @@ export function useProjectData() {
         chapters.value = transformChapters(data.data || [])
         chaptersLoaded.value = true
         lastLoadedProjectId.value = projectId
-        console.log('[useProjectData] Chapters loaded successfully:', chapters.value.length)
       }
     } catch (err) {
       console.error('Error loading chapters:', err)
@@ -175,13 +167,11 @@ export function useProjectData() {
   async function loadRelationships(projectId: number, forceReload = false) {
     // Cache: si ya están cargadas para este proyecto, no recargar
     if (!forceReload && relationshipsLoaded.value && lastLoadedProjectId.value === projectId && relationships.value) {
-      console.log('[useProjectData] Relationships already loaded from cache')
       return
     }
 
     // Si ya está cargando, esperar
     if (loadingRelationships.value) {
-      console.log('[useProjectData] Relationships already loading, waiting...')
       while (loadingRelationships.value) {
         await new Promise(resolve => setTimeout(resolve, 50))
       }
@@ -195,7 +185,6 @@ export function useProjectData() {
         relationships.value = data.data
         relationshipsLoaded.value = true
         lastLoadedProjectId.value = projectId
-        console.log('[useProjectData] Relationships loaded successfully')
       }
     } catch (err) {
       console.error('Error loading relationships:', err)

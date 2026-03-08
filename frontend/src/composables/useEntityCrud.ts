@@ -11,6 +11,7 @@
 
 import { ref, type Ref } from 'vue'
 import { useAppToast } from './useAppToast'
+import { useAppConfirm } from './useAppConfirm'
 import type { Entity, EntityAttribute } from '@/types'
 import { api } from '@/services/apiClient'
 import { getAttributeCategoriesForEntityType } from '@/config/attributes'
@@ -68,6 +69,7 @@ export interface UseEntityCrudReturn {
  */
 export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudReturn {
   const toast = useAppToast()
+  const appConfirm = useAppConfirm()
 
   // Edit entity dialog state
   const editingEntity = ref<Entity | null>(null)
@@ -136,11 +138,12 @@ export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudRetur
    * Elimina (oculta) una entidad del proyecto
    */
   async function deleteEntity(entity: Entity) {
-    if (
-      !confirm(
-        `"${entity.name}" dejará de aparecer en la lista de entidades.\n\nSi vuelves a analizar el documento, podría reaparecer.`
-      )
-    ) {
+    const accepted = await appConfirm.confirmDanger(
+      'Ocultar entidad',
+      `"${entity.name}" dejará de aparecer en la lista de entidades.\n\nSi vuelves a analizar el documento, podría reaparecer.`,
+      'Ocultar',
+    )
+    if (!accepted) {
       return
     }
 
@@ -267,7 +270,12 @@ export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudRetur
    * Elimina un atributo de la entidad
    */
   async function deleteAttribute(entityId: number, attributeId: number) {
-    if (!confirm('¿Seguro que deseas eliminar este atributo?')) {
+    const accepted = await appConfirm.confirmDanger(
+      'Eliminar atributo',
+      '¿Seguro que deseas eliminar este atributo?',
+      'Eliminar',
+    )
+    if (!accepted) {
       return
     }
 

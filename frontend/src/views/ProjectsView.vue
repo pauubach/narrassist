@@ -322,7 +322,6 @@
 
     <!-- Menu contextual de proyecto -->
     <Menu ref="projectMenu" :model="projectMenuItems" :popup="true" />
-    <ConfirmDialog />
   </div>
 </template>
 
@@ -346,7 +345,6 @@ import Menu from 'primevue/menu'
 import Badge from 'primevue/badge'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import ConfirmDialog from 'primevue/confirmdialog'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import type { Project } from '@/types'
@@ -400,13 +398,13 @@ const projectMenuItems = computed(() => [
   {
     label: 'Re-analizar',
     icon: 'pi pi-refresh',
-    command: () => console.log('Re-analyze')
+    command: () => selectedProject.value && openProjectAndDispatch(selectedProject.value.id, 'menubar:run-analysis')
   },
   { separator: true },
   {
     label: 'Exportar',
     icon: 'pi pi-download',
-    command: () => console.log('Export')
+    command: () => selectedProject.value && openProjectAndDispatch(selectedProject.value.id, 'menubar:export')
   },
   { separator: true },
   {
@@ -519,6 +517,13 @@ const loadProjects = async () => {
 
 const openProject = (projectId: number) => {
   router.push({ name: 'project', params: { id: projectId } })
+}
+
+const openProjectAndDispatch = (projectId: number, eventName: string) => {
+  router.push({ name: 'project', params: { id: projectId } })
+  window.setTimeout(() => {
+    window.dispatchEvent(new CustomEvent(eventName))
+  }, 250)
 }
 
 const onFileSelect = (event: any) => {

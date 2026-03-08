@@ -103,6 +103,7 @@ import Dialog from 'primevue/dialog'
 import { useProjectsStore } from '@/stores/projects'
 import { useCollectionsStore } from '@/stores/collections'
 import type { CollectionDetail, CollectionProject } from '@/types'
+import { useAppConfirm } from '@/composables/useAppConfirm'
 
 const props = defineProps<{
   collection: CollectionDetail
@@ -115,6 +116,7 @@ const emit = defineEmits<{
 
 const projectsStore = useProjectsStore()
 const collectionsStore = useCollectionsStore()
+const appConfirm = useAppConfirm()
 const showAddProject = ref(false)
 
 const collectionProjectIds = computed(() =>
@@ -141,8 +143,15 @@ function handleAdd(projectId: number) {
   showAddProject.value = false
 }
 
-function confirmRemove(project: CollectionProject) {
-  if (!confirm(`¿Quitar "${project.name}" de la colección?`)) return
+async function confirmRemove(project: CollectionProject) {
+  const accepted = await appConfirm.ask({
+    header: 'Quitar libro',
+    message: `¿Quitar "${project.name}" de la colección?`,
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: 'Quitar',
+    acceptSeverity: 'danger',
+  })
+  if (!accepted) return
   emit('remove-project', project.id)
 }
 

@@ -85,10 +85,12 @@ import CollectionBookList from '@/components/collections/CollectionBookList.vue'
 import EntityLinkPanel from '@/components/collections/EntityLinkPanel.vue'
 import CrossBookReport from '@/components/collections/CrossBookReport.vue'
 import { useCollectionsStore } from '@/stores/collections'
+import { useAppConfirm } from '@/composables/useAppConfirm'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const appConfirm = useAppConfirm()
 const collectionsStore = useCollectionsStore()
 
 const showEditDialog = ref(false)
@@ -108,7 +110,13 @@ async function handleSave(name: string, description: string) {
 
 async function handleDelete() {
   if (!collection.value) return
-  if (!confirm(`¿Eliminar la colección "${collection.value.name}"? Los proyectos no se borrarán.`)) return
+
+  const accepted = await appConfirm.confirmDanger(
+    'Eliminar colección',
+    `¿Eliminar la colección "${collection.value.name}"?\n\nLos proyectos no se borrarán.`,
+    'Eliminar',
+  )
+  if (!accepted) return
 
   try {
     await collectionsStore.deleteCollection(collectionId.value)

@@ -35,7 +35,6 @@ export const useAppStore = defineStore('app', () => {
     try {
       await tauriListen('backend-status', (event) => {
         const payload = event.payload as { status: string; message: string }
-        console.log('[Tauri] Backend status event:', payload)
 
         const systemStore = useSystemStore()
         if (payload.status === 'running') {

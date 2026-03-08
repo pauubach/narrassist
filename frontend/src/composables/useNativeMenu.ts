@@ -20,7 +20,6 @@ if (isTauriEnv) {
     import('@tauri-apps/api/event').then(module => {
       tauriListen = module.listen as typeof tauriListen
       tauriReady.value = true
-      console.log('[Menu] Tauri event API loaded successfully')
     }),
     new Promise<void>((_, reject) =>
       setTimeout(() => reject(new Error('Tauri event API import timeout (5s)')), 5000)
@@ -45,6 +44,7 @@ interface MenuEventHandlers {
   onToggleInspector?: () => void
   onToggleSidebar?: () => void
   onRunAnalysis?: () => void
+  onCheckUpdates?: () => void
   onTutorial?: () => void
   onKeyboardShortcuts?: () => void
   onAbout?: () => void
@@ -67,8 +67,6 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
   }
 
   const handleMenuEvent = async (eventId: string) => {
-    console.log('[Menu] Handling event:', eventId)
-
     switch (eventId) {
       // Archivo
       case 'new_project':
@@ -203,7 +201,7 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
         break
 
       case 'check_updates':
-        console.log('[Menu] Check updates — not implemented yet')
+        invoke('check_updates', handlers.onCheckUpdates)
         break
 
       default:
@@ -221,10 +219,8 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
 
         if (tauriListen) {
           unlisten = await tauriListen('menu-event', (event) => {
-            console.log('[Menu] Received menu event:', event.payload)
             handleMenuEvent(event.payload)
           })
-          console.log('[Menu] Listener setup successfully')
         } else {
           console.warn('[Menu] Tauri listen function not available after import')
         }

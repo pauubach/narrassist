@@ -202,7 +202,7 @@ import Checkbox from 'primevue/checkbox'
 import FileUpload from 'primevue/fileupload'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 const props = defineProps<{
   visible: boolean
@@ -286,19 +286,13 @@ async function uploadAndPreview() {
     const formData = new FormData()
     formData.append('file', selectedFile.value)
 
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/import-work/preview`),
-      { method: 'POST', body: formData }
+    const data = await api.postForm<ImportPreview>(
+      `/api/projects/${props.projectId}/import-work/preview`,
+      formData,
     )
 
-    const data = await response.json()
-
-    if (!data.success) {
-      throw new Error(data.error || 'Error al analizar archivo')
-    }
-
-    preview.value = data.data
-    importData.value = data.data.import_data
+    preview.value = data
+    importData.value = data.import_data
     step.value = 'preview'
   } catch (error) {
     console.error('Error previewing import:', error)
@@ -318,29 +312,17 @@ async function confirmImport() {
   loadingConfirm.value = true
 
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/import-work/confirm`),
+    confirmStats.value = await api.post<ConfirmStats>(
+      `/api/projects/${props.projectId}/import-work/confirm`,
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          import_data: importData.value,
-          import_entity_merges: importSections.value.entityMerges,
-          import_alert_decisions: importSections.value.alertDecisions,
-          import_verified_attributes: importSections.value.verifiedAttributes,
-          import_suppression_rules: importSections.value.suppressionRules,
-          conflict_overrides: null,
-        }),
+        import_data: importData.value,
+        import_entity_merges: importSections.value.entityMerges,
+        import_alert_decisions: importSections.value.alertDecisions,
+        import_verified_attributes: importSections.value.verifiedAttributes,
+        import_suppression_rules: importSections.value.suppressionRules,
+        conflict_overrides: null,
       }
     )
-
-    const data = await response.json()
-
-    if (!data.success) {
-      throw new Error(data.error || 'Error al importar')
-    }
-
-    confirmStats.value = data.data
     step.value = 'done'
     emit('imported')
   } catch (error) {

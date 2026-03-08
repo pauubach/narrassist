@@ -5,7 +5,6 @@ import type { HistoryEntry } from '@/composables/useGlobalUndo'
 import { useListKeyboardNav } from '@/composables/useListKeyboardNav'
 import { api } from '@/services/apiClient'
 import SelectButton from 'primevue/selectbutton'
-import ConfirmDialog from 'primevue/confirmdialog'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 
@@ -231,7 +230,6 @@ watch(() => props.projectId, () => {
 
 <template>
   <div class="history-panel">
-    <ConfirmDialog />
     <div class="panel-header">
       <div class="header-left">
         <span class="panel-title">Historial</span>

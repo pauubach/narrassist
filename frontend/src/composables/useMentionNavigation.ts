@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import { useWorkspaceStore } from '@/stores/workspace'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 export interface Mention {
   id: number
@@ -218,31 +218,22 @@ export function useMentionNavigation(projectId: () => number) {
     }
 
     try {
-      const response = await fetch(
-        apiUrl(`/api/projects/${pid}/entities/${entityId}/mentions`)
-      )
-
-      if (!response.ok) {
-        throw new Error('Error cargando menciones')
-      }
-
-      const data = await response.json()
-
-      if (!data.success) {
-        throw new Error(data.error || 'No se pudo completar la operación. Si persiste, reinicia la aplicación.')
-      }
+      const data = await api.getChecked<{
+        entityName: string
+        entityType: string
+        mentions: Mention[]
+      }>(`/api/projects/${pid}/entities/${entityId}/mentions`)
 
       state.value.entityId = entityId
-      state.value.entityName = data.data.entityName
-      state.value.entityType = data.data.entityType
-      state.value.mentions = data.data.mentions || []
+      state.value.entityName = data.entityName
+      state.value.entityType = data.entityType
+      state.value.mentions = data.mentions || []
       state.value.currentIndex = state.value.mentions.length > 0 ? 0 : -1
 
       // Si hay menciones, navegar a la primera
       if (state.value.mentions.length > 0) {
         const dedupedMentions = deduplicateMentions(state.value.mentions)
         if (dedupedMentions.length < state.value.mentions.length) {
-          console.log(`[MentionNav] Deduped ${state.value.mentions.length} -> ${dedupedMentions.length} mentions`)
           state.value.mentions = dedupedMentions
         }
         navigateToCurrentMention()

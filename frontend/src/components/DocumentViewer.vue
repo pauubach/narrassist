@@ -182,7 +182,8 @@ import { useToast } from 'primevue/usetoast'
 import type { Chapter } from '@/types'
 import type { ApiChapter } from '@/types/api/projects'
 import { transformChapters } from '@/types/transformers/projects'
-import { apiUrl } from '@/config/api'
+import { exportDocumentBlob } from '@/services/projectExports'
+import { downloadBlob, downloadJsonFile } from '@/utils/fileDownload'
 import { api } from '@/services/apiClient'
 import { sanitizeHtml } from '@/utils/sanitizeHtml'
 import { useSelectionStore } from '@/stores/selection'
@@ -1379,13 +1380,6 @@ const scrollToMention = async (target: ScrollTarget) => {
 
   const isDialogueTarget = target.endPosition !== undefined && !!target.text
 
-  console.log('scrollToMention called:', {
-    chapterId: target.chapterId,
-    position: target.position,
-    endPosition: target.endPosition,
-    text: target.text?.substring(0, 50) + (target.text && target.text.length > 50 ? '...' : '')
-  })
-
   // Para que el scroll sea preciso, necesitamos cargar todos los capítulos
   // desde el inicio hasta el capítulo objetivo, ya que el contenido cargado
   // afecta las alturas del DOM y por tanto la posición de scroll
@@ -1576,7 +1570,6 @@ const highlightTextInChapter = async (chapterElement: Element, text: string, pos
   // Verificar si el contenido tiene texto (v-html puede no haber renderizado aún)
   const hasContent = contentElement.textContent && contentElement.textContent.trim().length > 0
   if (!hasContent && retryCount < MAX_RETRIES) {
-    console.log(`Content not ready yet, retry ${retryCount + 1}/${MAX_RETRIES}...`)
     // Fix #2: Trackear timer para cleanup
     await new Promise<void>(resolve => {
       const timer = setTimeout(() => {
@@ -1618,7 +1611,6 @@ const highlightTextInChapter = async (chapterElement: Element, text: string, pos
     const words = cleanText.split(' ')
     const shortText = words.slice(0, Math.min(5, words.length)).join(' ').trim()
     if (shortText.length >= 10) {
-      console.log(`Trying shorter search: "${shortText}"`)
       searchedNeedle = shortText.toLowerCase()
       matchIndexes = findAllOccurrences(searchedNeedle)
     }
@@ -1628,7 +1620,6 @@ const highlightTextInChapter = async (chapterElement: Element, text: string, pos
     // Si no encontramos el texto pero hay contenido, intentar un retry más
     // (a veces v-html necesita más tiempo para procesar)
     if (retryCount < MAX_RETRIES) {
-      console.log(`Text not found, retry ${retryCount + 1}/${MAX_RETRIES}...`)
       // Fix #2: Trackear timer para cleanup
       await new Promise<void>(resolve => {
         const timer = setTimeout(() => {
@@ -1644,8 +1635,6 @@ const highlightTextInChapter = async (chapterElement: Element, text: string, pos
     console.warn(`Text "${cleanText}" not found in chapter after ${MAX_RETRIES} retries.`)
     return false
   }
-
-  console.log(`Found ${matchIndexes.length} matches for "${cleanText.substring(0, 30)}..."`, { position })
 
   // Seleccionar la ocurrencia correcta:
   // Si tenemos posición, usar la más cercana a esa posición
@@ -1771,40 +1760,19 @@ const doExport = async () => {
         total_words: totalWords.value
       }
 
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${props.documentTitle || 'documento'}_export.json`
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadJsonFile(exportData, `${props.documentTitle || 'documento'}_export.json`)
     } else {
-      // Exportar como DOCX o PDF usando el endpoint del backend
-      const params = new URLSearchParams({
+      const { blob, filename } = await exportDocumentBlob(props.projectId, {
         format: exportFormat.value,
-        include_characters: 'true',
-        include_alerts: 'true',
-        include_timeline: 'true',
-        include_relationships: 'true',
-        include_style_guide: 'true'
+        include_characters: true,
+        include_alerts: true,
+        include_timeline: true,
+        include_relationships: true,
+        include_style_guide: true,
       })
 
-      const response = await fetch(
-        apiUrl(`/api/projects/${props.projectId}/export/document?${params}`)
-      )
-
-      if (!response.ok) {
-        throw new Error('Error al exportar documento')
-      }
-
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
       const ext = exportFormat.value === 'pdf' ? 'pdf' : 'docx'
-      a.download = `${props.documentTitle || 'documento'}_informe.${ext}`
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, filename || `${props.documentTitle || 'documento'}_informe.${ext}`)
     }
 
     showExportDialog.value = false

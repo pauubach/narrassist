@@ -230,6 +230,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import { useCollectionsStore } from '@/stores/collections'
 import { api } from '@/services/apiClient'
 import type { CollectionProject, LinkSuggestion } from '@/types'
+import { useAppConfirm } from '@/composables/useAppConfirm'
 
 const props = defineProps<{
   collectionId: number
@@ -237,6 +238,7 @@ const props = defineProps<{
 }>()
 
 const toast = useToast()
+const appConfirm = useAppConfirm()
 const collectionsStore = useCollectionsStore()
 
 const threshold = ref(0.7)
@@ -293,7 +295,12 @@ function dismissSuggestion(suggestion: LinkSuggestion) {
 }
 
 async function deleteLink(linkId: number) {
-  if (!confirm('¿Eliminar este enlace entre entidades?')) return
+  const accepted = await appConfirm.confirmDanger(
+    'Eliminar enlace',
+    '¿Eliminar este enlace entre entidades?',
+    'Eliminar',
+  )
+  if (!accepted) return
   try {
     await collectionsStore.deleteEntityLink(props.collectionId, linkId)
     toast.add({ severity: 'success', summary: 'Enlace eliminado', life: 2000 })

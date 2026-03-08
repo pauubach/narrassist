@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import DocumentViewer from '@/components/DocumentViewer.vue'
 import TextFindBar from '@/components/workspace/TextFindBar.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -135,7 +135,6 @@ const alertsByChapter = computed(() => {
       chapterNum = findChapterForPosition(alert.spanStart)
       if (chapterNum !== undefined) {
         inferred++
-        console.log(`[TextTab] Capítulo inferido para "${alert.title}": cap ${chapterNum} (spanStart=${alert.spanStart})`)
       }
     }
 
@@ -149,7 +148,6 @@ const alertsByChapter = computed(() => {
     }
   }
 
-  console.log(`[TextTab] Total alerts: ${props.alerts.length}, inferidos: ${inferred}, sin capítulo: ${withoutChapter}, agrupadas: ${Array.from(grouped.entries()).map(([ch, alerts]) => `cap${ch}=${alerts.length}`).join(', ')}`)
   return grouped
 })
 
@@ -195,7 +193,6 @@ function computeGutterMarkers() {
         const meta = metaConfig as typeof META_CATEGORIES[MetaCategoryKey]
         if (meta.categories.includes(alert.category as never)) {
           metaKey = key as MetaCategoryKey
-          console.log(`[TextTab] Alert "${alert.title}" (${alert.category}) → meta: ${metaKey}`)
           break
         }
       }
@@ -244,8 +241,6 @@ function computeGutterMarkers() {
       // Calcular posición vertical como porcentaje del documento total
       const topPercent = (index / totalChapters) * 100
 
-      console.log(`[TextTab] Cap ${index} (${chapter.chapterNumber}) badges:`, badges.map(b => `${b.metaCategory}=${b.count}`).join(', '), `topPercent=${topPercent}%`)
-
       markers.push({
         id: chapter.id,
         chapterIndex: index,
@@ -254,8 +249,6 @@ function computeGutterMarkers() {
       })
     }
   })
-
-  console.log(`[TextTab] Total markers creados: ${markers.length}`)
   return markers
 }
 
@@ -362,17 +355,6 @@ watch(scrollTarget, (target) => {
   }
 })
 
-// onMounted: procesar scroll pendiente
-onMounted(async () => {
-  // Esperar al siguiente tick para asegurar que las props están actualizadas
-  await nextTick()
-
-  // Si hay una posición pendiente cuando el componente se monta, el computed scrollTarget
-  // ya la habrá detectado. Solo necesitamos asegurar que se procese.
-  if (workspaceStore.scrollToPosition !== null) {
-    console.log('[TextTab] Scroll pendiente detectado al montar:', workspaceStore.scrollToPosition)
-  }
-})
 </script>
 
 <template>

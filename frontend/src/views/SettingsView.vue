@@ -1327,9 +1327,7 @@ async function loadQualityLevels() {
       settings.value.qualityLevel = cfgData.qualityLevel || 'rapida'
       settings.value.llmSensitivity = cfgData.sensitivity ?? 5
     }
-  } catch (e) {
-    console.debug('Error loading quality levels:', e)
-  }
+  } catch {}
 }
 
 async function selectQualityLevel(level: string) {
@@ -1359,7 +1357,7 @@ function onLlmSensitivityChange() {
   api.put('/api/services/llm/config', {
     qualityLevel: settings.value.qualityLevel || 'rapida',
     sensitivity: settings.value.llmSensitivity ?? 5,
-  }).catch(e => console.debug('Error saving sensitivity:', e))
+  }).catch(() => {})
   onSettingChange()
 }
 
@@ -1600,9 +1598,7 @@ async function loadUserRejections() {
     if (data.success && data.data) {
       userRejections.value = data.data
     }
-  } catch (e) {
-    console.debug('Error loading user rejections:', e)
-  } finally {
+  } catch {} finally {
     loadingRejections.value = false
   }
 }

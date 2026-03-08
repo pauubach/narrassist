@@ -12,6 +12,7 @@
       aria-label="Contenido principal"
     >
       <Toast position="top-right" aria-live="polite" />
+      <ConfirmDialog />
       <div v-if="showBackendDownBanner" class="backend-down-banner" role="alert">
         <i class="pi pi-exclamation-triangle"></i>
         <div class="backend-down-banner__text">
@@ -60,6 +61,7 @@
 import { RouterView, useRouter, useRoute } from 'vue-router'
 import { onMounted, onBeforeUnmount, onErrorCaptured, ref, computed } from 'vue'
 import Toast from 'primevue/toast'
+import ConfirmDialog from 'primevue/confirmdialog'
 import { useToast } from 'primevue/usetoast'
 import { backendDown, recoveryAttempts } from '@/services/apiClient'
 import { useAppStore } from '@/stores/app'
@@ -135,14 +137,12 @@ const { saveProject, openProjectFile } = useProjectFile()
 // Activar manejo de menú nativo de Tauri
 useNativeMenu({
   onNewProject: () => {
-    console.log('[Menu] New project requested')
     router.push('/projects')
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent('menubar:new-project'))
     }, 200)
   },
   onOpenProject: () => {
-    console.log('[Menu] Open project requested')
     router.push('/projects')
   },
   onSaveProject: async () => {
@@ -179,15 +179,12 @@ useNativeMenu({
   },
   onSettings: () => { router.push('/settings') },
   onCloseProject: () => {
-    console.log('[Menu] Close project requested')
     router.push('/projects')
   },
   onImport: () => {
-    console.log('[Menu] Import requested — navigating to projects')
     router.push('/projects')
   },
   onExport: () => {
-    console.log('[Menu] Export requested')
     window.dispatchEvent(new CustomEvent('menubar:export'))
   },
   onUpdateManuscript: () => {
@@ -195,7 +192,6 @@ useNativeMenu({
       console.warn('[Menu] Update manuscript ignored: no project view active')
       return
     }
-    console.log('[Menu] Update manuscript requested')
     window.dispatchEvent(new CustomEvent('menubar:update-manuscript'))
   },
   onViewChange: (view: string) => {
@@ -213,16 +209,21 @@ useNativeMenu({
     workspaceStore.setActiveTab(tab as any)
   },
   onRunAnalysis: () => {
-    console.log('[Menu] Run analysis requested')
     window.dispatchEvent(new CustomEvent('menubar:run-analysis'))
   },
   onToggleInspector: () => {
-    console.log('[Menu] Toggle inspector')
     window.dispatchEvent(new CustomEvent('menubar:toggle-inspector'))
   },
   onToggleSidebar: () => {
-    console.log('[Menu] Toggle sidebar')
     window.dispatchEvent(new CustomEvent('menubar:toggle-sidebar'))
+  },
+  onCheckUpdates: () => {
+    toast.add({
+      severity: 'info',
+      summary: 'Actualizaciones',
+      detail: 'La comprobación automática de actualizaciones aún no está disponible en esta versión.',
+      life: 4000,
+    })
   },
   onTutorial: () => { showTutorial.value = true },
   onKeyboardShortcuts: () => { showShortcutsHelp.value = true },
@@ -235,33 +236,26 @@ useNativeMenu({
 const checkTutorialStatus = () => {
   // Si el usuario marcó "no mostrar más", no mostrar
   const tutorialCompleted = localStorage.getItem('narrative_assistant_tutorial_completed')
-  console.log('[Tutorial] tutorialCompleted:', tutorialCompleted)
   if (tutorialCompleted === 'true') {
-    console.log('[Tutorial] No mostrar: usuario marcó "no mostrar más"')
     return false
   }
 
   // Si ya se mostró en esta sesión, no mostrar
   const shownThisSession = sessionStorage.getItem('narrative_assistant_tutorial_shown')
-  console.log('[Tutorial] shownThisSession:', shownThisSession)
   if (shownThisSession === 'true') {
-    console.log('[Tutorial] No mostrar: ya se mostró en esta sesión')
     return false
   }
 
-  console.log('[Tutorial] Mostrando tutorial')
   return true
 }
 
 const onTutorialComplete = () => {
-  console.log('[Tutorial] onTutorialComplete llamado')
   // Marcar como mostrado en esta sesión
   sessionStorage.setItem('narrative_assistant_tutorial_shown', 'true')
 }
 
 // También marcar como mostrado cuando se cierra el tutorial (de cualquier forma)
 const onTutorialVisibilityChange = (visible: boolean) => {
-  console.log('[Tutorial] onTutorialVisibilityChange:', visible)
   showTutorial.value = visible
   // Si se cierra el diálogo, marcar como mostrado en esta sesión
   if (!visible) {
@@ -294,20 +288,11 @@ onMounted(() => {
     isTauri.value = '__TAURI__' in window || '__TAURI_INTERNALS__' in window
   }
 
-  const version = systemStore.backendVersion || 'loading...'
-  console.log(`Narrative Assistant UI - v${version}`)
-  console.log('Vue 3.5 + PrimeVue 4')
-  console.log(`Tema: ${themeStore.config.mode} | Modo oscuro: ${themeStore.isDark}`)
-  console.log(`Entorno Tauri: ${isTauri.value}`)
-  console.log(`Ruta actual: ${route.fullPath}`)
-
   // Mostrar tutorial inmediatamente si corresponde (modelos se instalan en background)
   const shouldShowTutorial = checkTutorialStatus()
-  console.log('[Tutorial] shouldShowTutorial:', shouldShowTutorial)
   if (shouldShowTutorial) {
     // Pequeño delay para que el DOM se estabilice
     setTimeout(() => {
-      console.log('[Tutorial] Activando showTutorial.value = true')
       showTutorial.value = true
     }, 500)
   }

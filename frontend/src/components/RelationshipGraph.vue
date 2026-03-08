@@ -1046,23 +1046,11 @@ const initializeGraph = () => {
     return
   }
 
-  // Debug: mostrar datos recibidos
-  console.log('RelationshipGraph: Initializing with data:', {
-    entitiesCount: data.entities?.length || 0,
-    relationsCount: data.relations?.length || 0,
-    relations: data.relations?.slice(0, 3) // Primeras 3 para debug
-  })
-
   // Crear set de IDs de entidades válidos para validar edges
   const validEntityIds = new Set(data.entities.map(e => e.id))
 
   // Normalizar todas las relaciones al formato del frontend
   const normalizedRelations = (data.relations || []).map(normalizeRelation)
-
-  console.log('RelationshipGraph: Normalized relations:', {
-    count: normalizedRelations.length,
-    sample: normalizedRelations.slice(0, 3)
-  })
 
   // PRIMERO: Filtrar relaciones antes de crear nodos
   // Esto permite mostrar solo los nodos que tienen relaciones visibles
@@ -1100,11 +1088,6 @@ const initializeGraph = () => {
     if (storeFilters.showOnlyConfirmed && !rel.confirmed) return false
 
     return true
-  })
-
-  console.log('RelationshipGraph: After filtering:', {
-    filteredRelationsCount: filteredRelations.length,
-    filters: graphStore.filters
   })
 
   // SEGUNDO: Mostrar TODAS las entidades siempre
@@ -1199,11 +1182,6 @@ const initializeGraph = () => {
     }
   })
 
-  console.log('RelationshipGraph: Creating edges:', {
-    edgeCount: edgeData.length,
-    sampleEdges: edgeData.slice(0, 3)
-  })
-
   const edges = new DataSet<Edge>(edgeData as Edge[])
 
   // Network options
@@ -1249,13 +1227,6 @@ const initializeGraph = () => {
   if (network.value) {
     network.value.destroy()
   }
-
-  console.log('RelationshipGraph: Creating network with:', {
-    nodesCount: nodes.length,
-    edgesCount: edges.length,
-    nodeIds: nodes.getIds().slice(0, 5),
-    edgeIds: edges.getIds().slice(0, 5)
-  })
 
   // Create new network
   network.value = new Network(graphContainer.value, { nodes, edges }, options)

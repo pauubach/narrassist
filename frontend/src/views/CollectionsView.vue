@@ -132,9 +132,11 @@ import DsSkeleton from '@/components/ds/DsSkeleton.vue'
 import CollectionDialog from '@/components/collections/CollectionDialog.vue'
 import { useCollectionsStore } from '@/stores/collections'
 import type { Collection } from '@/types'
+import { useAppConfirm } from '@/composables/useAppConfirm'
 
 const router = useRouter()
 const toast = useToast()
+const appConfirm = useAppConfirm()
 const collectionsStore = useCollectionsStore()
 
 const searchQuery = ref('')
@@ -197,7 +199,13 @@ async function handleSave(name: string, description: string) {
 
 async function handleDelete() {
   if (!selectedCollection.value) return
-  if (!confirm(`¿Eliminar la colección "${selectedCollection.value.name}"? Los proyectos no se borrarán.`)) return
+
+  const accepted = await appConfirm.confirmDanger(
+    'Eliminar colección',
+    `¿Eliminar la colección "${selectedCollection.value.name}"?\n\nLos proyectos no se borrarán.`,
+    'Eliminar',
+  )
+  if (!accepted) return
 
   try {
     await collectionsStore.deleteCollection(selectedCollection.value.id)

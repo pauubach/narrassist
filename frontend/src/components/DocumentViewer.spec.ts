@@ -41,6 +41,13 @@ const mountWithPlugins = (component: any, options: any = {}) => {
     ...options,
     global: {
       plugins: [PrimeVue, ToastService],
+      directives: {
+        tooltip: {
+          mounted: () => {},
+          updated: () => {},
+          unmounted: () => {},
+        },
+      },
       stubs: {
         // Stub de componentes PrimeVue pesados
         Toast: true,

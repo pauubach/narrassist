@@ -91,6 +91,9 @@ import MultiSelect from 'primevue/multiselect'
 import Checkbox from 'primevue/checkbox'
 import InputNumber from 'primevue/inputnumber'
 import { useToast } from 'primevue/usetoast'
+import { api } from '@/services/apiClient'
+import { exportEventsBlob } from '@/services/projectExports'
+import { downloadBlob, downloadJsonFile } from '@/utils/fileDownload'
 
 const props = defineProps<{
   projectId: number
@@ -152,40 +155,19 @@ async function handleExport() {
     if (chapterStart.value) params.set('chapter_start', chapterStart.value.toString())
     if (chapterEnd.value) params.set('chapter_end', chapterEnd.value.toString())
 
-    const url = `/api/projects/${props.projectId}/events/export?${params}`
-
-    const response = await fetch(url)
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ detail: 'Error desconocido' }))
-      throw new Error(errorData.detail || `HTTP ${response.status}`)
-    }
-
     if (exportFormat.value === 'csv') {
-      // Download CSV
-      const blob = await response.blob()
-      const downloadUrl = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = downloadUrl
-      a.download = `eventos_proyecto_${props.projectId}.csv`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(downloadUrl)
-    } else {
-      // Download JSON
-      const data = await response.json()
-      const blob = new Blob([JSON.stringify(data.data, null, 2)], {
-        type: 'application/json'
+      const { blob, filename } = await exportEventsBlob(props.projectId, {
+        format: exportFormat.value,
+        tier_filter: tierFilter.value,
+        event_types: selectedEventTypes.value,
+        critical_only: criticalOnly.value ? 'true' : undefined,
+        chapter_start: chapterStart.value,
+        chapter_end: chapterEnd.value,
       })
-      const downloadUrl = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = downloadUrl
-      a.download = `eventos_proyecto_${props.projectId}.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(downloadUrl)
+      downloadBlob(blob, filename || `eventos_proyecto_${props.projectId}.csv`)
+    } else {
+      const data = await api.getChecked<unknown>(`/api/projects/${props.projectId}/events/export?${params}`)
+      downloadJsonFile(data, `eventos_proyecto_${props.projectId}.json`)
     }
 
     toast.add({

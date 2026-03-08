@@ -25,7 +25,6 @@ const dialogReady: Promise<void> = isTauriEnv
   ? import('@tauri-apps/plugin-dialog')
       .then((mod) => {
         dialogModule = mod as unknown as typeof dialogModule
-        console.log('[ProjectFile] Dialog plugin loaded')
       })
       .catch((err) => {
         console.warn('[ProjectFile] Failed to load dialog plugin:', err)
@@ -58,22 +57,15 @@ export function useProjectFile() {
     // Esperar a que el plugin de diálogo cargue (evita race condition)
     await dialogReady
 
-    let filePath: string | null = null
-
-    if (dialogModule) {
-      // Tauri: diálogo nativo
-      filePath = await dialogModule.save({
-        title: 'Guardar proyecto',
-        defaultPath: `${sanitizeFileName(projectName)}.nra`,
-        filters: [NRA_FILTER],
-      })
-    } else {
-      // Fallback: prompt del navegador (dev mode)
-      filePath = window.prompt(
-        'Ruta para guardar el proyecto:',
-        `${sanitizeFileName(projectName)}.nra`
-      )
+    if (!dialogModule) {
+      throw new Error('Guardar proyectos como archivo solo esta disponible en la app de escritorio.')
     }
+
+    const filePath = await dialogModule.save({
+      title: 'Guardar proyecto',
+      defaultPath: `${sanitizeFileName(projectName)}.nra`,
+      filters: [NRA_FILTER],
+    })
 
     if (!filePath) return false // Usuario canceló
 
@@ -103,20 +95,16 @@ export function useProjectFile() {
     // Esperar a que el plugin de diálogo cargue (evita race condition)
     await dialogReady
 
-    let filePath: string | null = null
-
-    if (dialogModule) {
-      // Tauri: diálogo nativo
-      filePath = (await dialogModule.open({
-        title: 'Abrir proyecto',
-        filters: [NRA_FILTER],
-        multiple: false,
-        directory: false,
-      })) as string | null
-    } else {
-      // Fallback: prompt del navegador (dev mode)
-      filePath = window.prompt('Ruta del archivo .nra a abrir:')
+    if (!dialogModule) {
+      throw new Error('Abrir proyectos desde archivo solo esta disponible en la app de escritorio.')
     }
+
+    const filePath = (await dialogModule.open({
+      title: 'Abrir proyecto',
+      filters: [NRA_FILTER],
+      multiple: false,
+      directory: false,
+    })) as string | null
 
     if (!filePath) return null // Usuario canceló
 

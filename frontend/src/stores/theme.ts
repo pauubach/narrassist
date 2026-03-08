@@ -405,7 +405,6 @@ export const useThemeStore = defineStore('theme', () => {
       document.documentElement.classList.remove('dark')
     }
 
-    console.log('[Theme] Dark mode:', isDark.value)
   }
 
   /** Verifica si es un preset personalizado */
@@ -433,12 +432,6 @@ export const useThemeStore = defineStore('theme', () => {
       const colorPalette = palette(config.value.primaryColor) as PaletteDesignToken
       updatePrimaryPalette(colorPalette)
 
-      console.log(
-        '[Theme] Applied preset:',
-        presetKey,
-        'with color:',
-        config.value.primaryColor
-      )
     } catch (e) {
       console.error('[Theme] Error applying preset:', e)
     }
@@ -447,7 +440,6 @@ export const useThemeStore = defineStore('theme', () => {
   function applyFontSize() {
     const size = FONT_SIZES[config.value.fontSize].value
     document.documentElement.style.fontSize = size
-    console.log('[Theme] Font size:', size)
   }
 
   function applyLineHeight() {
@@ -455,7 +447,6 @@ export const useThemeStore = defineStore('theme', () => {
     document.documentElement.style.lineHeight = height
     // Also set as CSS variable for components that need it
     document.documentElement.style.setProperty('--app-line-height', height)
-    console.log('[Theme] Line height:', height)
   }
 
   function applyRadius() {
@@ -468,7 +459,6 @@ export const useThemeStore = defineStore('theme', () => {
     document.documentElement.style.setProperty('--app-radius', radius)
     document.documentElement.style.setProperty('--app-radius-sm', Math.max(0, Math.round(px * 0.5)) + 'px')
     document.documentElement.style.setProperty('--app-radius-lg', Math.round(px * 1.5) + 'px')
-    console.log('[Theme] Border radius:', radius)
   }
 
   function applyCompactness() {
@@ -482,7 +472,6 @@ export const useThemeStore = defineStore('theme', () => {
     document.documentElement.classList.remove('ui-compact', 'ui-normal', 'ui-comfortable')
     document.documentElement.classList.add(`ui-${config.value.compactness}`)
 
-    console.log('[Theme] Compactness scale:', scale, 'class:', `ui-${config.value.compactness}`)
   }
 
   function applyReducedMotion() {
@@ -492,7 +481,6 @@ export const useThemeStore = defineStore('theme', () => {
     } else {
       document.documentElement.classList.remove('reduced-motion')
     }
-    console.log('[Theme] Reduced motion:', shouldReduce)
   }
 
   function applyFontFamily() {
@@ -506,7 +494,6 @@ export const useThemeStore = defineStore('theme', () => {
     // Aplicar fuente de lectura
     document.documentElement.style.setProperty('--font-family-reading', fontInfoReading.cssVar)
 
-    console.log('[Theme] Font family:', config.value.fontFamily, '| Reading:', config.value.fontFamilyReading)
   }
 
   function applyAllStyles() {
@@ -642,7 +629,6 @@ export const useThemeStore = defineStore('theme', () => {
   // ============================================================================
 
   function initialize() {
-    console.log('[Theme] Initializing...')
     loadConfig()
     applyAllStyles()
 
@@ -657,8 +643,6 @@ export const useThemeStore = defineStore('theme', () => {
     prefersReducedMotion.addEventListener('change', () => {
       applyReducedMotion()
     })
-
-    console.log('[Theme] Initialized with config:', config.value)
   }
 
   return {
