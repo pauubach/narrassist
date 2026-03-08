@@ -182,11 +182,11 @@ import { useToast } from 'primevue/usetoast'
 import type { Chapter } from '@/types'
 import type { ApiChapter } from '@/types/api/projects'
 import { transformChapters } from '@/types/transformers/projects'
-import { exportDocumentBlob } from '@/services/projectExports'
-import { downloadBlob, downloadJsonFile } from '@/utils/fileDownload'
 import { api } from '@/services/apiClient'
 import { sanitizeHtml } from '@/utils/sanitizeHtml'
 import { useSelectionStore } from '@/stores/selection'
+import { useDocumentViewerExport } from '@/components/document-viewer/useDocumentViewerExport'
+import { useDocumentViewerPreferences } from '@/components/document-viewer/useDocumentViewerPreferences'
 
 const toast = useToast()
 const selectionStore = useSelectionStore()
@@ -358,52 +358,13 @@ const highlightedContentCache = ref<Map<number, HighlightedContentCache>>(new Ma
 const _showAnnotations = computed(() => showSpellingErrors.value || showGrammarErrors.value)
 
 // Configuración de apariencia desde settings
-const fontSize = ref<'small' | 'medium' | 'large'>('medium')
-const lineHeight = ref<string>('1.6')
-
-// Mapeo de tamaños de fuente a valores CSS
-const fontSizeMap: Record<string, string> = {
-  small: '0.9rem',
-  medium: '1rem',
-  large: '1.15rem'
-}
-
-// Cargar configuración de apariencia
-const loadAppearanceSettings = () => {
-  const savedSettings = localStorage.getItem('narrative_assistant_settings')
-  if (savedSettings) {
-    try {
-      const parsed = JSON.parse(savedSettings)
-      fontSize.value = parsed.fontSize || 'medium'
-      lineHeight.value = parsed.lineHeight || '1.6'
-    } catch (e) {
-      console.error('Error loading appearance settings:', e)
-    }
-  }
-
-  // Cargar preferencias de errores
-  const errorPrefs = localStorage.getItem('narrative_assistant_error_prefs')
-  if (errorPrefs) {
-    try {
-      const parsed = JSON.parse(errorPrefs)
-      showSpellingErrors.value = parsed.showSpellingErrors ?? true
-      showGrammarErrors.value = parsed.showGrammarErrors ?? true
-    } catch (e) {
-      console.error('Error loading error preferences:', e)
-    }
-  }
-}
-
-// Guardar preferencias de errores cuando cambien
-const saveErrorPreferences = () => {
-  localStorage.setItem('narrative_assistant_error_prefs', JSON.stringify({
-    showSpellingErrors: showSpellingErrors.value,
-    showGrammarErrors: showGrammarErrors.value
-  }))
-}
-
-// Watch para persistir los cambios
-watch([showSpellingErrors, showGrammarErrors], saveErrorPreferences)
+const {
+  contentStyle,
+  loadAppearanceSettings,
+} = useDocumentViewerPreferences({
+  showSpellingErrors,
+  showGrammarErrors,
+})
 
 // FIX #4: Invalidar cache selectivamente cuando cambien opciones de visualización
 watch([showSpellingErrors, showGrammarErrors, showDialoguePanel, showDialogueHighlights], ([newSpelling, newGrammar, newPanel, newHighlight], [oldSpelling, oldGrammar, oldPanel, oldHighlight]) => {
@@ -420,13 +381,6 @@ watch([showSpellingErrors, showGrammarErrors, showDialoguePanel, showDialogueHig
   }
 })
 
-// Computed para el estilo del contenido
-const contentStyle = computed(() => ({
-  fontSize: fontSizeMap[fontSize.value] || '1rem',
-  lineHeight: lineHeight.value
-}))
-
-// Cargar atribuciones de diálogo para un capítulo
 const loadChapterDialogues = async (chapterNumber: number) => {
   if (chapterDialogues.value.has(chapterNumber)) return
 
@@ -1729,60 +1683,20 @@ const onScroll = () => {
   }
 }
 
-// Estado para el diálogo de exportación
-const showExportDialog = ref(false)
-const exportFormat = ref<'docx' | 'pdf' | 'json'>('docx')
-const exportLoading = ref(false)
-
-// Exportar documento
-const exportDocument = () => {
-  showExportDialog.value = true
-}
-
-// Realizar la exportación
-const doExport = async () => {
-  exportLoading.value = true
-  try {
-    if (exportFormat.value === 'json') {
-      // Exportar como JSON local
-      const exportData = {
-        project_id: props.projectId,
-        title: props.documentTitle || 'Documento',
-        exported_at: new Date().toISOString(),
-        chapters: chapters.value.map(ch => ({
-          id: ch.id,
-          title: ch.title,
-          chapter_number: ch.chapterNumber,
-          word_count: ch.wordCount,
-          content: ch.content
-        })),
-        entities: entities.value,
-        total_words: totalWords.value
-      }
-
-      downloadJsonFile(exportData, `${props.documentTitle || 'documento'}_export.json`)
-    } else {
-      const { blob, filename } = await exportDocumentBlob(props.projectId, {
-        format: exportFormat.value,
-        include_characters: true,
-        include_alerts: true,
-        include_timeline: true,
-        include_relationships: true,
-        include_style_guide: true,
-      })
-
-      const ext = exportFormat.value === 'pdf' ? 'pdf' : 'docx'
-      downloadBlob(blob, filename || `${props.documentTitle || 'documento'}_informe.${ext}`)
-    }
-
-    showExportDialog.value = false
-  } catch (err) {
-    console.error('Error exporting document:', err)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Error al exportar el documento', life: 5000 })
-  } finally {
-    exportLoading.value = false
-  }
-}
+const {
+  showExportDialog,
+  exportFormat,
+  exportLoading,
+  exportDocument,
+  doExport,
+} = useDocumentViewerExport({
+  projectId: props.projectId,
+  documentTitle: computed(() => props.documentTitle),
+  chapters,
+  entities,
+  totalWords,
+  addToast: toast.add,
+})
 
 // Captura de selección de texto para el asistente
 const handleMouseUp = () => {

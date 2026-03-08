@@ -83,188 +83,7 @@
             </div>
           </template>
           <template #content>
-            <!-- Sensibilidad del análisis - Control unificado -->
-            <div class="sensitivity-section">
-              <div class="sensitivity-header">
-                <label class="setting-label">¿Cuántas sugerencias quieres ver?</label>
-                <p class="setting-description">
-                  Ajusta cuánto debería avisarte el asistente
-                </p>
-              </div>
-
-              <!-- Presets como botones (2x2 en pantallas anchas) -->
-              <div class="sensitivity-presets-grid">
-                <button
-                  v-for="preset in sensitivityPresets"
-                  :key="preset.value"
-                  class="preset-button"
-                  :class="{ active: settings.sensitivityPreset === preset.value }"
-                  @click="selectSensitivityPreset(preset.value)"
-                >
-                  <i :class="preset.icon"></i>
-                  <div class="preset-content">
-                    <span class="preset-title">{{ preset.label }}</span>
-                    <span class="preset-desc">{{ preset.description }}</span>
-                  </div>
-                  <i v-if="preset.recommended" class="pi pi-star-fill recommended-star" title="Recomendado"></i>
-                </button>
-              </div>
-
-              <!-- Slider de ajuste fino (siempre visible pero con etiqueta contextual) -->
-              <div class="sensitivity-slider">
-                <div class="slider-header">
-                  <span class="slider-label">Ajuste fino</span>
-                  <span class="slider-value">{{ sensitivityLabel }}</span>
-                </div>
-                <Slider
-                  v-model="settings.sensitivity"
-                  :min="0"
-                  :max="100"
-                  :step="5"
-                  aria-label="Ajuste fino de sensibilidad"
-                  @change="onSensitivityChange"
-                />
-                <div class="slider-hints">
-                  <span>Menos avisos</span>
-                  <span>Más avisos</span>
-                </div>
-              </div>
-
-              <!-- Panel avanzado colapsable -->
-              <div class="advanced-panel">
-                <button
-                  class="advanced-toggle"
-                  @click="showAdvancedSensitivity = !showAdvancedSensitivity"
-                >
-                  <i :class="showAdvancedSensitivity ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"></i>
-                  <span>Opciones avanzadas</span>
-                </button>
-
-                <div v-if="showAdvancedSensitivity" class="advanced-content">
-                  <p class="advanced-note">
-                    Estos valores se calculan automáticamente según la sensibilidad elegida.
-                    Solo modifícalos si necesitas control preciso.
-                  </p>
-
-                  <div class="advanced-slider">
-                    <div class="advanced-slider-header">
-                      <label>Certeza para mostrar alertas</label>
-                      <span>{{ settings.minConfidence }}%</span>
-                    </div>
-                    <p class="slider-help">Qué tan seguro debe estar el sistema para mostrarte una alerta. Más bajo = más alertas (algunas pueden ser falsas).</p>
-                    <Slider
-                      v-model="settings.minConfidence"
-                      :min="20"
-                      :max="95"
-                      :step="5"
-                      aria-label="Certeza para mostrar alertas"
-                      @change="onAdvancedSliderChange"
-                    />
-                  </div>
-
-                  <div class="advanced-slider">
-                    <div class="advanced-slider-header">
-                      <label>Certeza para detectar personajes</label>
-                      <span>{{ settings.inferenceMinConfidence }}%</span>
-                    </div>
-                    <p class="slider-help">Qué tan seguro debe estar para identificar que dos menciones son el mismo personaje.</p>
-                    <Slider
-                      v-model="settings.inferenceMinConfidence"
-                      :min="20"
-                      :max="90"
-                      :step="5"
-                      aria-label="Certeza para detectar personajes"
-                      @change="onAdvancedSliderChange"
-                    />
-                  </div>
-
-                  <div class="advanced-slider">
-                    <div class="advanced-slider-header">
-                      <label>Acuerdo entre métodos</label>
-                      <span>{{ settings.inferenceMinConsensus }}%</span>
-                    </div>
-                    <p class="slider-help">Cuántos métodos deben coincidir para aceptar una detección. Más alto = más fiable pero puede perder algunas.</p>
-                    <Slider
-                      v-model="settings.inferenceMinConsensus"
-                      :min="30"
-                      :max="100"
-                      :step="10"
-                      aria-label="Acuerdo entre métodos"
-                      @change="onAdvancedSliderChange"
-                    />
-                  </div>
-
-                  <Button
-                    label="Restaurar valores calculados"
-                    icon="pi pi-refresh"
-                    severity="secondary"
-                    text
-                    size="small"
-                    @click="recalculateFromSensitivity"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Análisis automático</label>
-                <p class="setting-description">Iniciar análisis automáticamente al crear proyecto</p>
-              </div>
-              <div class="setting-control">
-                <ToggleSwitch
-                  v-model="settings.autoAnalysis"
-                  inputId="settings-auto-analysis"
-                  aria-label="Análisis automático"
-                  @change="onSettingChange"
-                />
-              </div>
-            </div>
-
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Mostrar resultados parciales</label>
-                <p class="setting-description">Mostrar resultados disponibles mientras el análisis continúa</p>
-              </div>
-              <div class="setting-control">
-                <ToggleSwitch
-                  v-model="settings.showPartialResults"
-                  inputId="settings-show-partial-results"
-                  aria-label="Mostrar resultados parciales"
-                  @change="onSettingChange"
-                />
-              </div>
-            </div>
-
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Notificaciones de análisis</label>
-                <p class="setting-description">Notificar cuando el análisis se complete</p>
-              </div>
-              <div class="setting-control">
-                <ToggleSwitch
-                  v-model="settings.notifyAnalysisComplete"
-                  inputId="settings-notify-analysis"
-                  aria-label="Notificaciones de análisis"
-                  @change="onSettingChange"
-                />
-              </div>
-            </div>
-
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Sonidos</label>
-                <p class="setting-description">Reproducir sonidos para eventos importantes</p>
-              </div>
-              <div class="setting-control">
-                <ToggleSwitch
-                  v-model="settings.soundEnabled"
-                  inputId="settings-sounds"
-                  aria-label="Sonidos"
-                  @change="onSettingChange"
-                />
-              </div>
-            </div>
+            <AnalysisSection />
           </template>
         </Card>
 
@@ -278,177 +97,13 @@
             </div>
           </template>
           <template #content>
-            <div class="nlp-category">
-              <div class="category-header">
-                <h4>
-                  <i class="pi pi-microchip-ai"></i> Analizador Semántico
-                  <!-- Hardware inline badge -->
-                  <Tag
-                    v-if="systemCapabilities"
-                    v-tooltip.top="hardwareTooltip"
-                    :value="hardwareBadgeLabel"
-                    :severity="systemCapabilities.hardware.has_gpu ? 'success' : 'secondary'"
-                    class="hardware-inline-badge"
-                  />
-                  <!-- Status inline badge -->
-                  <Tag
-                    v-if="systemCapabilities && ollamaState === 'ready'"
-                    :value="ollamaStatusMessage"
-                    severity="success"
-                    class="ollama-inline-badge"
-                  />
-                </h4>
-                <span class="category-desc">Motor de análisis avanzado del significado y contexto</span>
-              </div>
-
-              <!-- Banner durante auto-configuración -->
-              <div v-if="systemCapabilities && ollamaState === 'configuring'" class="ollama-action-card ollama-state-configuring">
-                <div class="ollama-action-content">
-                  <i class="pi pi-spin pi-spinner"></i>
-                  <div class="ollama-action-text">
-                    <strong>Configurando análisis inteligente</strong>
-                    <span>{{ ollamaStatusMessage }}</span>
-                    <span class="ollama-hint">Esto solo ocurre la primera vez</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Banner de acción cuando el analizador NO está listo (y no está configurando) -->
-              <div v-else-if="systemCapabilities && ollamaState !== 'ready'" class="ollama-action-card" :class="'ollama-state-' + ollamaState">
-                <div class="ollama-action-content">
-                  <i
-                    :class="[
-                      ollamaState === 'no_models' ? 'pi pi-info-circle' : 'pi pi-exclamation-triangle'
-                    ]"
-                  ></i>
-                  <div class="ollama-action-text">
-                    <strong>{{
-                      ollamaState === 'not_installed' ? 'Análisis inteligente no disponible' :
-                      ollamaState === 'not_running' ? 'Análisis inteligente no iniciado' :
-                      'Sin motores de análisis'
-                    }}</strong>
-                    <span>{{ ollamaStatusMessage }}</span>
-                  </div>
-                  <Button
-                    v-if="!modelDownloading"
-                    :label="ollamaActionConfig.label"
-                    :icon="ollamaActionConfig.icon"
-                    :severity="ollamaActionConfig.severity"
-                    size="small"
-                    :loading="ollamaStarting"
-                    @click="ollamaActionConfig.action"
-                  />
-                </div>
-                <!-- Barra de progreso de descarga de modelo -->
-                <DsDownloadProgress
-                  v-if="modelDownloading"
-                  label="Descargando motor de análisis..."
-                  :percentage="ollamaDownloadProgress?.percentage ?? null"
-                  class="ollama-progress-wrapper"
-                />
-              </div>
-
-              <!-- Nivel de calidad (Rápida / Completa / Experta) -->
-              <div v-if="ollamaState === 'ready'" class="quality-level-section">
-                <div class="setting-info" style="margin-bottom: 0.75rem;">
-                  <label class="setting-label">Nivel de análisis</label>
-                  <p class="setting-description">
-                    Más motores = mayor precisión pero más tiempo
-                  </p>
-                </div>
-                <div class="quality-level-cards">
-                  <div
-                    v-for="level in qualityLevels"
-                    :key="level.value"
-                    v-tooltip.top="level.reason || ''"
-                    class="quality-level-card"
-                    :class="{
-                      selected: settings.qualityLevel === level.value,
-                      disabled: !level.available,
-                      recommended: level.recommended,
-                    }"
-                    @click="level.available ? selectQualityLevel(level.value) : undefined"
-                  >
-                    <div class="quality-level-header">
-                      <i :class="level.icon"></i>
-                      <strong>{{ level.label }}</strong>
-                      <Tag v-if="level.recommended" value="Recomendado" severity="success" class="recommended-badge" />
-                    </div>
-                    <p class="quality-level-desc">{{ level.description }}</p>
-                    <span v-if="level.estimate" class="quality-level-time">{{ level.estimate }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Slider de sensibilidad -->
-              <div v-if="ollamaState === 'ready'" class="setting-item">
-                <div class="setting-info">
-                  <label class="setting-label">Sensibilidad de detección</label>
-                  <p class="setting-description">
-                    {{ llmSensitivityLabel }}
-                  </p>
-                </div>
-                <div class="setting-control" style="min-width: 200px;">
-                  <Slider
-                    v-model="settings.llmSensitivity"
-                    :min="1"
-                    :max="10"
-                    :step="1"
-                    aria-label="Sensibilidad de detección del analizador semántico"
-                    @change="onLlmSensitivityChange"
-                  />
-                  <span class="slider-value">{{ settings.llmSensitivity ?? 5 }}</span>
-                </div>
-              </div>
-
-              <!-- Motores activos (colapsable) -->
-              <div v-if="ollamaState === 'ready'" class="setting-item motors-section">
-                <div class="setting-info" style="cursor: pointer;" @click="showMotors = !showMotors">
-                  <label class="setting-label">
-                    <i :class="showMotors ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" style="font-size: 0.8em; margin-right: 0.3em;"></i>
-                    Motores activos
-                  </label>
-                  <p class="setting-description">
-                    {{ activeMotorsCount }} motor{{ activeMotorsCount !== 1 ? 'es' : '' }} configurado{{ activeMotorsCount !== 1 ? 's' : '' }}
-                  </p>
-                </div>
-              </div>
-              <div v-if="showMotors && ollamaState === 'ready'" class="motors-list">
-                <div class="motor-item">
-                  <i class="pi pi-globe"></i>
-                  <div>
-                    <strong>Motor de idioma</strong>
-                    <span>Comprensión profunda del español</span>
-                  </div>
-                  <Tag value="Activo" severity="success" />
-                </div>
-                <div v-if="settings.qualityLevel !== 'rapida'" class="motor-item">
-                  <i class="pi pi-users"></i>
-                  <div>
-                    <strong>Motor de personajes</strong>
-                    <span>Análisis narrativo, voz y estilo</span>
-                  </div>
-                  <Tag value="Activo" severity="success" />
-                </div>
-                <div v-if="settings.qualityLevel === 'experta'" class="motor-item">
-                  <i class="pi pi-cog"></i>
-                  <div>
-                    <strong>Motor de razonamiento</strong>
-                    <span>Lógica temporal y causal</span>
-                  </div>
-                  <Tag value="Activo" severity="success" />
-                </div>
-              </div>
-
-              <!-- Download progress (when changing quality level) -->
-              <DsDownloadProgress
-                v-if="qualityLevelDownloading"
-                label="Descargando motores de análisis..."
-                :percentage="ollamaDownloadProgress?.percentage ?? null"
-                class="ollama-progress-wrapper"
-                style="margin-top: 0.5rem;"
-              />
-            </div>
+            <SemanticAnalyzerSection
+              :quality-levels="qualityLevels"
+              :quality-level-downloading="qualityLevelDownloading"
+              :loading-capabilities="loadingCapabilities"
+              @select-quality-level="selectQualityLevel"
+              @llm-sensitivity-change="onLlmSensitivityChange"
+            />
           </template>
         </Card>
 
@@ -461,258 +116,14 @@
             </div>
           </template>
           <template #content>
-            <!-- Correferencia -->
-            <div class="nlp-category">
-              <div class="category-header">
-                <h4><i class="pi pi-link"></i> Seguimiento de referencias</h4>
-                <span class="category-desc">Detecta cuándo "él", "la detective" o "María" se refieren al mismo personaje</span>
-              </div>
-              <div class="methods-grid">
-                <div
-                  v-for="(method, key) in getNLPMethodsForCategory('coreference')"
-                  :key="key"
-                  class="method-card"
-                  :class="{ disabled: !method.available, enabled: isMethodEnabled('coreference', String(key)) }"
-                >
-                  <div class="method-header">
-                    <ToggleSwitch
-                      :inputId="`method-coreference-${String(key)}`"
-                      :model-value="isMethodEnabled('coreference', String(key))"
-                      :aria-label="method.name"
-                      :disabled="!method.available"
-                      @update:model-value="toggleMethod('coreference', String(key), $event)"
-                    />
-                    <label class="method-name" :for="`method-coreference-${String(key)}`">{{ method.name }}</label>
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con aceleración" severity="secondary" class="method-tag" />
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
-                    <Tag
-                      v-if="method.requires_gpu"
-                      v-tooltip.top="gpuRequirementTooltip"
-                      :value="systemCapabilities?.hardware.gpu_blocked ? 'Hardware no compatible' : 'Requiere aceleración'"
-                      severity="warning"
-                      class="method-tag"
-                    />
-                    <Tag v-if="!method.available && method.requires_ollama" value="Requiere iniciar el analizador" severity="warning" class="method-tag" />
-                    <Tag v-else-if="!method.available && method.hardware_supported === false" value="No compatible con este equipo" severity="danger" class="method-tag" />
-                    <Tag v-else-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
-                  </div>
-                  <p class="method-description">{{ method.description }}</p>
-                  <div v-if="method.weight" class="method-weight">
-                    Peso en votación: {{ (method.weight * 100).toFixed(0) }}%
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 4. NER -->
-            <div class="nlp-category">
-              <div class="category-header">
-                <h4><i class="pi pi-user"></i> Detección de personajes y lugares</h4>
-                <span class="category-desc">Identifica automáticamente nombres de personas, lugares y organizaciones</span>
-              </div>
-              <div class="methods-grid">
-                <div
-                  v-for="(method, key) in getNLPMethodsForCategory('ner')"
-                  :key="key"
-                  class="method-card"
-                  :class="{ disabled: !method.available, enabled: isMethodEnabled('ner', String(key)) }"
-                >
-                  <div class="method-header">
-                    <ToggleSwitch
-                      :inputId="`method-ner-${String(key)}`"
-                      :model-value="isMethodEnabled('ner', String(key))"
-                      :aria-label="method.name"
-                      :disabled="!method.available"
-                      @update:model-value="toggleMethod('ner', String(key), $event)"
-                    />
-                    <label class="method-name" :for="`method-ner-${String(key)}`">{{ method.name }}</label>
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con aceleración" severity="secondary" class="method-tag" />
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
-                    <Tag
-                      v-if="method.requires_gpu"
-                      v-tooltip.top="gpuRequirementTooltip"
-                      :value="systemCapabilities?.hardware.gpu_blocked ? 'Hardware no compatible' : 'Requiere aceleración'"
-                      severity="warning"
-                      class="method-tag"
-                    />
-                    <Tag v-if="!method.available && method.requires_ollama" value="Requiere iniciar el analizador" severity="warning" class="method-tag" />
-                    <Tag v-else-if="!method.available && method.hardware_supported === false" value="No compatible con este equipo" severity="danger" class="method-tag" />
-                    <Tag v-else-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
-                  </div>
-                  <p class="method-description">{{ method.description }}</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- 5. Gramática -->
-            <div class="nlp-category">
-              <div class="category-header">
-                <h4><i class="pi pi-check-circle"></i> Corrección gramatical</h4>
-                <span class="category-desc">Detecta errores de concordancia, puntuación y otros problemas gramaticales</span>
-              </div>
-
-              <!-- LanguageTool status bar -->
-              <div v-if="ltState === 'running'" class="ollama-ready-bar" style="margin-bottom: 0.75rem;">
-                <div class="ollama-ready-info">
-                  <i class="pi pi-check-circle"></i>
-                  <span>Corrector avanzado activo (+2000 reglas)</span>
-                </div>
-              </div>
-              <div v-else class="ollama-action-card" :class="'ollama-state-' + (ltState === 'not_installed' ? 'not_installed' : ltState === 'installing' ? 'no_models' : 'not_running')" style="margin-bottom: 0.75rem;">
-                <div class="ollama-action-content">
-                  <i v-if="ltState !== 'installing'" class="pi pi-exclamation-triangle"></i>
-                  <i v-else class="pi pi-download"></i>
-                  <div class="ollama-action-text" style="flex: 1;">
-                    <strong>{{
-                      ltState === 'not_installed' ? 'Corrector avanzado no disponible' :
-                      ltState === 'installing' ? 'Instalando corrector avanzado' :
-                      'Corrector avanzado no iniciado'
-                    }}</strong>
-                    <span>{{ ltStatusMessage }}</span>
-                    <!-- Barra de progreso para instalación -->
-                    <DsDownloadProgress
-                      v-if="ltState === 'installing' && ltInstallProgress"
-                      :label="ltInstallProgress.phase_label"
-                      :percentage="ltInstallProgress.percentage > 0 ? ltInstallProgress.percentage : null"
-                      :detail="ltInstallProgress.detail"
-                      class="lt-progress-container"
-                    />
-                  </div>
-                  <Button
-                    v-if="ltState !== 'installing'"
-                    :label="ltActionConfig.label"
-                    :icon="ltActionConfig.icon"
-                    :severity="ltActionConfig.severity"
-                    size="small"
-                    :loading="ltInstalling || ltStarting"
-                    @click="ltActionConfig.action"
-                  />
-                </div>
-              </div>
-
-              <div class="methods-grid">
-                <div
-                  v-for="(method, key) in getNLPMethodsForCategory('grammar')"
-                  :key="key"
-                  class="method-card"
-                  :class="{ disabled: !method.available, enabled: isMethodEnabled('grammar', String(key)) }"
-                >
-                  <div class="method-header">
-                    <ToggleSwitch
-                      :inputId="`method-grammar-${String(key)}`"
-                      :model-value="isMethodEnabled('grammar', String(key))"
-                      :aria-label="method.name"
-                      :disabled="!method.available"
-                      @update:model-value="toggleMethod('grammar', String(key), $event)"
-                    />
-                    <label class="method-name" :for="`method-grammar-${String(key)}`">{{ method.name }}</label>
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con aceleración" severity="secondary" class="method-tag" />
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
-                    <Tag
-                      v-if="method.requires_gpu"
-                      v-tooltip.top="gpuRequirementTooltip"
-                      :value="systemCapabilities?.hardware.gpu_blocked ? 'Hardware no compatible' : 'Requiere aceleración'"
-                      severity="warning"
-                      class="method-tag"
-                    />
-                    <Tag v-if="!method.available && method.requires_ollama" value="Requiere iniciar el analizador" severity="warning" class="method-tag" />
-                    <Tag v-else-if="!method.available && method.hardware_supported === false" value="No compatible con este equipo" severity="danger" class="method-tag" />
-                    <Tag v-else-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
-                  </div>
-                  <p class="method-description">{{ method.description }}</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- 6. Ortografía (Votación Multi-Método) -->
-            <div class="nlp-category">
-              <div class="category-header">
-                <h4><i class="pi pi-spell-check"></i> Corrección ortográfica</h4>
-                <span class="category-desc">Sistema de votación con múltiples correctores para máxima precisión</span>
-              </div>
-              <div class="methods-grid">
-                <div
-                  v-for="(method, key) in getNLPMethodsForCategory('spelling')"
-                  :key="key"
-                  class="method-card"
-                  :class="{ disabled: !method.available, enabled: isMethodEnabled('spelling', String(key)) }"
-                >
-                  <div class="method-header">
-                    <ToggleSwitch
-                      :inputId="`method-spelling-${String(key)}`"
-                      :model-value="isMethodEnabled('spelling', String(key))"
-                      :aria-label="method.name"
-                      :disabled="!method.available"
-                      @update:model-value="toggleMethod('spelling', String(key), $event)"
-                    />
-                    <label class="method-name" :for="`method-spelling-${String(key)}`">{{ method.name }}</label>
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con aceleración" severity="secondary" class="method-tag" />
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
-                    <Tag
-                      v-if="method.requires_gpu"
-                      v-tooltip.top="gpuRequirementTooltip"
-                      :value="systemCapabilities?.hardware.gpu_blocked ? 'Hardware no compatible' : 'Requiere aceleración'"
-                      severity="warning"
-                      class="method-tag"
-                    />
-                    <Tag v-if="!method.available && method.requires_ollama" value="Requiere iniciar el analizador" severity="warning" class="method-tag" />
-                    <Tag v-else-if="!method.available && method.hardware_supported === false" value="No compatible con este equipo" severity="danger" class="method-tag" />
-                    <Tag v-else-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
-                  </div>
-                  <p class="method-description">{{ method.description }}</p>
-                  <div v-if="method.weight" class="method-weight">
-                    Peso en votación: {{ (method.weight * 100).toFixed(0) }}%
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 7. Conocimiento de Personajes -->
-            <div class="nlp-category">
-              <div class="category-header">
-                <h4><i class="pi pi-book"></i> Conocimiento de personajes</h4>
-                <span class="category-desc">Extrae qué sabe cada personaje sobre otros y sobre eventos</span>
-              </div>
-              <div class="knowledge-mode-selector">
-                <div
-                  v-for="(method, key) in getNLPMethodsForCategory('character_knowledge')"
-                  :key="key"
-                  class="knowledge-mode-card"
-                  :class="{
-                    disabled: !method.available,
-                    selected: settings.characterKnowledgeMode === key
-                  }"
-                  @click="method.available && setCharacterKnowledgeMode(String(key))"
-                >
-                  <span class="mode-name">{{ method.name }}</span>
-                  <p class="mode-description">{{ method.description }}</p>
-                  <Tag v-if="method.recommended_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con aceleración" severity="secondary" class="method-tag" />
-                  <Tag v-if="method.recommended_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
-                  <Tag v-if="!method.available && method.requires_ollama" value="Requiere iniciar el analizador" severity="warning" class="method-tag" />
-                  <Tag v-else-if="!method.available && method.hardware_supported === false" value="No compatible con este equipo" severity="danger" class="method-tag" />
-                  <Tag v-else-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
-                </div>
-              </div>
-            </div>
-
-            <!-- Botón para aplicar configuración recomendada -->
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Configuración recomendada</label>
-                <p class="setting-description">Aplicar configuración óptima según tu hardware detectado</p>
-              </div>
-              <div class="setting-control">
-                <Button
-                  label="Aplicar recomendada"
-                  icon="pi pi-sparkles"
-                  severity="secondary"
-                  outlined
-                  size="small"
-                  :disabled="!systemCapabilities"
-                  @click="applyRecommendedConfig"
-                />
-              </div>
-            </div>
+            <DetectionMethodsSection
+              :lt-action-config="ltActionConfig"
+              :lt-status-message="ltStatusMessage"
+              :lt-installing="ltInstalling"
+              :lt-starting="ltStarting"
+              :lt-install-progress="ltInstallProgress"
+              :lt-state="ltState"
+            />
           </template>
         </Card>
 
@@ -725,179 +136,7 @@
             </div>
           </template>
           <template #content>
-            <!-- Nota informativa -->
-            <Message severity="info" :closable="false" class="mb-4">
-              <template #default>
-                <div class="correction-info-message">
-                  <p>
-                    La configuración de correcciones se aplica por proyecto. Aquí puedes seleccionar un preset base
-                    que se aplicará a nuevos proyectos. Para ajustar la configuración de un proyecto específico,
-                    accede a sus ajustes desde el panel del proyecto.
-                  </p>
-                </div>
-              </template>
-            </Message>
-
-            <!-- Preset para nuevos proyectos -->
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Preset por defecto</label>
-                <p class="setting-description">
-                  Configuración base que se aplicará a nuevos proyectos. Puedes personalizarla después.
-                </p>
-              </div>
-              <div class="setting-control wide">
-                <Select
-                  v-model="defaultCorrectionPreset"
-                  :options="correctionPresetOptions"
-                  option-label="name"
-                  option-value="id"
-                  placeholder="Selecciona un preset"
-                  class="w-full"
-                  inputId="default-correction-preset"
-                  aria-label="Preset por defecto"
-                  @change="onDefaultPresetChange"
-                >
-                  <template #option="slotProps">
-                    <div class="preset-dropdown-option">
-                      <span class="preset-name">{{ slotProps.option.name }}</span>
-                      <span class="preset-description">{{ slotProps.option.description }}</span>
-                    </div>
-                  </template>
-                </Select>
-              </div>
-            </div>
-
-            <!-- Resumen de configuración actual -->
-            <div v-if="defaultCorrectionConfig" class="setting-item column">
-              <div class="setting-info">
-                <label class="setting-label">Resumen de configuración</label>
-                <p class="setting-description">
-                  Vista previa de la configuración del preset seleccionado
-                </p>
-              </div>
-              <div class="correction-config-summary">
-                <div class="config-grid">
-                  <!-- Perfil de documento -->
-                  <div class="config-section">
-                    <h4><i class="pi pi-file"></i> Perfil de documento</h4>
-                    <div class="config-items">
-                      <div class="config-item">
-                        <span class="config-label">Tipo:</span>
-                        <Tag :value="getFieldLabel(defaultCorrectionConfig.profile?.document_field)" severity="info" />
-                      </div>
-                      <div class="config-item">
-                        <span class="config-label">Registro:</span>
-                        <Tag :value="getRegisterLabel(defaultCorrectionConfig.profile?.register)" severity="secondary" />
-                      </div>
-                      <div class="config-item">
-                        <span class="config-label">Audiencia:</span>
-                        <span>{{ getAudienceLabel(defaultCorrectionConfig.profile?.audience) }}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Tipografía -->
-                  <div class="config-section">
-                    <h4><i class="pi pi-align-left"></i> Tipografía</h4>
-                    <div class="config-items">
-                      <div class="config-item">
-                        <span class="config-label">Habilitado:</span>
-                        <i :class="defaultCorrectionConfig.typography?.enabled ? 'pi pi-check text-green-500' : 'pi pi-times text-red-500'"></i>
-                      </div>
-                      <div class="config-item">
-                        <span class="config-label">Guiones:</span>
-                        <span>{{ getDashLabel(defaultCorrectionConfig.typography?.dialogue_dash) }}</span>
-                      </div>
-                      <div class="config-item">
-                        <span class="config-label">Comillas:</span>
-                        <span>{{ getQuoteLabel(defaultCorrectionConfig.typography?.quote_style) }}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Repeticiones -->
-                  <div class="config-section">
-                    <h4><i class="pi pi-copy"></i> Repeticiones</h4>
-                    <div class="config-items">
-                      <div class="config-item">
-                        <span class="config-label">Habilitado:</span>
-                        <i :class="defaultCorrectionConfig.repetition?.enabled ? 'pi pi-check text-green-500' : 'pi pi-times text-red-500'"></i>
-                      </div>
-                      <div class="config-item">
-                        <span class="config-label">Distancia mín:</span>
-                        <span>{{ defaultCorrectionConfig.repetition?.min_distance }} palabras</span>
-                      </div>
-                      <div class="config-item">
-                        <span class="config-label">Sensibilidad:</span>
-                        <Tag :value="getSensitivityLabel(defaultCorrectionConfig.repetition?.sensitivity)" :severity="getSensitivitySeverity(defaultCorrectionConfig.repetition?.sensitivity)" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Regional -->
-                  <div class="config-section">
-                    <h4><i class="pi pi-globe"></i> Vocabulario regional</h4>
-                    <div class="config-items">
-                      <div class="config-item">
-                        <span class="config-label">Habilitado:</span>
-                        <i :class="defaultCorrectionConfig.regional?.enabled ? 'pi pi-check text-green-500' : 'pi pi-times text-red-500'"></i>
-                      </div>
-                      <div class="config-item">
-                        <span class="config-label">Región:</span>
-                        <span>{{ getRegionLabel(defaultCorrectionConfig.regional?.target_region) }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Variante regional por defecto -->
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Variante regional</label>
-                <p class="setting-description">
-                  Variante del español para nuevos proyectos. Cada proyecto puede personalizarse desde su configuración.
-                </p>
-              </div>
-              <div class="setting-control">
-                <Select
-                  v-model="defaultRegion"
-                  :options="regionOptions"
-                  option-label="label"
-                  option-value="value"
-                  placeholder="Selecciona región"
-                  inputId="default-region"
-                  aria-label="Variante regional"
-                  @change="onDefaultRegionChange"
-                />
-              </div>
-            </div>
-
-            <!-- Revisión con LLM -->
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Revisión inteligente</label>
-                <p class="setting-description">
-                  Usar la IA para filtrar falsos positivos en las alertas de corrección.
-                  Requiere el analizador semántico activo.
-                </p>
-              </div>
-              <div class="setting-control">
-                <ToggleSwitch
-                  v-model="useLLMReview"
-                  inputId="settings-llm-review"
-                  aria-label="Revisión inteligente"
-                  @change="onLLMReviewChange"
-                />
-              </div>
-            </div>
-
-            <Divider />
-
-            <!-- Personalización de defaults por tipo -->
-            <CorrectionDefaultsManager ref="defaultsManager" />
+            <CorrectionsSection ref="correctionsSection" />
           </template>
         </Card>
 
@@ -910,131 +149,12 @@
             </div>
           </template>
           <template #content>
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Ubicación de datos</label>
-                <p class="setting-description">
-                  Los proyectos se guardan en: <code>{{ dataLocation }}</code>
-                </p>
-              </div>
-              <div class="setting-control">
-                <Button
-                  label="Cambiar ubicación"
-                  icon="pi pi-folder-open"
-                  outlined
-                  @click="changeDataLocation"
-                />
-              </div>
-            </div>
-
-            <Message severity="info" :closable="false" class="info-message">
-              <span class="message-content">
-                <strong>Modo 100% offline:</strong> Tus manuscritos nunca salen de tu máquina.
-                Esta aplicación no envía datos a internet excepto para verificación de licencia.
-              </span>
-            </Message>
-
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Modelos de analisis del texto</label>
-                <p class="setting-description">Verificar y preparar los recursos de analisis necesarios</p>
-              </div>
-              <div class="setting-control">
-                <Button
-                  :label="nlpDownloading ? 'Descargando...' : 'Verificar modelos'"
-                  icon="pi pi-download"
-                  severity="secondary"
-                  outlined
-                  :loading="nlpDownloading"
-                  @click="redownloadNLPModels"
-                />
-              </div>
-            </div>
-
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Limpiar caché</label>
-                <p class="setting-description">Eliminar archivos temporales y caché de modelos</p>
-              </div>
-              <div class="setting-control">
-                <Button
-                  label="Limpiar caché"
-                  icon="pi pi-trash"
-                  severity="secondary"
-                  outlined
-                  @click="clearCache"
-                />
-              </div>
-            </div>
-
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Restablecer configuración</label>
-                <p class="setting-description">Volver a la configuración por defecto</p>
-              </div>
-              <div class="setting-control">
-                <Button
-                  label="Restablecer"
-                  icon="pi pi-refresh"
-                  severity="danger"
-                  outlined
-                  @click="confirmReset"
-                />
-              </div>
-            </div>
-
-            <Divider />
-
-            <div class="setting-item column">
-              <div class="setting-info">
-                <label class="setting-label">Entidades rechazadas (global)</label>
-                <p class="setting-description">
-                  Textos marcados como "no es una entidad" en todos tus proyectos.
-                  Al restaurar, volverán a detectarse en futuros análisis.
-                </p>
-              </div>
-
-              <div v-if="loadingRejections" class="loading-patterns">
-                <i class="pi pi-spin pi-spinner"></i>
-                <span>Cargando...</span>
-              </div>
-
-              <div v-else-if="userRejections.length === 0" class="empty-rejections">
-                <i class="pi pi-check-circle"></i>
-                <span>No hay entidades rechazadas globalmente</span>
-              </div>
-
-              <div v-else class="user-rejections-list">
-                <div
-                  v-for="rejection in userRejections"
-                  :key="rejection.id"
-                  class="rejection-item"
-                >
-                  <div class="rejection-info">
-                    <span class="rejection-name">{{ rejection.entityName }}</span>
-                    <Tag
-                      v-if="rejection.entityType"
-                      :value="rejection.entityType"
-                      severity="secondary"
-                      class="rejection-type"
-                    />
-                    <span v-if="rejection.reason" class="rejection-reason">
-                      — {{ rejection.reason }}
-                    </span>
-                  </div>
-                  <Button
-                    v-tooltip.left="'Restaurar: volver a detectar esta entidad'"
-                    :aria-label="`Restaurar entidad rechazada ${rejection.entityName}`"
-                    icon="pi pi-undo"
-                    severity="secondary"
-                    text
-                    rounded
-                    size="small"
-                    @click="removeRejection(rejection)"
-                  />
-                </div>
-              </div>
-            </div>
+            <DataMaintenanceSection
+              ref="dataMaintenanceSection"
+              :data-location="dataLocation"
+              @change-data-location="changeDataLocation"
+              @confirm-reset="confirmReset"
+            />
           </template>
         </Card>
 
@@ -1047,44 +167,7 @@
             </div>
           </template>
           <template #content>
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Estado de licencia</label>
-                <p class="setting-description">
-                  {{ licenseStore.isLicensed
-                    ? `Plan ${licenseStore.tierDisplayName} activo`
-                    : 'Sin licencia activa' }}
-                </p>
-              </div>
-              <div class="setting-control">
-                <Button
-                  :label="licenseStore.isLicensed ? 'Gestionar licencia' : 'Activar licencia'"
-                  :icon="licenseStore.isLicensed ? 'pi pi-cog' : 'pi pi-key'"
-                  :severity="licenseStore.isLicensed ? 'secondary' : undefined"
-                  outlined
-                  @click="showLicenseDialog = true"
-                />
-              </div>
-            </div>
-
-            <div v-if="licenseStore.isLicensed && licenseStore.quotaStatus" class="setting-item">
-              <div class="setting-info">
-                <label class="setting-label">Uso del periodo</label>
-                <p class="setting-description">
-                  {{ licenseStore.quotaStatus.unlimited
-                    ? 'Páginas ilimitadas'
-                    : `${licenseStore.quotaStatus.pages_used} / ${licenseStore.quotaStatus.pages_max} páginas` }}
-                </p>
-              </div>
-              <div class="setting-control">
-                <Tag
-                  :value="licenseStore.quotaWarningLevel === 'none' ? 'OK' : licenseStore.quotaWarningLevel"
-                  :severity="licenseStore.quotaWarningLevel === 'none' ? 'success'
-                    : licenseStore.quotaWarningLevel === 'warning' ? 'warn'
-                      : 'danger'"
-                />
-              </div>
-            </div>
+            <LicenseSection @show-license-dialog="showLicenseDialog = true" />
           </template>
         </Card>
       </div>
@@ -1170,42 +253,40 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, provide, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/apiClient'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
-import Select from 'primevue/select'
-import Slider from 'primevue/slider'
-import ToggleSwitch from 'primevue/toggleswitch'
 import InputText from 'primevue/inputtext'
+import ToggleSwitch from 'primevue/toggleswitch'
 import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
 import Tag from 'primevue/tag'
-import DsDownloadProgress from '@/components/ds/DsDownloadProgress.vue'
-import Divider from 'primevue/divider'
 import { useToast } from 'primevue/usetoast'
-import CorrectionDefaultsManager from '@/components/settings/CorrectionDefaultsManager.vue'
-import AppearanceSection from '@/components/settings/AppearanceSection.vue'
 import { useSystemStore, type LTState } from '@/stores/system'
 import { useLicenseStore } from '@/stores/license'
 import { useProjectsStore } from '@/stores/projects'
 import LicenseDialog from '@/components/LicenseDialog.vue'
-import type { CorrectionConfig } from '@/types'
+
+// Section components
+import AppearanceSection from '@/components/settings/AppearanceSection.vue'
+import AnalysisSection from '@/components/settings/AnalysisSection.vue'
+import SemanticAnalyzerSection from '@/components/settings/SemanticAnalyzerSection.vue'
+import DetectionMethodsSection from '@/components/settings/DetectionMethodsSection.vue'
+import CorrectionsSection from '@/components/settings/CorrectionsSection.vue'
+import DataMaintenanceSection from '@/components/settings/DataMaintenanceSection.vue'
+import LicenseSection from '@/components/settings/LicenseSection.vue'
 
 // Composables
 import { useSettingsPersistence } from '@/composables/useSettingsPersistence'
 import { useSensitivityPresets } from '@/composables/useSensitivityPresets'
 import { useOllamaManagement } from '@/composables/useOllamaManagement'
 import { useNLPMethods } from '@/composables/useNLPMethods'
-// Label utilities
-import {
-  getFieldLabel, getRegisterLabel, getAudienceLabel,
-  getDashLabel, getQuoteLabel,
-  getSensitivityLabel, getSensitivitySeverity,
-  getRegionLabel,
-} from '@/utils/settingsLabels'
-import { safeSetItem, safeGetItem } from '@/utils/safeStorage'
+import { safeGetItem } from '@/utils/safeStorage'
+
+// Injection keys
+import { settingsKey, sensitivityKey, ollamaKey, nlpMethodsKey } from '@/components/settings/settingsInjection'
 
 const router = useRouter()
 const toast = useToast()
@@ -1226,27 +307,21 @@ const {
   loadAnalysisSettingsFromBackend, syncAnalysisSettingsToBackend, cleanup: cleanupPersistence,
 } = useSettingsPersistence()
 
-const {
-  sensitivityPresets, showAdvancedSensitivity, sensitivityLabel,
-  selectSensitivityPreset, onSensitivityChange, onAdvancedSliderChange, recalculateFromSensitivity,
-} = useSensitivityPresets(settings, saveSettings, onSliderChange)
+const sensitivityContext = useSensitivityPresets(settings, saveSettings, onSliderChange)
 
-const {
-  ollamaState, ollamaActionConfig, ollamaStatusMessage,
-  ollamaStarting, modelDownloading, ollamaDownloadProgress,
-  installModel,
-  cleanup: cleanupOllama,
-} = useOllamaManagement()
+const ollamaContext = useOllamaManagement()
 
-const {
-  availableLLMOptions: _availableLLMOptions, gpuRequirementTooltip,
-  getNLPMethodsForCategory, isMethodEnabled, toggleMethod,
-  setCharacterKnowledgeMode, applyRecommendedConfig,
-} = useNLPMethods(settings, saveSettings, applyDefaultsFromCapabilities)
+const nlpMethodsContext = useNLPMethods(settings, saveSettings, applyDefaultsFromCapabilities)
+
+// ── Provide composable state to child sections ──────────────
+
+provide(settingsKey, { settings, onSettingChange, saveSettings })
+provide(sensitivityKey, sensitivityContext)
+provide(ollamaKey, ollamaContext)
+provide(nlpMethodsKey, nlpMethodsContext)
 
 // ── Quality Level system ────────────────────────────────────
 
-const showMotors = ref(false)
 const qualityLevelDownloading = ref(false)
 
 const qualityLevels = ref([
@@ -1282,20 +357,6 @@ const qualityLevels = ref([
   },
 ])
 
-const activeMotorsCount = computed(() => {
-  const level = settings.value.qualityLevel || 'rapida'
-  if (level === 'experta') return 3
-  if (level === 'completa') return 2
-  return 1
-})
-
-const llmSensitivityLabel = computed(() => {
-  const val = settings.value.llmSensitivity ?? 5
-  if (val <= 3) return 'Menos alertas, más precisas (pocos falsos positivos)'
-  if (val >= 8) return 'Más alertas, posibles falsos positivos'
-  return 'Equilibrio entre precisión y cobertura'
-})
-
 async function loadQualityLevels() {
   try {
     const hwData = await api.get<{ levels: Array<{ value: string; available: boolean; recommended: boolean; reason: string }> }>('/api/services/llm/hardware')
@@ -1310,10 +371,9 @@ async function loadQualityLevels() {
       }
     }
 
-    // Cargar estimaciones
     const estData = await api.get<{ estimates: Record<string, { description: string }> }>('/api/services/llm/estimates?word_count=50000')
     if (estData?.estimates) {
-      for (const [level, est] of Object.entries(estData.estimates)) {
+      for (const [level, est] of Object.entries(estData.estimates) as [string, { description: string }][]) {
         const local = qualityLevels.value.find(l => l.value === level)
         if (local && est?.description) {
           local.estimate = est.description
@@ -1321,7 +381,6 @@ async function loadQualityLevels() {
       }
     }
 
-    // Cargar config actual
     const cfgData = await api.get<{ qualityLevel: string; sensitivity: number }>('/api/services/llm/config')
     if (cfgData) {
       settings.value.qualityLevel = cfgData.qualityLevel || 'rapida'
@@ -1339,10 +398,9 @@ async function selectQualityLevel(level: string) {
     })
 
     if (data?.modelsToDownload?.length) {
-      // Auto-download missing models
       qualityLevelDownloading.value = true
       for (const modelName of data.modelsToDownload) {
-        await installModel(modelName)
+        await ollamaContext.installModel(modelName)
       }
       qualityLevelDownloading.value = false
     }
@@ -1366,144 +424,11 @@ function onLlmSensitivityChange() {
 const systemCapabilities = computed(() => systemStore.systemCapabilities)
 const loadingCapabilities = computed(() => systemStore.capabilitiesLoading)
 
-// ── Hardware inline badge ───────────────────────────────────
+// ── LanguageTool state ─────────────────────────────────────
 
-const hardwareBadgeLabel = computed(() => {
-  if (!systemCapabilities.value) return ''
-  const hw = systemCapabilities.value.hardware
-  if (hw.has_gpu) return hw.gpu?.name || 'GPU'
-  return 'CPU'
-})
-
-const hardwareTooltip = computed(() => {
-  if (!systemCapabilities.value) return ''
-  const hw = systemCapabilities.value.hardware
-  if (hw.has_gpu) {
-    const mem = hw.gpu?.memory_gb ? ` (${hw.gpu.memory_gb.toFixed(1)} GB)` : ''
-    return `Aceleración por hardware: ${hw.gpu?.name}${mem}`
-  }
-  if (hw.gpu_blocked) {
-    return `${hw.gpu_blocked.name} no compatible (Compute Capability ${hw.gpu_blocked.compute_capability}, se requiere ${hw.gpu_blocked.min_required}+). Usando CPU.`
-  }
-  return `Modo CPU: ${hw.cpu.name}`
-})
-
-// ── NLP model download ──────────────────────────────────────
-
-const nlpDownloading = ref(false)
-
-async function redownloadNLPModels() {
-  nlpDownloading.value = true
-  try {
-    const ok = await systemStore.downloadModels(['spacy', 'embeddings', 'transformer_ner'])
-    if (ok) {
-      toast.add({ severity: 'success', summary: 'Recursos verificados', detail: 'Los recursos de analisis estan disponibles.', life: 3000 })
-    } else {
-      toast.add({ severity: 'error', summary: 'No se pudo completar', detail: systemStore.modelsError || 'No se pudieron preparar los recursos. El sistema puede seguir ocupado; espera unos segundos y reintenta.', life: 6000 })
-    }
-  } finally {
-    nlpDownloading.value = false
-  }
-}
-
-// ── Data location state ────────────────────────────────────
-
-const dataLocation = ref('~/.narrative_assistant')
-const showResetDialog = ref(false)
-const showDataLocationDialog = ref(false)
-const newDataLocation = ref('')
-const migrateData = ref(true)
-const changingLocation = ref(false)
-
-// ============================================================================
-// Configuración de Correcciones
-// ============================================================================
-
-interface CorrectionPresetLocal {
-  id: string
-  name: string
-  description: string
-  config: CorrectionConfig
-}
-
-interface CorrectionOptions {
-  document_fields: Array<{ value: string; label: string }>
-  register_levels: Array<{ value: string; label: string }>
-  audience_types: Array<{ value: string; label: string }>
-  regions: Array<{ value: string; label: string }>
-  quote_styles: Array<{ value: string; label: string }>
-  dialogue_dashes: Array<{ value: string; label: string }>
-  sensitivity_levels: Array<{ value: string; label: string }>
-}
-
-const correctionPresetOptions = ref<CorrectionPresetLocal[]>([])
-const correctionOptions = ref<CorrectionOptions | null>(null)
-const defaultCorrectionPreset = ref<string>('default')
-const defaultCorrectionConfig = ref<CorrectionConfig | null>(null)
-const defaultRegion = ref<string>('es_ES')
-const useLLMReview = ref<boolean>(false)
-
-const regionOptions = computed(() => correctionOptions.value?.regions || [
-  { value: 'es_ES', label: 'Espana' },
-  { value: 'es_MX', label: 'Mexico' },
-  { value: 'es_AR', label: 'Argentina' },
-  { value: 'es_CO', label: 'Colombia' },
-])
-
-// Cargar presets de correcciones
-async function loadCorrectionPresets() {
-  try {
-    const data = await api.getRaw<{ success: boolean; data?: any; error?: string }>('/api/correction-presets')
-
-    if (data.success && data.data) {
-      correctionPresetOptions.value = data.data.presets || []
-      correctionOptions.value = data.data.options || null
-
-      // Cargar configuracion guardada
-      const savedPreset = safeGetItem('defaultCorrectionPreset')
-      if (savedPreset) {
-        defaultCorrectionPreset.value = savedPreset
-        const preset = correctionPresetOptions.value.find(p => p.id === savedPreset)
-        if (preset) {
-          defaultCorrectionConfig.value = preset.config
-        }
-      } else if (correctionPresetOptions.value.length > 0) {
-        defaultCorrectionConfig.value = correctionPresetOptions.value[0].config
-      }
-
-      const savedRegion = safeGetItem('defaultCorrectionRegion')
-      if (savedRegion) {
-        defaultRegion.value = savedRegion
-      }
-
-      useLLMReview.value = safeGetItem('useLLMReview') === 'true'
-    }
-  } catch (error) {
-    console.error('Error loading correction presets:', error)
-  }
-}
-
-function onDefaultPresetChange() {
-  const preset = correctionPresetOptions.value.find(p => p.id === defaultCorrectionPreset.value)
-  if (preset) {
-    defaultCorrectionConfig.value = preset.config
-    safeSetItem('defaultCorrectionPreset', preset.id)
-  }
-}
-
-function onDefaultRegionChange() {
-  safeSetItem('defaultCorrectionRegion', defaultRegion.value)
-}
-
-function onLLMReviewChange() {
-  safeSetItem('useLLMReview', useLLMReview.value.toString())
-}
-
-// LanguageTool state - usar store centralizado
 const ltInstalling = computed(() => systemStore.ltInstalling)
 const ltStarting = computed(() => systemStore.ltStarting)
 const ltInstallProgress = computed(() => systemStore.ltInstallProgress)
-
 const ltState = computed<LTState>(() => systemStore.ltState)
 
 const ltActionConfig = computed(() => {
@@ -1537,11 +462,9 @@ const ltActionConfig = computed(() => {
 })
 
 const ltStatusMessage = computed(() => {
-  // Si está instalando y tenemos progreso, mostrar el detalle
   if (ltState.value === 'installing' && ltInstallProgress.value) {
     return ltInstallProgress.value.detail || ltInstallProgress.value.phase_label
   }
-
   const messages: Record<LTState, string> = {
     not_installed: 'Instala el corrector avanzado para +2000 reglas de gramática y ortografía (~300MB)',
     installing: 'Iniciando descarga...',
@@ -1551,7 +474,6 @@ const ltStatusMessage = computed(() => {
   return messages[ltState.value]
 })
 
-// LanguageTool install/start - usar acciones del store con toasts
 const installLanguageTool = async () => {
   toast.add({ severity: 'info', summary: 'Instalando corrector avanzado', detail: 'Descargando componentes necesarios...', life: 5000 })
   const success = await systemStore.installLanguageTool()
@@ -1578,55 +500,22 @@ const startLanguageTool = async () => {
   }
 }
 
-// ── User rejected entities (global) ─────────────────────────
+// ── Data location state ────────────────────────────────────
 
-interface UserRejection {
-  id: number
-  entityName: string
-  entityType: string | null
-  reason: string | null
-  rejectedAt: string
-}
+const dataLocation = ref('~/.narrative_assistant')
+const showResetDialog = ref(false)
+const showDataLocationDialog = ref(false)
+const newDataLocation = ref('')
+const migrateData = ref(true)
+const changingLocation = ref(false)
 
-const userRejections = ref<UserRejection[]>([])
-const loadingRejections = ref(false)
+// ── Child component refs ───────────────────────────────────
 
-async function loadUserRejections() {
-  loadingRejections.value = true
-  try {
-    const data = await api.getRaw<{ success: boolean; data?: UserRejection[] }>('/api/entity-filters/user-rejections')
-    if (data.success && data.data) {
-      userRejections.value = data.data
-    }
-  } catch {} finally {
-    loadingRejections.value = false
-  }
-}
+const correctionsSection = ref()
+const dataMaintenanceSection = ref()
 
-async function removeRejection(rejection: UserRejection) {
-  try {
-    const data = await api.del<{ success: boolean }>(`/api/entity-filters/user-rejections/${rejection.id}`)
-    if (data.success) {
-      userRejections.value = userRejections.value.filter(r => r.id !== rejection.id)
-      toast.add({
-        severity: 'success',
-        summary: 'Entidad restaurada',
-        detail: `"${rejection.entityName}" volverá a detectarse en futuros análisis`,
-        life: 3000,
-      })
-    }
-  } catch (e) {
-    console.error('Error removing rejection:', e)
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'No se pudo restaurar la entidad',
-      life: 3000,
-    })
-  }
-}
+// ── Navigation ─────────────────────────────────────────────
 
-// Navigation
 const activeSection = ref('apariencia')
 const contentArea = ref<HTMLElement | null>(null)
 const activeProjectId = computed(() => projectsStore.currentProject?.id ?? null)
@@ -1685,7 +574,6 @@ watch(
   }
 )
 
-
 onMounted(async () => {
   loadSettings()
   if (activeProjectId.value) {
@@ -1693,29 +581,27 @@ onMounted(async () => {
   }
   await loadSystemCapabilities()
   await loadCurrentDataLocation()
-  await loadCorrectionPresets()
+  correctionsSection.value?.loadCorrectionPresets()
   await loadQualityLevels()
-  loadUserRejections()
+  dataMaintenanceSection.value?.loadUserRejections()
 })
 
 onUnmounted(() => {
   if (analysisSyncTimer) {
     clearTimeout(analysisSyncTimer)
     analysisSyncTimer = null
-    // Flush: enviar settings pendientes al backend antes de salir
     const projectId = activeProjectId.value
     if (projectId) {
       syncAnalysisSettingsToBackend(projectId).catch(() => undefined)
     }
   }
   cleanupPersistence()
-  cleanupOllama()
+  ollamaContext.cleanup()
   systemStore.stopLTPolling()
 })
 
 const loadSystemCapabilities = async (): Promise<boolean> => {
-  // Usar el store centralizado
-  const capabilities = await systemStore.loadCapabilities(true) // force refresh
+  const capabilities = await systemStore.loadCapabilities(true)
   if (capabilities) {
     if (
       !capabilitiesWarningShown &&
@@ -1732,7 +618,6 @@ const loadSystemCapabilities = async (): Promise<boolean> => {
       })
     }
 
-    // Si es la primera vez (no hay settings guardados), aplicar defaults según hardware
     const savedSettings = safeGetItem('narrative_assistant_settings')
     if (!savedSettings) {
       applyDefaultsFromCapabilities(capabilities)
@@ -1744,7 +629,6 @@ const loadSystemCapabilities = async (): Promise<boolean> => {
 }
 
 const changeDataLocation = () => {
-  // Cargar la ubicación actual
   loadCurrentDataLocation()
   showDataLocationDialog.value = true
 }
@@ -1763,12 +647,7 @@ const loadCurrentDataLocation = async () => {
 
 const confirmChangeDataLocation = async () => {
   if (!newDataLocation.value.trim()) {
-    toast.add({
-      severity: 'warn',
-      summary: 'Ruta vacía',
-      detail: 'Introduce una ruta válida',
-      life: 3000
-    })
+    toast.add({ severity: 'warn', summary: 'Ruta vacía', detail: 'Introduce una ruta válida', life: 3000 })
     return
   }
 
@@ -1802,12 +681,7 @@ const confirmChangeDataLocation = async () => {
         })
       }
     } else {
-      toast.add({
-        severity: 'error',
-        summary: 'Error',
-        detail: result.error || 'No se pudo cambiar la ubicación',
-        life: 5000
-      })
+      toast.add({ severity: 'error', summary: 'Error', detail: result.error || 'No se pudo cambiar la ubicación', life: 5000 })
     }
   } catch (error) {
     console.error('Error changing data location:', error)
@@ -1822,31 +696,9 @@ const confirmChangeDataLocation = async () => {
   }
 }
 
-const clearCache = async () => {
-  try {
-    await api.postRaw('/api/maintenance/clear-cache')
-
-    toast.add({
-      severity: 'success',
-      summary: 'Caché limpiado',
-      detail: 'Los archivos temporales se han eliminado',
-      life: 3000
-    })
-  } catch (error) {
-    console.error('Error clearing cache:', error)
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'No se pudo limpiar el caché',
-      life: 3000
-    })
-  }
-}
-
 const confirmReset = () => {
   showResetDialog.value = true
 }
-
 
 const resetSettings = () => {
   doResetSettings(systemCapabilities.value)
@@ -1860,15 +712,10 @@ const goBack = () => {
 const scrollToSection = (sectionId: string) => {
   const element = document.getElementById(sectionId)
   if (element && contentArea.value) {
-    // Calcular la posición del elemento relativa al contenedor de scroll
     const containerRect = contentArea.value.getBoundingClientRect()
     const elementRect = element.getBoundingClientRect()
-
-    // Posición actual de scroll + diferencia entre elemento y contenedor
     const scrollTop = contentArea.value.scrollTop
     const elementRelativeTop = elementRect.top - containerRect.top + scrollTop
-
-    // Offset para dejar espacio visual arriba (16px de margen)
     const offset = 16
 
     contentArea.value.scrollTo({
@@ -1898,8 +745,6 @@ const handleScroll = () => {
     }
   }
 }
-
-
 </script>
 
 <style scoped>
@@ -1931,7 +776,6 @@ const handleScroll = () => {
   flex-shrink: 0;
 }
 
-/* Dark mode para header */
 :global(.dark) .settings-header {
   background: var(--surface-card);
   border-bottom-color: var(--surface-border);
@@ -1957,7 +801,6 @@ const handleScroll = () => {
   padding: 1.5rem 0;
 }
 
-/* Dark mode para sidebar */
 :global(.dark) .settings-sidebar {
   background: var(--surface-card);
   border-right-color: var(--surface-border);
@@ -2002,7 +845,6 @@ const handleScroll = () => {
   font-weight: 600;
 }
 
-/* Dark mode para navegación */
 :global(.dark) .nav-menu a:hover {
   background: var(--settings-nav-hover-bg);
   color: var(--settings-nav-hover-color) !important;
@@ -2074,7 +916,9 @@ const handleScroll = () => {
   color: var(--p-primary-color);
 }
 
-.setting-item {
+/* ── Shared styles used by child section components ──────── */
+
+:deep(.setting-item) {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -2082,391 +926,304 @@ const handleScroll = () => {
   border-bottom: 1px solid var(--surface-border);
 }
 
-:global(.dark) .setting-item {
+:global(.dark) :deep(.setting-item) {
   border-bottom-color: var(--surface-border);
 }
 
-.setting-item:last-child {
+:deep(.setting-item:last-child) {
   border-bottom: none;
 }
 
-/* Layout de columna para items con contenido ancho */
-.setting-item.column {
+:deep(.setting-item.column) {
   flex-direction: column;
   gap: 1rem;
 }
 
-.setting-item.column .setting-info {
+:deep(.setting-item.column .setting-info) {
   padding-right: 0;
   max-width: 100%;
 }
 
-.setting-item.column .setting-control,
-.setting-item.column .system-patterns-list,
-.setting-item.column .correction-config-summary,
-.setting-item.column .user-rejections-list {
+:deep(.setting-item.column .setting-control),
+:deep(.setting-item.column .system-patterns-list),
+:deep(.setting-item.column .correction-config-summary),
+:deep(.setting-item.column .user-rejections-list) {
   width: 100%;
 }
 
-.setting-info {
+:deep(.setting-info) {
   flex: 1;
   padding-right: 2rem;
 }
 
-.setting-label {
+:deep(.setting-label) {
   display: block;
   font-weight: 600;
   margin-bottom: 0.25rem;
   color: var(--p-text-color);
 }
 
-.setting-description {
+:deep(.setting-description) {
   margin: 0;
   font-size: 0.9rem;
   color: var(--p-text-muted-color);
   line-height: 1.5;
 }
 
-.setting-description code {
+:deep(.setting-description code) {
   background: var(--p-surface-100);
   padding: 0.125rem 0.375rem;
   border-radius: 0.25rem;
   font-size: 0.85rem;
 }
 
-:global(.dark) .setting-description code {
+:global(.dark) :deep(.setting-description code) {
   background: var(--p-surface-800);
 }
 
-.setting-control {
+:deep(.setting-control) {
   min-width: 200px;
   display: flex;
   justify-content: flex-end;
   align-items: center;
 }
 
-/* Sliders necesitan ancho completo */
-.setting-control :deep(.p-slider) {
+:deep(.setting-control :deep(.p-slider)) {
   width: 100%;
 }
 
-.about-info {
-  text-align: center;
-}
-
-.about-info h3 {
-  margin: 0 0 0.5rem 0;
-  color: var(--p-primary-color);
-}
-
-.about-info .version {
-  margin: 0 0 1rem 0;
-  color: var(--p-text-muted-color);
-  font-weight: 500;
-}
-
-.about-info .description {
-  margin: 0 0 1.5rem 0;
-  color: var(--p-text-muted-color);
-  line-height: 1.6;
-}
-
-.about-links {
-  display: flex;
-  justify-content: center;
-  gap: 1rem;
-}
-
-/* LLM / Inferencia section */
-.setting-control.wide {
+:deep(.setting-control.wide) {
   min-width: 350px;
 }
 
-.method-option {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  gap: 1rem;
+/* ── Sensitivity section styles ─────────────────────────── */
+
+:deep(.sensitivity-section) {
+  padding: 0.5rem 0;
 }
 
-.method-info {
+:deep(.sensitivity-header) {
+  margin-bottom: 1.25rem;
+}
+
+:deep(.sensitivity-header .setting-label) {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+:deep(.sensitivity-presets-grid) {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+:deep(.preset-button) {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--p-surface-50);
+  border: 2px solid var(--p-surface-200);
+  border-radius: var(--p-border-radius);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  width: 100%;
+}
+
+:deep(.preset-button:hover) {
+  border-color: var(--p-primary-color);
+  background: color-mix(in srgb, var(--p-primary-color) 5%, var(--p-surface-50));
+}
+
+:deep(.preset-button.active) {
+  border-color: var(--p-primary-color);
+  background: color-mix(in srgb, var(--p-primary-color) 10%, var(--p-surface-50));
+}
+
+:deep(.preset-button > i:first-child) {
+  font-size: 1.5rem;
+  color: var(--p-text-muted-color);
+  width: 2rem;
+  text-align: center;
+}
+
+:deep(.preset-button.active > i:first-child) {
+  color: var(--p-primary-color);
+}
+
+:deep(.preset-content) {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  flex: 1;
 }
 
-.method-name {
-  font-weight: 500;
+:deep(.preset-title) {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--p-text-color);
 }
 
-.method-desc {
-  font-size: 0.8rem;
+:deep(.preset-button .preset-desc) {
+  font-size: 0.85rem;
   color: var(--p-text-muted-color);
 }
 
-.method-badges {
-  display: flex;
-  gap: 0.25rem;
-  flex-shrink: 0;
+:deep(.recommended-star) {
+  color: var(--ds-text-warning);
+  font-size: 0.9rem;
 }
 
-.speed-badge {
-  font-size: 0.7rem;
-  font-weight: 600;
-  border: 1px solid transparent;
+:global(.dark) :deep(.preset-button) {
+  background: var(--p-surface-800);
+  border-color: var(--p-surface-700);
 }
 
-/* ── LLM model card grid ──────────────────────────────────── */
+:global(.dark) :deep(.preset-button:hover) {
+  background: color-mix(in srgb, var(--p-primary-color) 15%, var(--p-surface-800));
+}
 
-/* Quality Level cards */
-.quality-level-section {
+:global(.dark) :deep(.preset-button.active) {
+  background: color-mix(in srgb, var(--p-primary-color) 20%, var(--p-surface-800));
+}
+
+:deep(.sensitivity-slider) {
+  padding: 1rem 1.25rem;
+  background: var(--p-surface-50);
+  border-radius: var(--p-border-radius);
   margin-bottom: 1rem;
 }
 
-.quality-level-cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.75rem;
+:global(.dark) :deep(.sensitivity-slider) {
+  background: var(--p-surface-800);
 }
 
-.quality-level-card {
-  border: 2px solid var(--p-surface-200);
-  border-radius: 8px;
-  padding: 0.75rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: var(--p-surface-0);
+:deep(.slider-header) {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
 }
 
-.quality-level-card:hover:not(.disabled) {
-  border-color: var(--p-primary-300);
-  background: var(--p-primary-50);
+:deep(.slider-label) {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--p-text-color);
 }
 
-.quality-level-card.selected {
-  border-color: var(--p-primary-500);
-  background: var(--p-primary-50);
+:deep(.slider-value) {
+  font-size: 0.85rem;
+  color: var(--p-primary-color);
+  font-weight: 600;
 }
 
-.quality-level-card.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+:deep(.slider-hints) {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
 }
 
-.quality-level-card.recommended:not(.selected) {
-  border-color: var(--p-green-200);
+:deep(.advanced-panel) {
+  border-top: 1px solid var(--p-surface-200);
+  padding-top: 1rem;
+  margin-top: 0.5rem;
 }
 
-.quality-level-header {
+:global(.dark) :deep(.advanced-panel) {
+  border-top-color: var(--p-surface-700);
+}
+
+:deep(.advanced-toggle) {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.3rem;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--p-text-muted-color);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  transition: color 0.15s ease;
 }
 
-.quality-level-header i {
-  color: var(--p-primary-500);
-  font-size: 1.1rem;
+:deep(.advanced-toggle:hover) {
+  color: var(--p-primary-color);
 }
 
-.quality-level-header strong {
-  font-size: 0.95rem;
-}
-
-.recommended-badge {
-  font-size: 0.65rem !important;
-  padding: 0.1rem 0.3rem !important;
-}
-
-.quality-level-desc {
-  font-size: 0.8rem;
-  color: var(--p-text-secondary-color);
-  margin: 0 0 0.3rem 0;
-}
-
-.quality-level-time {
+:deep(.advanced-toggle i) {
   font-size: 0.75rem;
-  color: var(--p-text-secondary-color);
+}
+
+:deep(.advanced-content) {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--p-surface-50);
+  border-radius: var(--p-border-radius);
+}
+
+:global(.dark) :deep(.advanced-content) {
+  background: var(--p-surface-800);
+}
+
+:deep(.advanced-note) {
+  margin: 0 0 1rem 0;
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
   font-style: italic;
 }
 
-.slider-value {
-  font-weight: 600;
-  font-size: 0.9rem;
-  min-width: 1.5rem;
-  text-align: center;
-  margin-left: 0.5rem;
-}
-
-/* Motors section */
-.motors-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+:deep(.advanced-slider) {
   margin-bottom: 1rem;
-  padding-left: 0.5rem;
 }
 
-.motor-item {
+:deep(.advanced-slider:last-of-type) {
+  margin-bottom: 1.25rem;
+}
+
+:deep(.advanced-slider-header) {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem;
-  border-radius: 6px;
-  background: var(--p-surface-50);
+  margin-bottom: 0.5rem;
 }
 
-.motor-item i {
-  font-size: 1.1rem;
-  color: var(--p-primary-400);
-}
-
-.motor-item div {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.motor-item strong {
+:deep(.advanced-slider-header label) {
   font-size: 0.85rem;
+  color: var(--p-text-color);
 }
 
-.motor-item span {
+:deep(.advanced-slider-header span) {
+  font-size: 0.85rem;
+  color: var(--p-primary-color);
+  font-weight: 500;
+}
+
+:deep(.slider-help) {
   font-size: 0.75rem;
   color: var(--p-text-secondary-color);
+  margin: 0 0 0.5rem 0;
+  line-height: 1.4;
 }
 
-:global(.dark) .quality-level-card {
-  background: var(--p-surface-800);
-  border-color: var(--p-surface-600);
-}
+/* ── NLP / Ollama styles ────────────────────────────────── */
 
-:global(.dark) .quality-level-card.selected {
-  background: var(--p-primary-900);
-  border-color: var(--p-primary-400);
-}
-
-:global(.dark) .quality-level-card:hover:not(.disabled) {
-  background: var(--p-primary-900);
-  border-color: var(--p-primary-500);
-}
-
-:global(.dark) .motor-item {
-  background: var(--p-surface-700);
-}
-
-/* Inline badges en sección header */
-.hardware-inline-badge {
-  font-size: 0.7rem !important;
-  padding: 0.15rem 0.4rem !important;
-  vertical-align: middle;
-  margin-left: 0.4rem;
-}
-
-.ollama-inline-badge {
-  font-size: 0.7rem !important;
-  padding: 0.15rem 0.4rem !important;
-  vertical-align: middle;
-  margin-left: 0.25rem;
-}
-
-/* Speed badges - contraste alto */
-.speed-badge.p-tag-success {
-  background: var(--green-100) !important;
-  color: var(--green-800) !important;
-  border-color: var(--green-300) !important;
-}
-
-.speed-badge.p-tag-warn,
-.speed-badge.p-tag-warning {
-  background: var(--yellow-100) !important;
-  color: var(--yellow-900) !important;
-  border-color: var(--yellow-400) !important;
-}
-
-.speed-badge.p-tag-danger {
-  background: var(--red-100) !important;
-  color: var(--red-800) !important;
-  border-color: var(--red-400) !important;
-}
-
-:global(.dark) .speed-badge.p-tag-success {
-  background: var(--green-900) !important;
-  color: var(--green-200) !important;
-  border-color: var(--green-700) !important;
-}
-
-:global(.dark) .speed-badge.p-tag-warn,
-:global(.dark) .speed-badge.p-tag-warning {
-  background: var(--yellow-900) !important;
-  color: var(--yellow-200) !important;
-  border-color: var(--yellow-700) !important;
-}
-
-:global(.dark) .speed-badge.p-tag-danger {
-  background: var(--red-900) !important;
-  color: var(--red-200) !important;
-  border-color: var(--red-700) !important;
-}
-
-/* Badges de velocidad - alineación vertical */
-.method-badges :deep(.p-tag) {
-  padding: 0.2rem 0.5rem;
-  line-height: 1;
-}
-
-/* Message styling */
-.info-message {
-  margin-top: 1rem;
-}
-
-.info-message :deep(.p-message-wrapper) {
-  padding: 0.75rem 1rem;
-  gap: 0.75rem;
-}
-
-.info-message .message-content {
-  line-height: 1.5;
-}
-
-.info-message .message-content code {
-  padding: 0.125rem 0.375rem;
-  margin: 0 0.125rem;
-  background: var(--p-surface-200);
-  border-radius: 0.25rem;
-  font-size: 0.85em;
-}
-
-:global(.dark) .info-message .message-content code {
-  background: var(--p-surface-700);
-}
-
-.info-message .message-content a {
-  color: var(--p-primary-color);
-  text-decoration: underline;
-}
-
-/* ============================================================================
-   Métodos de Análisis - Sección de configuración granular
-   ============================================================================ */
-
-
-.nlp-category {
+:deep(.nlp-category) {
   margin-bottom: 2rem;
 }
 
-.nlp-category:last-of-type {
+:deep(.nlp-category:last-of-type) {
   margin-bottom: 1rem;
 }
 
-.category-header {
+:deep(.category-header) {
   margin-bottom: 1rem;
 }
 
-.category-header h4 {
+:deep(.category-header h4) {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -2476,22 +1233,22 @@ const handleScroll = () => {
   color: var(--p-text-color);
 }
 
-.category-header h4 i {
+:deep(.category-header h4 i) {
   color: var(--p-primary-color);
 }
 
-.category-desc {
+:deep(.category-desc) {
   font-size: 0.85rem;
   color: var(--p-text-muted-color);
 }
 
-.methods-grid {
+:deep(.methods-grid) {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1rem;
 }
 
-.method-card {
+:deep(.method-card) {
   background: var(--p-surface-50);
   border: 1px solid var(--p-surface-200);
   border-radius: var(--p-border-radius);
@@ -2499,25 +1256,25 @@ const handleScroll = () => {
   transition: all 0.15s ease;
 }
 
-:global(.dark) .method-card {
+:global(.dark) :deep(.method-card) {
   background: var(--p-surface-800);
   border-color: var(--p-surface-700);
 }
 
-.method-card.enabled {
+:deep(.method-card.enabled) {
   border-color: var(--p-primary-color);
   background: color-mix(in srgb, var(--p-primary-color) 5%, var(--p-surface-50));
 }
 
-:global(.dark) .method-card.enabled {
+:global(.dark) :deep(.method-card.enabled) {
   background: color-mix(in srgb, var(--p-primary-color) 10%, var(--p-surface-800));
 }
 
-.method-card.disabled {
+:deep(.method-card.disabled) {
   opacity: 0.6;
 }
 
-.method-header {
+:deep(.method-header) {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -2525,73 +1282,221 @@ const handleScroll = () => {
   margin-bottom: 0.5rem;
 }
 
-.method-header .method-name {
+:deep(.method-header .method-name) {
   font-weight: 600;
   font-size: 0.95rem;
   flex: 1;
   min-width: 120px;
 }
 
-.method-tag {
+:deep(.method-tag) {
   font-size: 0.7rem;
   padding: 0.2rem 0.5rem;
   font-weight: 600;
 }
 
-/* Tags de método con mejor visibilidad en todos los modos */
-.method-card .method-tag.p-tag-info {
+:deep(.method-card .method-tag.p-tag-info) {
   background: var(--blue-100) !important;
   color: var(--blue-700) !important;
   border: 1px solid var(--blue-300) !important;
 }
 
-.method-card .method-tag.p-tag-warning {
+:deep(.method-card .method-tag.p-tag-warning) {
   background: var(--yellow-100) !important;
   color: var(--yellow-800) !important;
   border: 1px solid var(--yellow-400) !important;
 }
 
-.method-card .method-tag.p-tag-danger {
+:deep(.method-card .method-tag.p-tag-danger) {
   background: var(--red-100) !important;
   color: var(--red-700) !important;
   border: 1px solid var(--red-300) !important;
 }
 
-/* Dark mode: Tags con fondo más visible */
-:global(.dark) .method-card .method-tag.p-tag-info {
+:global(.dark) :deep(.method-card .method-tag.p-tag-info) {
   background: var(--blue-900) !important;
   color: var(--blue-200) !important;
   border: 1px solid var(--blue-600) !important;
 }
 
-:global(.dark) .method-card .method-tag.p-tag-warning {
+:global(.dark) :deep(.method-card .method-tag.p-tag-warning) {
   background: var(--yellow-900) !important;
   color: var(--yellow-200) !important;
   border: 1px solid var(--ds-color-warning, #d97706) !important;
 }
 
-:global(.dark) .method-card .method-tag.p-tag-danger {
+:global(.dark) :deep(.method-card .method-tag.p-tag-danger) {
   background: var(--red-900) !important;
   color: var(--red-200) !important;
   border: 1px solid var(--red-600) !important;
 }
 
-.method-description {
+:deep(.method-description) {
   margin: 0;
   font-size: 0.85rem;
   color: var(--p-text-muted-color);
   line-height: 1.4;
 }
 
-.method-weight {
+:deep(.method-weight) {
   margin-top: 0.5rem;
   font-size: 0.8rem;
   color: var(--p-text-muted-color);
   font-style: italic;
 }
 
-/* Ollama ready bar - compacto cuando está listo */
-.ollama-ready-bar {
+/* Quality Level cards */
+:deep(.quality-level-section) {
+  margin-bottom: 1rem;
+}
+
+:deep(.quality-level-cards) {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+:deep(.quality-level-card) {
+  border: 2px solid var(--p-surface-200);
+  border-radius: 8px;
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--p-surface-0);
+}
+
+:deep(.quality-level-card:hover:not(.disabled)) {
+  border-color: var(--p-primary-300);
+  background: var(--p-primary-50);
+}
+
+:deep(.quality-level-card.selected) {
+  border-color: var(--p-primary-500);
+  background: var(--p-primary-50);
+}
+
+:deep(.quality-level-card.disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+:deep(.quality-level-card.recommended:not(.selected)) {
+  border-color: var(--p-green-200);
+}
+
+:deep(.quality-level-header) {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.3rem;
+}
+
+:deep(.quality-level-header i) {
+  color: var(--p-primary-500);
+  font-size: 1.1rem;
+}
+
+:deep(.quality-level-header strong) {
+  font-size: 0.95rem;
+}
+
+:deep(.recommended-badge) {
+  font-size: 0.65rem !important;
+  padding: 0.1rem 0.3rem !important;
+}
+
+:deep(.quality-level-desc) {
+  font-size: 0.8rem;
+  color: var(--p-text-secondary-color);
+  margin: 0 0 0.3rem 0;
+}
+
+:deep(.quality-level-time) {
+  font-size: 0.75rem;
+  color: var(--p-text-secondary-color);
+  font-style: italic;
+}
+
+:deep(.slider-value) {
+  font-weight: 600;
+  font-size: 0.9rem;
+  min-width: 1.5rem;
+  text-align: center;
+  margin-left: 0.5rem;
+}
+
+:deep(.motors-list) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding-left: 0.5rem;
+}
+
+:deep(.motor-item) {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border-radius: 6px;
+  background: var(--p-surface-50);
+}
+
+:deep(.motor-item i) {
+  font-size: 1.1rem;
+  color: var(--p-primary-400);
+}
+
+:deep(.motor-item div) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.motor-item strong) {
+  font-size: 0.85rem;
+}
+
+:deep(.motor-item span) {
+  font-size: 0.75rem;
+  color: var(--p-text-secondary-color);
+}
+
+:global(.dark) :deep(.quality-level-card) {
+  background: var(--p-surface-800);
+  border-color: var(--p-surface-600);
+}
+
+:global(.dark) :deep(.quality-level-card.selected) {
+  background: var(--p-primary-900);
+  border-color: var(--p-primary-400);
+}
+
+:global(.dark) :deep(.quality-level-card:hover:not(.disabled)) {
+  background: var(--p-primary-900);
+  border-color: var(--p-primary-500);
+}
+
+:global(.dark) :deep(.motor-item) {
+  background: var(--p-surface-700);
+}
+
+:deep(.hardware-inline-badge) {
+  font-size: 0.7rem !important;
+  padding: 0.15rem 0.4rem !important;
+  vertical-align: middle;
+  margin-left: 0.4rem;
+}
+
+:deep(.ollama-inline-badge) {
+  font-size: 0.7rem !important;
+  padding: 0.15rem 0.4rem !important;
+  vertical-align: middle;
+  margin-left: 0.25rem;
+}
+
+/* Ollama action card / ready bar */
+:deep(.ollama-ready-bar) {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2602,7 +1507,7 @@ const handleScroll = () => {
   margin-bottom: 1rem;
 }
 
-.ollama-ready-info {
+:deep(.ollama-ready-info) {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -2610,12 +1515,11 @@ const handleScroll = () => {
   color: var(--green-700);
 }
 
-.ollama-ready-info i {
+:deep(.ollama-ready-info i) {
   color: var(--ds-text-success);
 }
 
-/* Ollama action card - cuando necesita acción */
-.ollama-action-card {
+:deep(.ollama-action-card) {
   background: var(--yellow-50);
   border: 1px solid var(--yellow-200);
   border-radius: var(--app-radius);
@@ -2623,43 +1527,43 @@ const handleScroll = () => {
   margin-top: 0.75rem;
 }
 
-.ollama-action-card.ollama-state-no_models {
+:deep(.ollama-action-card.ollama-state-no_models) {
   background: var(--blue-50);
   border-color: var(--blue-200);
 }
 
-.ollama-action-card.ollama-state-configuring {
+:deep(.ollama-action-card.ollama-state-configuring) {
   background: var(--blue-50);
   border-color: var(--blue-200);
 }
 
-.ollama-action-card.ollama-state-configuring .ollama-action-content > i {
+:deep(.ollama-action-card.ollama-state-configuring .ollama-action-content > i) {
   color: var(--ds-text-info, #3b82f6);
 }
 
-.ollama-hint {
+:deep(.ollama-hint) {
   font-size: 0.7rem;
   opacity: 0.7;
   font-style: italic;
 }
 
-.ollama-action-content {
+:deep(.ollama-action-content) {
   display: flex;
   align-items: center;
   gap: 0.75rem;
 }
 
-.ollama-action-content > i {
+:deep(.ollama-action-content > i) {
   font-size: 1.25rem;
   color: var(--ds-color-warning, #d97706);
   flex-shrink: 0;
 }
 
-.ollama-action-card.ollama-state-no_models .ollama-action-content > i {
+:deep(.ollama-action-card.ollama-state-no_models .ollama-action-content > i) {
   color: var(--ds-text-info);
 }
 
-.ollama-action-text {
+:deep(.ollama-action-text) {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -2667,66 +1571,278 @@ const handleScroll = () => {
   min-width: 0;
 }
 
-.ollama-action-text strong {
+:deep(.ollama-action-text strong) {
   font-size: 0.9rem;
   color: var(--p-text-color);
 }
 
-.ollama-action-text span {
+:deep(.ollama-action-text span) {
   font-size: 0.8rem;
   color: var(--p-text-muted-color);
 }
 
-/* Ollama download progress bar */
-.ollama-progress-wrapper {
+:deep(.ollama-progress-wrapper) {
   width: 100%;
   margin-top: 0.5rem;
 }
 
-/* LanguageTool progress bar */
-.lt-progress-container {
+:deep(.lt-progress-container) {
   margin-top: 0.5rem;
   width: 100%;
 }
 
-/* Setting deshabilitado visualmente */
-.setting-item.setting-disabled {
-  opacity: 0.6;
-}
-
-/* Dark mode para Ollama */
-:global(.dark) .ollama-ready-bar {
+:global(.dark) :deep(.ollama-ready-bar) {
   background: rgba(34, 197, 94, 0.1);
   border-color: var(--green-800);
 }
 
-:global(.dark) .ollama-ready-info {
+:global(.dark) :deep(.ollama-ready-info) {
   color: var(--green-400);
 }
 
-:global(.dark) .ollama-action-card {
+:global(.dark) :deep(.ollama-action-card) {
   background: rgba(234, 179, 8, 0.1);
   border-color: var(--yellow-800);
 }
 
-:global(.dark) .ollama-action-card.ollama-state-no_models,
-:global(.dark) .ollama-action-card.ollama-state-configuring {
+:global(.dark) :deep(.ollama-action-card.ollama-state-no_models),
+:global(.dark) :deep(.ollama-action-card.ollama-state-configuring) {
   background: color-mix(in srgb, var(--p-primary-color, #3B82F6) 10%, transparent);
   border-color: var(--p-primary-800, #1e40af);
 }
 
-:global(.dark) .ollama-action-content > i {
+:global(.dark) :deep(.ollama-action-content > i) {
   color: var(--yellow-400);
 }
 
-:global(.dark) .ollama-action-card.ollama-state-no_models .ollama-action-content > i,
-:global(.dark) .ollama-action-card.ollama-state-configuring .ollama-action-content > i {
+:global(.dark) :deep(.ollama-action-card.ollama-state-no_models .ollama-action-content > i),
+:global(.dark) :deep(.ollama-action-card.ollama-state-configuring .ollama-action-content > i) {
   color: var(--blue-400);
 }
 
-/* ============================================================================
-   Data Location Dialog
-   ============================================================================ */
+/* ── Corrections section styles ─────────────────────────── */
+
+:deep(.correction-info-message) {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+:deep(.correction-info-message p) {
+  margin: 0;
+}
+
+:deep(.correction-config-summary) {
+  background: var(--p-surface-100);
+  border-radius: var(--p-border-radius);
+  padding: 1rem;
+}
+
+:global(.dark) :deep(.correction-config-summary) {
+  background: var(--p-surface-800);
+}
+
+:deep(.config-grid) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+:deep(.config-section) {
+  background: var(--p-surface-0);
+  border-radius: var(--p-border-radius);
+  padding: 1rem;
+}
+
+:global(.dark) :deep(.config-section) {
+  background: var(--p-surface-900);
+}
+
+:deep(.config-section h4) {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--p-primary-color);
+}
+
+:deep(.config-section h4 i) {
+  font-size: 1rem;
+}
+
+:deep(.config-items) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+:deep(.config-item) {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+:deep(.config-label) {
+  color: var(--p-text-secondary-color);
+  min-width: 80px;
+}
+
+:deep(.preset-dropdown-option) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+:deep(.preset-dropdown-option .preset-name) {
+  font-weight: 500;
+}
+
+:deep(.preset-dropdown-option .preset-description) {
+  font-size: 0.8rem;
+  color: var(--p-text-secondary-color);
+}
+
+:deep(.text-green-500) {
+  color: var(--p-green-500);
+}
+
+:deep(.text-red-500) {
+  color: var(--p-red-500);
+}
+
+/* ── Knowledge mode selector ────────────────────────────── */
+
+:deep(.knowledge-mode-selector) {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+:deep(.knowledge-mode-card) {
+  flex: 1;
+  min-width: 200px;
+  padding: 1rem;
+  border: 2px solid var(--p-content-border-color);
+  border-radius: var(--p-border-radius);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--p-surface-ground);
+}
+
+:deep(.knowledge-mode-card:hover:not(.disabled)) {
+  border-color: var(--p-primary-color);
+  background: var(--p-surface-hover);
+}
+
+:deep(.knowledge-mode-card.selected) {
+  border-color: var(--p-primary-color);
+  background: var(--p-primary-50);
+}
+
+:deep(.knowledge-mode-card.disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+:deep(.knowledge-mode-card .mode-name) {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+:deep(.knowledge-mode-card .mode-description) {
+  font-size: 0.85rem;
+  color: var(--p-text-secondary-color);
+  line-height: 1.4;
+}
+
+:deep(.knowledge-mode-card .method-tag) {
+  margin-top: 0.5rem;
+  width: fit-content;
+}
+
+/* ── Data maintenance styles ────────────────────────────── */
+
+:deep(.info-message) {
+  margin-top: 1rem;
+}
+
+:deep(.info-message :deep(.p-message-wrapper)) {
+  padding: 0.75rem 1rem;
+  gap: 0.75rem;
+}
+
+:deep(.info-message .message-content) {
+  line-height: 1.5;
+}
+
+:deep(.loading-patterns) {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  color: var(--p-text-secondary-color);
+}
+
+:deep(.user-rejections-list) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+:deep(.rejection-item) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--p-surface-100);
+  border-radius: var(--p-border-radius);
+}
+
+:global(.dark) :deep(.rejection-item) {
+  background: var(--p-surface-800);
+}
+
+:deep(.rejection-info) {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+:deep(.rejection-name) {
+  font-weight: 500;
+  color: var(--p-text-color);
+}
+
+:deep(.rejection-reason) {
+  font-size: 0.85rem;
+  color: var(--p-text-secondary-color);
+}
+
+:deep(.empty-rejections) {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  color: var(--p-text-secondary-color);
+  background: var(--p-surface-100);
+  border-radius: var(--p-border-radius);
+}
+
+:global(.dark) :deep(.empty-rejections) {
+  background: var(--p-surface-800);
+}
+
+:deep(.empty-rejections i) {
+  font-size: 1.25rem;
+  color: var(--p-green-500);
+}
+
+/* ── Data Location Dialog ───────────────────────────────── */
 
 .data-location-dialog {
   display: flex;
@@ -2791,554 +1907,5 @@ const handleScroll = () => {
 
 .location-info-message :deep(.p-message-wrapper) {
   padding: 0.75rem 1rem;
-}
-
-/* ============================================================================
-   Sistema de Sensibilidad Unificado
-   ============================================================================ */
-
-.sensitivity-section {
-  padding: 0.5rem 0;
-}
-
-.sensitivity-header {
-  margin-bottom: 1.25rem;
-}
-
-.sensitivity-header .setting-label {
-  font-size: 1.1rem;
-  margin-bottom: 0.5rem;
-}
-
-/* Presets como botones grandes (2x2 en pantallas anchas) */
-.sensitivity-presets-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
-}
-
-.preset-button {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem 1.25rem;
-  background: var(--p-surface-50);
-  border: 2px solid var(--p-surface-200);
-  border-radius: var(--p-border-radius);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  text-align: left;
-  width: 100%;
-}
-
-.preset-button:hover {
-  border-color: var(--p-primary-color);
-  background: color-mix(in srgb, var(--p-primary-color) 5%, var(--p-surface-50));
-}
-
-.preset-button.active {
-  border-color: var(--p-primary-color);
-  background: color-mix(in srgb, var(--p-primary-color) 10%, var(--p-surface-50));
-}
-
-.preset-button > i:first-child {
-  font-size: 1.5rem;
-  color: var(--p-text-muted-color);
-  width: 2rem;
-  text-align: center;
-}
-
-.preset-button.active > i:first-child {
-  color: var(--p-primary-color);
-}
-
-.preset-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.preset-title {
-  font-weight: 600;
-  font-size: 1rem;
-  color: var(--p-text-color);
-}
-
-.preset-button .preset-desc {
-  font-size: 0.85rem;
-  color: var(--p-text-muted-color);
-}
-
-.recommended-star {
-  color: var(--ds-text-warning);
-  font-size: 0.9rem;
-}
-
-/* Dark mode para presets */
-:global(.dark) .preset-button {
-  background: var(--p-surface-800);
-  border-color: var(--p-surface-700);
-}
-
-:global(.dark) .preset-button:hover {
-  background: color-mix(in srgb, var(--p-primary-color) 15%, var(--p-surface-800));
-}
-
-:global(.dark) .preset-button.active {
-  background: color-mix(in srgb, var(--p-primary-color) 20%, var(--p-surface-800));
-}
-
-/* Slider de ajuste fino */
-.sensitivity-slider {
-  padding: 1rem 1.25rem;
-  background: var(--p-surface-50);
-  border-radius: var(--p-border-radius);
-  margin-bottom: 1rem;
-}
-
-:global(.dark) .sensitivity-slider {
-  background: var(--p-surface-800);
-}
-
-.slider-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.75rem;
-}
-
-.slider-label {
-  font-weight: 500;
-  font-size: 0.9rem;
-  color: var(--p-text-color);
-}
-
-.slider-value {
-  font-size: 0.85rem;
-  color: var(--p-primary-color);
-  font-weight: 600;
-}
-
-.slider-hints {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 0.5rem;
-  font-size: 0.75rem;
-  color: var(--p-text-muted-color);
-}
-
-/* Panel avanzado */
-.advanced-panel {
-  border-top: 1px solid var(--p-surface-200);
-  padding-top: 1rem;
-  margin-top: 0.5rem;
-}
-
-:global(.dark) .advanced-panel {
-  border-top-color: var(--p-surface-700);
-}
-
-.advanced-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: none;
-  border: none;
-  color: var(--p-text-muted-color);
-  font-size: 0.9rem;
-  cursor: pointer;
-  padding: 0.5rem 0;
-  transition: color 0.15s ease;
-}
-
-.advanced-toggle:hover {
-  color: var(--p-primary-color);
-}
-
-.advanced-toggle i {
-  font-size: 0.75rem;
-}
-
-.advanced-content {
-  margin-top: 1rem;
-  padding: 1rem;
-  background: var(--p-surface-50);
-  border-radius: var(--p-border-radius);
-}
-
-:global(.dark) .advanced-content {
-  background: var(--p-surface-800);
-}
-
-.advanced-note {
-  margin: 0 0 1rem 0;
-  font-size: 0.85rem;
-  color: var(--p-text-muted-color);
-  font-style: italic;
-}
-
-.advanced-slider {
-  margin-bottom: 1rem;
-}
-
-.advanced-slider:last-of-type {
-  margin-bottom: 1.25rem;
-}
-
-.advanced-slider-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-.advanced-slider-header label {
-  font-size: 0.85rem;
-  color: var(--p-text-color);
-}
-
-.advanced-slider-header span {
-  font-size: 0.85rem;
-  color: var(--p-primary-color);
-  font-weight: 500;
-}
-
-.slider-help {
-  font-size: 0.75rem;
-  color: var(--p-text-secondary-color);
-  margin: 0 0 0.5rem 0;
-  line-height: 1.4;
-}
-
-/* ============================================================================
-   Filtros de Entidades
-   ============================================================================ */
-
-.section-description {
-  color: var(--p-text-secondary-color);
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
-.filter-stats {
-  display: flex;
-  gap: 2rem;
-  padding: 1rem;
-  background: var(--p-surface-100);
-  border-radius: var(--p-border-radius);
-}
-
-:global(.dark) .filter-stats {
-  background: var(--p-surface-800);
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.stat-value {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--p-primary-color);
-}
-
-.stat-label {
-  font-size: 0.8rem;
-  color: var(--p-text-secondary-color);
-}
-
-.system-patterns-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.pattern-category {
-  border: 1px solid var(--p-surface-200);
-  border-radius: var(--p-border-radius);
-  overflow: hidden;
-}
-
-:global(.dark) .pattern-category {
-  border-color: var(--p-surface-700);
-}
-
-.category-title {
-  margin: 0;
-  padding: 0.75rem 1rem;
-  background: var(--p-surface-100);
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--p-text-color);
-}
-
-:global(.dark) .category-title {
-  background: var(--p-surface-800);
-}
-
-.patterns-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 0.5rem;
-  padding: 0.75rem;
-}
-
-.pattern-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  border-radius: var(--p-border-radius);
-  transition: background 0.15s ease;
-}
-
-.pattern-item:hover {
-  background: var(--p-surface-100);
-}
-
-:global(.dark) .pattern-item:hover {
-  background: var(--p-surface-800);
-}
-
-.pattern-item.inactive {
-  opacity: 0.5;
-}
-
-.pattern-label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-  cursor: pointer;
-}
-
-.pattern-text {
-  font-family: var(--p-font-family-mono, monospace);
-  font-size: 0.8rem;
-  color: var(--p-text-color);
-  background: var(--p-surface-200);
-  padding: 0.125rem 0.375rem;
-  border-radius: var(--app-radius-sm);
-}
-
-:global(.dark) .pattern-text {
-  background: var(--p-surface-700);
-}
-
-.pattern-desc {
-  font-size: 0.75rem;
-  color: var(--p-text-secondary-color);
-}
-
-.loading-patterns {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  color: var(--p-text-secondary-color);
-}
-
-.user-rejections-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.rejection-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1rem;
-  background: var(--p-surface-100);
-  border-radius: var(--p-border-radius);
-}
-
-:global(.dark) .rejection-item {
-  background: var(--p-surface-800);
-}
-
-.rejection-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.rejection-name {
-  font-weight: 500;
-  color: var(--p-text-color);
-}
-
-.rejection-reason {
-  font-size: 0.85rem;
-  color: var(--p-text-secondary-color);
-}
-
-.empty-rejections {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1.5rem;
-  color: var(--p-text-secondary-color);
-  background: var(--p-surface-100);
-  border-radius: var(--p-border-radius);
-}
-
-:global(.dark) .empty-rejections {
-  background: var(--p-surface-800);
-}
-
-.empty-rejections i {
-  font-size: 1.25rem;
-  color: var(--p-green-500);
-}
-
-/* ============================================================================
-   Configuracion de Correcciones
-   ============================================================================ */
-
-.correction-info-message {
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
-.correction-info-message p {
-  margin: 0;
-}
-
-.correction-config-summary {
-  background: var(--p-surface-100);
-  border-radius: var(--p-border-radius);
-  padding: 1rem;
-}
-
-:global(.dark) .correction-config-summary {
-  background: var(--p-surface-800);
-}
-
-.config-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.config-section {
-  background: var(--p-surface-0);
-  border-radius: var(--p-border-radius);
-  padding: 1rem;
-}
-
-:global(.dark) .config-section {
-  background: var(--p-surface-900);
-}
-
-.config-section h4 {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0 0 0.75rem 0;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--p-primary-color);
-}
-
-.config-section h4 i {
-  font-size: 1rem;
-}
-
-.config-items {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.config-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-}
-
-.config-label {
-  color: var(--p-text-secondary-color);
-  min-width: 80px;
-}
-
-.preset-dropdown-option {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.preset-dropdown-option .preset-name {
-  font-weight: 500;
-}
-
-.preset-dropdown-option .preset-description {
-  font-size: 0.8rem;
-  color: var(--p-text-secondary-color);
-}
-
-.text-green-500 {
-  color: var(--p-green-500);
-}
-
-.text-red-500 {
-  color: var(--p-red-500);
-}
-
-/* Character Knowledge Mode Selector */
-.knowledge-mode-selector {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.knowledge-mode-card {
-  flex: 1;
-  min-width: 200px;
-  padding: 1rem;
-  border: 2px solid var(--p-content-border-color);
-  border-radius: var(--p-border-radius);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  background: var(--p-surface-ground);
-}
-
-.knowledge-mode-card:hover:not(.disabled) {
-  border-color: var(--p-primary-color);
-  background: var(--p-surface-hover);
-}
-
-.knowledge-mode-card.selected {
-  border-color: var(--p-primary-color);
-  background: var(--p-primary-50);
-}
-
-.knowledge-mode-card.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.knowledge-mode-card .mode-name {
-  font-weight: 600;
-  font-size: 1rem;
-}
-
-.knowledge-mode-card .mode-description {
-  font-size: 0.85rem;
-  color: var(--p-text-secondary-color);
-  line-height: 1.4;
-}
-
-
-.knowledge-mode-card .method-tag {
-  margin-top: 0.5rem;
-  width: fit-content;
 }
 </style>

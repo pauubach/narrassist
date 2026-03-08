@@ -137,6 +137,9 @@ jobs:
 
       - name: Build Tauri (Windows)
         run: cargo tauri build --target x86_64-pc-windows-msvc
+
+      - name: Smoke test built desktop app (Windows)
+        run: python scripts/smoke_desktop_app.py
       
       - name: Upload Windows Installer
         uses: actions/upload-artifact@v4

@@ -53,7 +53,7 @@
             aria-label="Exportar Guía de Estilo"
             @click="quickExportStyleGuide"
           />
-          <Button label="Exportar" icon="pi pi-download" outlined @click="showExportDialog = true" />
+          <Button label="Exportar" icon="pi pi-download" outlined @click="openExportDialog" />
           <Button
             v-if="isAnalyzing"
             label="Cancelar análisis"
@@ -375,7 +375,7 @@
             :entities="entities"
             :alerts="alerts"
             :chapters="chapters"
-            @export="showExportDialog = true"
+            @export="openExportDialog()"
             @export-style-guide="handleExportStyleGuide"
             @export-corrected="handleExportCorrected"
             @re-analyze="showReanalyzeDialog = true"
@@ -632,12 +632,12 @@ import type { SidebarTab } from '@/stores/workspace'
 import type { Entity, Alert, AlertSource, ChatReference, DialogueAttribution } from '@/types'
 import { resetGlobalHighlight } from '@/composables/useHighlight'
 import { api } from '@/services/apiClient'
-import { exportCorrectedDocumentBlob } from '@/services/projectExports'
 import { useNotifications } from '@/composables/useNotifications'
 import { useGlobalUndo } from '@/composables/useGlobalUndo'
 import { updateProjectStats } from '@/composables/useGlobalStats'
 import { waitForPendingAnalysisSettingsSync } from '@/composables/useSettingsPersistence'
-import { downloadBlob, downloadTextFile } from '@/utils/fileDownload'
+import { useProjectDetailExports } from '@/views/project-detail/useProjectDetailExports'
+import { useProjectDetailAlerts } from '@/views/project-detail/useProjectDetailAlerts'
 import { useToast } from 'primevue/usetoast'
 
 const route = useRoute()
@@ -702,7 +702,34 @@ const loadingRelations = computed(() => loadingEntities.value || loadingRelation
 // ── Local UI state ─────────────────────────────────────────
 const loading = ref(true) // Loading inicial del proyecto
 const error = ref('')
-const showExportDialog = ref(false)
+const {
+  showExportDialog,
+  exportingStyleGuide,
+  openExportDialog,
+  handleExportCorrected,
+  quickExportStyleGuide,
+} = useProjectDetailExports({
+  project,
+  setError: (message: string) => {
+    error.value = message
+  },
+  addToast: toast.add,
+})
+const {
+  onAlertResolve,
+  onAlertDismiss,
+  onResolveAmbiguousAttribute,
+  onResolveAll,
+  onBatchResolveAmbiguous,
+  handleAlertAction,
+} = useProjectDetailAlerts({
+  projectId: computed(() => project.value?.id ?? null),
+  loadAlerts,
+  clearSelection: () => {
+    selectionStore.clearAll()
+  },
+  addToast: toast.add,
+})
 const replaceDocumentInputRef = ref<HTMLInputElement | null>(null)
 const showReanalyzeDialog = ref(false)
 const correctionConfigModalRef = ref<InstanceType<typeof CorrectionConfigModal> | null>(null)
@@ -715,7 +742,6 @@ const analysisModeOptions = [
   { label: 'Estándar', value: 'standard', description: 'Análisis completo' },
   { label: 'Profundo', value: 'deep', description: 'Todo incluido (requiere más recursos)' },
 ]
-const exportingStyleGuide = ref(false)
 const retryingTimeline = ref(false)
 
 // Estados de carga individuales vienen de useProjectData()
@@ -954,7 +980,7 @@ const handleMenuTabEvent = (event: Event) => {
   }
 }
 
-const handleMenuExport = () => { showExportDialog.value = true }
+const handleMenuExport = () => { openExportDialog() }
 const handleMenuUpdateManuscript = () => { openUpdateDocumentDialog() }
 const handleMenuRunAnalysis = () => { showReanalyzeDialog.value = true }
 const handleMenuToggleInspector = () => { workspaceStore.toggleRightPanel() }
@@ -1327,88 +1353,6 @@ const onAlertNavigateToPosition = (alert: Alert | null, startChar: number, endCh
   workspaceStore.navigateToTextPosition(startChar, text, chapterId)
 }
 
-const onAlertResolve = async (alert: Alert) => {
-  try {
-    const projectId = project.value!.id
-    await api.postRaw(`/api/projects/${projectId}/alerts/${alert.id}/resolve`)
-    await loadAlerts(projectId)
-    selectionStore.clearAll()
-    toast.add({ severity: 'success', summary: 'Resuelta', detail: alert.title || `Alerta #${alert.id} resuelta`, life: 3000 })
-  } catch (err) {
-    console.error('Error resolving alert:', err)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo resolver la alerta', life: 3000 })
-  }
-}
-
-const onAlertDismiss = async (alert: Alert) => {
-  try {
-    const projectId = project.value!.id
-    await api.postRaw(`/api/projects/${projectId}/alerts/${alert.id}/dismiss`)
-    await loadAlerts(projectId)
-    selectionStore.clearAll()
-    toast.add({ severity: 'info', summary: 'Descartada', detail: alert.title || `Alerta #${alert.id} descartada`, life: 3000 })
-  } catch (err) {
-    console.error('Error dismissing alert:', err)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo descartar la alerta', life: 3000 })
-  }
-}
-
-const onResolveAmbiguousAttribute = async (alert: Alert, entityId: number | null) => {
-  try {
-    const projectId = project.value!.id
-    await api.postRaw(`/api/projects/${projectId}/alerts/${alert.id}/resolve-attribute`, {
-      entity_id: entityId
-    })
-    await loadAlerts(projectId)
-    selectionStore.clearAll()
-
-    const message = entityId === null
-      ? 'Atributo no asignado'
-      : 'Atributo asignado correctamente'
-    toast.add({ severity: 'success', summary: 'Resuelto', detail: message, life: 3000 })
-  } catch (err) {
-    console.error('Error resolving ambiguous attribute:', err)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo resolver el atributo ambiguo', life: 3000 })
-  }
-}
-
-const onResolveAll = async () => {
-  try {
-    const projectId = project.value!.id
-    await api.postRaw(`/api/projects/${projectId}/alerts/resolve-all`)
-    await loadAlerts(projectId)
-    selectionStore.clearAll()
-    toast.add({ severity: 'success', summary: 'Resueltas', detail: 'Todas las alertas activas han sido resueltas', life: 3000 })
-  } catch (err) {
-    console.error('Error resolving all alerts:', err)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron resolver las alertas', life: 3000 })
-  }
-}
-
-const onBatchResolveAmbiguous = async (alertsToResolve: Alert[]) => {
-  try {
-    const projectId = project.value!.id
-    const resolutions = alertsToResolve.map(a => ({
-      alert_id: a.id,
-      entity_id: a.extraData?.suggestedEntityId ?? null
-    }))
-    await api.postRaw(`/api/projects/${projectId}/alerts/batch-resolve-attributes`, {
-      resolutions
-    })
-    await loadAlerts(projectId)
-    selectionStore.clearAll()
-    toast.add({
-      severity: 'success',
-      summary: 'Resueltas',
-      detail: `${alertsToResolve.length} alertas ambiguas resueltas con sugerencia`,
-      life: 3000
-    })
-  } catch (err) {
-    console.error('Error batch resolving ambiguous alerts:', err)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron resolver las alertas', life: 3000 })
-  }
-}
-
 const navigateToAlerts = () => {
   workspaceStore.setActiveTab('alerts')
 }
@@ -1453,42 +1397,6 @@ const onAlertClick = (alert: Alert) => {
   // Asegurar que estamos en la pestaña de texto y en el inspector derecho
   workspaceStore.setActiveTab('text')
   rightInspectorTab.value = 'contextual'
-}
-
-const handleAlertAction = async (alert: Alert, action: 'accept' | 'reject') => {
-  if (!project.value) return
-
-  const newStatus = action === 'accept' ? 'resolved' : 'dismissed'
-
-  try {
-    await api.patch(`/api/projects/${project.value.id}/alerts/${alert.id}/status`, {
-      status: newStatus
-    })
-
-    // Recargar las alertas desde el servidor para sincronizar
-    await loadAlerts(project.value.id)
-
-    // Disparar evento para refrescar el historial
-    window.dispatchEvent(new CustomEvent('history:changed', {
-      detail: { projectId: project.value.id, alertId: alert.id }
-    }))
-
-    // Mostrar notificación de éxito
-    toast.add({
-      severity: 'success',
-      summary: action === 'accept' ? 'Alerta aceptada' : 'Alerta rechazada',
-      life: 2000
-    })
-
-  } catch (error) {
-    console.error(`Error ${action}ing alert:`, error)
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: `No se pudo ${action === 'accept' ? 'aceptar' : 'rechazar'} la alerta`,
-      life: 3000
-    })
-  }
 }
 
 const handleGoToMentions = (entity: Entity) => {
@@ -1576,56 +1484,12 @@ const onChatReferenceNavigate = (ref: ChatReference) => {
 }
 
 const handleExportStyleGuide = () => {
-  showExportDialog.value = true
+  openExportDialog()
 }
 
 const handleNavigateToCharacter = (entityId: number) => {
   initialEntityId.value = entityId
   workspaceStore.setActiveTab('entities')
-}
-
-const handleExportCorrected = async () => {
-  if (!project.value) return
-
-  try {
-    const { blob, filename } = await exportCorrectedDocumentBlob(project.value.id, {
-      min_confidence: 0.5,
-      as_track_changes: true,
-    })
-    downloadBlob(blob, filename || 'documento_corregido.docx')
-  } catch (err) {
-    console.error('Error exporting corrected document:', err)
-    toast.add({
-      severity: 'error',
-      summary: 'No se pudo exportar',
-      detail: err instanceof Error ? err.message : 'Error al exportar documento corregido',
-      life: 5000,
-    })
-  }
-}
-
-const quickExportStyleGuide = async () => {
-  if (!project.value) return
-
-  exportingStyleGuide.value = true
-
-  try {
-    // Exportar directamente en formato Markdown (el más común para correctores)
-    const data = await api.getRaw<{ success: boolean; data?: any; error?: string }>(`/api/projects/${project.value.id}/style-guide?format=markdown`)
-
-    if (data.success) {
-      const content = data.data.content
-      const filename = `guia_estilo_${project.value.name}_${Date.now()}.md`
-      downloadTextFile(content, filename, 'text/markdown')
-    } else {
-      throw new Error(data.error || 'No se pudo completar la operación. Si persiste, reinicia la aplicación.')
-    }
-  } catch (err) {
-    console.error('Error exporting style guide:', err)
-    error.value = 'No se pudo exportar la guía de estilo'
-  } finally {
-    exportingStyleGuide.value = false
-  }
 }
 
 /**

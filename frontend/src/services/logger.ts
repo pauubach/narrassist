@@ -14,9 +14,14 @@
  * Helper DRY para catch blocks:
  *   import { logError } from '@/services/logger'
  *   catch (err) { logError('Entities', 'Error loading entities:', err) }
+ *
+ * NOTA ARQUITECTÓNICA: este módulo usa el transporte HTTP de bajo nivel
+ * compartido, no apiClient. Así evitamos una dependencia circular
+ * (apiClient también registra errores) y mantenemos `keepalive` para el
+ * flush de beforeunload, donde las garantías de apiClient no aplican.
  */
 
-import { apiUrl } from '@/config/api'
+import { apiRequest } from '@/services/httpTransport'
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
@@ -65,7 +70,7 @@ function flush() {
   const entries = buffer.splice(0)
   flushing = true
 
-  fetch(apiUrl('/api/logs/frontend'), {
+  apiRequest('/api/logs/frontend', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ entries }),

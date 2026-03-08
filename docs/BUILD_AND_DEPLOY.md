@@ -212,6 +212,23 @@ npx playwright test --debug
 - `e2e/home.spec.ts` - Vista de inicio
 - Más tests según se implementen
 
+### Smoke desktop sobre binario construido
+
+Tras construir Tauri, puede ejecutarse un smoke reproducible del binario desktop:
+
+```bash
+python scripts/smoke_desktop_app.py --binary src-tauri/target/release/narrative-assistant.exe
+```
+
+El script:
+
+- lanza la app desktop
+- espera readiness real en `http://127.0.0.1:8008/api/health`
+- falla si el backend local no queda listo dentro del timeout
+- cierra el proceso al finalizar
+
+Si no se pasa `--binary`, intenta autodetectar una build release en `src-tauri/target/`.
+
 ### Tests de Integración
 
 ```bash

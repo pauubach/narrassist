@@ -7,6 +7,7 @@
 
 import { ref, readonly } from 'vue'
 import { apiUrl } from '@/config/api'
+import { apiRequest, rawRequest } from '@/services/httpTransport'
 import type { ApiResponse } from '@/types/api'
 
 /** Error específico de la API con detalles del backend */
@@ -67,7 +68,7 @@ function startRecoveryPolling() {
   if (recoveryTimer) return
   recoveryTimer = setInterval(async () => {
     try {
-      const res = await fetch(apiUrl('/api/health'), { signal: AbortSignal.timeout(5000) })
+      const res = await apiRequest('/api/health', { signal: AbortSignal.timeout(5000) })
       if (res.ok) {
         onRequestSuccess()
         console.info('[API] Backend recuperado')
@@ -118,7 +119,7 @@ export interface BlobResponse {
  */
 async function monitoredFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   try {
-    const response = await fetch(input, init)
+    const response = await rawRequest(input, init)
     onRequestSuccess()
     return response
   } catch (err) {
