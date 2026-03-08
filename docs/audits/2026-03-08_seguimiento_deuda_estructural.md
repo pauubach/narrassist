@@ -20,10 +20,10 @@ Cierres y avances ya materializados:
 - smoke reproducible sobre instalador NSIS y DMG final: cerrado a nivel de script, tests y workflow
 - `SettingsView` troceado y cubierto: cerrado en este tramo
 - flujo `.nra` y flujo editorial: cubiertos con tests de composable/dialogos
-- `ProjectDetailView` con bootstrap, analisis, alertas, exportaciones y lifecycle extraidos: avance solido
-- `DocumentViewer` con exportacion, preferencias, datos, dialogos y helpers puros extraidos: avance solido
-- `_analysis_phases.py` con helpers runtime/cache/structure extraidos: avance solido
-- `analysis_pipeline.py` con modelos, temporal y dialogo/voz extraidos: avance solido
+- `ProjectDetailView` con bootstrap, analisis, alertas, exportaciones, lifecycle y navegacion extraidos: avance solido
+- `DocumentViewer` con exportacion, preferencias, datos, dialogos, interacciones, navegacion por teclado y helpers puros extraidos: avance solido
+- `_analysis_phases.py` con helpers runtime/cache/structure y subfase de gramatica extraidos: avance solido
+- `analysis_pipeline.py` con modelos, temporal, dialogo/voz y creacion de alertas extraidos: avance solido
 
 Resultado global:
 
@@ -147,6 +147,7 @@ Slices ya extraidos:
 - `frontend/src/components/document-viewer/useDocumentViewerPreferences.ts`
 - `frontend/src/components/document-viewer/useDocumentViewerData.ts`
 - `frontend/src/components/document-viewer/useDocumentViewerDialogues.ts`
+- `frontend/src/components/document-viewer/useDocumentViewerKeyboardNavigation.ts`
 - `frontend/src/components/document-viewer/documentViewerText.ts`
 - `frontend/src/components/document-viewer/useDocumentViewerInteractions.ts`
 
@@ -156,6 +157,7 @@ Cobertura asociada:
 - `useDocumentViewerPreferences.spec.ts`
 - `useDocumentViewerData.spec.ts`
 - `useDocumentViewerDialogues.spec.ts`
+- `useDocumentViewerKeyboardNavigation.spec.ts`
 - `documentViewerText.spec.ts`
 - `useDocumentViewerInteractions.spec.ts`
 - `DocumentViewer.spec.ts`
@@ -163,7 +165,8 @@ Cobertura asociada:
 Resultado:
 
 - `DocumentViewer.vue` reduce IO, helpers puros, interaccion de seleccion/click y estado mezclado
-- el componente principal baja a ~1922 lineas
+- la navegacion por teclado entre highlights deja de vivir incrustada en el componente
+- el componente principal baja a ~2097 lineas
 - la logica de exportacion, datos, dialogos, preferencias y texto queda testeada por separado
 
 ### 2.12 Extraccion funcional de ProjectDetailView
@@ -175,6 +178,7 @@ Slices ya extraidos:
 - `frontend/src/views/project-detail/projectDetailBootstrap.ts`
 - `frontend/src/views/project-detail/useProjectDetailAnalysis.ts`
 - `frontend/src/views/project-detail/useProjectDetailLifecycle.ts`
+- `frontend/src/views/project-detail/useProjectDetailNavigation.ts`
 
 Cobertura asociada:
 
@@ -183,12 +187,14 @@ Cobertura asociada:
 - `projectDetailBootstrap.spec.ts`
 - `useProjectDetailAnalysis.spec.ts`
 - `useProjectDetailLifecycle.spec.ts`
+- `useProjectDetailNavigation.spec.ts`
 
 Resultado:
 
 - `ProjectDetailView.vue` reduce bootstrap incrustado, reanalisis, toasts, recargas reactivas y wiring de tabs
+- la navegacion contextual a alertas, capitulos, sidebar y dialogos queda aislada en un slice propio
 - la carrera inicial de `?alert=` queda corregida y testeada
-- el componente principal baja a ~1865 lineas
+- el componente principal baja a ~1870 lineas
 
 ### 2.13 Primer troceado de monolitos backend
 
@@ -197,6 +203,7 @@ Modulos nuevos en routers:
 - `api-server/routers/_analysis_runtime.py`
 - `api-server/routers/_analysis_cache_helpers.py`
 - `api-server/routers/_analysis_structure_helpers.py`
+- `api-server/routers/_grammar_subphases.py`
 
 Responsabilidades extraidas:
 
@@ -211,10 +218,11 @@ Cobertura asociada:
 - `tests/unit/test_cr03_runtime_settings.py`
 - `tests/unit/test_analysis_cache_roundtrip.py`
 - `tests/unit/test_analysis_structure_helpers.py`
+- `tests/unit/test_grammar_subphases.py`
 
 Resultado:
 
-- `_analysis_phases.py` baja a ~4968 lineas
+- `_analysis_phases.py` baja a ~4439 lineas
 - se mantiene compatibilidad con los puntos de monkeypatch historicos de la suite
 
 ### 2.14 Primer troceado del pipeline legacy
@@ -224,6 +232,7 @@ Modulos nuevos:
 - `src/narrative_assistant/pipelines/analysis_pipeline_models.py`
 - `src/narrative_assistant/pipelines/analysis_pipeline_temporal.py`
 - `src/narrative_assistant/pipelines/analysis_pipeline_dialogue.py`
+- `src/narrative_assistant/pipelines/analysis_pipeline_alerts.py`
 
 Responsabilidades extraidas:
 
@@ -232,16 +241,19 @@ Responsabilidades extraidas:
 - extraccion de dialogos por capitulo
 - conversion de dialogos para analisis emocional
 - analisis legacy de voz
+- creacion de alertas de inconsistencias, timeline, voz, focalizacion y coherencia emocional
 
 Cobertura asociada:
 
 - `tests/unit/test_analysis_pipeline_dialogue.py`
 - `tests/unit/test_temporal_entity_mentions_integration.py`
+- `tests/unit/test_analysis_pipeline_alerts_module.py`
 
 Resultado:
 
-- `analysis_pipeline.py` baja a ~1995 lineas
+- `analysis_pipeline.py` baja a ~1909 lineas
 - la logica de dialogo/voz deja de vivir incrustada en el pipeline principal
+- la construccion de alertas deja de vivir incrustada en el pipeline legacy
 
 ## 3. Reutilizacion y centralizacion logradas
 
@@ -255,9 +267,13 @@ Piezas reutilizables nuevas o consolidadas:
 6. `projectDetailBootstrap` como bootstrap reutilizable y testeable del detalle.
 7. `useProjectDetailAnalysis` como slice reutilizable del flujo de analisis del detalle.
 8. `useProjectDetailLifecycle` como sincronizacion reactiva reutilizable del detalle.
-9. `documentViewerText` como modulo puro reutilizable para transformaciones textuales del visor.
-10. `analysis_pipeline_dialogue` como modulo reutilizable de dialogo/voz para el pipeline legacy.
-11. `_analysis_structure_helpers` como capa reutilizable de estructura persistida en router.
+9. `useProjectDetailNavigation` como slice reutilizable de navegacion contextual del detalle.
+10. `documentViewerText` como modulo puro reutilizable para transformaciones textuales del visor.
+11. `useDocumentViewerKeyboardNavigation` como slice reutilizable de navegacion por highlights.
+12. `analysis_pipeline_dialogue` como modulo reutilizable de dialogo/voz para el pipeline legacy.
+13. `analysis_pipeline_alerts` como modulo reutilizable de emision de alertas del pipeline legacy.
+14. `_analysis_structure_helpers` como capa reutilizable de estructura persistida en router.
+15. `_grammar_subphases` como subfase reutilizable y testeable de gramatica/correcciones.
 
 ## 4. Lo que sigue pendiente de verdad
 
@@ -274,16 +290,20 @@ Ya no falta soporte tecnico. Lo pendiente es operativo:
 Siguen siendo la deuda de mantenibilidad mas costosa:
 
 - `frontend/src/views/SettingsView.vue` (~1630 lineas)
-- `frontend/src/views/ProjectDetailView.vue` (~1865 lineas)
-- `frontend/src/components/DocumentViewer.vue` (~1922 lineas)
-- `api-server/routers/_analysis_phases.py` (~4785 lineas, -924 tras extracciones)
-- `src/narrative_assistant/pipelines/analysis_pipeline.py` (~1995 lineas)
+- `frontend/src/views/ProjectDetailView.vue` (~1870 lineas)
+- `frontend/src/components/DocumentViewer.vue` (~2097 lineas)
+- `api-server/routers/_analysis_phases.py` (~4439 lineas)
+- `src/narrative_assistant/pipelines/analysis_pipeline.py` (~1909 lineas)
 
-Avance reciente en `_analysis_phases.py` (5709 → 4785 lineas):
+Avance reciente en `_analysis_phases.py` (5709 → 4439 lineas):
 
 - `_alert_emission.py`: emision de alertas (grammar + consistency) (~320 lineas)
 - `_analysis_restoration.py`: SP-1 restauracion de datos de usuario (~200 lineas)
 - `_consistency_subphases.py`: 7 sub-analisis de consistencia + helpers (~380 lineas)
+- `_analysis_runtime.py`: capabilities runtime y filtrado de metodos
+- `_analysis_cache_helpers.py`: cache roundtrip de entidades/coref/menciones
+- `_analysis_structure_helpers.py`: estructura ligera y dialogos persistidos
+- `_grammar_subphases.py`: gramatica/ortografia/correcciones editoriales
 
 Prioridad recomendada:
 
@@ -309,12 +329,12 @@ Lo pendiente aqui es el salto a flujo desktop real o Playwright/Tauri real para:
 
 ### 4.4 Politica global de logging de error
 
-Politica establecida y parcialmente aplicada:
+Politica establecida y aplicada salvo infraestructura de bajo nivel:
 
 Infraestructura:
 
 - `logError(tag, message, err?)` en `logger.ts` — para catch blocks con console.error
-- `logWarn(tag, message, err?)` en `logger.ts` (nuevo) — para catch blocks con console.warn
+- `logWarn(tag, message, err?)` en `logger.ts` — para catch blocks con console.warn
 - Interceptor global ya captura todo `console.*` y lo envia a `frontend.log` via backend
 
 Reglas:
@@ -324,13 +344,11 @@ Reglas:
 - lifecycle/error boundary → conservar `console.error` directo (contexto Vue)
 - infraestructura (logger.ts, apiClient.ts) → no tocar
 
-Migracion completada:
+Estado real del arbol:
 
-- **stores**: 7 archivos, 56 llamadas migradas — 0 restantes
-- **composables**: 14 archivos, 33 llamadas migradas — 4 guard clauses conservados
-- **views**: 4 archivos, 23 llamadas migradas — 0 restantes
-- **Total**: 112 de 236 migradas (47%)
-- **Restantes**: 124 en ~58 componentes individuales — migracion incremental a medida que se toquen
+- `console.log/debug` de producto: 0
+- `console.warn/error` de producto: 0 fuera de infraestructura
+- restos conservados y justificados: `apiClient.ts`, `logger.ts`, `safeStorage.ts`
 
 ## 5. Validacion realizada
 
@@ -341,13 +359,16 @@ Frontend:
 - `npm run test:run -- src/components/settings/SettingsSections.spec.ts src/views/SettingsView.spec.ts src/composables/useProjectFile.spec.ts src/components/ImportWorkDialog.spec.ts src/services/httpTransport.spec.ts`
 - `npm run test:run -- src/services/projectExports.spec.ts src/components/ExportDialog.spec.ts`
 - `npm run test:run -- src/views/project-detail/useProjectDetailExports.spec.ts src/views/project-detail/useProjectDetailAlerts.spec.ts src/views/project-detail/projectDetailBootstrap.spec.ts src/views/project-detail/useProjectDetailAnalysis.spec.ts src/views/project-detail/useProjectDetailLifecycle.spec.ts`
-- `npm run test:run -- src/components/document-viewer/useDocumentViewerExport.spec.ts src/components/document-viewer/useDocumentViewerPreferences.spec.ts src/components/document-viewer/useDocumentViewerData.spec.ts src/components/document-viewer/useDocumentViewerDialogues.spec.ts src/components/document-viewer/documentViewerText.spec.ts src/components/document-viewer/useDocumentViewerInteractions.spec.ts src/components/DocumentViewer.spec.ts`
+- `npm run test:run -- src/views/project-detail/useProjectDetailNavigation.spec.ts`
+- `npm run test:run -- src/components/document-viewer/useDocumentViewerExport.spec.ts src/components/document-viewer/useDocumentViewerPreferences.spec.ts src/components/document-viewer/useDocumentViewerData.spec.ts src/components/document-viewer/useDocumentViewerDialogues.spec.ts src/components/document-viewer/useDocumentViewerKeyboardNavigation.spec.ts src/components/document-viewer/documentViewerText.spec.ts src/components/document-viewer/useDocumentViewerInteractions.spec.ts src/components/DocumentViewer.spec.ts`
+- `npx playwright test e2e/export-import-editorial.spec.ts --project=chromium`
 
 Backend / scripts:
 
 - `pytest tests/scripts/test_smoke_desktop_app.py -q`
-- `pytest tests/unit/test_cr03_runtime_settings.py tests/unit/test_analysis_cache_roundtrip.py tests/unit/test_analysis_structure_helpers.py tests/unit/test_analysis_pipeline_dialogue.py tests/unit/test_temporal_entity_mentions_integration.py -q`
-- `python -m compileall api-server/routers/_analysis_runtime.py api-server/routers/_analysis_cache_helpers.py api-server/routers/_analysis_structure_helpers.py src/narrative_assistant/pipelines/analysis_pipeline.py src/narrative_assistant/pipelines/analysis_pipeline_models.py src/narrative_assistant/pipelines/analysis_pipeline_temporal.py src/narrative_assistant/pipelines/analysis_pipeline_dialogue.py`
+- `pytest tests/api/test_cr03_pipeline_e2e.py tests/unit/test_analysis_alert_emission.py tests/unit/test_analysis_pipeline_dialogue.py tests/unit/test_temporal_entity_mentions_integration.py -q`
+- `pytest tests/unit/test_cr03_runtime_settings.py tests/unit/test_analysis_cache_roundtrip.py tests/unit/test_analysis_structure_helpers.py tests/unit/test_grammar_subphases.py tests/unit/test_analysis_pipeline_alerts_module.py -q`
+- `python -m compileall api-server/routers/_analysis_runtime.py api-server/routers/_analysis_cache_helpers.py api-server/routers/_analysis_structure_helpers.py api-server/routers/_grammar_subphases.py src/narrative_assistant/pipelines/analysis_pipeline.py src/narrative_assistant/pipelines/analysis_pipeline_models.py src/narrative_assistant/pipelines/analysis_pipeline_temporal.py src/narrative_assistant/pipelines/analysis_pipeline_dialogue.py src/narrative_assistant/pipelines/analysis_pipeline_alerts.py`
 
 Comprobaciones de estructura:
 
@@ -362,6 +383,7 @@ Resultado:
 - `fetch()` directo de producto: 0
 - dialogos nativos: 0
 - `console.log/debug` de producto: 0
+- `console.warn/error` de producto: 0 fuera de infraestructura
 
 ### 5.1 Validacion adicional (bloque 2)
 
