@@ -133,4 +133,60 @@ describe('useProjectDetailAlerts', () => {
       life: 2000,
     })
   })
+
+  it('resolves all active alerts and clears selection through the shared reload path', async () => {
+    const alertsState = useProjectDetailAlerts({
+      projectId,
+      loadAlerts,
+      clearSelection,
+      addToast,
+    })
+
+    await alertsState.onResolveAll()
+
+    expect(postRawMock).toHaveBeenCalledWith('/api/projects/7/alerts/resolve-all')
+    expect(loadAlerts).toHaveBeenCalledWith(7)
+    expect(clearSelection).toHaveBeenCalled()
+    expect(addToast).toHaveBeenCalledWith({
+      severity: 'success',
+      summary: 'Resueltas',
+      detail: 'Todas las alertas activas han sido resueltas',
+      life: 3000,
+    })
+  })
+
+  it('sends batch resolutions using suggested entities and reports success', async () => {
+    const alertsState = useProjectDetailAlerts({
+      projectId,
+      loadAlerts,
+      clearSelection,
+      addToast,
+    })
+
+    await alertsState.onBatchResolveAmbiguous([
+      makeAlert({
+        id: 21,
+        extraData: { suggestedEntityId: 9 } as Alert['extraData'],
+      }),
+      makeAlert({
+        id: 22,
+        extraData: undefined,
+      }),
+    ])
+
+    expect(postRawMock).toHaveBeenCalledWith('/api/projects/7/alerts/batch-resolve-attributes', {
+      resolutions: [
+        { alert_id: 21, entity_id: 9 },
+        { alert_id: 22, entity_id: null },
+      ],
+    })
+    expect(loadAlerts).toHaveBeenCalledWith(7)
+    expect(clearSelection).toHaveBeenCalled()
+    expect(addToast).toHaveBeenCalledWith({
+      severity: 'success',
+      summary: 'Resueltas',
+      detail: '2 alertas ambiguas resueltas con sugerencia',
+      life: 3000,
+    })
+  })
 })

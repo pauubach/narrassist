@@ -23,7 +23,7 @@ export function useDocumentViewerPreferences(options: UseDocumentViewerPreferenc
         fontSize.value = parsed.fontSize || 'medium'
         lineHeight.value = parsed.lineHeight || '1.6'
       } catch {
-        // Mantener defaults si el almacenamiento local est?? corrupto.
+        // Mantener defaults si el almacenamiento local está corrupto.
       }
     }
 
@@ -34,7 +34,7 @@ export function useDocumentViewerPreferences(options: UseDocumentViewerPreferenc
         options.showSpellingErrors.value = parsed.showSpellingErrors ?? true
         options.showGrammarErrors.value = parsed.showGrammarErrors ?? true
       } catch {
-        // Mantener defaults si las preferencias est??n corruptas.
+        // Mantener defaults si las preferencias están corruptas.
       }
     }
   }

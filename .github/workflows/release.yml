@@ -164,6 +164,9 @@ jobs:
       - name: Build Tauri
         run: cargo tauri build
 
+      - name: Smoke test built desktop app (macOS)
+        run: python scripts/smoke_desktop_app.py
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:

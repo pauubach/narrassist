@@ -286,6 +286,9 @@ jobs:
       
       - name: Build Tauri (macOS)
         run: cargo tauri build --target aarch64-apple-darwin
+
+      - name: Smoke test built desktop app (macOS)
+        run: python3 scripts/smoke_desktop_app.py
       
       - name: Upload macOS DMG
         uses: actions/upload-artifact@v4

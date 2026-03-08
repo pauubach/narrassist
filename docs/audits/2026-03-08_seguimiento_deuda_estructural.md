@@ -15,6 +15,7 @@ Entre el 2026-03-07 y el 2026-03-08 se ha cerrado la mayor parte de la deuda est
 - `console.log/debug` de producto: cerrados en `frontend/src`
 - smoke test desktop MVP del shell Tauri: cerrado a nivel de store/eventos
 - smoke reproducible sobre binario desktop construido: disponible
+- smoke de binario construido integrado en CI para Windows y macOS: cerrado
 - refactor de `SettingsView` cubierto con smoke test y tests por seccion: cerrado
 - flujo `.nra` (dialogo Tauri + backend): cubierto con tests de composable
 
@@ -186,8 +187,9 @@ Cobertura:
 
 Limite actual:
 
-- no sustituye un test CI ya integrado sobre instalador/DMG
+- no sustituye una prueba sobre instalador/DMG final
 - pero elimina el hueco de "no hay script reproducible para comprobar el binario"
+- el script queda integrado en workflows de Windows y macOS tras `cargo tauri build`
 
 ### 2.10 Extraccion del flujo de exportacion en DocumentViewer
 
@@ -228,6 +230,7 @@ Resultado:
 - `ProjectDetailView.vue` baja a ~2.1K lineas
 - la IO y los toasts de alertas/exportaciones dejan de vivir incrustados en la vista
 - el refactor queda blindado con tests especificos y no solo con smoke del contenedor
+- los caminos batch (`resolve-all`, `batch-resolve-attributes`) tambien quedan cubiertos
 
 ## 3. Reutilizacion y centralizacion logradas
 
@@ -246,11 +249,13 @@ Esto reduce duplicacion y baja el coste de seguir troceando vistas monoliticas.
 
 Pendiente:
 
-- prueba automatizada sobre binario Tauri empaquetado por plataforma
 - verificacion de bootstrap real fuera del entorno de desarrollo
 - validacion de sidecar + ventana + backend ya compilados
 
-Estado: no bloqueante para desarrollo diario, pero si deuda real de release.
+Estado:
+
+- cerrado para binario construido en CI Windows/macOS
+- pendiente solo el ultimo tramo sobre instalador/DMG empaquetado final
 
 ### 4.2 Monolitos grandes
 
@@ -326,7 +331,7 @@ La deuda estructural inmediata del frontend queda mayoritariamente cerrada.
 
 Lo pendiente ya no es un problema de higiene basica, sino de siguientes capas de calidad:
 
-- release testing desktop empaquetado
+- release testing final sobre instalador/DMG
 - refactor por slices de archivos monoliticos
 - cobertura E2E especifica de export/import
 - continuar troceando vistas grandes ya con cobertura incremental
