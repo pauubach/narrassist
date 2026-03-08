@@ -92,6 +92,13 @@ from ..persistence.document_fingerprint import generate_fingerprint
 from ..persistence.project import ProjectManager
 from ..persistence.session import SessionManager
 from ..temporal import TemporalInconsistency
+from .analysis_pipeline_alerts import (
+    create_alerts_from_emotional_incoherences as _create_alerts_from_emotional_incoherences_impl,
+    create_alerts_from_focalization_violations as _create_alerts_from_focalization_violations_impl,
+    create_alerts_from_inconsistencies as _create_alerts_from_inconsistencies_impl,
+    create_alerts_from_temporal_inconsistencies as _create_alerts_from_temporal_inconsistencies_impl,
+    create_alerts_from_voice_deviations as _create_alerts_from_voice_deviations_impl,
+)
 from .analysis_pipeline_dialogue import (
     extract_dialogues_for_emotional_analysis as _extract_dialogues_for_emotional_analysis,
     extract_dialogues_from_chapter as _extract_dialogues_from_chapter,
@@ -1642,118 +1649,8 @@ def _create_alerts_from_inconsistencies(
     inconsistencies: list[AttributeInconsistency],
     min_confidence: float,
 ) -> Result[list[Alert]]:
-    """
-    Convierte inconsistencias en alertas.
-
-    CRÍTICO: Aquí se resuelve entity_name → entity_id usando EntityRepository.
-    """
-    try:
-        engine = get_alert_engine()
-        entity_repo = get_entity_repository()
-        alerts = []
-
-        logger.info(f"Processing {len(inconsistencies)} inconsistencies for alerts...")
-        for incon in inconsistencies:
-            logger.debug(
-                f"Processing inconsistency: {incon.entity_name}.{incon.attribute_key.value} = {incon.value1} vs {incon.value2}, confidence={incon.confidence}"
-            )
-
-            # Filtrar por confianza mínima
-            if incon.confidence < min_confidence:
-                logger.debug(f"  -> Skipped: confidence {incon.confidence} < {min_confidence}")
-                continue
-
-            # RESOLUCIÓN entity_name → entity_id
-            # Si entity_id es 0 (placeholder), buscar por nombre
-            entity_id = incon.entity_id
-            if entity_id == 0:
-                # Primero intentar búsqueda exacta (case-insensitive)
-                found_entities = entity_repo.find_entities_by_name(
-                    project_id=project_id, name=incon.entity_name
-                )
-                # Si no hay match exacto, intentar fuzzy (ej: "María" → "María Sánchez")
-                if not found_entities:
-                    found_entities = entity_repo.find_entities_by_name(
-                        project_id=project_id, name=incon.entity_name, fuzzy=True
-                    )
-                if found_entities:
-                    entity_id = found_entities[0].id
-                    logger.debug(f"Found entity_id={entity_id} for '{incon.entity_name}'")
-                else:
-                    logger.warning(f"Entity not found: {incon.entity_name}, skipping alert")
-                    continue
-
-            # Construir fuentes con información de ubicación
-            # Soportar tanto multi-valor (conflicting_values) como legacy (value1/value2)
-            if incon.conflicting_values and len(incon.conflicting_values) > 0:
-                # Multi-valor: construir sources[] COMPLETO desde conflicting_values
-                sources = []
-                for cv in incon.conflicting_values:
-                    sources.append(
-                        {
-                            "chapter": cv.chapter,
-                            "position": cv.position,
-                            "start_char": cv.position,
-                            "end_char": cv.position + 100,  # Estimación
-                            "text": cv.excerpt,
-                            "value": cv.value,
-                        }
-                    )
-
-                # Legacy: usar primeros 2 valores para compatibilidad con campos value1/value2
-                # NOTA: sources[] contiene TODOS los valores, no solo 2
-                value1_source = sources[0] if len(sources) >= 1 else {}
-                value2_source = sources[1] if len(sources) >= 2 else {}
-            else:
-                # Legacy: value1/value2
-                value1_source = {
-                    "chapter": incon.value1_chapter,
-                    "position": incon.value1_position,
-                    "start_char": incon.value1_position,
-                    "end_char": incon.value1_position + 100,
-                    "text": incon.value1_excerpt,
-                    "value": incon.value1,
-                }
-                value2_source = {
-                    "chapter": incon.value2_chapter,
-                    "position": incon.value2_position,
-                    "start_char": incon.value2_position,
-                    "end_char": incon.value2_position + 100,
-                    "text": incon.value2_excerpt,
-                    "value": incon.value2,
-                }
-                sources = [value1_source, value2_source]
-
-            # Crear alerta
-            alert_result = engine.create_from_attribute_inconsistency(
-                project_id=project_id,
-                entity_name=incon.entity_name,
-                entity_id=entity_id,
-                attribute_key=incon.attribute_key.value,
-                value1=incon.value1,
-                value2=incon.value2,
-                value1_source=value1_source,
-                value2_source=value2_source,
-                explanation=incon.explanation,
-                confidence=incon.confidence,
-                sources=sources,  # Nueva lista de fuentes
-            )
-
-            if alert_result.is_success:
-                alerts.append(alert_result.value)
-                logger.debug("  -> Alert created successfully")
-            else:
-                logger.warning(f"Failed to create alert: {alert_result.error}")
-
-        logger.info(f"Created {len(alerts)} alerts from {len(inconsistencies)} inconsistencies")
-        return Result.success(alerts)
-
-    except Exception as e:
-        error = NarrativeError(
-            message=f"Alert creation failed: {str(e)}",
-            severity=ErrorSeverity.RECOVERABLE,
-        )
-        return Result.failure(error)
+    """Wrapper fino sobre `analysis_pipeline_alerts.create_alerts_from_inconsistencies`."""
+    return _create_alerts_from_inconsistencies_impl(project_id, inconsistencies, min_confidence)
 
 
 def _create_alerts_from_ambiguous_attributes(
@@ -1843,173 +1740,16 @@ def _create_alerts_from_temporal_inconsistencies(
     project_id: int,
     inconsistencies: list[TemporalInconsistency],
 ) -> Result[list[Alert]]:
-    """
-    Crea alertas a partir de inconsistencias temporales.
-
-    Args:
-        project_id: ID del proyecto
-        inconsistencies: Lista de inconsistencias temporales detectadas
-
-    Returns:
-        Result con lista de alertas creadas
-    """
-    try:
-        from ..alerts.repository import get_alert_repository
-
-        alert_repo = get_alert_repository()
-        alerts = []
-
-        # Mapeo de severidad temporal a severidad de alerta
-        severity_map = {
-            "critical": AlertSeverity.CRITICAL,
-            "high": AlertSeverity.WARNING,
-            "medium": AlertSeverity.INFO,
-            "low": AlertSeverity.INFO,
-        }
-
-        # Mapeo de tipo de inconsistencia a categoría
-        category_map = {
-            "age_contradiction": AlertCategory.CHARACTER_CONSISTENCY,
-            "impossible_sequence": AlertCategory.TIMELINE_ISSUE,
-            "time_jump_suspicious": AlertCategory.TIMELINE_ISSUE,
-            "marker_conflict": AlertCategory.TIMELINE_ISSUE,
-            "character_age_mismatch": AlertCategory.CHARACTER_CONSISTENCY,
-            "anachronism": AlertCategory.TIMELINE_ISSUE,
-        }
-
-        for incon in inconsistencies:
-            severity = severity_map.get(incon.severity.value, AlertSeverity.INFO)
-            category = category_map.get(
-                incon.inconsistency_type.value, AlertCategory.TIMELINE_ISSUE
-            )
-
-            # Construir título descriptivo
-            title = f"Inconsistencia temporal: {incon.inconsistency_type.value.replace('_', ' ').title()}"
-
-            # Construir descripción
-            description = incon.description
-            if incon.expected and incon.found:
-                description += f"\n\nEsperado: {incon.expected}\nEncontrado: {incon.found}"
-            if incon.suggestion:
-                description += f"\n\nSugerencia: {incon.suggestion}"
-
-            # Crear alerta en la base de datos
-            alert_id = alert_repo.create_alert(
-                project_id=project_id,
-                entity_id=None,  # Las alertas temporales no siempre tienen entidad
-                category=category.value,
-                severity=severity.value,
-                title=title,
-                description=description,
-                source_chapter=incon.chapter,
-                source_position=incon.position,
-                confidence=incon.confidence,
-            )
-
-            if alert_id:
-                # Recuperar la alerta creada
-                alert = alert_repo.get_alert_by_id(alert_id)
-                if alert:
-                    alerts.append(alert)
-                    logger.debug(f"Created temporal alert: {title}")
-
-        logger.info(f"Created {len(alerts)} temporal alerts")
-        return Result.success(alerts)
-
-    except Exception as e:
-        error = NarrativeError(
-            message=f"Failed to create temporal alerts: {str(e)}",
-            severity=ErrorSeverity.RECOVERABLE,
-        )
-        logger.exception("Error creating temporal alerts")
-        return Result.failure(error)
+    """Wrapper fino sobre `analysis_pipeline_alerts.create_alerts_from_temporal_inconsistencies`."""
+    return _create_alerts_from_temporal_inconsistencies_impl(project_id, inconsistencies)
 
 
 def _create_alerts_from_voice_deviations(
     project_id: int,
     deviations: list[VoiceDeviation],
 ) -> Result[list[Alert]]:
-    """
-    Crea alertas a partir de desviaciones de voz.
-
-    Args:
-        project_id: ID del proyecto
-        deviations: Lista de desviaciones de voz detectadas
-
-    Returns:
-        Result con lista de alertas creadas
-    """
-    from ..alerts.repository import get_alert_repository
-    from ..voice.deviations import DeviationType
-
-    try:
-        alert_repo = get_alert_repository()
-        alerts = []
-
-        # Mapeo de severidad de desviación a severidad de alerta
-        severity_map = {
-            "high": AlertSeverity.WARNING,
-            "medium": AlertSeverity.INFO,
-            "low": AlertSeverity.HINT,
-        }
-
-        # Mapeo de tipo de desviación a categoría
-        category_map = {
-            DeviationType.FORMALITY_SHIFT.value: AlertCategory.VOICE_DEVIATION,
-            DeviationType.LENGTH_ANOMALY.value: AlertCategory.VOICE_DEVIATION,
-            DeviationType.VOCABULARY_SHIFT.value: AlertCategory.VOICE_DEVIATION,
-            DeviationType.FILLER_ANOMALY.value: AlertCategory.VOICE_DEVIATION,
-            DeviationType.PUNCTUATION_SHIFT.value: AlertCategory.VOICE_DEVIATION,
-        }
-
-        for deviation in deviations:
-            severity = severity_map.get(deviation.severity.value, AlertSeverity.INFO)
-            category = category_map.get(
-                deviation.deviation_type.value, AlertCategory.CHARACTER_CONSISTENCY
-            )
-
-            # Construir título descriptivo
-            title = f"Desviación de voz: {deviation.entity_name}"
-
-            # Construir descripción
-            description = deviation.description
-            if deviation.text:
-                # Truncar texto si es muy largo
-                text_preview = (
-                    deviation.text[:150] + "..." if len(deviation.text) > 150 else deviation.text
-                )
-                description += f'\n\nTexto: "{text_preview}"'
-
-            # Crear alerta en la base de datos
-            alert_id = alert_repo.create_alert(
-                project_id=project_id,
-                entity_id=deviation.entity_id,
-                category=category.value,
-                severity=severity.value,
-                title=title,
-                description=description,
-                source_chapter=deviation.chapter,
-                source_position=deviation.position,
-                confidence=deviation.confidence,
-            )
-
-            if alert_id:
-                # Recuperar la alerta creada
-                alert = alert_repo.get_alert_by_id(alert_id)
-                if alert:
-                    alerts.append(alert)
-                    logger.debug(f"Created voice alert: {title}")
-
-        logger.info(f"Created {len(alerts)} voice alerts")
-        return Result.success(alerts)
-
-    except Exception as e:
-        error = NarrativeError(
-            message=f"Failed to create voice alerts: {str(e)}",
-            severity=ErrorSeverity.RECOVERABLE,
-        )
-        logger.exception("Error creating voice alerts")
-        return Result.failure(error)
+    """Wrapper fino sobre `analysis_pipeline_alerts.create_alerts_from_voice_deviations`."""
+    return _create_alerts_from_voice_deviations_impl(project_id, deviations)
 
 
 def _run_focalization_analysis(
@@ -2089,80 +1829,8 @@ def _create_alerts_from_focalization_violations(
     project_id: int,
     violations: list[FocalizationViolation],
 ) -> Result[list[Alert]]:
-    """
-    Crea alertas a partir de violaciones de focalización.
-
-    Args:
-        project_id: ID del proyecto
-        violations: Lista de violaciones detectadas
-
-    Returns:
-        Result con lista de alertas creadas
-    """
-    from ..alerts.repository import get_alert_repository
-
-    try:
-        alert_repo = get_alert_repository()
-        alerts = []
-
-        # Mapeo de severidad
-        severity_map = {
-            "high": AlertSeverity.WARNING,
-            "medium": AlertSeverity.INFO,
-            "low": AlertSeverity.HINT,
-        }
-
-        for violation in violations:
-            severity = severity_map.get(violation.severity.value, AlertSeverity.INFO)
-
-            # Construir título
-            title = f"Violación de focalización: {violation.violation_type.value.replace('_', ' ').title()}"
-            if violation.entity_name:
-                title = f"Violación de focalización: {violation.entity_name}"
-
-            # Construir descripción
-            description = violation.explanation
-            if violation.declared_focalizer:
-                description += f"\n\nFocalizador declarado: {violation.declared_focalizer}"
-            if violation.suggestion:
-                description += f"\n\nSugerencia: {violation.suggestion}"
-            if violation.text_excerpt:
-                excerpt = (
-                    violation.text_excerpt[:150] + "..."
-                    if len(violation.text_excerpt) > 150
-                    else violation.text_excerpt
-                )
-                description += f'\n\nTexto: "{excerpt}"'
-
-            # Crear alerta
-            alert_id = alert_repo.create_alert(
-                project_id=project_id,
-                entity_id=violation.entity_involved,
-                category=AlertCategory.FOCALIZATION.value,
-                severity=severity.value,
-                title=title,
-                description=description,
-                source_chapter=violation.chapter,
-                source_position=violation.position,
-                confidence=violation.confidence,
-            )
-
-            if alert_id:
-                alert = alert_repo.get_alert_by_id(alert_id)
-                if alert:
-                    alerts.append(alert)
-                    logger.debug(f"Created focalization alert: {title}")
-
-        logger.info(f"Created {len(alerts)} focalization alerts")
-        return Result.success(alerts)
-
-    except Exception as e:
-        error = NarrativeError(
-            message=f"Failed to create focalization alerts: {str(e)}",
-            severity=ErrorSeverity.RECOVERABLE,
-        )
-        logger.exception("Error creating focalization alerts")
-        return Result.failure(error)
+    """Wrapper fino sobre `analysis_pipeline_alerts.create_alerts_from_focalization_violations`."""
+    return _create_alerts_from_focalization_violations_impl(project_id, violations)
 
 
 def _run_emotional_analysis(
@@ -2237,112 +1905,5 @@ def _create_alerts_from_emotional_incoherences(
     project_id: int,
     incoherences: list[EmotionalIncoherence],
 ) -> Result[list[Alert]]:
-    """
-    Crea alertas a partir de incoherencias emocionales.
-
-    Args:
-        project_id: ID del proyecto
-        incoherences: Lista de incoherencias detectadas
-
-    Returns:
-        Result con lista de alertas creadas
-    """
-    from ..alerts.repository import get_alert_repository
-    from ..analysis.emotional_coherence import IncoherenceType
-
-    try:
-        alert_repo = get_alert_repository()
-        alerts = []
-
-        # Mapeo de severidad según tipo de incoherencia
-        severity_map = {
-            IncoherenceType.EMOTION_DIALOGUE: AlertSeverity.WARNING,
-            IncoherenceType.EMOTION_ACTION: AlertSeverity.INFO,
-            IncoherenceType.TEMPORAL_JUMP: AlertSeverity.INFO,
-            IncoherenceType.NARRATOR_BIAS: AlertSeverity.HINT,
-        }
-
-        # Mapeo de etiquetas para títulos
-        type_labels = {
-            IncoherenceType.EMOTION_DIALOGUE: "Diálogo incoherente con emoción",
-            IncoherenceType.EMOTION_ACTION: "Acción incoherente con emoción",
-            IncoherenceType.TEMPORAL_JUMP: "Cambio emocional abrupto",
-            IncoherenceType.NARRATOR_BIAS: "Inconsistencia del narrador",
-        }
-
-        for incoherence in incoherences:
-            # Determinar severidad basada en confianza y tipo
-            if incoherence.confidence >= 0.8:
-                severity = AlertSeverity.WARNING
-            elif incoherence.confidence >= 0.6:
-                severity = severity_map.get(incoherence.incoherence_type, AlertSeverity.INFO)
-            else:
-                severity = AlertSeverity.HINT
-
-            # Construir título descriptivo
-            title = type_labels.get(
-                incoherence.incoherence_type,
-                f"Incoherencia emocional: {incoherence.incoherence_type.value}",
-            )
-            if incoherence.entity_name:
-                title = f"{incoherence.entity_name}: {title}"
-
-            # Construir descripción detallada
-            description = incoherence.explanation
-
-            if incoherence.declared_emotion and incoherence.actual_behavior:
-                description += (
-                    f"\n\nEmoción declarada: {incoherence.declared_emotion}"
-                    f"\nComportamiento detectado: {incoherence.actual_behavior}"
-                )
-
-            if incoherence.behavior_text:
-                excerpt = (
-                    incoherence.behavior_text[:150] + "..."
-                    if len(incoherence.behavior_text) > 150
-                    else incoherence.behavior_text
-                )
-                description += f'\n\nTexto: "{excerpt}"'
-
-            if incoherence.suggestion:
-                description += f"\n\nSugerencia: {incoherence.suggestion}"
-
-            # Buscar entity_id si hay personaje asociado
-            entity_id = None
-            if incoherence.entity_name:
-                from ..entities.repository import get_entity_repository
-
-                entity_repo = get_entity_repository()
-                entity = entity_repo.find_by_name(project_id, incoherence.entity_name)
-                if entity:
-                    entity_id = entity.id
-
-            # Crear alerta
-            alert_id = alert_repo.create_alert(
-                project_id=project_id,
-                entity_id=entity_id,
-                category=AlertCategory.EMOTIONAL.value,
-                severity=severity.value,
-                title=title,
-                description=description,
-                source_chapter=incoherence.chapter_id,
-                source_position=incoherence.start_char,
-                confidence=incoherence.confidence,
-            )
-
-            if alert_id:
-                alert = alert_repo.get_alert_by_id(alert_id)
-                if alert:
-                    alerts.append(alert)
-                    logger.debug(f"Created emotional alert: {title}")
-
-        logger.info(f"Created {len(alerts)} emotional alerts")
-        return Result.success(alerts)
-
-    except Exception as e:
-        error = NarrativeError(
-            message=f"Failed to create emotional alerts: {str(e)}",
-            severity=ErrorSeverity.RECOVERABLE,
-        )
-        logger.exception("Error creating emotional alerts")
-        return Result.failure(error)
+    """Wrapper fino sobre `analysis_pipeline_alerts.create_alerts_from_emotional_incoherences`."""
+    return _create_alerts_from_emotional_incoherences_impl(project_id, incoherences)
