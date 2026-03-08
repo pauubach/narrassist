@@ -280,7 +280,12 @@ export function useAlertFiltering(
    * Sincroniza con el filtro de severidad del workspace store.
    * Llamar dentro de setup() del componente que lo necesite.
    */
-  function syncWithWorkspaceStore(workspaceStore: { alertSeverityFilter: string | null; setAlertSeverityFilter: (v: string | null) => void }) {
+  function syncWithWorkspaceStore(workspaceStore: {
+    alertSeverityFilter: string | null
+    alertCategoryFilter?: string | null
+    setAlertSeverityFilter: (v: string | null) => void
+    setAlertCategoryFilter?: (v: string | null) => void
+  }) {
     watch(() => workspaceStore.alertSeverityFilter, (newFilter) => {
       if (newFilter) {
         selectedSeverities.value = [newFilter as AlertSeverity]
@@ -288,10 +293,21 @@ export function useAlertFiltering(
       }
     }, { immediate: true })
 
+    watch(() => workspaceStore.alertCategoryFilter, (newFilter) => {
+      if (newFilter) {
+        selectedCategories.value = [newFilter]
+        workspaceStore.setAlertCategoryFilter?.(null)
+      }
+    }, { immediate: true })
+
     onMounted(() => {
       if (workspaceStore.alertSeverityFilter) {
         selectedSeverities.value = [workspaceStore.alertSeverityFilter as AlertSeverity]
         workspaceStore.setAlertSeverityFilter(null)
+      }
+      if (workspaceStore.alertCategoryFilter) {
+        selectedCategories.value = [workspaceStore.alertCategoryFilter]
+        workspaceStore.setAlertCategoryFilter?.(null)
       }
     })
   }

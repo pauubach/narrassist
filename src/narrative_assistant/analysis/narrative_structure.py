@@ -312,15 +312,107 @@ class NarrativeStructureDetector:
             NarrativeStructureReport con todas las anomalías
         """
         prolepsis = self.detect_prolepsis(text, chapters, min_confidence)
-
-        # TODO: Implementar detección de analepsis (flashbacks sin marcador)
-        analepsis = []
+        analepsis = self.detect_analepsis(text, chapters, min_confidence)
 
         return NarrativeStructureReport(
             prolepsis_found=prolepsis,
             analepsis_found=analepsis,
             chapters_analyzed=len(chapters),
         )
+
+    def detect_analepsis(
+        self,
+        text: str,
+        chapters: list[dict],
+        min_confidence: float = 0.7,
+    ) -> list[ProlepticReference]:
+        """
+        Detecta analepsis apoyándose en el detector de señales retrospectivas.
+
+        No intenta sustituir a timeline.py; cubre la capa ligera de estructura
+        narrativa para que los flashbacks textuales no queden invisibles.
+        """
+        if not text or not chapters:
+            return []
+
+        from narrative_assistant.temporal.non_linear_detector import (
+            NonLinearNarrativeDetector,
+        )
+
+        detector = NonLinearNarrativeDetector()
+        analepsis_found: list[ProlepticReference] = []
+
+        for chapter in chapters:
+            chapter_num = chapter.get("number", 0)
+            chapter_content = chapter.get("content", "")
+            chapter_start = chapter.get("start_char", 0)
+
+            if not chapter_content:
+                continue
+
+            signals = [
+                signal
+                for signal in detector.detect_signals(chapter_content, chapter_num)
+                if signal.direction == "past"
+            ]
+            if not signals:
+                continue
+
+            chapter_is_flashback = (
+                detector.classify_chapter(chapter_content, chapter_num) == "analepsis"
+            )
+
+            for signal in signals:
+                sentence = self._extract_sentence(
+                    chapter_content, signal.start_char, signal.end_char
+                )
+                confidence = signal.confidence
+
+                if chapter_is_flashback:
+                    confidence = min(1.0, confidence + 0.1)
+                if signal.signal_type in {"retrospective", "subjunctive"}:
+                    confidence = min(1.0, confidence + 0.05)
+
+                if confidence < min_confidence:
+                    continue
+
+                evidence = [
+                    f"Señal retrospectiva: {signal.signal_type}",
+                ]
+                if chapter_is_flashback:
+                    evidence.append("Capítulo clasificado como analepsis por acumulación de señales")
+
+                severity = self._assess_analepsis_severity(
+                    sentence, chapter_num, len(chapters)
+                )
+                resolved_chapter, resolved_text = self._find_prior_event(
+                    sentence, chapters, chapter_num
+                )
+
+                analepsis_found.append(
+                    ProlepticReference(
+                        anomaly_type=NarrativeAnomaly.ANALEPSIS,
+                        location=NarrativeLocation(
+                            chapter=chapter_num,
+                            paragraph=self._get_paragraph_number(
+                                chapter_content, signal.start_char
+                            ),
+                            start_char=chapter_start + signal.start_char,
+                            end_char=chapter_start + signal.end_char,
+                            text=sentence,
+                        ),
+                        severity=severity,
+                        description=self._generate_analepsis_description(
+                            chapter_num, resolved_chapter
+                        ),
+                        evidence=evidence,
+                        resolved_event_chapter=resolved_chapter,
+                        resolved_event_text=resolved_text,
+                        confidence=confidence,
+                    )
+                )
+
+        return self._deduplicate(analepsis_found)
 
     def _extract_sentence(self, text: str, start: int, end: int) -> str:
         """Extrae la oración completa que contiene el match."""
@@ -398,6 +490,44 @@ class NarrativeStructureDetector:
 
         return ProlepsisSeverity.LOW
 
+    def _assess_analepsis_severity(
+        self, sentence: str, current_chapter: int, total_chapters: int
+    ) -> ProlepsisSeverity:
+        """Evalúa severidad de una analepsis detectada."""
+        sentence_lower = sentence.lower()
+
+        high_severity_keywords = [
+            "muerte",
+            "murió",
+            "asesin",
+            "traición",
+            "infancia",
+            "pasado oculto",
+            "secreto",
+        ]
+        medium_severity_keywords = [
+            "años atrás",
+            "cuando era",
+            "hacía años",
+            "recordó",
+            "evocó",
+            "aún no",
+            "todavía no",
+        ]
+
+        for kw in high_severity_keywords:
+            if kw in sentence_lower:
+                return ProlepsisSeverity.HIGH
+
+        for kw in medium_severity_keywords:
+            if kw in sentence_lower:
+                return ProlepsisSeverity.MEDIUM
+
+        if current_chapter >= max(3, total_chapters // 2):
+            return ProlepsisSeverity.MEDIUM
+
+        return ProlepsisSeverity.LOW
+
     def _find_resolved_event(
         self,
         prolepsis_sentence: str,
@@ -452,6 +582,39 @@ class NarrativeStructureDetector:
                             end = min(len(content), idx + 100)
                             fragment = chapter.get("content", "")[start:end]
                             return chapter.get("number"), fragment.strip()
+
+        return None, None
+
+    def _find_prior_event(
+        self,
+        analepsis_sentence: str,
+        chapters: list[dict],
+        current_chapter: int,
+    ) -> tuple[int | None, str | None]:
+        """
+        Busca si el evento retrospectivo ya había sido narrado en capítulos previos.
+        """
+        keywords = self._extract_event_keywords(analepsis_sentence)
+        if not keywords:
+            return None, None
+
+        for chapter in chapters:
+            if chapter.get("number", 0) >= current_chapter:
+                continue
+
+            content = chapter.get("content", "").lower()
+            matches = sum(1 for kw in keywords if kw.lower() in content)
+            min_matches = max(2, len(keywords) * 0.4)
+
+            if matches >= min_matches:
+                for kw in keywords:
+                    kw_lower = kw.lower()
+                    if kw_lower in content:
+                        idx = content.find(kw_lower)
+                        start = max(0, idx - 50)
+                        end = min(len(content), idx + 100)
+                        fragment = chapter.get("content", "")[start:end]
+                        return chapter.get("number"), fragment.strip()
 
         return None, None
 
@@ -543,6 +706,22 @@ class NarrativeStructureDetector:
         return (
             f"Posible prolepsis en capítulo {current_chapter}: "
             f"uso de condicional con marcador temporal futuro"
+        )
+
+    def _generate_analepsis_description(
+        self,
+        current_chapter: int,
+        resolved_chapter: int | None,
+    ) -> str:
+        """Genera descripción legible de la analepsis."""
+        if resolved_chapter:
+            return (
+                f"Analepsis en capítulo {current_chapter}: retoma un evento ya narrado "
+                f"en capítulo {resolved_chapter}"
+            )
+        return (
+            f"Posible analepsis en capítulo {current_chapter}: "
+            f"uso de marcadores retrospectivos o memoria narrativa"
         )
 
     def _deduplicate(self, prolepsis_list: list[ProlepticReference]) -> list[ProlepticReference]:

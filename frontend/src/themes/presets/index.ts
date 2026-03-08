@@ -75,18 +75,28 @@ export const grammarlyPreset: ThemePresetConfig = {
     950: '#121212'
   },
   darkSurface: {
-    0: '#121212',
-    50: '#1E1E1E',
-    100: '#232323',
-    200: '#2C2C2C',
-    300: '#3D3D3D',
-    400: '#4F4F4F',
+    0: '#FFFFFF',
+    50: '#FAFAFA',
+    100: '#E5E5E5',
+    200: '#C7C7C7',
+    300: '#A8A8A8',
+    400: '#8A8A8A',
     500: '#6B6B6B',
-    600: '#8A8A8A',
-    700: '#A8A8A8',
-    800: '#C7C7C7',
-    900: '#E5E5E5',
-    950: '#FAFAFA'
+    600: '#4F4F4F',
+    700: '#3D3D3D',
+    800: '#2C2C2C',
+    900: '#1E1E1E',
+    950: '#121212'
+  },
+  lightSemantics: {
+    text: '#212121',
+    textMuted: '#616161',
+    borderColor: '#E0E0E0'
+  },
+  darkSemantics: {
+    text: '#FAFAFA',
+    textMuted: '#C7C7C7',
+    borderColor: '#3D3D3D'
   }
 }
 

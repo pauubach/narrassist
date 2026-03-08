@@ -2104,13 +2104,23 @@ html.scrivener-theme.dark .p-fieldset-legend {
   color: var(--scrivener-text) !important;
 }
 
-/* Texto de párrafos y contenido */
+/* Texto de párrafos y contenido semántico.
+   No forzar span/div genéricos: pisan labels/iconos de botones y controles. */
 html.scrivener-theme.dark p,
-html.scrivener-theme.dark span,
-html.scrivener-theme.dark div,
+html.scrivener-theme.dark li,
+html.scrivener-theme.dark dt,
+html.scrivener-theme.dark dd,
+html.scrivener-theme.dark blockquote,
 html.scrivener-theme.dark .p-card-content,
 html.scrivener-theme.dark .p-dialog-content,
-html.scrivener-theme.dark .p-message-text {
+html.scrivener-theme.dark .p-message-text,
+html.scrivener-theme.dark .setting-description,
+html.scrivener-theme.dark .subtitle,
+html.scrivener-theme.dark .privacy-note,
+html.scrivener-theme.dark .status-label,
+html.scrivener-theme.dark .status-value,
+html.scrivener-theme.dark .stat-label,
+html.scrivener-theme.dark .stat-value {
   color: var(--scrivener-text);
 }
 
@@ -2176,13 +2186,23 @@ html.scrivener-theme:not(.dark) .p-fieldset-legend {
   color: var(--scrivener-text) !important;
 }
 
-/* Texto de párrafos y contenido */
+/* Texto de párrafos y contenido semántico.
+   No forzar span/div genéricos: pisan labels/iconos de botones y controles. */
 html.scrivener-theme:not(.dark) p,
-html.scrivener-theme:not(.dark) span,
-html.scrivener-theme:not(.dark) div,
+html.scrivener-theme:not(.dark) li,
+html.scrivener-theme:not(.dark) dt,
+html.scrivener-theme:not(.dark) dd,
+html.scrivener-theme:not(.dark) blockquote,
 html.scrivener-theme:not(.dark) .p-card-content,
 html.scrivener-theme:not(.dark) .p-dialog-content,
-html.scrivener-theme:not(.dark) .p-message-text {
+html.scrivener-theme:not(.dark) .p-message-text,
+html.scrivener-theme:not(.dark) .setting-description,
+html.scrivener-theme:not(.dark) .subtitle,
+html.scrivener-theme:not(.dark) .privacy-note,
+html.scrivener-theme:not(.dark) .status-label,
+html.scrivener-theme:not(.dark) .status-value,
+html.scrivener-theme:not(.dark) .stat-label,
+html.scrivener-theme:not(.dark) .stat-value {
   color: var(--scrivener-text);
 }
 
@@ -3233,6 +3253,10 @@ html.scrivener-theme.dark .p-tabview .p-tabview-panels {
 .p-selectbutton .p-button {
   border-radius: 0;
   border-right-width: 0;
+  background-color: var(--p-surface-0, #ffffff);
+  border-color: var(--p-surface-300, #cbd5e1);
+  color: var(--p-text-color, #0f172a);
+  font-weight: 500;
 }
 
 .p-selectbutton .p-button:first-child {
@@ -3246,18 +3270,78 @@ html.scrivener-theme.dark .p-tabview .p-tabview-panels {
   border-right-width: 1px;
 }
 
+.p-selectbutton .p-togglebutton,
+.p-selectbutton [data-pc-name="pcToggleButton"],
+.p-selectbutton [data-pc-name="togglebutton"] {
+  background-color: var(--p-surface-0, #ffffff);
+  border-color: var(--p-surface-300, #cbd5e1);
+  color: var(--p-text-color, #0f172a);
+  font-weight: 500;
+}
+
+.p-selectbutton .p-togglebutton-content,
+.p-selectbutton .p-button-label,
+.p-selectbutton .p-togglebutton-label {
+  color: inherit !important;
+}
+
+.p-selectbutton .p-button:hover:not(.p-highlight):not([aria-pressed="true"]),
+.p-selectbutton .p-togglebutton:hover:not(.p-togglebutton-checked),
+.p-selectbutton [data-pc-name="pcToggleButton"]:not([data-p-checked="true"]):hover {
+  background-color: var(--p-surface-100, #f1f5f9);
+  color: var(--p-text-color, #0f172a);
+}
+
+.p-selectbutton .p-button.p-highlight,
+.p-selectbutton .p-togglebutton.p-togglebutton-checked,
+.p-selectbutton [aria-pressed="true"],
+.p-selectbutton [data-pc-name="pcToggleButton"][data-p-checked="true"] {
+  background-color: var(--p-primary-600, #2563eb);
+  border-color: var(--p-primary-600, #2563eb);
+  color: var(--p-primary-contrast-color, #ffffff);
+}
+
+/* Settings navigation: active/hover states need stronger contrast than the
+   generic primary-on-subtle combination used by some presets. */
+.settings-view .nav-menu a:hover,
+.settings-view .nav-menu a:hover span,
+.settings-view .nav-menu a:hover i,
+.settings-view .nav-menu a.active,
+.settings-view .nav-menu a.active span,
+.settings-view .nav-menu a.active i {
+  color: var(--p-primary-800, var(--p-primary-color)) !important;
+}
+
+html.dark .settings-view .nav-menu a:hover,
+html.dark .settings-view .nav-menu a:hover span,
+html.dark .settings-view .nav-menu a:hover i,
+html.dark .settings-view .nav-menu a.active,
+html.dark .settings-view .nav-menu a.active span,
+html.dark .settings-view .nav-menu a.active i {
+  color: var(--p-primary-200, #bfdbfe) !important;
+}
+
 /* Dark mode genérico */
-html.dark .p-selectbutton .p-button {
+html.dark .p-selectbutton .p-button,
+html.dark .p-selectbutton .p-togglebutton,
+html.dark .p-selectbutton [data-pc-name="pcToggleButton"],
+html.dark .p-selectbutton [data-pc-name="togglebutton"] {
   background-color: var(--p-surface-800, #1e293b);
   border-color: var(--p-surface-600, #475569);
   color: var(--p-surface-300, #cbd5e1);
 }
 
-html.dark .p-selectbutton .p-button:hover:not(.p-highlight) {
+html.dark .p-selectbutton .p-button:hover:not(.p-highlight):not([aria-pressed="true"]),
+html.dark .p-selectbutton .p-togglebutton:hover:not(.p-togglebutton-checked),
+html.dark .p-selectbutton [data-pc-name="pcToggleButton"]:not([data-p-checked="true"]):hover {
   background-color: var(--p-surface-700, #334155);
+  color: var(--p-surface-100, #f4f4f5);
 }
 
-html.dark .p-selectbutton .p-button.p-highlight {
+html.dark .p-selectbutton .p-button.p-highlight,
+html.dark .p-selectbutton .p-togglebutton.p-togglebutton-checked,
+html.dark .p-selectbutton [aria-pressed="true"],
+html.dark .p-selectbutton [data-pc-name="pcToggleButton"][data-p-checked="true"] {
   background-color: var(--p-primary-color, #3b82f6);
   border-color: var(--p-primary-color, #3b82f6);
   color: #ffffff;
@@ -3604,7 +3688,6 @@ html.scrivener-theme.dark [data-pc-name="selectbutton"] .p-togglebutton-checked 
   border-color: #9A8A6A !important;
   color: #FFFBF5 !important;  /* Near-white for max readability */
   font-weight: 600 !important;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3) !important;
 }
 
 html.scrivener-theme.dark .p-selectbutton .p-togglebutton.p-togglebutton-checked:hover,
@@ -3793,4 +3876,138 @@ html.scrivener-theme.dark .p-selectbutton .p-button:last-child {
 html.scrivener-theme.dark .p-selectbutton .p-togglebutton:not(:last-child),
 html.scrivener-theme.dark .p-selectbutton .p-button:not(:last-child) {
   border-right: 1px solid #3E3626 !important;
+}
+
+/* ============================================================================
+   PRIMEVUE ACCESSIBILITY HARDENING - Mar 2026
+   Cierra overrides internos de PrimeVue que seguian reintroduciendo
+   contrastes bajos en labels/contenidos de Button y SelectButton.
+   ============================================================================ */
+
+/* Los labels/iconos internos deben heredar el color efectivo del botón. */
+.p-button .p-button-label,
+.p-button .p-button-icon,
+.p-button .p-button-loading-icon,
+.p-button .p-button-icon-left,
+.p-button .p-button-icon-right {
+  color: inherit !important;
+}
+
+/* Filled buttons: garantizar texto legible en todos los presets, también en dark. */
+.p-button-primary .p-button-label,
+.p-button-primary .p-button-icon,
+.p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-secondary) .p-button-label,
+.p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-secondary) .p-button-icon,
+.p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-secondary) .p-button-loading-icon {
+  color: inherit !important;
+}
+
+/* El contenido interno de ToggleButton/SelectButton no debe pintar su propio
+   fondo/foreground por encima del estado del botón raíz. */
+.p-selectbutton .p-togglebutton-content,
+.p-selectbutton [data-pc-section="content"] {
+  background: transparent !important;
+  color: inherit !important;
+}
+
+.p-selectbutton .p-togglebutton-content .p-togglebutton-label,
+.p-selectbutton .p-togglebutton-content .p-button-label,
+.p-selectbutton [data-pc-section="content"] .p-togglebutton-label,
+.p-selectbutton [data-pc-section="content"] .p-button-label {
+  color: inherit !important;
+}
+
+/* Settings dark mode: el shell de ajustes debe permanecer oscuro y con
+   navegación/botones de cabecera de alto contraste en todos los presets. */
+html.dark .settings-view .settings-header,
+html.dark .settings-view .settings-sidebar {
+  background: var(--surface-card, #111827) !important;
+}
+
+html.dark .settings-view .settings-header {
+  border-bottom: 1px solid var(--surface-border, #334155) !important;
+}
+
+html.dark .settings-view .settings-sidebar {
+  border-right: 1px solid var(--surface-border, #334155) !important;
+}
+
+html.dark .settings-view .settings-header h1 {
+  color: var(--text-color, #ffffff) !important;
+}
+
+html.dark .settings-view .settings-header .p-button.p-button-text,
+html.dark .settings-view .settings-header .p-button.p-button-text .p-button-label,
+html.dark .settings-view .settings-header .p-button.p-button-text .p-button-icon {
+  color: var(--p-primary-100, #dbeafe) !important;
+}
+
+html.dark .settings-view .settings-header .p-button.p-button-text:hover {
+  background: color-mix(in srgb, var(--p-primary-color, #3b82f6) 18%, transparent) !important;
+  color: var(--text-color, #ffffff) !important;
+}
+
+html.dark .settings-view .nav-menu a:hover,
+html.dark .settings-view .nav-menu a.active {
+  background: color-mix(in srgb, var(--p-primary-color, #3b82f6) 24%, var(--surface-card, #111827)) !important;
+}
+
+html.dark .settings-view .nav-menu a.active {
+  border-left-color: var(--p-primary-300, #93c5fd) !important;
+}
+
+html.dark .settings-view .nav-menu a:hover,
+html.dark .settings-view .nav-menu a:hover span,
+html.dark .settings-view .nav-menu a:hover i,
+html.dark .settings-view .nav-menu a.active,
+html.dark .settings-view .nav-menu a.active span,
+html.dark .settings-view .nav-menu a.active i {
+  color: var(--text-color, #ffffff) !important;
+}
+
+/* Scrivener light/dark: el estado seleccionado debe dibujarse en el botón
+   raíz, no en un contenido interno sepia que rompe el contraste. */
+html.scrivener-theme:not(.dark) .p-selectbutton [data-pc-section="content"][data-p="checked"],
+html.scrivener-theme:not(.dark) .p-selectbutton .p-togglebutton-content[data-p="checked"] {
+  background: transparent !important;
+  color: inherit !important;
+}
+
+html.scrivener-theme.dark .p-selectbutton [data-pc-section="content"][data-p="checked"],
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton-content[data-p="checked"] {
+  background: transparent !important;
+  color: inherit !important;
+}
+
+/* Dark mode: usar tonos primarios más profundos para selected states.
+   Los presets dark de PrimeVue dejan algunos azules demasiado claros con texto blanco. */
+html.dark .p-selectbutton .p-button.p-highlight,
+html.dark .p-selectbutton .p-togglebutton.p-togglebutton-checked,
+html.dark .p-selectbutton [aria-pressed="true"],
+html.dark .p-selectbutton [data-pc-name="pcToggleButton"][data-p-checked="true"] {
+  background-color: var(--p-primary-700, #1d4ed8) !important;
+  border-color: var(--p-primary-700, #1d4ed8) !important;
+  color: #ffffff !important;
+}
+
+html.dark .p-selectbutton .p-button.p-highlight:hover,
+html.dark .p-selectbutton .p-togglebutton.p-togglebutton-checked:hover,
+html.dark .p-selectbutton [aria-pressed="true"]:hover,
+html.dark .p-selectbutton [data-pc-name="pcToggleButton"][data-p-checked="true"]:hover {
+  background-color: var(--p-primary-800, #1e40af) !important;
+  border-color: var(--p-primary-800, #1e40af) !important;
+}
+
+/* Dark mode: también endurecer botones primarios rellenos. */
+html.dark .p-button-primary,
+html.dark .p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-secondary) {
+  background: var(--p-primary-700, #1d4ed8) !important;
+  border-color: var(--p-primary-700, #1d4ed8) !important;
+  color: #ffffff !important;
+}
+
+html.dark .p-button-primary:hover,
+html.dark .p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-secondary):hover {
+  background: var(--p-primary-800, #1e40af) !important;
+  border-color: var(--p-primary-800, #1e40af) !important;
 }

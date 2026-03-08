@@ -1,5 +1,7 @@
 # Próximos Pasos - Sesión 2026-02-22
 
+> **Nota de vigencia (2026-03-07):** este documento refleja el siguiente trabajo percibido el 2026-02-22. Hoy debe leerse como histórico de sesión, no como backlog operativo vigente. Usa `docs/PLAN_ACTIVE.md`, `docs/ROADMAP.md` y `docs/audits/` para el estado actual.
+
 **Fecha**: 2026-02-22
 **Trabajo completado**: M3 + UX improvements + Frontend tests
 **Pendiente**: Más tests frontend + Sprints A-D

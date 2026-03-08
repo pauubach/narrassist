@@ -30,7 +30,7 @@
   text-decoration: none;
   border-radius: var(--ds-radius-md);
   box-shadow: var(--ds-shadow-lg);
-  transition: top var(--ds-duration-fast) var(--ds-ease-out);
+  transition: top 0.12s ease-out;
 }
 
 .skip-link:focus {

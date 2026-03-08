@@ -34,11 +34,13 @@ defineProps<{
       v-if="percentage != null"
       :value="percentage"
       :show-value="false"
+      :aria-label="`${label}: ${Math.round(percentage)}% completado`"
       class="ds-download-progress__bar"
     />
     <ProgressBar
       v-else
       mode="indeterminate"
+      :aria-label="`${label}: progreso en curso`"
       class="ds-download-progress__bar"
     />
 

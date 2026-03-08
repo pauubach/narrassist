@@ -23,6 +23,7 @@ Ejemplo:
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -37,7 +38,7 @@ class ValidationMethod(Enum):
 
     REGEX = "regex"
     SPACY = "spacy"
-    LLM = "llm"  # Futuro
+    LLM = "llm"
 
 
 class ConfidenceLevel(Enum):
@@ -651,6 +652,123 @@ class SpacyValidator:
         return None
 
 
+class LLMValidator:
+    """
+    Validador semántico usando LLM local para casos ambiguos.
+
+    Solo entra en juego cuando regex y/o spaCy no pueden clasificar la mención
+    con suficiente certeza. Si el LLM no está disponible, degrada de forma
+    explícita al método base configurado.
+    """
+
+    def __init__(
+        self,
+        fallback_method: ValidationMethod = ValidationMethod.SPACY,
+    ) -> None:
+        self._client = None
+        self._fallback_method = fallback_method
+
+    def _get_client(self):
+        if self._client is None:
+            from ..llm.client import get_llm_client
+
+            self._client = get_llm_client()
+        return self._client
+
+    @staticmethod
+    def _clamp_confidence(value: object, default: float = 0.7) -> float:
+        try:
+            numeric = float(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return default
+        return max(0.0, min(1.0, numeric))
+
+    def validate(
+        self, mention: Mention, context: str, entities: set[str]
+    ) -> ValidationResult:
+        client = self._get_client()
+        if client is None or not getattr(client, "is_available", False):
+            return ValidationResult(
+                is_valid=True,
+                confidence=0.7,
+                method=self._fallback_method,
+                reasoning="Mención ambigua; LLM no disponible, se mantiene por defecto",
+                metadata={"fallback": "llm_unavailable"},
+            )
+
+        system = (
+            "Eres un analista sintáctico y semántico de narrativa en español. "
+            "Debes decidir si una mención de entidad funciona como referente principal "
+            "(sujeto/objeto/aposición/vocativo) o como contexto posesivo/genitivo. "
+            "Responde SOLO JSON válido con las claves: "
+            "is_valid (bool), confidence (0..1), reasoning (string), role (string)."
+        )
+        prompt = (
+            f"Entidades conocidas: {sorted(entities)}\n"
+            f"Mención objetivo: {mention.text}\n"
+            f"Posición aproximada: {mention.position}\n"
+            f"Contexto completo:\n{context}\n\n"
+            "Criterio:\n"
+            "- is_valid=true si la mención actúa como sujeto, objeto, aposición o vocativo.\n"
+            "- is_valid=false si es posesivo/genitivo/descriptivo (ej: 'el hermano de Isabel').\n"
+            "- role debe ser uno de: subject, object, apposition, vocative, possessive, contextual.\n"
+        )
+
+        try:
+            raw = client.complete(
+                prompt=prompt,
+                system=system,
+                max_tokens=120,
+                temperature=0.0,
+            )
+        except Exception as e:
+            logger.warning(f"Error llamando al LLM de mention validation: {e}")
+            raw = None
+
+        if not raw:
+            return ValidationResult(
+                is_valid=True,
+                confidence=0.7,
+                method=self._fallback_method,
+                reasoning="Mención ambigua; el LLM no devolvió respuesta útil",
+                metadata={"fallback": "llm_empty"},
+            )
+
+        try:
+            cleaned = raw.strip()
+            if cleaned.startswith("```"):
+                lines = [line for line in cleaned.splitlines() if not line.startswith("```")]
+                cleaned = "\n".join(lines).strip()
+
+            start_idx = cleaned.find("{")
+            end_idx = cleaned.rfind("}") + 1
+            if start_idx == -1 or end_idx <= start_idx:
+                raise ValueError("No JSON object found")
+
+            parsed = json.loads(cleaned[start_idx:end_idx])
+            is_valid = bool(parsed.get("is_valid", True))
+            confidence = self._clamp_confidence(parsed.get("confidence"), 0.75 if is_valid else 0.85)
+            reasoning = str(parsed.get("reasoning") or "Clasificación semántica por LLM")
+            role = str(parsed.get("role") or "contextual")
+
+            return ValidationResult(
+                is_valid=is_valid,
+                confidence=confidence,
+                method=ValidationMethod.LLM,
+                reasoning=reasoning,
+                metadata={"role": role, "raw": cleaned},
+            )
+        except Exception as e:
+            logger.warning(f"Respuesta LLM inválida en mention validation: {e}")
+            return ValidationResult(
+                is_valid=True,
+                confidence=0.7,
+                method=self._fallback_method,
+                reasoning="Mención ambigua; la respuesta del LLM no fue interpretable",
+                metadata={"fallback": "llm_parse_error"},
+            )
+
+
 def create_validator_chain(
     use_spacy: bool = True, use_llm: bool = False, nlp=None
 ) -> MentionValidator:
@@ -659,7 +777,7 @@ def create_validator_chain(
 
     Args:
         use_spacy: Si usar spaCy para análisis sintáctico
-        use_llm: Si usar LLM para casos ambiguos (futuro)
+        use_llm: Si usar LLM para casos ambiguos
         nlp: Modelo spaCy pre-cargado (opcional)
 
     Returns:
@@ -672,10 +790,11 @@ def create_validator_chain(
     """
     next_validator = None
 
-    # Nivel 3: LLM (futuro)
+    # Nivel 3: LLM para ambigüedades residuales
     if use_llm:
-        # TODO: Implementar LLMValidator cuando sea necesario
-        logger.warning("LLM validator no implementado aún, usando solo spaCy")
+        next_validator = LLMValidator(
+            fallback_method=ValidationMethod.SPACY if use_spacy else ValidationMethod.REGEX
+        )
 
     # Nivel 2: spaCy
     if use_spacy:

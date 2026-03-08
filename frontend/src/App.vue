@@ -44,7 +44,7 @@
       :visible="showManageData"
       @update:visible="showManageData = $event"
     />
-    <ModelSetupDialog :hidden="showTutorial" />
+    <ModelSetupDialog v-if="isTauri" :hidden="showTutorial" />
     <TierComparisonDialog
       :visible="showTierComparison"
       @update:visible="showTierComparison = $event"

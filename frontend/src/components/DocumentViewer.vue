@@ -261,8 +261,6 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const chapters = ref<Chapter[]>([])
 const entities = ref<Entity[]>([])
-// TODO: entityMentions se usará cuando se implemente el endpoint de menciones
-const _entityMentions = ref<EntityMention[]>([])
 
 // Estado para lazy loading con LRU cache para limitar memoria
 const visibleChapters = ref<Set<number>>(new Set())

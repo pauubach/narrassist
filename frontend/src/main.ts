@@ -1,4 +1,4 @@
-// Interceptor de console → archivo (DEBE ser lo primero)
+// Interceptor de console -> archivo (DEBE ser lo primero)
 import { installConsoleInterceptor } from '@/services/logger'
 installConsoleInterceptor()
 
@@ -32,6 +32,7 @@ import './assets/design-system/accessibility.css'
 
 // Overrides de PrimeVue - DEBE cargarse después del tema
 import './assets/primevue-overrides.css'
+import { useThemeStore } from './stores/theme'
 
 const pinia = createPinia()
 const app = createApp(App)
@@ -56,11 +57,9 @@ app.use(ConfirmationService)
 // Directivas
 app.directive('tooltip', Tooltip)
 
-// Inicializar el store de tema después de montar para aplicar configuración guardada
-import { useThemeStore } from './stores/theme'
+// Inicializar tema antes de montar para evitar flash de tema incorrecto,
+// pero después de registrar PrimeVue para que los tokens del preset existan.
+const themeStore = useThemeStore(pinia)
+themeStore.initialize()
 
 app.mount('#app')
-
-// Inicializar tema después de montar la app
-const themeStore = useThemeStore()
-themeStore.initialize()

@@ -6,6 +6,8 @@
         <Button
           v-tooltip.bottom="'Cambiar tema'"
           :icon="themeStore.isDark ? 'pi pi-sun' : 'pi pi-moon'"
+          aria-label="Cambiar tema"
+          title="Cambiar tema"
           text
           rounded
           @click="themeStore.toggleMode"
@@ -13,6 +15,8 @@
         <Button
           v-tooltip.bottom="'Configuración'"
           icon="pi pi-cog"
+          aria-label="Abrir configuración"
+          title="Abrir configuración"
           text
           rounded
           @click="goToSettings"
@@ -282,12 +286,22 @@ const goToSettings = () => {
 
 .status-value.status-ok {
   background: var(--green-50);
-  color: var(--ds-color-success, #16a34a);
+  color: var(--green-800, #166534);
 }
 
 .status-value.status-error {
   background: var(--red-50);
-  color: var(--red-600);
+  color: var(--red-700);
+}
+
+:global(.dark) .status-value.status-ok {
+  background: color-mix(in srgb, var(--green-500, #22c55e) 18%, var(--p-surface-900));
+  color: var(--green-200, #bbf7d0);
+}
+
+:global(.dark) .status-value.status-error {
+  background: color-mix(in srgb, var(--red-500, #ef4444) 18%, var(--p-surface-900));
+  color: var(--red-200, #fecaca);
 }
 
 .backend-error-container {

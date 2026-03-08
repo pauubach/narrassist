@@ -4,6 +4,8 @@
 **Estado**: Completado
 **Metodología**: Panel de 8 expertos simulados + investigación estado del arte
 
+> **Nota de vigencia (2026-03-07):** este documento conserva el contexto y las decisiones del momento en que se redactó. Sigue siendo útil como histórico, pero no describe literalmente el estado actual del producto. La arquitectura vigente ya no se resume en "pipeline de 6 fases": el flujo operativo actual expone 14 fases en la orquestación principal y `SCHEMA_VERSION = 34`.
+
 ---
 
 ## Índice
@@ -27,7 +29,7 @@
 
 ### Diagnóstico General
 
-El sistema tiene una **arquitectura sólida** con pipeline de 6 fases y votación multi-método,
+El sistema tenía en ese momento una **arquitectura sólida** con pipeline de 6 fases y votación multi-método,
 pero presenta debilidades en:
 
 1. **NER para ficción**: F1 estimado ~60-70% con spaCy; existen modelos mejores (PlanTL RoBERTa)
@@ -72,7 +74,7 @@ pero presenta debilidades en:
 | **Embeddings** | `nlp/embeddings.py` | ✅ Funcional | Baja |
 | **Frontend atributos** | `EntitiesTab.vue` | ✅ Funcional | Baja |
 
-### 2.2 Pipeline Unificado (6 Fases)
+### 2.2 Pipeline Unificado (snapshot histórico de 6 fases)
 
 ```
 FASE 1 - PARSING Y ESTRUCTURA

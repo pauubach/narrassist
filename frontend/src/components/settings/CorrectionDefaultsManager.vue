@@ -24,7 +24,10 @@
 
     <!-- Loading -->
     <div v-if="loading" class="loading-state">
-      <ProgressSpinner style="width: 30px; height: 30px" />
+      <ProgressSpinner
+        style="width: 30px; height: 30px"
+        aria-label="Cargando configuraci?n de correcciones"
+      />
       <span>Cargando configuración...</span>
     </div>
 
@@ -53,9 +56,14 @@
                   class="modified-badge"
                 />
               </div>
-              <div class="type-actions" @click.stop>
+            </div>
+          </AccordionHeader>
+          <AccordionContent>
+            <div class="subtypes-list">
+              <div class="type-actions" role="toolbar" :aria-label="`Acciones para ${typeEntry.name}`">
                 <Button
                   v-tooltip.top="'Editar defaults del tipo'"
+                  :aria-label="`Editar defaults del tipo ${typeEntry.name}`"
                   icon="pi pi-pencil"
                   text
                   rounded
@@ -65,6 +73,7 @@
                 <Button
                   v-if="typeEntry.hasTypeOverride"
                   v-tooltip.top="'Restaurar tipo'"
+                  :aria-label="`Restaurar defaults del tipo ${typeEntry.name}`"
                   icon="pi pi-undo"
                   text
                   rounded
@@ -73,10 +82,6 @@
                   @click="resetType(typeEntry.code)"
                 />
               </div>
-            </div>
-          </AccordionHeader>
-          <AccordionContent>
-            <div class="subtypes-list">
               <div
                 v-for="subtype in typeEntry.subtypes"
                 :key="subtype.code"
@@ -94,6 +99,7 @@
                 <div class="subtype-actions">
                   <Button
                     v-tooltip.top="'Editar defaults'"
+                    :aria-label="`Editar defaults de ${subtype.name}`"
                     icon="pi pi-pencil"
                     text
                     rounded
@@ -103,6 +109,7 @@
                   <Button
                     v-if="subtype.hasOverride"
                     v-tooltip.top="'Restaurar'"
+                    :aria-label="`Restaurar defaults de ${subtype.name}`"
                     icon="pi pi-undo"
                     text
                     rounded
@@ -443,6 +450,8 @@ defineExpose({
 .type-actions {
   display: flex;
   gap: 0.25rem;
+  justify-content: flex-end;
+  margin: 0 0.5rem 0.5rem;
 }
 
 .subtypes-list {

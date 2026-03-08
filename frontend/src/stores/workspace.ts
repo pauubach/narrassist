@@ -117,6 +117,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   /** Filtro de severidad para la pestaña de alertas */
   const alertSeverityFilter = ref<string | null>(null)
 
+  /** Filtro de categoría para la pestaña de alertas */
+  const alertCategoryFilter = ref<string | null>(null)
+
   /** Entidad seleccionada para ver sus menciones */
   const selectedEntityForMentions = ref<number | null>(null)
 
@@ -311,6 +314,13 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
 
   /**
+   * Establece el filtro de categoría para alertas
+   */
+  function setAlertCategoryFilter(category: string | null) {
+    alertCategoryFilter.value = category
+  }
+
+  /**
    * Navega a las menciones de una entidad en el texto
    */
   function navigateToEntityMentions(entityId: number) {
@@ -428,6 +438,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     fullscreenText.value = false
     navigationHistory.value = []
     alertSeverityFilter.value = null
+    alertCategoryFilter.value = null
     selectedEntityForMentions.value = null
     scrollToPosition.value = null
     scrollToText.value = null
@@ -445,6 +456,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     fullscreenText,
     navigationHistory,
     alertSeverityFilter,
+    alertCategoryFilter,
     selectedEntityForMentions,
     scrollToPosition,
     scrollToText,
@@ -477,6 +489,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     focusMode,
     normalMode,
     setAlertSeverityFilter,
+    setAlertCategoryFilter,
     navigateToEntityMentions,
     navigateToTextPosition,
     clearScrollToPosition,

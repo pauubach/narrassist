@@ -121,6 +121,7 @@
                   :min="0"
                   :max="100"
                   :step="5"
+                  aria-label="Ajuste fino de sensibilidad"
                   @change="onSensitivityChange"
                 />
                 <div class="slider-hints">
@@ -156,6 +157,7 @@
                       :min="20"
                       :max="95"
                       :step="5"
+                      aria-label="Certeza para mostrar alertas"
                       @change="onAdvancedSliderChange"
                     />
                   </div>
@@ -171,6 +173,7 @@
                       :min="20"
                       :max="90"
                       :step="5"
+                      aria-label="Certeza para detectar personajes"
                       @change="onAdvancedSliderChange"
                     />
                   </div>
@@ -186,6 +189,7 @@
                       :min="30"
                       :max="100"
                       :step="10"
+                      aria-label="Acuerdo entre métodos"
                       @change="onAdvancedSliderChange"
                     />
                   </div>
@@ -210,6 +214,8 @@
               <div class="setting-control">
                 <ToggleSwitch
                   v-model="settings.autoAnalysis"
+                  inputId="settings-auto-analysis"
+                  aria-label="Análisis automático"
                   @change="onSettingChange"
                 />
               </div>
@@ -223,6 +229,8 @@
               <div class="setting-control">
                 <ToggleSwitch
                   v-model="settings.showPartialResults"
+                  inputId="settings-show-partial-results"
+                  aria-label="Mostrar resultados parciales"
                   @change="onSettingChange"
                 />
               </div>
@@ -236,6 +244,8 @@
               <div class="setting-control">
                 <ToggleSwitch
                   v-model="settings.notifyAnalysisComplete"
+                  inputId="settings-notify-analysis"
+                  aria-label="Notificaciones de análisis"
                   @change="onSettingChange"
                 />
               </div>
@@ -249,6 +259,8 @@
               <div class="setting-control">
                 <ToggleSwitch
                   v-model="settings.soundEnabled"
+                  inputId="settings-sounds"
+                  aria-label="Sonidos"
                   @change="onSettingChange"
                 />
               </div>
@@ -382,6 +394,7 @@
                     :min="1"
                     :max="10"
                     :step="1"
+                    aria-label="Sensibilidad de detección del analizador semántico"
                     @change="onLlmSensitivityChange"
                   />
                   <span class="slider-value">{{ settings.llmSensitivity ?? 5 }}</span>
@@ -463,11 +476,13 @@
                 >
                   <div class="method-header">
                     <ToggleSwitch
+                      :inputId="`method-coreference-${String(key)}`"
                       :model-value="isMethodEnabled('coreference', String(key))"
+                      :aria-label="method.name"
                       :disabled="!method.available"
                       @update:model-value="toggleMethod('coreference', String(key), $event)"
                     />
-                    <span class="method-name">{{ method.name }}</span>
+                    <label class="method-name" :for="`method-coreference-${String(key)}`">{{ method.name }}</label>
                     <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con aceleración" severity="secondary" class="method-tag" />
                     <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
                     <Tag
@@ -504,11 +519,13 @@
                 >
                   <div class="method-header">
                     <ToggleSwitch
+                      :inputId="`method-ner-${String(key)}`"
                       :model-value="isMethodEnabled('ner', String(key))"
+                      :aria-label="method.name"
                       :disabled="!method.available"
                       @update:model-value="toggleMethod('ner', String(key), $event)"
                     />
-                    <span class="method-name">{{ method.name }}</span>
+                    <label class="method-name" :for="`method-ner-${String(key)}`">{{ method.name }}</label>
                     <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con aceleración" severity="secondary" class="method-tag" />
                     <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
                     <Tag
@@ -582,11 +599,13 @@
                 >
                   <div class="method-header">
                     <ToggleSwitch
+                      :inputId="`method-grammar-${String(key)}`"
                       :model-value="isMethodEnabled('grammar', String(key))"
+                      :aria-label="method.name"
                       :disabled="!method.available"
                       @update:model-value="toggleMethod('grammar', String(key), $event)"
                     />
-                    <span class="method-name">{{ method.name }}</span>
+                    <label class="method-name" :for="`method-grammar-${String(key)}`">{{ method.name }}</label>
                     <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con aceleración" severity="secondary" class="method-tag" />
                     <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
                     <Tag
@@ -620,11 +639,13 @@
                 >
                   <div class="method-header">
                     <ToggleSwitch
+                      :inputId="`method-spelling-${String(key)}`"
                       :model-value="isMethodEnabled('spelling', String(key))"
+                      :aria-label="method.name"
                       :disabled="!method.available"
                       @update:model-value="toggleMethod('spelling', String(key), $event)"
                     />
-                    <span class="method-name">{{ method.name }}</span>
+                    <label class="method-name" :for="`method-spelling-${String(key)}`">{{ method.name }}</label>
                     <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con aceleración" severity="secondary" class="method-tag" />
                     <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
                     <Tag
@@ -733,6 +754,8 @@
                   option-value="id"
                   placeholder="Selecciona un preset"
                   class="w-full"
+                  inputId="default-correction-preset"
+                  aria-label="Preset por defecto"
                   @change="onDefaultPresetChange"
                 >
                   <template #option="slotProps">
@@ -845,6 +868,8 @@
                   option-label="label"
                   option-value="value"
                   placeholder="Selecciona región"
+                  inputId="default-region"
+                  aria-label="Variante regional"
                   @change="onDefaultRegionChange"
                 />
               </div>
@@ -860,7 +885,12 @@
                 </p>
               </div>
               <div class="setting-control">
-                <ToggleSwitch v-model="useLLMReview" @change="onLLMReviewChange" />
+                <ToggleSwitch
+                  v-model="useLLMReview"
+                  inputId="settings-llm-review"
+                  aria-label="Revisión inteligente"
+                  @change="onLLMReviewChange"
+                />
               </div>
             </div>
 
@@ -994,6 +1024,7 @@
                   </div>
                   <Button
                     v-tooltip.left="'Restaurar: volver a detectar esta entidad'"
+                    :aria-label="`Restaurar entidad rechazada ${rejection.entityName}`"
                     icon="pi pi-undo"
                     severity="secondary"
                     text
@@ -1100,7 +1131,11 @@
         </div>
 
         <div class="migrate-option">
-          <ToggleSwitch v-model="migrateData" />
+          <ToggleSwitch
+            v-model="migrateData"
+            inputId="settings-migrate-data"
+            aria-label="Migrar datos existentes"
+          />
           <div class="migrate-info">
             <label>Migrar datos existentes</label>
             <span class="migrate-description">
@@ -1877,6 +1912,17 @@ const handleScroll = () => {
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+  --settings-nav-hover-color: var(--p-primary-800, var(--primary-color, #2563eb));
+  --settings-nav-active-color: var(--p-primary-800, var(--primary-color, #2563eb));
+  --settings-nav-hover-bg: color-mix(in srgb, var(--p-primary-color, var(--primary-color, #3B82F6)) 10%, var(--surface-card));
+  --settings-nav-active-bg: color-mix(in srgb, var(--p-primary-color, var(--primary-color, #3B82F6)) 16%, var(--surface-card));
+}
+
+:global(.dark) .settings-view {
+  --settings-nav-hover-color: var(--text-color, #f8fafc);
+  --settings-nav-active-color: var(--text-color, #f8fafc);
+  --settings-nav-hover-bg: color-mix(in srgb, var(--p-primary-color, var(--primary-color, #3B82F6)) 18%, var(--surface-card, #111827));
+  --settings-nav-active-bg: color-mix(in srgb, var(--p-primary-color, var(--primary-color, #3B82F6)) 28%, var(--surface-card, #111827));
 }
 
 .settings-header {
@@ -1884,15 +1930,15 @@ const handleScroll = () => {
   align-items: center;
   gap: 1rem;
   padding: 1.5rem 2rem;
-  border-bottom: 1px solid var(--p-surface-200);
-  background: var(--p-surface-0);
+  border-bottom: 1px solid var(--surface-border);
+  background: var(--surface-card);
   flex-shrink: 0;
 }
 
 /* Dark mode para header */
 :global(.dark) .settings-header {
-  background: var(--p-surface-900);
-  border-bottom-color: var(--p-surface-700);
+  background: var(--surface-card);
+  border-bottom-color: var(--surface-border);
 }
 
 .settings-header h1 {
@@ -1909,16 +1955,16 @@ const handleScroll = () => {
 .settings-sidebar {
   width: 250px;
   flex-shrink: 0;
-  background: var(--p-surface-0);
-  border-right: 1px solid var(--p-surface-200);
+  background: var(--surface-card);
+  border-right: 1px solid var(--surface-border);
   overflow-y: auto;
   padding: 1.5rem 0;
 }
 
 /* Dark mode para sidebar */
 :global(.dark) .settings-sidebar {
-  background: var(--p-surface-900);
-  border-right-color: var(--p-surface-700);
+  background: var(--surface-card);
+  border-right-color: var(--surface-border);
 }
 
 .nav-menu {
@@ -1940,7 +1986,7 @@ const handleScroll = () => {
   align-items: center;
   gap: 0.75rem;
   padding: 0.875rem 1.5rem;
-  color: var(--p-text-color);
+  color: var(--text-color);
   text-decoration: none !important;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   border-left: 3px solid transparent;
@@ -1949,35 +1995,51 @@ const handleScroll = () => {
 }
 
 .nav-menu a:hover {
-  background: var(--p-surface-100);
-  color: var(--p-primary-color);
+  background: var(--settings-nav-hover-bg);
+  color: var(--settings-nav-hover-color) !important;
 }
 
 .nav-menu a.active {
-  background: color-mix(in srgb, var(--p-primary-color) 10%, transparent);
-  color: var(--p-primary-color);
-  border-left-color: var(--p-primary-color);
+  background: var(--settings-nav-active-bg);
+  color: var(--settings-nav-active-color) !important;
+  border-left-color: var(--p-primary-color, var(--primary-color, #3B82F6));
   font-weight: 600;
 }
 
 /* Dark mode para navegación */
 :global(.dark) .nav-menu a:hover {
-  background: var(--p-surface-800);
+  background: var(--settings-nav-hover-bg);
+  color: var(--settings-nav-hover-color) !important;
 }
 
 :global(.dark) .nav-menu a.active {
-  background: color-mix(in srgb, var(--p-primary-color) 20%, transparent);
+  background: var(--settings-nav-active-bg);
+  color: var(--settings-nav-active-color) !important;
+}
+
+:global(html.dark) .settings-view .nav-menu a:hover,
+:global(html.dark) .settings-view .nav-menu a:hover span,
+:global(html.dark) .settings-view .nav-menu a:hover i {
+  color: var(--settings-nav-hover-color) !important;
+}
+
+:global(html.dark) .settings-view .nav-menu a.active,
+:global(html.dark) .settings-view .nav-menu a.active span,
+:global(html.dark) .settings-view .nav-menu a.active i {
+  color: var(--settings-nav-active-color) !important;
 }
 
 .nav-menu a i {
   font-size: 1.1rem;
   width: 1.5rem;
   text-align: center;
+  color: inherit;
   text-decoration: none !important;
 }
 
 .nav-menu a span {
   font-size: 0.95rem;
+  color: inherit;
   text-decoration: none !important;
 }
 
@@ -1986,11 +2048,23 @@ const handleScroll = () => {
   overflow-y: auto;
   padding: 2rem 2.5rem;
   scroll-behavior: smooth;
+  background: var(--surface-ground);
 }
 
 .settings-content > :deep(.p-card) {
   max-width: 1100px;
   margin-bottom: 1.5rem;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  color: var(--text-color);
+}
+
+.settings-content > :deep(.p-card .p-card-body),
+.settings-content > :deep(.p-card .p-card-content),
+.settings-content > :deep(.p-card .p-card-title),
+.settings-content > :deep(.p-card .p-card-subtitle) {
+  background: transparent;
+  color: inherit;
 }
 
 .section-title {
@@ -2009,11 +2083,11 @@ const handleScroll = () => {
   justify-content: space-between;
   align-items: flex-start;
   padding: 1rem 0;
-  border-bottom: 1px solid var(--p-surface-200);
+  border-bottom: 1px solid var(--surface-border);
 }
 
 :global(.dark) .setting-item {
-  border-bottom-color: var(--p-surface-700);
+  border-bottom-color: var(--surface-border);
 }
 
 .setting-item:last-child {

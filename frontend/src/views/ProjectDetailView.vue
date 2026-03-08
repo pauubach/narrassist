@@ -1440,8 +1440,8 @@ const handleViewAlerts = () => {
   workspaceStore.setActiveTab('alerts')
 }
 
-const handleFilterAlerts = (_category: Alert['category']) => {
-  // TODO: Implementar filtro por categoría en workspace store
+const handleFilterAlerts = (category: Alert['category']) => {
+  workspaceStore.setAlertCategoryFilter(category)
   workspaceStore.setActiveTab('alerts')
 }
 
@@ -1626,7 +1626,12 @@ const handleExportCorrected = async () => {
 
   } catch (err) {
     console.error('Error exporting corrected document:', err)
-    alert(err instanceof Error ? err.message : 'Error al exportar documento corregido')
+    toast.add({
+      severity: 'error',
+      summary: 'No se pudo exportar',
+      detail: err instanceof Error ? err.message : 'Error al exportar documento corregido',
+      life: 5000,
+    })
   }
 }
 

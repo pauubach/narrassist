@@ -6,6 +6,8 @@ mod menu;
 
 #[cfg(not(debug_assertions))]
 use std::io::{BufRead, BufReader};
+#[cfg(test)]
+use std::io::{Read, Write};
 use std::process::Child;
 #[cfg(not(debug_assertions))]
 use std::process::{Command, Stdio};
@@ -13,9 +15,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 #[cfg(not(debug_assertions))]
 use std::thread;
+#[cfg(test)]
+use std::thread;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 const BACKEND_WARMING_MSG: &str = "Backend warming up (modules loading)";
+const BACKEND_HEALTH_URL: &str = "http://127.0.0.1:8008/api/health";
 
 /// Estado compartido del servidor backend
 struct BackendServer {
@@ -33,11 +38,21 @@ impl BackendServer {
     }
 }
 
+fn is_backend_ready_body(body: &serde_json::Value) -> bool {
+    body.get("backend_loaded")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+}
+
 /// Liveness check: el proceso backend responde HTTP 200 (puede no tener módulos cargados).
 async fn poll_health_alive() -> bool {
+    poll_health_alive_url(BACKEND_HEALTH_URL).await
+}
+
+async fn poll_health_alive_url(url: &str) -> bool {
     let client = reqwest::Client::new();
     match client
-        .get("http://127.0.0.1:8008/api/health")
+        .get(url)
         .timeout(std::time::Duration::from_secs(2))
         .send()
         .await
@@ -50,9 +65,13 @@ async fn poll_health_alive() -> bool {
 /// Readiness check: el backend responde Y tiene los módulos cargados (`backend_loaded: true`).
 /// Usa esto para decidir cuándo emitir "running" al frontend.
 async fn poll_health_ready() -> bool {
+    poll_health_ready_url(BACKEND_HEALTH_URL).await
+}
+
+async fn poll_health_ready_url(url: &str) -> bool {
     let client = reqwest::Client::new();
     match client
-        .get("http://127.0.0.1:8008/api/health")
+        .get(url)
         .timeout(std::time::Duration::from_secs(2))
         .send()
         .await
@@ -62,10 +81,7 @@ async fn poll_health_ready() -> bool {
                 return false;
             }
             match response.json::<serde_json::Value>().await {
-                Ok(body) => body
-                    .get("backend_loaded")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false),
+                Ok(body) => is_backend_ready_body(&body),
                 Err(_) => false,
             }
         }
@@ -73,15 +89,28 @@ async fn poll_health_ready() -> bool {
     }
 }
 
+async fn wait_for_health<F, Fut>(max_attempts: u32, delay_ms: u64, mut check: F) -> bool
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    for _ in 1..=max_attempts {
+        if check().await {
+            return true;
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+    }
+    false
+}
+
 /// Espera a que el backend esté alive (liveness). Retorna true si responde HTTP 200.
 #[cfg(not(debug_assertions))]
 async fn wait_for_alive(max_attempts: u32, delay_ms: u64) -> bool {
     for attempt in 1..=max_attempts {
-        if poll_health_alive().await {
+        if wait_for_health(1, delay_ms, poll_health_alive).await {
             println!("[Health] Backend alive after {} attempts", attempt);
             return true;
         }
-        tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
     }
     false
 }
@@ -90,11 +119,10 @@ async fn wait_for_alive(max_attempts: u32, delay_ms: u64) -> bool {
 #[cfg(not(debug_assertions))]
 async fn wait_for_ready(max_attempts: u32, delay_ms: u64) -> bool {
     for attempt in 1..=max_attempts {
-        if poll_health_ready().await {
+        if wait_for_health(1, delay_ms, poll_health_ready).await {
             println!("[Health] Backend ready after {} attempts", attempt);
             return true;
         }
-        tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
     }
     false
 }
@@ -642,4 +670,126 @@ where
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::TcpListener;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    fn spawn_mock_health_server(responses: Vec<String>) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock server");
+        let addr = listener.local_addr().expect("listener addr");
+        let responses = Arc::new(responses);
+        let counter = Arc::new(AtomicUsize::new(0));
+
+        let responses_clone = Arc::clone(&responses);
+        let counter_clone = Arc::clone(&counter);
+
+        thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = match stream {
+                    Ok(stream) => stream,
+                    Err(_) => break,
+                };
+
+                let mut buffer = [0_u8; 1024];
+                let _ = stream.read(&mut buffer);
+
+                let idx = counter_clone.fetch_add(1, Ordering::SeqCst);
+                let response = responses_clone
+                    .get(idx)
+                    .or_else(|| responses_clone.last())
+                    .expect("mock response");
+
+                let _ = stream.write_all(response.as_bytes());
+                let _ = stream.flush();
+
+                if idx + 1 >= responses_clone.len() {
+                    break;
+                }
+            }
+        });
+
+        format!("http://{}/api/health", addr)
+    }
+
+    fn json_response(body: &str) -> String {
+        format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.len(),
+            body
+        )
+    }
+
+    fn ok_response(body: &str) -> String {
+        format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.len(),
+            body
+        )
+    }
+
+    #[test]
+    fn backend_ready_body_requires_explicit_flag() {
+        assert!(is_backend_ready_body(&serde_json::json!({ "backend_loaded": true })));
+        assert!(!is_backend_ready_body(&serde_json::json!({ "backend_loaded": false })));
+        assert!(!is_backend_ready_body(&serde_json::json!({ "status": "ok" })));
+    }
+
+    #[tokio::test]
+    async fn poll_health_alive_accepts_http_200() {
+        let url = spawn_mock_health_server(vec![ok_response("ok")]);
+
+        assert!(poll_health_alive_url(&url).await);
+    }
+
+    #[tokio::test]
+    async fn poll_health_ready_requires_backend_loaded_true() {
+        let url = spawn_mock_health_server(vec![json_response(r#"{"backend_loaded":false}"#)]);
+
+        assert!(!poll_health_ready_url(&url).await);
+    }
+
+    #[tokio::test]
+    async fn wait_for_health_retries_until_backend_is_ready() {
+        let url = spawn_mock_health_server(vec![
+            json_response(r#"{"backend_loaded":false}"#),
+            json_response(r#"{"backend_loaded":true}"#),
+        ]);
+
+        let ready = wait_for_health(3, 10, || poll_health_ready_url(&url)).await;
+
+        assert!(ready);
+    }
+
+    #[tokio::test]
+    async fn poll_health_alive_rejects_non_success_http_status() {
+        let response = "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        let url = spawn_mock_health_server(vec![response.to_string()]);
+
+        assert!(!poll_health_alive_url(&url).await);
+    }
+
+    #[tokio::test]
+    async fn poll_health_ready_rejects_invalid_json_payload() {
+        let url = spawn_mock_health_server(vec![ok_response("backend warming up")]);
+
+        assert!(!poll_health_ready_url(&url).await);
+    }
+
+    #[tokio::test]
+    async fn wait_for_health_returns_false_when_backend_never_becomes_ready() {
+        let url = spawn_mock_health_server(vec![
+            json_response(r#"{"backend_loaded":false}"#),
+            json_response(r#"{"backend_loaded":false}"#),
+            json_response(r#"{"backend_loaded":false}"#),
+        ]);
+
+        let ready = wait_for_health(3, 10, || poll_health_ready_url(&url)).await;
+
+        assert!(!ready);
+    }
 }

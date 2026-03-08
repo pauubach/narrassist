@@ -1,8 +1,10 @@
 # Sistema de Cache - Notas de Implementación
 
 **Fecha**: 2026-02-17
-**Versión**: v0.10.15
+**Versión**: snapshot histórico v0.10.15
 **Objetivo**: 100x speedup en re-análisis (10-12 min → <10 seg)
+
+> **Nota de vigencia (2026-03-07):** este documento describe la estrategia de cache en el momento de su redacción. El producto actual ya ha evolucionado (schema v34, planner incremental granular e invalidación selectiva), así que debe leerse como referencia histórica/técnica, no como contrato exacto del estado presente.
 
 ---
 
@@ -27,7 +29,7 @@
 
 ## 🏗️ Arquitectura
 
-### Tablas de Cache (SCHEMA_VERSION 29)
+### Tablas de Cache (snapshot histórico, SCHEMA_VERSION 29)
 
 ```sql
 -- 3 tablas con patrón idéntico

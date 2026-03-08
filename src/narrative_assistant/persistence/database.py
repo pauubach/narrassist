@@ -1371,7 +1371,7 @@ CREATE INDEX IF NOT EXISTS idx_speech_by_character ON character_speech_snapshots
 );
 
 -- ============================================================================
--- Analysis Phase Caches (v0.10.15 - S17)
+-- Analysis Phase Caches (legacy rollout S17, still supported)
 -- Objetivo: 100x speedup en re-análisis cuando documento NO cambió
 -- ============================================================================
 

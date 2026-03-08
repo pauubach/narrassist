@@ -205,6 +205,30 @@ describe('workspaceStore', () => {
     })
   })
 
+  describe('alert filters', () => {
+    it('should store and clear alert category filter', () => {
+      const store = useWorkspaceStore()
+
+      store.setAlertCategoryFilter('grammar')
+      expect(store.alertCategoryFilter).toBe('grammar')
+
+      store.setAlertCategoryFilter(null)
+      expect(store.alertCategoryFilter).toBeNull()
+    })
+
+    it('should reset alert filters on reset', () => {
+      const store = useWorkspaceStore()
+
+      store.setAlertSeverityFilter('critical')
+      store.setAlertCategoryFilter('timeline')
+
+      store.reset()
+
+      expect(store.alertSeverityFilter).toBeNull()
+      expect(store.alertCategoryFilter).toBeNull()
+    })
+  })
+
   describe('normalMode', () => {
     it('should expand both panels', () => {
       const store = useWorkspaceStore()

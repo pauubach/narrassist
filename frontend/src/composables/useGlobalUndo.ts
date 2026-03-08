@@ -7,7 +7,7 @@
 
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 export interface UndoResult {
   success: boolean
@@ -36,6 +36,12 @@ export function useGlobalUndo(projectId: () => number | null) {
   const undoableCount = ref(0)
   const toast = useToast()
 
+  async function postUndoAction(
+    path: string,
+  ): Promise<{ success: boolean; data?: { entry_id?: number; message?: string; conflicts?: string[] }; message?: string; error?: string }> {
+    return api.postRaw(path)
+  }
+
   /**
    * Deshace la última acción del proyecto (Ctrl+Z).
    */
@@ -47,11 +53,7 @@ export function useGlobalUndo(projectId: () => number | null) {
 
     undoing.value = true
     try {
-      const response = await fetch(apiUrl(`/api/projects/${pid}/undo`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      const json = await response.json()
+      const json = await postUndoAction(`/api/projects/${pid}/undo`)
 
       if (json.success) {
         const result: UndoResult = {
@@ -123,11 +125,7 @@ export function useGlobalUndo(projectId: () => number | null) {
 
     undoing.value = true
     try {
-      const response = await fetch(apiUrl(`/api/projects/${pid}/undo/${entryId}`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      const json = await response.json()
+      const json = await postUndoAction(`/api/projects/${pid}/undo/${entryId}`)
 
       if (json.success) {
         const result: UndoResult = {
@@ -180,11 +178,7 @@ export function useGlobalUndo(projectId: () => number | null) {
 
     undoing.value = true
     try {
-      const response = await fetch(apiUrl(`/api/projects/${pid}/undo-batch/${batchId}`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      const json = await response.json()
+      const json = await postUndoAction(`/api/projects/${pid}/undo-batch/${batchId}`)
 
       if (json.success) {
         toast.add({
@@ -233,9 +227,9 @@ export function useGlobalUndo(projectId: () => number | null) {
       if (options?.offset) params.set('offset', String(options.offset))
       if (options?.undoableOnly) params.set('undoable_only', 'true')
 
-      const url = apiUrl(`/api/projects/${pid}/history?${params}`)
-      const response = await fetch(url)
-      const json = await response.json()
+      const json = await api.getRaw<{ success: boolean; data?: Record<string, unknown>[] }>(
+        `/api/projects/${pid}/history?${params}`
+      )
 
       if (json.success && Array.isArray(json.data)) {
         return json.data.map(mapHistoryEntry)
@@ -254,8 +248,7 @@ export function useGlobalUndo(projectId: () => number | null) {
     if (!pid) return 0
 
     try {
-      const response = await fetch(apiUrl(`/api/projects/${pid}/history/count`))
-      const json = await response.json()
+      const json = await api.getRaw<{ data?: { count?: number } }>(`/api/projects/${pid}/history/count`)
       undoableCount.value = json.data?.count ?? 0
       return undoableCount.value
     } catch {

@@ -1,5 +1,7 @@
 # Frontend Testing - Estado Actual
 
+> **Nota de vigencia (2026-03-07):** este documento es un snapshot histórico de la sesión de 2026-02-22. Ya no debe usarse como fuente de verdad del estado presente de testing frontend. Para el estado actual usar `docs/PROJECT_STATUS.md`, `docs/AUDIT_INDEX.md` y las auditorías vigentes en `docs/audits/`.
+
 **Fecha**: 2026-02-22
 **Estado**: ✅ Entorno configurado, ✅ 65 tests de componentes críticos completados
 

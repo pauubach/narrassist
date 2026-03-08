@@ -1,6 +1,11 @@
 import { test, expect, Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
+type SeedTheme = {
+  preset?: string
+  mode?: 'light' | 'dark' | 'auto'
+}
+
 /**
  * Tests de Accesibilidad con axe-core
  *
@@ -8,14 +13,57 @@ import AxeBuilder from '@axe-core/playwright'
  * Ejecutar con: npx playwright test e2e/accessibility.spec.ts
  */
 
-async function waitForLoad(page: Page) {
+async function waitForThemeApplied(page: Page, theme: SeedTheme = {}) {
+  const expectedPreset = theme.preset ?? 'aura'
+  const expectedMode = theme.mode ?? 'light'
+
+  await page.waitForFunction(
+    ({ preset, mode }) => {
+      const html = document.documentElement
+      const hasPreset = html.classList.contains(`${preset}-theme`)
+      const hasMode = mode === 'dark'
+        ? html.classList.contains('dark')
+        : mode === 'light'
+          ? !html.classList.contains('dark')
+          : true
+      return hasPreset && hasMode
+    },
+    { preset: expectedPreset, mode: expectedMode },
+    { timeout: 10000 }
+  )
+}
+
+async function waitForLoad(page: Page, theme: SeedTheme = {}) {
   await page.waitForSelector('.p-progress-spinner', { state: 'detached', timeout: 30000 }).catch(() => {})
   await page.waitForLoadState('domcontentloaded')
+  await waitForThemeApplied(page, theme)
+}
+
+async function seedAccessibilitySession(page: Page, theme: SeedTheme = {}) {
+  const config = {
+    preset: theme.preset ?? 'aura',
+    mode: theme.mode ?? 'light',
+    primaryColor: '#3B82F6',
+    fontSize: 'medium',
+    lineHeight: 'normal',
+    radius: 'medium',
+    compactness: 'normal',
+    reducedMotion: false,
+    fontFamily: 'inter',
+    fontFamilyReading: 'literata',
+  }
+
+  await page.addInitScript((seededConfig) => {
+    localStorage.setItem('narrative_assistant_tutorial_completed', 'true')
+    sessionStorage.setItem('narrative_assistant_tutorial_shown', 'true')
+    localStorage.setItem('narrative_assistant_theme_config', JSON.stringify(seededConfig))
+  }, config)
 }
 
 test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
   test.describe('Home Page', () => {
     test('should have no critical accessibility violations', async ({ page }) => {
+      await seedAccessibilitySession(page)
       await page.goto('/')
       await waitForLoad(page)
 
@@ -45,6 +93,7 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
     })
 
     test('skip link should be accessible', async ({ page }) => {
+      await seedAccessibilitySession(page)
       await page.goto('/')
       await waitForLoad(page)
 
@@ -61,6 +110,7 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
 
         // Debería aparecer con Tab
         await page.keyboard.press('Tab')
+        await page.waitForTimeout(150)
 
         const isVisible = await skipLink.evaluate(el => {
           const rect = el.getBoundingClientRect()
@@ -73,6 +123,7 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
 
   test.describe('Projects View', () => {
     test('should have no critical accessibility violations', async ({ page }) => {
+      await seedAccessibilitySession(page)
       await page.goto('/projects')
       await waitForLoad(page)
 
@@ -89,6 +140,7 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
     })
 
     test('project cards should be keyboard accessible', async ({ page }) => {
+      await seedAccessibilitySession(page)
       await page.goto('/projects')
       await waitForLoad(page)
 
@@ -119,6 +171,7 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
 
   test.describe('Settings View', () => {
     test('should have no critical accessibility violations', async ({ page }) => {
+      await seedAccessibilitySession(page)
       await page.goto('/settings')
       await waitForLoad(page)
 
@@ -134,6 +187,7 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
     })
 
     test('form controls should have labels', async ({ page }) => {
+      await seedAccessibilitySession(page)
       await page.goto('/settings')
       await waitForLoad(page)
 
@@ -166,15 +220,16 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
         if (hasLabel) inputsWithLabels++
       }
 
-      // Al menos el 80% de los inputs deben tener labels
+      // Todos los inputs visibles deben tener labels accesibles
       if (count > 0) {
-        expect(inputsWithLabels / count).toBeGreaterThanOrEqual(0.8)
+        expect(inputsWithLabels / count).toBe(1)
       }
     })
   })
 
   test.describe('Menu Navigation', () => {
     test('menubar should be keyboard accessible', async ({ page }) => {
+      await seedAccessibilitySession(page)
       await page.goto('/')
       await waitForLoad(page)
 
@@ -200,6 +255,7 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
     })
 
     test('dropdown menu should be keyboard accessible', async ({ page }) => {
+      await seedAccessibilitySession(page)
       await page.goto('/')
       await waitForLoad(page)
 
@@ -227,17 +283,12 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
 
   test.describe('Color Contrast', () => {
     test('light mode should have sufficient contrast', async ({ page }) => {
+      await seedAccessibilitySession(page, { mode: 'light' })
       await page.goto('/')
-      await waitForLoad(page)
-
-      // Asegurar modo claro
-      await page.evaluate(() => {
-        document.documentElement.classList.remove('dark')
-      })
+      await waitForLoad(page, { mode: 'light' })
 
       const results = await new AxeBuilder({ page })
-        .withTags(['wcag2aa'])
-        .options({ rules: ['color-contrast'] })
+        .withRules(['color-contrast'])
         .analyze()
 
       // Solo contar violaciones críticas de contraste
@@ -245,37 +296,29 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
         v => v.id === 'color-contrast' && v.impact === 'serious'
       )
 
-      // Permitir algunas violaciones menores (decorativos, etc.)
-      expect(contrastViolations.length).toBeLessThanOrEqual(3)
+      expect(contrastViolations).toHaveLength(0)
     })
 
     test('dark mode should have sufficient contrast', async ({ page }) => {
+      await seedAccessibilitySession(page, { mode: 'dark' })
       await page.goto('/')
-      await waitForLoad(page)
-
-      // Activar modo oscuro
-      await page.evaluate(() => {
-        document.documentElement.classList.add('dark')
-      })
-
-      // Esperar que los estilos se apliquen
-      await page.waitForTimeout(500)
+      await waitForLoad(page, { mode: 'dark' })
 
       const results = await new AxeBuilder({ page })
-        .withTags(['wcag2aa'])
-        .options({ rules: ['color-contrast'] })
+        .withRules(['color-contrast'])
         .analyze()
 
       const contrastViolations = results.violations.filter(
         v => v.id === 'color-contrast' && v.impact === 'serious'
       )
 
-      expect(contrastViolations.length).toBeLessThanOrEqual(3)
+      expect(contrastViolations).toHaveLength(0)
     })
   })
 
   test.describe('Focus Management', () => {
     test('focus should be visible on interactive elements', async ({ page }) => {
+      await seedAccessibilitySession(page)
       await page.goto('/')
       await waitForLoad(page)
 
@@ -307,7 +350,7 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
         }
       }
 
-      // Al menos el 80% de los elementos enfocables deben tener estilos de focus
+      // Todos los elementos enfocables evaluados deben tener estilos de focus
       const elementsWithFocusStyle = focusableElements.filter(info => {
         const parsed = JSON.parse(info)
         return parsed.hasFocusStyle
@@ -315,11 +358,12 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
 
       if (focusableElements.length > 0) {
         const ratio = elementsWithFocusStyle.length / focusableElements.length
-        expect(ratio).toBeGreaterThanOrEqual(0.8)
+        expect(ratio).toBe(1)
       }
     })
 
     test('focus trap should work in dialogs', async ({ page }) => {
+      await seedAccessibilitySession(page)
       await page.goto('/')
       await waitForLoad(page)
 
@@ -359,6 +403,7 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
 
   test.describe('Screen Reader Support', () => {
     test('main content should have proper landmarks', async ({ page }) => {
+      await seedAccessibilitySession(page)
       await page.goto('/')
       await waitForLoad(page)
 
@@ -371,6 +416,7 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
     })
 
     test('headings should be hierarchical', async ({ page }) => {
+      await seedAccessibilitySession(page)
       await page.goto('/projects')
       await waitForLoad(page)
 
@@ -396,6 +442,7 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
     })
 
     test('images should have alt text', async ({ page }) => {
+      await seedAccessibilitySession(page)
       await page.goto('/projects')
       await waitForLoad(page)
 
@@ -420,26 +467,9 @@ test.describe('Accessibility - WCAG 2.1 AA Compliance', () => {
     for (const theme of themes) {
       for (const mode of modes) {
         test(`${theme} theme in ${mode} mode should be accessible`, async ({ page }) => {
+          await seedAccessibilitySession(page, { preset: theme, mode: mode as 'light' | 'dark' })
           await page.goto('/settings')
-          await waitForLoad(page)
-
-          // Aplicar tema y modo
-          await page.evaluate(({ theme, mode }) => {
-            localStorage.setItem('narrative_assistant_theme_config', JSON.stringify({
-              preset: theme,
-              mode: mode,
-              primaryColor: '#3B82F6',
-              fontSize: 'medium',
-              lineHeight: 'normal',
-              radius: 'medium',
-              compactness: 'normal',
-              reducedMotion: false
-            }))
-          }, { theme, mode })
-
-          // Recargar para aplicar
-          await page.reload()
-          await waitForLoad(page)
+          await waitForLoad(page, { preset: theme, mode: mode as 'light' | 'dark' })
 
           // Ejecutar axe
           const results = await new AxeBuilder({ page })

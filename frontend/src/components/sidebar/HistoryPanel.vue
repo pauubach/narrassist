@@ -3,8 +3,11 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useGlobalUndo } from '@/composables/useGlobalUndo'
 import type { HistoryEntry } from '@/composables/useGlobalUndo'
 import { useListKeyboardNav } from '@/composables/useListKeyboardNav'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 import SelectButton from 'primevue/selectbutton'
+import ConfirmDialog from 'primevue/confirmdialog'
+import { useConfirm } from 'primevue/useconfirm'
+import { useToast } from 'primevue/usetoast'
 
 /**
  * HistoryPanel - Panel de historial de acciones en el sidebar.
@@ -22,6 +25,8 @@ const { undoEntry, undoBatch, fetchHistory, fetchUndoableCount: _fetchUndoableCo
   useGlobalUndo(() => props.projectId)
 
 const { setItemRef: setHistoryRef, getTabindex: getHistoryTabindex, onKeydown: onHistoryKeydown, focusedIndex: historyFocusedIndex } = useListKeyboardNav()
+const confirmDialog = useConfirm()
+const toast = useToast()
 
 const entries = ref<HistoryEntry[]>([])
 const loading = ref(false)
@@ -88,46 +93,61 @@ async function handleRestoreAll() {
     return
   }
 
-  // Confirmación
-  const confirmed = confirm(
-    `⚠️ ¿Restaurar todo?\n\n` +
-    `Se deshará todo el trabajo realizado:\n` +
-    `• ${undoableEntries.length} acciones se revertirán\n` +
-    `• Todas las alertas resueltas/descartadas volverán a estar activas\n` +
-    `• Todas las fusiones de entidades se separarán\n` +
-    `• Todos los cambios manuales se eliminarán\n\n` +
-    `Esta acción NO se puede deshacer.`
-  )
+  confirmDialog.require({
+    header: 'Restaurar historial',
+    message:
+      `Se deshará todo el trabajo realizado en este proyecto:\n\n` +
+      `• ${undoableEntries.length} acciones se revertirán\n` +
+      `• Las alertas resueltas o descartadas volverán a estar activas\n` +
+      `• Las fusiones de entidades se separarán\n` +
+      `• Los cambios manuales se eliminarán\n\n` +
+      `Esta acción no se puede deshacer.`,
+    icon: 'pi pi-exclamation-triangle',
+    rejectProps: {
+      label: 'Cancelar',
+      severity: 'secondary',
+      text: true,
+    },
+    acceptProps: {
+      label: 'Sí, restaurar todo',
+      severity: 'danger',
+    },
+    accept: async () => {
+      restoringAll.value = true
+      try {
+        const json = await api.postRaw<{ success: boolean; data?: { count?: number }; error?: string }>(
+          `/api/projects/${props.projectId}/undo-all`
+        )
 
-  if (!confirmed) return
+        if (!json.success) {
+          throw new Error(json.error || 'No se pudo restaurar el historial.')
+        }
 
-  restoringAll.value = true
-  try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/undo-all`), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    })
+        await loadHistory()
 
-    const json = await response.json()
+        window.dispatchEvent(new CustomEvent('history:undo-complete', {
+          detail: { projectId: props.projectId, restoreAll: true }
+        }))
 
-    if (json.success) {
-      await loadHistory()
-
-      // Notificar al resto de la app
-      window.dispatchEvent(new CustomEvent('history:undo-complete', {
-        detail: { projectId: props.projectId, restoreAll: true }
-      }))
-
-      alert(`✅ ${json.data?.count || 0} acciones deshecha(s) correctamente`)
-    } else {
-      alert(`❌ Error: ${json.error}`)
-    }
-  } catch (error) {
-    console.error('Error restaurando todo:', error)
-    alert('❌ Error de conexión al restaurar')
-  } finally {
-    restoringAll.value = false
-  }
+        toast.add({
+          severity: 'success',
+          summary: 'Historial restaurado',
+          detail: `${json.data?.count || 0} acciones deshechas correctamente`,
+          life: 4000,
+        })
+      } catch (error) {
+        console.error('Error restaurando todo:', error)
+        toast.add({
+          severity: 'error',
+          summary: 'No se pudo restaurar el historial',
+          detail: error instanceof Error ? error.message : 'Error de conexión al restaurar',
+          life: 5000,
+        })
+      } finally {
+        restoringAll.value = false
+      }
+    },
+  })
 }
 
 function getActionIcon(actionType: string): string {
@@ -211,6 +231,7 @@ watch(() => props.projectId, () => {
 
 <template>
   <div class="history-panel">
+    <ConfirmDialog />
     <div class="panel-header">
       <div class="header-left">
         <span class="panel-title">Historial</span>

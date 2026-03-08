@@ -1,5 +1,7 @@
 # Resumen de Trabajo Completado - 2026-02-22
 
+> **Nota de vigencia (2026-03-07):** este documento conserva el resumen de una sesión pasada. No describe el estado actual del producto ni del repositorio completo. Mantenerlo como histórico; para estado vigente usar `docs/PROJECT_STATUS.md` y `docs/audits/`.
+
 **Sesión**: Implementación Backlog Fase 3
 **Duración**: ~2-3 horas
 **Estado**: ✅ M3 Completado, ⏸️ Frontend Tests documentado, 📋 Sprints A-D por definir

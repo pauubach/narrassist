@@ -11,6 +11,7 @@
         :options="modeOptions"
         option-label="label"
         option-value="value"
+        aria-label="Modo de apariencia"
         @update:model-value="(val) => themeStore.setMode(val)"
       />
     </div>
@@ -31,6 +32,8 @@
         option-group-label="label"
         option-group-children="items"
         class="preset-dropdown"
+        inputId="appearance-preset"
+        aria-label="Estilo visual"
         @update:model-value="onPresetChange"
       >
         <template #value="slotProps">
@@ -68,10 +71,15 @@
         <button
           v-for="color in PRIMARY_COLORS"
           :key="color.name"
+          type="button"
           class="color-swatch"
           :class="{ active: themeStore.config.primaryColor === color.value }"
           :style="{ backgroundColor: color.value }"
           :title="color.label"
+          :aria-label="themeStore.config.primaryColor === color.value
+            ? `Color primario ${color.label} seleccionado`
+            : `Seleccionar color primario ${color.label}`"
+          :aria-pressed="themeStore.config.primaryColor === color.value"
           @click="themeStore.setPrimaryColor(color.value)"
         >
           <i v-if="themeStore.config.primaryColor === color.value" class="pi pi-check"></i>
@@ -95,6 +103,8 @@
         option-group-label="label"
         option-group-children="items"
         class="font-dropdown"
+        inputId="appearance-font-ui"
+        aria-label="Fuente de interfaz"
         @update:model-value="onFontFamilyChange"
       >
         <template #value="slotProps">
@@ -133,6 +143,8 @@
         option-group-label="label"
         option-group-children="items"
         class="font-dropdown"
+        inputId="appearance-font-reading"
+        aria-label="Fuente de lectura"
         @update:model-value="onFontFamilyReadingChange"
       >
         <template #value="slotProps">
@@ -169,6 +181,7 @@
           :options="fontSizeOptions"
           option-label="label"
           option-value="value"
+          aria-label="Tamaño de fuente"
           @update:model-value="(val) => themeStore.setFontSize(val)"
         />
       </div>
@@ -185,6 +198,8 @@
           :options="lineHeightOptions"
           option-label="label"
           option-value="value"
+          inputId="appearance-line-height"
+          aria-label="Interlineado"
           @update:model-value="onLineHeightChange"
         />
       </div>
@@ -201,6 +216,7 @@
           :options="radiusOptions"
           option-label="label"
           option-value="value"
+          aria-label="Bordes redondeados"
           @update:model-value="(val) => themeStore.setRadius(val)"
         />
       </div>
@@ -217,6 +233,7 @@
           :options="compactnessOptions"
           option-label="label"
           option-value="value"
+          aria-label="Densidad de la interfaz"
           @update:model-value="(val) => themeStore.setCompactness(val)"
         />
       </div>
@@ -232,6 +249,8 @@
     <div class="setting-control">
       <ToggleSwitch
         :model-value="themeStore.config.reducedMotion"
+        inputId="appearance-reduced-motion"
+        aria-label="Reducir animaciones"
         @update:model-value="onReducedMotionChange"
       />
     </div>
@@ -425,11 +444,11 @@ const onReducedMotionChange = (val: boolean) => {
   justify-content: space-between;
   align-items: flex-start;
   padding: 1rem 0;
-  border-bottom: 1px solid var(--p-surface-200);
+  border-bottom: 1px solid var(--surface-border);
 }
 
 :global(.dark) .setting-item {
-  border-bottom-color: var(--p-surface-700);
+  border-bottom-color: var(--surface-border);
 }
 
 .setting-item:last-child {
@@ -445,13 +464,13 @@ const onReducedMotionChange = (val: boolean) => {
   display: block;
   font-weight: 600;
   margin-bottom: 0.25rem;
-  color: var(--p-text-color);
+  color: var(--text-color);
 }
 
 .setting-description {
   margin: 0;
   font-size: 0.9rem;
-  color: var(--p-text-muted-color);
+  color: var(--text-color-secondary);
   line-height: 1.5;
 }
 
@@ -497,9 +516,9 @@ const onReducedMotionChange = (val: boolean) => {
 }
 
 .color-swatch.active {
-  border-color: var(--p-text-color);
+  border-color: var(--text-color);
   transform: scale(1.1);
-  box-shadow: 0 0 0 2px var(--p-surface-0), 0 0 0 4px var(--p-text-color);
+  box-shadow: 0 0 0 2px var(--surface-card), 0 0 0 4px var(--text-color);
 }
 
 .color-swatch i {
@@ -510,7 +529,7 @@ const onReducedMotionChange = (val: boolean) => {
 
 /* Dark mode ajustes para color swatches */
 .dark .color-swatch.active {
-  box-shadow: 0 0 0 2px var(--p-surface-900), 0 0 0 4px var(--p-text-color);
+  box-shadow: 0 0 0 2px var(--surface-card), 0 0 0 4px var(--text-color);
 }
 
 /* ============================================================================
@@ -533,7 +552,7 @@ const onReducedMotionChange = (val: boolean) => {
   align-items: center;
   gap: 0.5rem;
   font-weight: 600;
-  color: var(--p-text-muted-color);
+  color: var(--text-color-secondary);
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.025em;
@@ -565,7 +584,7 @@ const onReducedMotionChange = (val: boolean) => {
 
 .preset-desc {
   font-size: 0.8rem;
-  color: var(--p-text-muted-color);
+  color: var(--text-color-secondary);
 }
 
 /* ============================================================================
@@ -582,7 +601,7 @@ const onReducedMotionChange = (val: boolean) => {
   align-items: center;
   gap: 0.5rem;
   font-weight: 600;
-  color: var(--p-text-muted-color);
+  color: var(--text-color-secondary);
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.025em;
@@ -605,7 +624,7 @@ const onReducedMotionChange = (val: boolean) => {
 
 .font-desc {
   font-size: 0.8rem;
-  color: var(--p-text-muted-color);
+  color: var(--text-color-secondary);
 }
 
 /* Clases de fuente para previsualización */
@@ -647,21 +666,21 @@ const onReducedMotionChange = (val: boolean) => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
   gap: 0;
-  border-bottom: 1px solid var(--p-surface-200);
+  border-bottom: 1px solid var(--surface-border);
 }
 
 :global(.dark) .compact-settings-grid {
-  border-bottom-color: var(--p-surface-700);
+  border-bottom-color: var(--surface-border);
 }
 
 .compact-settings-grid .setting-item {
   border-bottom: none;
-  border-right: 1px solid var(--p-surface-200);
+  border-right: 1px solid var(--surface-border);
   padding-right: 1.25rem;
 }
 
 :global(.dark) .compact-settings-grid .setting-item {
-  border-right-color: var(--p-surface-700);
+  border-right-color: var(--surface-border);
 }
 
 /* Right column items: left padding from divider, no right border */
@@ -678,12 +697,12 @@ const onReducedMotionChange = (val: boolean) => {
   }
   .compact-settings-grid .setting-item {
     border-right: none;
-    border-bottom: 1px solid var(--p-surface-200);
+    border-bottom: 1px solid var(--surface-border);
     padding-left: 0;
     padding-right: 0;
   }
   :global(.dark) .compact-settings-grid .setting-item {
-    border-bottom-color: var(--p-surface-700);
+    border-bottom-color: var(--surface-border);
   }
   .compact-settings-grid .setting-item:last-child {
     border-bottom: none;

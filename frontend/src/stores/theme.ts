@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { usePreset, updatePreset, palette, definePreset } from '@primeuix/themes'
+import { usePreset, updatePrimaryPalette, palette, definePreset } from '@primeuix/themes'
+import type { PaletteDesignToken } from '@primeuix/themes/types'
 import Aura from '@primeuix/themes/aura'
 import Lara from '@primeuix/themes/lara'
 import Material from '@primeuix/themes/material'
@@ -418,7 +419,7 @@ export const useThemeStore = defineStore('theme', () => {
       const presetInfo = PRESETS[presetKey]
       const basePreset = presetInfo.value
 
-      // Use usePreset to change the base preset completely
+      // Cambiar el preset base y luego sobreescribir solo la paleta primaria.
       usePreset(basePreset)
 
       // Agregar clase de tema activo para CSS específico por tema
@@ -427,13 +428,10 @@ export const useThemeStore = defineStore('theme', () => {
       document.documentElement.classList.remove(...themeClasses)
       document.documentElement.classList.add(`${presetKey}-theme`)
 
-      // Aplicar el color primario a TODOS los temas (incluidos los personalizados)
-      const colorPalette = palette(config.value.primaryColor)
-      updatePreset(basePreset, {
-        semantic: {
-          primary: colorPalette
-        }
-      })
+      // PrimeVue espera la actualizacion de color via updatePrimaryPalette();
+      // updatePreset() no acepta un diff parcial de semantic tokens.
+      const colorPalette = palette(config.value.primaryColor) as PaletteDesignToken
+      updatePrimaryPalette(colorPalette)
 
       console.log(
         '[Theme] Applied preset:',

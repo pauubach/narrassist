@@ -15,6 +15,7 @@ import re
 import pytest
 
 from narrative_assistant.nlp.mention_validation import (
+    LLMValidator,
     Mention,
     ValidationMethod,
     create_validator_chain,
@@ -257,6 +258,44 @@ class TestAmbiguousCases:
         # Documentar comportamiento actual
         assert isinstance(result.is_valid, bool)
         assert result.confidence > 0.0
+
+
+class TestLLMValidator:
+    def test_llm_validator_can_reject_ambiguous_possessive(self, monkeypatch):
+        class _FakeClient:
+            is_available = True
+
+            def complete(self, *args, **kwargs):
+                return (
+                    '{"is_valid": false, "confidence": 0.94, '
+                    '"reasoning": "Contexto posesivo/descriptivo", "role": "possessive"}'
+                )
+
+        monkeypatch.setattr(LLMValidator, "_get_client", lambda self: _FakeClient())
+
+        validator = create_validator_chain(use_spacy=False, use_llm=True)
+        text = "La historia sobre Isabel seguía obsesionando al narrador."
+        mention = Mention(text="Isabel", position=text.index("Isabel"))
+
+        result = validator.validate(mention, text, {"Isabel"})
+
+        assert result.is_valid is False
+        assert result.method == ValidationMethod.LLM
+        assert result.confidence == pytest.approx(0.94)
+        assert result.metadata["role"] == "possessive"
+
+    def test_llm_validator_degrades_cleanly_when_unavailable(self, monkeypatch):
+        monkeypatch.setattr(LLMValidator, "_get_client", lambda self: None)
+
+        validator = create_validator_chain(use_spacy=False, use_llm=True)
+        text = "La historia sobre Isabel seguía obsesionando al narrador."
+        mention = Mention(text="Isabel", position=text.index("Isabel"))
+
+        result = validator.validate(mention, text, {"Isabel"})
+
+        assert result.is_valid is True
+        assert result.method == ValidationMethod.REGEX
+        assert result.metadata["fallback"] == "llm_unavailable"
 
 
 # ==============================================================================

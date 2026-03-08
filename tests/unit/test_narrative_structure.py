@@ -303,6 +303,48 @@ class TestDetectAll:
         assert "by_type" in data
         assert "by_severity" in data
 
+    def test_detect_all_detects_analepsis(self, detector):
+        chapters = [
+            {
+                "number": 1,
+                "start_char": 0,
+                "end_char": 180,
+                "content": "Tomás avanzó por la casa sin mirar atrás.",
+            },
+            {
+                "number": 2,
+                "start_char": 180,
+                "end_char": 520,
+                "content": (
+                    "Años atrás, cuando era niño, Tomás vivía en esa misma casa. "
+                    "Recordó el patio y el olor de la madera mojada."
+                ),
+            },
+        ]
+        text = "\n".join(ch["content"] for ch in chapters)
+
+        report = detector.detect_all(text, chapters)
+
+        assert len(report.analepsis_found) >= 1
+        assert any(a.location.chapter == 2 for a in report.analepsis_found)
+        assert report.total_anomalies >= len(report.analepsis_found)
+
+    def test_detect_all_does_not_flag_simple_past_as_analepsis(self, detector):
+        chapters = [
+            {
+                "number": 1,
+                "start_char": 0,
+                "end_char": 220,
+                "content": (
+                    "Tomás caminó por el patio, abrió la puerta y observó la calle en silencio."
+                ),
+            }
+        ]
+
+        report = detector.detect_all(chapters[0]["content"], chapters)
+
+        assert report.analepsis_found == []
+
 
 # =============================================================================
 # Tests con documento real

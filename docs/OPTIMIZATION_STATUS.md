@@ -1,5 +1,7 @@
 # Estado de Optimización de Recursos - Narrative Assistant
 
+> **Nota de vigencia (2026-03-07):** este documento es una fotografía de implementación respecto al estudio de recursos del 2026-02-04. Sigue siendo útil como referencia técnica, pero no debe interpretarse como inventario exhaustivo del estado actual. Complementar con `docs/PLAN_ACTIVE.md` y auditorías vigentes.
+
 **Fecha de revisión**: 4 de febrero de 2026
 **Documento base**: [docs/research/ESTUDIO_OPTIMIZACION_RECURSOS.md](research/ESTUDIO_OPTIMIZACION_RECURSOS.md)
 

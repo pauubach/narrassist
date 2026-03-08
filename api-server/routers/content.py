@@ -2,13 +2,74 @@
 Router: content
 """
 
-from typing import Optional
+import bisect
+from typing import Any, Callable, Optional
 
 import deps
 from deps import ApiResponse, CustomWordRequest, GlossaryEntryRequest, logger
 from fastapi import APIRouter, Body, HTTPException, Query
 
 router = APIRouter()
+
+
+def _build_chapter_position_locator(
+    chapters: list[Any],
+) -> Callable[[int | None], dict[str, Any] | None]:
+    """
+    Construye un localizador O(log n) para mapear offsets globales a capítulos.
+
+    Usa start/end_char cuando están disponibles. Si no, degrada a longitudes
+    acumuladas del contenido para endpoints que trabajan con texto concatenado.
+    """
+    if not chapters:
+        return lambda _pos: None
+
+    chapters_sorted = sorted(
+        chapters,
+        key=lambda ch: (
+            getattr(ch, "start_char", None)
+            if getattr(ch, "start_char", None) is not None
+            else getattr(ch, "position", 0)
+        ),
+    )
+
+    chapters_with_bounds: list[tuple[int, int, Any]] = []
+    chapter_starts: list[int] = []
+    cumulative = 0
+
+    for chapter in chapters_sorted:
+        start_char = getattr(chapter, "start_char", None)
+        end_char = getattr(chapter, "end_char", None)
+
+        if start_char is None or end_char is None:
+            content = getattr(chapter, "content", "") or ""
+            start_char = cumulative
+            end_char = cumulative + len(content)
+            cumulative = end_char
+
+        chapter_starts.append(start_char)
+        chapters_with_bounds.append((start_char, end_char, chapter))
+
+    def locate(pos: int | None) -> dict[str, Any] | None:
+        if pos is None:
+            return None
+
+        idx = bisect.bisect_right(chapter_starts, pos) - 1
+        if idx < 0:
+            return None
+
+        start_char, end_char, chapter = chapters_with_bounds[idx]
+        if not (start_char <= pos < end_char):
+            return None
+
+        return {
+            "id": getattr(chapter, "id", None),
+            "chapter_number": getattr(chapter, "chapter_number", None),
+            "title": getattr(chapter, "title", None),
+            "start_char_in_chapter": pos - start_char,
+        }
+
+    return locate
 
 @router.get("/api/projects/{project_id}/glossary", response_model=ApiResponse)
 def list_glossary_entries(
@@ -376,6 +437,7 @@ def get_glossary_suggestions(
 
         chapter_repo = ChapterRepository()
         chapters = chapter_repo.get_by_project(project_id)
+        locate_chapter = _build_chapter_position_locator(chapters)
 
         if not chapters:
             return ApiResponse(
@@ -403,15 +465,21 @@ def get_glossary_suggestions(
                 entity_list = entity_repo.get_entities_by_project(project_id)
 
                 if entity_list:
-                    entities = [
-                        {
-                            "name": e.canonical_name,
-                            "type": e.entity_type.value,
-                            "mention_count": e.mention_count,
-                            "first_mention_chapter": None,  # TODO: calculate from first_appearance_char
-                        }
-                        for e in entity_list
-                    ]
+                    entities = []
+                    for entity in entity_list:
+                        location = locate_chapter(
+                            getattr(entity, "first_appearance_char", None)
+                        )
+                        entities.append(
+                            {
+                                "name": entity.canonical_name,
+                                "type": entity.entity_type.value,
+                                "mention_count": entity.mention_count,
+                                "first_mention_chapter": (
+                                    location["chapter_number"] if location else None
+                                ),
+                            }
+                        )
             except Exception as e:
                 logger.warning(f"No se pudieron obtener entidades: {e}", exc_info=True)
 
@@ -1000,6 +1068,7 @@ def search_similar_text(
             raise HTTPException(status_code=500, detail="Chapter repository not initialized")
 
         chapters = deps.chapter_repository.get_by_project(project_id)
+        locate_chapter = _build_chapter_position_locator(chapters)
         full_text = "\n\n".join(ch.content for ch in chapters if ch.content)
 
         if not full_text.strip():
@@ -1046,37 +1115,19 @@ def search_similar_text(
                     "start_char": chunk.start_char,
                     "end_char": chunk.end_char,
                     "similarity": float(score),
-                    "chapter_id": None,  # TODO: mapear a capítulo
+                    "chapter_id": None,
                 })
 
         # Ordenar por similaridad descendente
         matches.sort(key=lambda x: x["similarity"], reverse=True)
         matches = matches[:limit]
 
-        # Mapear a capítulos si existen
-        if project.chapter_count > 0:
-            from narrative_assistant.persistence.chapter import get_chapter_repository
-            ch_repo = get_chapter_repository()
-            chapters_result = ch_repo.get_all_by_project(project_id)
-
-            if chapters_result.is_success:
-                chapters = chapters_result.value
-                # Ordenar capítulos por posición
-                chapters_sorted = sorted(chapters, key=lambda c: c.position)
-
-                # Mapear cada match a su capítulo
-                for match in matches:
-                    start = match["start_char"]
-                    cumulative = 0
-
-                    for chapter in chapters_sorted:
-                        ch_len = len(chapter.content) if chapter.content else 0
-                        if cumulative <= start < cumulative + ch_len:
-                            match["chapter_id"] = chapter.id
-                            match["chapter_title"] = chapter.title
-                            match["start_char_in_chapter"] = start - cumulative
-                            break
-                        cumulative += ch_len
+        for match in matches:
+            location = locate_chapter(match["start_char"])
+            if location:
+                match["chapter_id"] = location["id"]
+                match["chapter_title"] = location["title"]
+                match["start_char_in_chapter"] = location["start_char_in_chapter"]
 
         return ApiResponse(
             success=True,

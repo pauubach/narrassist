@@ -27,6 +27,8 @@
         <Button
           v-tooltip.bottom="viewMode === 'grid' ? 'Vista lista' : 'Vista tarjetas'"
           :icon="viewMode === 'grid' ? 'pi pi-list' : 'pi pi-th-large'"
+          :aria-label="viewMode === 'grid' ? 'Cambiar a vista de lista' : 'Cambiar a vista de tarjetas'"
+          :title="viewMode === 'grid' ? 'Cambiar a vista de lista' : 'Cambiar a vista de tarjetas'"
           text
           rounded
           @click="toggleViewMode"
@@ -96,6 +98,8 @@
                   />
                   <Button
                     icon="pi pi-ellipsis-v"
+                    :aria-label="`Más acciones para ${project.name}`"
+                    :title="`Más acciones para ${project.name}`"
                     text
                     rounded
                     @click.stop="showProjectMenu($event, project)"
@@ -226,6 +230,8 @@
             <template #body="{ data }">
               <Button
                 icon="pi pi-ellipsis-v"
+                :aria-label="`Más acciones para ${data.name}`"
+                :title="`Más acciones para ${data.name}`"
                 text
                 rounded
                 size="small"
