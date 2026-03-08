@@ -3,6 +3,7 @@
  */
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { logWarn } from '@/services/logger'
 
 // Variable para guardar la función listen de Tauri
 let tauriListen: ((event: string, handler: (event: { payload: string }) => void) => Promise<() => void>) | null = null
@@ -26,7 +27,7 @@ if (isTauriEnv) {
     ),
   ])
   tauriReadyPromise = importWithTimeout.catch(error => {
-    console.warn('[Menu] Failed to load Tauri event API:', error)
+    logWarn('Menu', 'Failed to load Tauri event API', error)
   })
 }
 
@@ -222,10 +223,10 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
             handleMenuEvent(event.payload)
           })
         } else {
-          console.warn('[Menu] Tauri listen function not available after import')
+          logWarn('Menu', 'Tauri listen function not available after import')
         }
       } catch (error) {
-        console.warn('[Menu] Failed to setup Tauri menu listener:', error)
+        logWarn('Menu', 'Failed to setup Tauri menu listener', error)
       }
     }
   })

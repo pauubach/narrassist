@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '@/services/apiClient'
+import { logError, logWarn } from '@/services/logger'
 
 export interface ModelStatus {
   type: string
@@ -179,7 +180,7 @@ export const useSystemStore = defineStore('system', () => {
       } catch (error) {
         if (!llmHeartbeatWarned) {
           const msg = error instanceof Error ? error.message : String(error)
-          console.warn('[autoConfig] No se pudo comprobar el estado de los motores en segundo plano:', msg)
+          logWarn('autoConfig', 'No se pudo comprobar el estado de los motores en segundo plano:', msg)
           autoConfigErrors.value.push(`LLM heartbeat: ${msg}`)
           llmHeartbeatWarned = true
         }
@@ -249,7 +250,7 @@ export const useSystemStore = defineStore('system', () => {
       backendConnected.value = false
       if (!backendHealthWarned) {
         const msg = error instanceof Error ? error.message : String(error)
-        console.warn('[system] Health check no disponible, reintentando:', msg)
+        logWarn('system', 'Health check no disponible, reintentando:', msg)
         backendHealthWarned = true
       }
     }
@@ -280,7 +281,7 @@ export const useSystemStore = defineStore('system', () => {
         // Backend no disponible todavia, reintentar
         if (!warned) {
           const msg = error instanceof Error ? error.message : String(error)
-          console.warn('[system] Esperando a que el motor de analisis responda:', msg)
+          logWarn('system', 'Esperando a que el motor de analisis responda:', msg)
           warned = true
         }
       }
@@ -341,7 +342,7 @@ export const useSystemStore = defineStore('system', () => {
       if (!response) {
         modelProgressPollErrorCount += 1
         if (modelProgressPollErrorCount === 1) {
-          console.warn('[models] El progreso de descarga no respondio, reintentando...')
+          logWarn('models', 'El progreso de descarga no respondio, reintentando...')
         }
         if (modelProgressPollErrorCount >= 8) {
           modelsError.value = 'No pudimos actualizar el progreso de la descarga. El sistema puede seguir ocupado; espera unos segundos y reintenta.'
@@ -376,7 +377,7 @@ export const useSystemStore = defineStore('system', () => {
             if (status?.all_required_installed) {
               // Required models OK, optional ones failed — warn but don't block
               const failedNames = errorDownloads.map(([name]) => name).join(', ')
-              console.warn(`Optional model download failed: ${failedNames}`)
+              logWarn('models', `Optional model download failed: ${failedNames}`)
               stopPolling()
               modelsDownloading.value = false
             } else {
@@ -393,7 +394,7 @@ export const useSystemStore = defineStore('system', () => {
       modelProgressPollErrorCount += 1
       if (modelProgressPollErrorCount === 1) {
         const msg = error instanceof Error ? error.message : String(error)
-        console.warn('[models] No se pudo consultar el progreso de descarga:', msg)
+        logWarn('models', 'No se pudo consultar el progreso de descarga:', msg)
       }
       if (modelProgressPollErrorCount >= 8) {
         modelsError.value = 'No pudimos actualizar el progreso de la descarga. El sistema puede seguir ocupado; espera unos segundos y reintenta.'
@@ -452,7 +453,7 @@ export const useSystemStore = defineStore('system', () => {
       systemCapabilities.value = await api.get<SystemCapabilities>('/api/system/capabilities')
       return systemCapabilities.value
     } catch (error) {
-      console.error('Error loading system capabilities:', error)
+      logError('system', 'Error loading system capabilities', error)
     } finally {
       capabilitiesLoading.value = false
     }
@@ -562,7 +563,7 @@ export const useSystemStore = defineStore('system', () => {
             }
           } catch {
             if (pollCount === 1) {
-              console.warn('[languagetool] Error temporal comprobando instalacion, reintentando...')
+              logWarn('languagetool', 'Error temporal comprobando instalacion, reintentando...')
             }
             // Show connection issue to user via progress UI
             if (pollCount > 5 && !ltInstallProgress.value) {
@@ -583,7 +584,7 @@ export const useSystemStore = defineStore('system', () => {
       })
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      console.warn('[languagetool] Error iniciando instalacion:', msg)
+      logWarn('languagetool', 'Error iniciando instalacion:', msg)
       ltInstallProgress.value = {
         phase: 'error',
         phase_label: 'Error',
@@ -610,7 +611,7 @@ export const useSystemStore = defineStore('system', () => {
       return systemCapabilities.value?.languagetool?.running ?? false
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      console.warn('[languagetool] No se pudo iniciar el corrector avanzado:', msg)
+      logWarn('languagetool', 'No se pudo iniciar el corrector avanzado:', msg)
       return false
     } finally {
       ltStarting.value = false
@@ -683,7 +684,7 @@ export const useSystemStore = defineStore('system', () => {
         } catch (e) {
           // HI-02: log structured warning instead of silent swallow
           const msg = e instanceof Error ? e.message : String(e)
-          console.warn('[autoConfig] Ollama start failed:', msg)
+          logWarn('autoConfig', 'Ollama start failed:', msg)
           autoConfigErrors.value.push(`Ollama start: ${msg}`)
         }
       }
@@ -706,7 +707,7 @@ export const useSystemStore = defineStore('system', () => {
         } catch (e) {
           // HI-02: log structured warning instead of silent swallow
           const msg = e instanceof Error ? e.message : String(e)
-          console.warn('[autoConfig] LLM readiness check failed:', msg)
+          logWarn('autoConfig', 'LLM readiness check failed:', msg)
           autoConfigErrors.value.push(`LLM readiness: ${msg}`)
           // HI-03: don't clear llmDownloadingModels here — heartbeat handles it
         }
@@ -714,7 +715,7 @@ export const useSystemStore = defineStore('system', () => {
     } catch (e) {
       // HI-02: log structured warning for outer auto-config failure
       const msg = e instanceof Error ? e.message : String(e)
-      console.warn('[autoConfig] autoConfigOnStartup failed:', msg)
+      logWarn('autoConfig', 'autoConfigOnStartup failed:', msg)
       autoConfigErrors.value.push(`autoConfig: ${msg}`)
     } finally {
       _autoConfigRunning = false

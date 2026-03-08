@@ -8,6 +8,7 @@ import Material from '@primeuix/themes/material'
 import Nora from '@primeuix/themes/nora'
 
 import { customPresets, type ThemePresetConfig, type CustomPresetKey } from '@/themes/presets'
+import { logError, logWarn } from '@/services/logger'
 import { safeSetItem, safeGetItem } from '@/utils/safeStorage'
 
 // ============================================================================
@@ -433,7 +434,7 @@ export const useThemeStore = defineStore('theme', () => {
       updatePrimaryPalette(colorPalette)
 
     } catch (e) {
-      console.error('[Theme] Error applying preset:', e)
+      logError('Theme', 'Error applying preset', e)
     }
   }
 
@@ -531,7 +532,7 @@ export const useThemeStore = defineStore('theme', () => {
         }
         config.value = { ...DEFAULT_CONFIG, ...parsed }
       } catch (e) {
-        console.warn('[Theme] Failed to parse theme config:', e)
+        logWarn('Theme', 'Failed to parse theme config', e)
         config.value = { ...DEFAULT_CONFIG }
       }
       return

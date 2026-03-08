@@ -8,6 +8,7 @@
  */
 
 import { ref } from 'vue'
+import { logWarn } from '@/services/logger'
 
 // Sonidos reales (.wav) importados como assets de Vite
 import SUCCESS_SOUND from '@/assets/sounds/success.wav'
@@ -46,7 +47,7 @@ function getUserPreferences() {
       }
     }
   } catch (e) {
-    console.warn('Error reading user preferences:', e)
+    logWarn('Notifications', 'Error reading user preferences', e)
   }
   return {
     notifyAnalysisComplete: true,
@@ -84,7 +85,7 @@ function playSound(severity: NotificationSeverity = 'success'): void {
       // Ignorar errores de autoplay bloqueado
     })
   } catch (e) {
-    console.warn('Error playing sound:', e)
+    logWarn('Notifications', 'Error playing sound', e)
   }
 }
 
@@ -113,7 +114,7 @@ async function requestPermission(): Promise<boolean> {
     permissionDenied.value = permission === 'denied'
     return permissionGranted.value
   } catch (e) {
-    console.warn('Error requesting notification permission:', e)
+    logWarn('Notifications', 'Error requesting notification permission', e)
     return false
   }
 }
@@ -178,7 +179,7 @@ async function showNotification(options: NotificationOptions): Promise<void> {
       notification.close()
     }
   } catch (e) {
-    console.warn('Error showing notification:', e)
+    logWarn('Notifications', 'Error showing notification', e)
   }
 }
 

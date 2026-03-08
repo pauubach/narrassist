@@ -153,7 +153,29 @@ export function installConsoleInterceptor() {
 export function logError(tag: string, message: string, err?: unknown) {
   const errStr = err instanceof Error ? `${err.name}: ${err.message}` : err !== undefined ? String(err) : ''
   const full = errStr ? `[${tag}] ${message} ${errStr}` : `[${tag}] ${message}`
-  console.error(full)
+  if (err !== undefined) {
+    console.error(full, err)
+  } else {
+    console.error(full)
+  }
+}
+
+/**
+ * Helper DRY para catch blocks con nivel warn.
+ * Mismo patrón que logError pero con console.warn.
+ *
+ * @example
+ *   catch (err) { logWarn('Menu', 'Tauri API not available:', err) }
+ *   // Output: [Menu] Tauri API not available: TypeError: ...
+ */
+export function logWarn(tag: string, message: string, err?: unknown) {
+  const errStr = err instanceof Error ? `${err.name}: ${err.message}` : err !== undefined ? String(err) : ''
+  const full = errStr ? `[${tag}] ${message} ${errStr}` : `[${tag}] ${message}`
+  if (err !== undefined) {
+    console.warn(full, err)
+  } else {
+    console.warn(full)
+  }
 }
 
 /** Force immediate flush of buffered entries */

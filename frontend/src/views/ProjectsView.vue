@@ -351,6 +351,7 @@ import type { Project } from '@/types'
 import { getProjectStats } from '@/composables/useGlobalStats'
 import { safeGetItem, safeSetItem } from '@/utils/safeStorage'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 const router = useRouter()
 const confirmDialog = useConfirm()
@@ -560,7 +561,7 @@ const createProject = async () => {
       // Iniciar análisis en background (no bloquea la navegación)
       if (fileToAnalyze) {
         analysisStore.startAnalysis(project.id, fileToAnalyze).catch((error) => {
-          console.error('Error starting analysis:', error)
+          logError('ProjectsView', 'Error starting analysis', error)
           toast.add({
             severity: 'error',
             summary: 'Error al iniciar análisis',
@@ -573,7 +574,7 @@ const createProject = async () => {
       closeCreateDialog()
     }
   } catch (error) {
-    console.error('Error creating project:', error)
+    logError('ProjectsView', 'Error creating project', error)
     toast.add({
       severity: 'error',
       summary: 'Error al crear proyecto',
@@ -619,7 +620,7 @@ const deleteProject = (projectId: number) => {
         await projectsStore.fetchProjects()
         toast.add({ severity: 'success', summary: 'Eliminado', detail: `Proyecto "${projectName}" eliminado.`, life: 3000 })
       } catch (error) {
-        console.error('Error deleting project:', error)
+        logError('ProjectsView', 'Error deleting project', error)
         toast.add({ severity: 'error', summary: 'Error', detail: 'Error al eliminar el proyecto. Por favor, inténtalo de nuevo.', life: 5000 })
       }
     }

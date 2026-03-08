@@ -13,6 +13,7 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import type { Alert, AlertStatus, AlertSeverity } from '@/types'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 export interface SequentialFilters {
   statuses: AlertStatus[]
@@ -308,7 +309,7 @@ export function useSequentialMode(
 
       return true
     } catch (error) {
-      console.error('Error updating alert status:', error)
+      logError('SequentialMode', 'Error updating alert status', error)
     } finally {
       updating.value = false
     }
@@ -412,7 +413,7 @@ export function useSequentialMode(
       goToAlert(lastAction.alertId)
       return true
     } catch (error) {
-      console.error('Error undoing action:', error)
+      logError('SequentialMode', 'Error undoing action', error)
       // Put the action back
       actionHistory.value.push(lastAction)
     } finally {

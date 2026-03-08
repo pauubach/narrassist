@@ -6,6 +6,7 @@
  */
 import { ref } from 'vue'
 import { api } from '@/services/apiClient'
+import { logWarn } from '@/services/logger'
 
 const saving = ref(false)
 const opening = ref(false)
@@ -27,7 +28,7 @@ const dialogReady: Promise<void> = isTauriEnv
         dialogModule = mod as unknown as typeof dialogModule
       })
       .catch((err) => {
-        console.warn('[ProjectFile] Failed to load dialog plugin:', err)
+        logWarn('ProjectFile', 'Failed to load dialog plugin', err)
       })
   : Promise.resolve()
 

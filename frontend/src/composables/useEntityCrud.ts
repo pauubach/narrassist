@@ -14,6 +14,7 @@ import { useAppToast } from './useAppToast'
 import { useAppConfirm } from './useAppConfirm'
 import type { Entity, EntityAttribute } from '@/types'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 import { getAttributeCategoriesForEntityType } from '@/config/attributes'
 
 export interface UseEntityCrudOptions {
@@ -129,7 +130,7 @@ export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudRetur
         toast.error(`Error al guardar: ${data.error}`)
       }
     } catch (err) {
-      console.error('Error updating entity:', err)
+      logError('EntityCrud', 'Error updating entity', err)
       toast.error('No se pudo guardar la entidad')
     }
   }
@@ -157,7 +158,7 @@ export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudRetur
         toast.error(`Error al ocultar: ${data.error}`)
       }
     } catch (err) {
-      console.error('Error deleting entity:', err)
+      logError('EntityCrud', 'Error deleting entity', err)
       toast.error('No se pudo ocultar la entidad')
     }
   }
@@ -175,7 +176,7 @@ export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudRetur
         attributes.value = []
       }
     } catch (err) {
-      console.error('Error loading entity attributes:', err)
+      logError('EntityCrud', 'Error loading entity attributes', err)
       attributes.value = []
     } finally {
       loadingAttributes.value = false
@@ -219,7 +220,7 @@ export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudRetur
         toast.error(data.error || 'No se pudo actualizar', { life: 4000 })
       }
     } catch (err) {
-      console.error('Error updating attribute:', err)
+      logError('EntityCrud', 'Error updating attribute', err)
       toast.error('Error al actualizar el atributo', { life: 4000 })
     } finally {
       savingAttribute.value = false
@@ -259,7 +260,7 @@ export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudRetur
         toast.error(data.error || 'No se pudo crear', { life: 4000 })
       }
     } catch (err) {
-      console.error('Error creating attribute:', err)
+      logError('EntityCrud', 'Error creating attribute', err)
       toast.error('Error al crear el atributo', { life: 4000 })
     } finally {
       savingAttribute.value = false
@@ -292,7 +293,7 @@ export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudRetur
         toast.error(data.error || 'No se pudo eliminar', { life: 4000 })
       }
     } catch (err) {
-      console.error('Error deleting attribute:', err)
+      logError('EntityCrud', 'Error deleting attribute', err)
       toast.error('Error al eliminar el atributo', { life: 4000 })
     }
   }
@@ -322,7 +323,7 @@ export function useEntityCrud(options: UseEntityCrudOptions): UseEntityCrudRetur
         entityVitalStatus.value = null
       }
     } catch (err) {
-      console.error('Error loading rich entity data:', err)
+      logError('EntityCrud', 'Error loading rich entity data', err)
       entityRelationships.value = []
       entityVitalStatus.value = null
     } finally {

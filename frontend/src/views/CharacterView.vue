@@ -260,6 +260,7 @@ import type { Entity, CharacterAttribute, CharacterRelationship } from '@/types'
 import { transformEntity, transformEntities } from '@/types/transformers'
 import { api } from '@/services/apiClient'
 import { getAttributeCategoriesForEntityType } from '@/config/attributes'
+import { logError } from '@/services/logger'
 import { useAppConfirm } from '@/composables/useAppConfirm'
 
 const route = useRoute()
@@ -430,11 +431,11 @@ const saveCharacter = async () => {
       }
       toast.add({ severity: 'success', summary: 'Actualizado', detail: data.message || 'Ficha actualizada correctamente', life: 3000 })
     } else {
-      console.error('Failed to update character:', data.error)
+      logError('CharacterView', 'Failed to update character', data.error)
       toast.add({ severity: 'error', summary: 'Error', detail: `Error al guardar: ${data.error}`, life: 5000 })
     }
   } catch (err) {
-    console.error('Error updating character:', err)
+    logError('CharacterView', 'Error updating character', err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo guardar el personaje', life: 5000 })
   }
 }
@@ -478,11 +479,11 @@ const saveAttribute = async () => {
       })
       toast.add({ severity: 'success', summary: 'Atributo creado', detail: data.message || 'Atributo añadido correctamente', life: 3000 })
     } else {
-      console.error('Failed to create attribute:', data.error)
+      logError('CharacterView', 'Failed to create attribute', data.error)
       toast.add({ severity: 'error', summary: 'Error', detail: `Error al crear atributo: ${data.error}`, life: 5000 })
     }
   } catch (err) {
-    console.error('Error creating attribute:', err)
+    logError('CharacterView', 'Error creating attribute', err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo crear el atributo', life: 5000 })
   }
 }
@@ -507,11 +508,11 @@ const onDeleteAttribute = async (attributeId: number | undefined) => {
       attributes.value = attributes.value.filter(a => a.id !== attributeId)
       toast.add({ severity: 'success', summary: 'Eliminado', detail: 'Atributo eliminado correctamente', life: 3000 })
     } else {
-      console.error('Failed to delete attribute:', data.error)
+      logError('CharacterView', 'Failed to delete attribute', data.error)
       toast.add({ severity: 'error', summary: 'Error', detail: `Error al eliminar: ${data.error}`, life: 5000 })
     }
   } catch (err) {
-    console.error('Error deleting attribute:', err)
+    logError('CharacterView', 'Error deleting attribute', err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo eliminar el atributo', life: 5000 })
   }
 }
@@ -546,11 +547,11 @@ const saveRelationship = async () => {
       await loadCharacter()
       toast.add({ severity: 'success', summary: 'Relación creada', detail: 'La relación se ha añadido correctamente', life: 3000 })
     } else {
-      console.error('Failed to create relationship:', data.error)
+      logError('CharacterView', 'Failed to create relationship', data.error)
       toast.add({ severity: 'error', summary: 'Error', detail: `Error al crear relación: ${data.error}`, life: 5000 })
     }
   } catch (err) {
-    console.error('Error creating relationship:', err)
+    logError('CharacterView', 'Error creating relationship', err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo crear la relación', life: 5000 })
   }
 }
@@ -573,11 +574,11 @@ const onDeleteRelationship = async (relationshipId: number | string | undefined)
       await loadCharacter()
       toast.add({ severity: 'success', summary: 'Eliminada', detail: 'Relación eliminada correctamente', life: 3000 })
     } else {
-      console.error('Failed to delete relationship:', data.error)
+      logError('CharacterView', 'Failed to delete relationship', data.error)
       toast.add({ severity: 'error', summary: 'Error', detail: `Error al eliminar relación: ${data.error}`, life: 5000 })
     }
   } catch (err) {
-    console.error('Error deleting relationship:', err)
+    logError('CharacterView', 'Error deleting relationship', err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo eliminar la relación', life: 5000 })
   }
 }
@@ -624,7 +625,7 @@ const exportSheet = async () => {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
   } catch (err) {
-    console.error('Error exporting sheet:', err)
+    logError('CharacterView', 'Error exporting sheet', err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'Error al exportar la ficha', life: 5000 })
   }
 }

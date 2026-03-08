@@ -287,6 +287,7 @@ import { safeGetItem } from '@/utils/safeStorage'
 
 // Injection keys
 import { settingsKey, sensitivityKey, ollamaKey, nlpMethodsKey } from '@/components/settings/settingsInjection'
+import { logError } from '@/services/logger'
 
 const router = useRouter()
 const toast = useToast()
@@ -407,7 +408,7 @@ async function selectQualityLevel(level: string) {
 
     onSettingChange()
   } catch (e) {
-    console.error('Error setting quality level:', e)
+    logError('SettingsView', 'Error setting quality level', e)
   }
 }
 
@@ -624,7 +625,7 @@ const loadSystemCapabilities = async (): Promise<boolean> => {
     }
     return true
   }
-  console.error('Error loading system capabilities')
+  logError('SettingsView', 'Error loading system capabilities')
   return false
 }
 
@@ -641,7 +642,7 @@ const loadCurrentDataLocation = async () => {
       newDataLocation.value = result.data.path
     }
   } catch (error) {
-    console.error('Error loading data location:', error)
+    logError('SettingsView', 'Error loading data location', error)
   }
 }
 
@@ -684,7 +685,7 @@ const confirmChangeDataLocation = async () => {
       toast.add({ severity: 'error', summary: 'Error', detail: result.error || 'No se pudo cambiar la ubicación', life: 5000 })
     }
   } catch (error) {
-    console.error('Error changing data location:', error)
+    logError('SettingsView', 'Error changing data location', error)
     toast.add({
       severity: 'error',
       summary: 'Error',

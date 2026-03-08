@@ -20,6 +20,7 @@ import type {
   ApiNLPMethods,
   ApiPipelineFlags,
 } from '@/types/api/projects'
+import { logError, logWarn } from '@/services/logger'
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -195,7 +196,7 @@ export function useSettingsPersistence() {
           prioritizeSpeed: parsedWithoutAnalysis.prioritizeSpeed ?? false,
         }
       } catch (error) {
-        console.error('Error loading settings:', error)
+        logError('Settings', 'Error loading settings', error)
       }
     }
   }
@@ -316,7 +317,7 @@ export function useSettingsPersistence() {
 
       return true
     } catch (err) {
-      console.warn('Could not load analysis settings from backend:', err)
+      logWarn('Settings', 'Could not load analysis settings from backend', err)
       return false
     }
   }
@@ -381,7 +382,7 @@ export function useSettingsPersistence() {
 
         return true
       } catch (err) {
-        console.warn('Could not sync analysis settings to backend:', err)
+        logWarn('Settings', 'Could not sync analysis settings to backend', err)
         return false
       }
     })()

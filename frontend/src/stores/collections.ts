@@ -22,6 +22,7 @@ import {
 } from '@/types/transformers'
 import { api } from '@/services/apiClient'
 import { ensureBackendReady } from '@/composables/useBackendReady'
+import { logError } from '@/services/logger'
 
 export const useCollectionsStore = defineStore('collections', () => {
   const collections = ref<Collection[]>([])
@@ -47,7 +48,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       collections.value = transformCollections(data)
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Error al cargar colecciones'
-      console.error('Failed to fetch collections:', err)
+      logError('Collections', 'Failed to fetch collections', err)
     } finally {
       loading.value = false
     }
@@ -62,7 +63,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       currentCollection.value = transformCollectionDetail(data)
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Error al cargar colección'
-      console.error('Failed to fetch collection:', err)
+      logError('Collections', 'Failed to fetch collection', err)
     } finally {
       loading.value = false
     }
@@ -77,7 +78,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       await fetchCollections()
       return data
     } catch (err) {
-      console.error('Failed to create collection:', err)
+      logError('Collections', 'Failed to create collection', err)
       throw err
     }
   }
@@ -87,7 +88,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       await api.putRaw('/api/collections/' + id, updates as Record<string, unknown>)
       await fetchCollection(id)
     } catch (err) {
-      console.error('Failed to update collection:', err)
+      logError('Collections', 'Failed to update collection', err)
       throw err
     }
   }
@@ -100,7 +101,7 @@ export const useCollectionsStore = defineStore('collections', () => {
         currentCollection.value = null
       }
     } catch (err) {
-      console.error('Failed to delete collection:', err)
+      logError('Collections', 'Failed to delete collection', err)
       throw err
     }
   }
@@ -112,7 +113,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       await api.postRaw(`/api/collections/${collectionId}/projects/${projectId}?order=${order}`)
       await fetchCollection(collectionId)
     } catch (err) {
-      console.error('Failed to add project to collection:', err)
+      logError('Collections', 'Failed to add project to collection', err)
       throw err
     }
   }
@@ -122,7 +123,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       await api.del(`/api/collections/${collectionId}/projects/${projectId}`)
       await fetchCollection(collectionId)
     } catch (err) {
-      console.error('Failed to remove project from collection:', err)
+      logError('Collections', 'Failed to remove project from collection', err)
       throw err
     }
   }
@@ -136,7 +137,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       )
       entityLinks.value = transformEntityLinks(data)
     } catch (err) {
-      console.error('Failed to fetch entity links:', err)
+      logError('Collections', 'Failed to fetch entity links', err)
       entityLinks.value = []
     }
   }
@@ -148,7 +149,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       )
       linkSuggestions.value = transformLinkSuggestions(data)
     } catch (err) {
-      console.error('Failed to fetch link suggestions:', err)
+      logError('Collections', 'Failed to fetch link suggestions', err)
       linkSuggestions.value = []
     }
   }
@@ -171,7 +172,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       )
       await fetchEntityLinks(collectionId)
     } catch (err) {
-      console.error('Failed to create entity link:', err)
+      logError('Collections', 'Failed to create entity link', err)
       throw err
     }
   }
@@ -181,7 +182,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       await api.del(`/api/collections/${collectionId}/entity-links/${linkId}`)
       entityLinks.value = entityLinks.value.filter(l => l.id !== linkId)
     } catch (err) {
-      console.error('Failed to delete entity link:', err)
+      logError('Collections', 'Failed to delete entity link', err)
       throw err
     }
   }
@@ -197,7 +198,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       )
       crossBookReport.value = transformCrossBookReport(data)
     } catch (err) {
-      console.error('Failed to fetch cross-book analysis:', err)
+      logError('Collections', 'Failed to fetch cross-book analysis', err)
       crossBookReport.value = null
       throw err
     } finally {
@@ -212,7 +213,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       const data = await api.getRaw<ApiCrossBookEventReport>(url, { timeout: 120000 })
       crossBookEventReport.value = transformCrossBookEventReport(data)
     } catch (err) {
-      console.error('Failed to fetch cross-book event analysis:', err)
+      logError('Collections', 'Failed to fetch cross-book event analysis', err)
       crossBookEventReport.value = null
       throw err
     } finally {

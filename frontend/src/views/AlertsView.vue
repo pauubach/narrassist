@@ -295,6 +295,7 @@ import { transformAlerts } from '@/types/transformers'
 import { useToast } from 'primevue/usetoast'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 const { getSeverityConfig, getCategoryConfig, getStatusConfig, getSeverityLabel } = useAlertUtils()
 
@@ -394,7 +395,7 @@ const onResolveAlert = async (alert: Alert) => {
       showAlertDetails.value = false
     }
   } catch (err) {
-    console.error('Error resolving alert:', err)
+    logError('AlertsView', 'Error resolving alert', err)
   }
 }
 
@@ -407,7 +408,7 @@ const onDismissAlert = async (alert: Alert) => {
       showAlertDetails.value = false
     }
   } catch (err) {
-    console.error('Error dismissing alert:', err)
+    logError('AlertsView', 'Error dismissing alert', err)
   }
 }
 
@@ -419,7 +420,7 @@ const onReopenAlert = async (alert: Alert) => {
       await loadAlerts()
     }
   } catch (err) {
-    console.error('Error reopening alert:', err)
+    logError('AlertsView', 'Error reopening alert', err)
   }
 }
 
@@ -436,7 +437,7 @@ const confirmResolveAll = async () => {
       await loadAlerts()
     }
   } catch (err) {
-    console.error('Error resolving all alerts:', err)
+    logError('AlertsView', 'Error resolving all alerts', err)
   }
 }
 
@@ -486,7 +487,7 @@ const exportAlerts = () => {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
   } catch (err) {
-    console.error('Error exporting alerts:', err)
+    logError('AlertsView', 'Error exporting alerts', err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'Error al exportar alertas', life: 5000 })
   }
 }

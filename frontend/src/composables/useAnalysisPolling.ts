@@ -10,6 +10,7 @@ import { useAnalysisStore } from '@/stores/analysis'
 import { useProjectsStore } from '@/stores/projects'
 import { useNotifications } from '@/composables/useNotifications'
 import type { Entity, Alert, Chapter } from '@/types'
+import { logError } from '@/services/logger'
 
 interface AnalysisPollingOptions {
   /** Reactive project computed */
@@ -163,7 +164,7 @@ export function useAnalysisPolling(options: AnalysisPollingOptions) {
         }
       }
     } catch (err) {
-      console.error('Error polling analysis progress:', err)
+      logError('AnalysisPolling', 'Error polling analysis progress', err)
       stopPolling()
     }
   }

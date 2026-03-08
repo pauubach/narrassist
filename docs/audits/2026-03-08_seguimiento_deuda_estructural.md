@@ -276,14 +276,20 @@ Siguen siendo la deuda de mantenibilidad mas costosa:
 - `frontend/src/views/SettingsView.vue` (~1630 lineas)
 - `frontend/src/views/ProjectDetailView.vue` (~1865 lineas)
 - `frontend/src/components/DocumentViewer.vue` (~1922 lineas)
-- `api-server/routers/_analysis_phases.py` (~4968 lineas)
+- `api-server/routers/_analysis_phases.py` (~4785 lineas, -924 tras extracciones)
 - `src/narrative_assistant/pipelines/analysis_pipeline.py` (~1995 lineas)
+
+Avance reciente en `_analysis_phases.py` (5709 → 4785 lineas):
+
+- `_alert_emission.py`: emision de alertas (grammar + consistency) (~320 lineas)
+- `_analysis_restoration.py`: SP-1 restauracion de datos de usuario (~200 lineas)
+- `_consistency_subphases.py`: 7 sub-analisis de consistencia + helpers (~380 lineas)
 
 Prioridad recomendada:
 
 1. `DocumentViewer.vue`
 2. `ProjectDetailView.vue`
-3. `_analysis_phases.py`
+3. `_analysis_phases.py` (continuar extraccion)
 4. `analysis_pipeline.py`
 
 ### 4.3 Cobertura E2E de export/import en desktop real
@@ -303,11 +309,28 @@ Lo pendiente aqui es el salto a flujo desktop real o Playwright/Tauri real para:
 
 ### 4.4 Politica global de logging de error
 
-Ya no queda ruido de depuracion basico, pero sigue faltando decidir una politica comun para `console.error` / `console.warn` residuales:
+Politica establecida y parcialmente aplicada:
 
-- que se conserva como diagnostico local legitimo
-- que debe pasar por logger estructurado
-- que debe degradarse a toast, telemetry o silence controlado
+Infraestructura:
+
+- `logError(tag, message, err?)` en `logger.ts` — para catch blocks con console.error
+- `logWarn(tag, message, err?)` en `logger.ts` (nuevo) — para catch blocks con console.warn
+- Interceptor global ya captura todo `console.*` y lo envia a `frontend.log` via backend
+
+Reglas:
+
+- catch blocks → usar `logError()`/`logWarn()` con tag descriptivo (nombre del store/composable/componente)
+- guard clauses (early returns, validacion) → conservar `console.warn` directo (diagnostico local)
+- lifecycle/error boundary → conservar `console.error` directo (contexto Vue)
+- infraestructura (logger.ts, apiClient.ts) → no tocar
+
+Migracion completada:
+
+- **stores**: 7 archivos, 56 llamadas migradas — 0 restantes
+- **composables**: 14 archivos, 33 llamadas migradas — 4 guard clauses conservados
+- **views**: 4 archivos, 23 llamadas migradas — 0 restantes
+- **Total**: 112 de 236 migradas (47%)
+- **Restantes**: 124 en ~58 componentes individuales — migracion incremental a medida que se toquen
 
 ## 5. Validacion realizada
 
@@ -340,6 +363,18 @@ Resultado:
 - dialogos nativos: 0
 - `console.log/debug` de producto: 0
 
+### 5.1 Validacion adicional (bloque 2)
+
+Backend:
+
+- `python -m compileall api-server/routers/_alert_emission.py api-server/routers/_analysis_restoration.py api-server/routers/_consistency_subphases.py`
+- `pytest tests/unit/test_cr05_granular_incremental.py tests/unit/test_fast_path_cancelled.py tests/unit/test_sp1_reanalysis_persistence.py -q` (88 passed)
+
+Frontend:
+
+- `vue-tsc --noEmit`: OK (0 errores tras migracion logging)
+- `vitest run src/stores/__tests__/ src/composables/__tests__/`: 282 passed
+
 ## 6. Veredicto
 
 La deuda estructural inmediata de este bloque queda ampliamente cerrada.
@@ -347,6 +382,6 @@ La deuda estructural inmediata de este bloque queda ampliamente cerrada.
 Lo pendiente ya no es higiene basica ni soporte tecnico faltante, sino trabajo de siguiente escala:
 
 - release testing final sobre artefactos empaquetados
-- siguiente troceado de monolitos grandes
+- siguiente troceado de monolitos grandes (prioridad: DocumentViewer.vue, ProjectDetailView.vue)
 - cobertura desktop real de export/import
-- politica transversal de logging de error
+- migracion incremental de logging en componentes individuales (124 restantes)

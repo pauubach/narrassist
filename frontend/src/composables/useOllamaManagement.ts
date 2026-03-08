@@ -11,6 +11,7 @@ import { ref, computed } from 'vue'
 import { api } from '@/services/apiClient'
 import { useToast } from 'primevue/usetoast'
 import { useSystemStore } from '@/stores/system'
+import { logError } from '@/services/logger'
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -185,7 +186,7 @@ export function useOllamaManagement() {
         }
       }
     } catch (error) {
-      console.error('Error starting Ollama:', error)
+      logError('OllamaManagement', 'Error starting Ollama', error)
       toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo iniciar el analizador', life: 3000 })
     } finally {
       ollamaStarting.value = false

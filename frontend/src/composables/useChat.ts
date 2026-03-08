@@ -9,6 +9,7 @@
 import { ref, watch, onMounted } from 'vue'
 import { api, backendDown } from '@/services/apiClient'
 import type { ChatMessage, ChatRequest, ChatResponse } from '@/types'
+import { logWarn } from '@/services/logger'
 
 /** Text selection context to send with a message */
 export interface ChatSelectionContext {
@@ -64,7 +65,7 @@ export function useChat(projectId: number) {
         }))
       }
     } catch (e) {
-      console.warn('Error loading chat history:', e)
+      logWarn('Chat', 'Error loading chat history', e)
     }
   }
 
@@ -75,7 +76,7 @@ export function useChat(projectId: number) {
       const toSave = messages.value.slice(-50)
       localStorage.setItem(key, JSON.stringify(toSave))
     } catch (e) {
-      console.warn('Error saving chat history:', e)
+      logWarn('Chat', 'Error saving chat history', e)
     }
   }
 

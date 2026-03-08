@@ -12,6 +12,7 @@
 import { safeGetItem } from '@/utils/safeStorage'
 import { getProject, updateProjectSettings } from '@/services/projects'
 import type { ApiNLPMethods, ApiPipelineFlags } from '@/types/api/projects'
+import { logWarn } from '@/services/logger'
 
 const STORAGE_KEY = 'narrative_assistant_settings'
 const NLP_CATEGORIES = ['coreference', 'ner', 'grammar', 'spelling', 'character_knowledge'] as const
@@ -142,7 +143,7 @@ export async function migrateLocalStorageSettingsToBackend(
 
     return true
   } catch (err) {
-    console.warn('Settings migration failed (non-blocking):', err)
+    logWarn('SettingsMigration', 'Settings migration failed (non-blocking)', err)
     return false
   }
 }

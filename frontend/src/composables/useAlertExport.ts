@@ -7,6 +7,7 @@
 import { useToast } from 'primevue/usetoast'
 import type { MenuItem } from 'primevue/menuitem'
 import type { Alert } from '@/types'
+import { logError } from '@/services/logger'
 
 /**
  * Descarga un Blob como archivo.
@@ -100,7 +101,7 @@ export function useAlertExport(projectId: () => number) {
         exportJson(alerts)
       }
     } catch (err) {
-      console.error('Error exporting alerts:', err)
+      logError('AlertExport', 'Error exporting alerts', err)
       toast.add({ severity: 'error', summary: 'Error', detail: 'Error al exportar alertas', life: 5000 })
     }
   }

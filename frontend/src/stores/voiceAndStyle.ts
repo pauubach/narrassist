@@ -8,6 +8,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 import type {
   VoiceProfile,
   RegisterAnalysis,
@@ -307,7 +308,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
       return true
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
-      console.error('Failed to fetch voice profiles:', err)
+      logError('VoiceAndStyle', 'Failed to fetch voice profiles', err)
       return false
     } finally {
       loadingVoice.value = false
@@ -340,7 +341,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
       return true
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
-      console.error('Failed to fetch register analysis:', err)
+      logError('VoiceAndStyle', 'Failed to fetch register analysis', err)
       return false
     } finally {
       loadingRegister.value = false
@@ -370,7 +371,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
       return true
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
-      console.error('Failed to fetch dialogue attributions:', err)
+      logError('VoiceAndStyle', 'Failed to fetch dialogue attributions', err)
       return false
     } finally {
       loadingDialogue.value = false
@@ -404,7 +405,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
       return true
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
-      console.error('Failed to fetch character knowledge:', err)
+      logError('VoiceAndStyle', 'Failed to fetch character knowledge', err)
       return false
     } finally {
       loadingKnowledge.value = false

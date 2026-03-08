@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { watchDebounced } from '@vueuse/core'
 import { defineStore } from 'pinia'
+import { logWarn } from '@/services/logger'
 
 /**
  * Tipos de relación disponibles para el grafo visual
@@ -102,7 +103,7 @@ export const useRelationshipGraphStore = defineStore('relationshipGraph', () => 
         return { ...defaultFilters, ...parsed }
       }
     } catch (err) {
-      console.warn('Error loading relationship graph filters from storage:', err)
+      logWarn('RelGraph', 'Error loading filters from storage', err)
     }
     return { ...defaultFilters }
   }
@@ -122,7 +123,7 @@ export const useRelationshipGraphStore = defineStore('relationshipGraph', () => 
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(newFilters))
         } catch (err) {
-          console.warn('Error saving relationship graph filters to storage:', err)
+          logWarn('RelGraph', 'Error saving filters to storage', err)
         }
       }
 

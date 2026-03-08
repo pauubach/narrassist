@@ -1,6 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { api } from '@/services/apiClient'
+import { logError } from '@/services/logger'
 
 export interface Mention {
   id: number
@@ -242,7 +243,7 @@ export function useMentionNavigation(projectId: () => number) {
       return true
     } catch (err) {
       state.value.error = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
-      console.error('Error loading mentions:', err)
+      logError('MentionNav', 'Error loading mentions', err)
       return false
     } finally {
       state.value.loading = false

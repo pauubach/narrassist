@@ -26,6 +26,7 @@
  */
 
 import { ref, type Ref } from 'vue'
+import { logError } from '@/services/logger'
 
 interface RunOptions {
   toast?: { add: (opts: { severity: string; summary: string; detail: string; life: number }) => void }
@@ -53,7 +54,7 @@ export function useAsyncAction(
     } catch (err) {
       const msg = err instanceof Error ? err.message : fallbackMessage
       error.value = msg
-      console.error(`[AsyncAction] ${fallbackMessage}:`, err)
+      logError('AsyncAction', fallbackMessage, err)
 
       if (options?.toast) {
         options.toast.add({

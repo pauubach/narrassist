@@ -5,6 +5,7 @@ import type { ApiProject } from '@/types/api'
 import { transformProject, transformProjects } from '@/types/transformers'
 import { api } from '@/services/apiClient'
 import { ensureBackendReady } from '@/composables/useBackendReady'
+import { logError } from '@/services/logger'
 
 export const useProjectsStore = defineStore('projects', () => {
   const projects = ref<Project[]>([])
@@ -30,7 +31,7 @@ export const useProjectsStore = defineStore('projects', () => {
       projects.value = transformProjects(data)
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
-      console.error('Failed to fetch projects:', err)
+      logError('Projects', 'Failed to fetch projects', err)
     } finally {
       loading.value = false
     }
@@ -52,7 +53,7 @@ export const useProjectsStore = defineStore('projects', () => {
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
-      console.error('Failed to fetch project:', err)
+      logError('Projects', 'Failed to fetch project', err)
     } finally {
       loading.value = false
     }
@@ -75,7 +76,7 @@ export const useProjectsStore = defineStore('projects', () => {
       return transformed
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
-      console.error('Failed to create project:', err)
+      logError('Projects', 'Failed to create project', err)
       throw err
     } finally {
       loading.value = false

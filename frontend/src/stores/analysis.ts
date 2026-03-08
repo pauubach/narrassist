@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { api, backendDown } from '@/services/apiClient'
 import type { WorkspaceTab } from '@/types'
+import { logError } from '@/services/logger'
 
 export interface AnalysisProgress {
   project_id: number
@@ -362,7 +363,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
       _startInflight.value.delete(projectId)
       _errors.value[projectId] = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
       _analyzing.value[projectId] = false
-      console.error('Failed to start analysis:', err)
+      logError('Analysis', 'Failed to start analysis', err)
       return false
     }
   }
@@ -378,7 +379,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
       }
       return true
     } catch (err) {
-      console.error('Failed to cancel analysis:', err)
+      logError('Analysis', 'Failed to cancel analysis', err)
       return false
     }
   }
@@ -417,7 +418,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
       return progressData
     } catch (err) {
-      console.error('Error fetching progress:', err)
+      logError('Analysis', 'Error fetching progress', err)
       return null
     }
   }
@@ -586,7 +587,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
       _analyzing.value[projectId] = false
       delete _analyses.value[projectId]
       _errors.value[projectId] = err instanceof Error ? err.message : 'No se pudo completar la operación. Si persiste, reinicia la aplicación.'
-      console.error('Error in partial analysis:', err)
+      logError('Analysis', 'Error in partial analysis', err)
       return false
     }
   }

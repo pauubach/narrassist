@@ -4,6 +4,7 @@
 import { defineStore } from 'pinia'
 import { api } from '@/services/apiClient'
 import { ref, computed } from 'vue'
+import { logError } from '@/services/logger'
 
 // Tipos de licencia
 export type LicenseTier = 'corrector' | 'profesional' | 'editorial'
@@ -143,7 +144,7 @@ export const useLicenseStore = defineStore('license', () => {
       licenseInfo.value = await api.get<LicenseInfo>('/api/license/status')
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'No se pudo verificar la licencia'
-      console.error('Error fetching license status:', e)
+      logError('License', 'Error fetching license status', e)
     } finally {
       loading.value = false
     }
@@ -159,7 +160,7 @@ export const useLicenseStore = defineStore('license', () => {
       return true
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Error activando licencia'
-      console.error('Error activating license:', e)
+      logError('License', 'Error activating license', e)
       return false
     } finally {
       loading.value = false
@@ -180,7 +181,7 @@ export const useLicenseStore = defineStore('license', () => {
       return false
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Verificación fallida'
-      console.error('Error verifying license:', e)
+      logError('License', 'Error verifying license', e)
       return false
     } finally {
       loading.value = false
@@ -192,7 +193,7 @@ export const useLicenseStore = defineStore('license', () => {
       const data = await api.get<{ devices: DeviceInfo[] }>('/api/license/devices')
       devices.value = data.devices || []
     } catch (e) {
-      console.error('Error fetching devices:', e)
+      logError('License', 'Error fetching devices', e)
     }
   }
 
@@ -206,7 +207,7 @@ export const useLicenseStore = defineStore('license', () => {
       return true
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Error desactivando dispositivo'
-      console.error('Error deactivating device:', e)
+      logError('License', 'Error deactivating device', e)
       return false
     } finally {
       loading.value = false
@@ -217,7 +218,7 @@ export const useLicenseStore = defineStore('license', () => {
     try {
       usage.value = await api.get<UsageInfo>('/api/license/usage')
     } catch (e) {
-      console.error('Error fetching usage:', e)
+      logError('License', 'Error fetching usage', e)
     }
   }
 
@@ -225,7 +226,7 @@ export const useLicenseStore = defineStore('license', () => {
     try {
       quotaStatus.value = await api.get<QuotaStatus>('/api/license/quota-status')
     } catch (e) {
-      console.error('Error fetching quota status:', e)
+      logError('License', 'Error fetching quota status', e)
     }
   }
 
@@ -236,7 +237,7 @@ export const useLicenseStore = defineStore('license', () => {
       const data = await api.get<{ has_access: boolean }>(`/api/license/check-feature/${featureName}`)
       return data.has_access === true
     } catch (e) {
-      console.error('Error checking feature access:', e)
+      logError('License', 'Error checking feature access', e)
       return false
     }
   }
@@ -251,7 +252,7 @@ export const useLicenseStore = defineStore('license', () => {
       error.value = 'Cuota de paginas excedida'
       return false
     } catch (e) {
-      console.error('Error recording usage:', e)
+      logError('License', 'Error recording usage', e)
       return true // Permitir en modo desarrollo si no hay conexion
     }
   }

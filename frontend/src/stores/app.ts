@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { useSystemStore } from './system'
+import { logError } from '@/services/logger'
 
 // Tauri imports (only available in Tauri environment)
 let tauriListen: ((event: string, handler: (event: { payload: unknown }) => void) => Promise<() => void>) | null = null
@@ -51,7 +52,7 @@ export const useAppStore = defineStore('app', () => {
       })
       listenerInitialized.value = true
     } catch (err) {
-      console.error('Failed to listen for Tauri events:', err)
+      logError('App', 'Failed to listen for Tauri events', err)
     }
   }
 
@@ -63,7 +64,7 @@ export const useAppStore = defineStore('app', () => {
       const result = await tauriInvoke('start_backend_server')
       return result
     } catch (err) {
-      console.error('Failed to start backend server:', err)
+      logError('App', 'Failed to start backend server', err)
       const systemStore = useSystemStore()
       systemStore.backendStartupError = err instanceof Error ? err.message : 'Error iniciando el motor de analisis'
       return null

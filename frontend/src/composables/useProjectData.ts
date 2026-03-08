@@ -9,6 +9,7 @@ import { ref, computed } from 'vue'
 import { api } from '@/services/apiClient'
 import { transformEntities, transformAlerts, transformChapters } from '@/types/transformers'
 import type { Entity, Alert, Chapter } from '@/types'
+import { logError } from '@/services/logger'
 
 /** Summary data per chapter — matches backend ChapterSummary.to_dict() */
 export interface ChapterSummaryData {
@@ -83,7 +84,7 @@ export function useProjectData() {
         lastLoadedProjectId.value = projectId
       }
     } catch (err) {
-      console.error('Error loading entities:', err)
+      logError('ProjectData', 'Error loading entities', err)
       entitiesLoaded.value = false
     } finally {
       loadingEntities.value = false
@@ -114,7 +115,7 @@ export function useProjectData() {
         lastLoadedProjectId.value = projectId
       }
     } catch (err) {
-      console.error('Error loading alerts:', err)
+      logError('ProjectData', 'Error loading alerts', err)
       alertsLoaded.value = false
     } finally {
       loadingAlerts.value = false
@@ -145,7 +146,7 @@ export function useProjectData() {
         lastLoadedProjectId.value = projectId
       }
     } catch (err) {
-      console.error('Error loading chapters:', err)
+      logError('ProjectData', 'Error loading chapters', err)
       chaptersLoaded.value = false
       if (fallbackProject && fallbackProject.chapterCount > 0) {
         chapters.value = Array.from({ length: fallbackProject.chapterCount }, (_, i) => ({
@@ -187,7 +188,7 @@ export function useProjectData() {
         lastLoadedProjectId.value = projectId
       }
     } catch (err) {
-      console.error('Error loading relationships:', err)
+      logError('ProjectData', 'Error loading relationships', err)
       relationshipsLoaded.value = false
     } finally {
       loadingRelationships.value = false
@@ -224,7 +225,7 @@ export function useProjectData() {
         lastLoadedProjectId.value = projectId
       }
     } catch (err) {
-      console.error('Error loading chapter summaries:', err)
+      logError('ProjectData', 'Error loading chapter summaries', err)
       summariesLoaded.value = false
     } finally {
       loadingSummaries.value = false
