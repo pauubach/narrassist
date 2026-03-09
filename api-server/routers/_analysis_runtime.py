@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import deps
+from narrative_assistant.llm.ollama_manager import ensure_ollama_ready
 
 # Mapa de requisitos de servicio por metodo NLP (consistente con projects.py).
 _METHOD_SERVICE_REQUIREMENTS: dict[tuple[str, str], str] = {
@@ -27,14 +28,16 @@ def _get_runtime_service_capabilities() -> dict[str, bool]:
     }
 
     try:
-        from narrative_assistant.llm.ollama_manager import is_ollama_available
-
-        caps["ollama"] = bool(is_ollama_available())
+        ollama_ready, _ = ensure_ollama_ready(
+            install_if_missing=False,
+            start_if_stopped=True,
+        )
+        caps["ollama"] = bool(ollama_ready)
     except Exception:
         pass
 
     try:
-        caps["languagetool"] = bool(deps._check_languagetool_available())
+        caps["languagetool"] = bool(deps._check_languagetool_available(auto_start=True))
     except Exception:
         pass
 

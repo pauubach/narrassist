@@ -108,6 +108,12 @@ export interface LLMReadiness {
   has_any_model: boolean
 }
 
+export interface ServicePreparationResult {
+  warnings: string[]
+  ollamaReady: boolean
+  languagetoolReady: boolean
+}
+
 interface BackendHealthStatus {
   status: string
   version?: string
@@ -618,6 +624,98 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
+  async function waitForCapabilitiesState(
+    predicate: (caps: SystemCapabilities | null) => boolean,
+    timeoutMs = 45000,
+    intervalMs = 2000,
+  ): Promise<SystemCapabilities | null> {
+    const startedAt = Date.now()
+    let caps = systemCapabilities.value
+    if (predicate(caps)) return caps
+
+    while (Date.now() - startedAt < timeoutMs) {
+      await new Promise(resolve => setTimeout(resolve, intervalMs))
+      caps = await loadCapabilities(true)
+      if (predicate(caps)) return caps
+    }
+
+    return systemCapabilities.value
+  }
+
+  async function prepareAdvancedServicesOnStartup(): Promise<ServicePreparationResult> {
+    const warnings: string[] = []
+    let caps = await loadCapabilities(true)
+
+    if (!caps) {
+      return {
+        warnings: ['No se pudo comprobar el estado de los servicios avanzados.'],
+        ollamaReady: false,
+        languagetoolReady: false,
+      }
+    }
+
+    if (caps.languagetool && !caps.languagetool.installing && !caps.languagetool.installed) {
+      const installed = await installLanguageTool()
+      if (!installed) {
+        warnings.push('No se pudo preparar el corrector avanzado. Se usará la revisión básica.')
+      }
+      caps = await loadCapabilities(true)
+    }
+
+    if (caps?.languagetool?.installed && !caps.languagetool.running) {
+      const started = await startLanguageTool()
+      if (!started) {
+        warnings.push('El corrector avanzado no pudo iniciarse. Se usará la revisión básica.')
+      }
+      caps = await loadCapabilities(true)
+    }
+
+    if (caps?.ollama && !caps.ollama.installed) {
+      try {
+        const installResult = await api.postRaw<{ success: boolean; error?: string }>('/api/ollama/install')
+        if (!installResult.success) {
+          warnings.push('No se pudo instalar el analizador inteligente. Se usará análisis básico.')
+        } else {
+          caps = await waitForCapabilitiesState(
+            currentCaps => Boolean(currentCaps?.ollama?.installed),
+            90000,
+            3000,
+          )
+        }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error)
+        logWarn('autoConfig', 'Ollama install failed:', msg)
+        warnings.push('No se pudo preparar el analizador inteligente. Se usará análisis básico.')
+      }
+    }
+
+    if (caps?.ollama?.installed && !caps.ollama.available) {
+      try {
+        const startResult = await api.postRaw<{ success: boolean; error?: string }>('/api/ollama/start')
+        if (!startResult.success) {
+          warnings.push('El analizador inteligente no pudo iniciarse. Se usará análisis básico.')
+        } else {
+          caps = await waitForCapabilitiesState(
+            currentCaps => Boolean(currentCaps?.ollama?.available),
+            45000,
+            2000,
+          )
+        }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error)
+        logWarn('autoConfig', 'Ollama start failed during service preparation:', msg)
+        warnings.push('El analizador inteligente no pudo iniciarse. Se usará análisis básico.')
+      }
+    }
+
+    caps = await loadCapabilities(true)
+    return {
+      warnings,
+      ollamaReady: Boolean(caps?.ollama?.available),
+      languagetoolReady: Boolean(caps?.languagetool?.running),
+    }
+  }
+
   /**
    * Stop LanguageTool polling timer.
    */
@@ -686,6 +784,19 @@ export const useSystemStore = defineStore('system', () => {
           const msg = e instanceof Error ? e.message : String(e)
           logWarn('autoConfig', 'Ollama start failed:', msg)
           autoConfigErrors.value.push(`Ollama start: ${msg}`)
+        }
+      }
+
+      // 2b. Auto-iniciar LanguageTool si ya está instalado
+      const languagetool = caps.languagetool
+      if (languagetool?.installed && !languagetool?.running && !languagetool?.installing) {
+        try {
+          await startLanguageTool()
+          await refreshCapabilities()
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          logWarn('autoConfig', 'LanguageTool start failed:', msg)
+          autoConfigErrors.value.push(`LanguageTool start: ${msg}`)
         }
       }
 
@@ -790,6 +901,7 @@ export const useSystemStore = defineStore('system', () => {
     // LanguageTool actions
     installLanguageTool,
     startLanguageTool,
+    prepareAdvancedServicesOnStartup,
     stopLTPolling,
 
     // LLM readiness

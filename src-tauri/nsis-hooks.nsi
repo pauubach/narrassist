@@ -24,6 +24,9 @@ Var CleanInstall
     ; Cerrar el servidor backend
     nsExec::Exec 'taskkill /F /IM "narrative-assistant-server.exe" /T'
     Pop $0
+    ; Cerrar solo el Python embebido de esta instalacion, no cualquier python.exe del sistema
+    nsExec::Exec 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq ''python.exe'' -and $_.ExecutablePath -like ''$INSTDIR\binaries\python-embed\*'' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"'
+    Pop $0
 
     ; Esperar un momento para que los procesos se cierren
     Sleep 1000
@@ -36,6 +39,7 @@ Var CleanInstall
     IfFileExists "$PROFILE\.narrative_assistant\narrative_assistant.db" 0 done_clean
 
     ask_clean:
+        IfSilent keep_data
         MessageBox MB_YESNO|MB_ICONQUESTION \
             "Se ha detectado una instalación anterior con datos de proyectos.$\n$\n\
             ¿Desea eliminar todos los datos anteriores y comenzar con una instalación limpia?$\n$\n\
@@ -117,7 +121,8 @@ Var CleanInstall
     Pop $0
     nsExec::Exec 'taskkill /F /IM "narrative-assistant-server.exe" /T'
     Pop $0
-    nsExec::Exec 'taskkill /F /IM "python.exe" /T'
+    ; Cerrar solo el Python embebido de esta instalacion, no cualquier python.exe del sistema
+    nsExec::Exec 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq ''python.exe'' -and $_.ExecutablePath -like ''$INSTDIR\binaries\python-embed\*'' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"'
     Pop $0
     nsExec::Exec 'taskkill /F /IM "ollama.exe" /T'
     Pop $0
@@ -158,6 +163,7 @@ Var CleanInstall
     ${If} $DeleteAppDataCheckboxState == 1
       ; Skip cleanup during silent/update uninstall
       StrCmp $UpdateMode 1 postuninstall_done
+      IfSilent postuninstall_done
 
         ; --- Tier 1: App cache (always safe, lightweight) ---
         DetailPrint "Eliminando cache de la aplicacion..."

@@ -34,7 +34,7 @@ const mockApi = api as unknown as {
 describe('systemStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    vi.clearAllMocks()
+    vi.resetAllMocks()
     vi.useFakeTimers()
   })
 
@@ -463,6 +463,135 @@ describe('systemStore', () => {
   })
 
   // ── stopPolling ────────────────────────────────────────
+
+
+  describe('prepareAdvancedServicesOnStartup', () => {
+    const baseCaps: SystemCapabilities = {
+      hardware: {
+        gpu: null,
+        gpu_type: 'none',
+        has_gpu: false,
+        has_high_vram: false,
+        has_cupy: false,
+        gpu_blocked: null,
+        cpu: { name: 'test' },
+      },
+      embeddings_available: true,
+      ollama: {
+        installed: true,
+        available: true,
+        models: [],
+        recommended_models: [],
+      },
+      languagetool: {
+        installed: true,
+        running: true,
+        installing: false,
+        java_available: true,
+      },
+      nlp_methods: {
+        coreference: {},
+        ner: {},
+        grammar: {},
+      },
+      recommended_config: {
+        device_preference: 'cpu',
+        spacy_gpu_enabled: false,
+        embeddings_gpu_enabled: false,
+        batch_size: 16,
+      },
+    }
+
+    it('instala LanguageTool si falta y devuelve warning si falla', async () => {
+      const capsMissingLt = {
+        ...baseCaps,
+        languagetool: { ...baseCaps.languagetool!, installed: false, running: false },
+      }
+      mockApi.get
+        .mockResolvedValueOnce(capsMissingLt)
+        .mockResolvedValueOnce(capsMissingLt)
+        .mockResolvedValueOnce(capsMissingLt)
+      mockApi.postRaw.mockResolvedValueOnce({ success: false })
+
+      const store = useSystemStore()
+      const result = await store.prepareAdvancedServicesOnStartup()
+
+      expect(mockApi.postRaw).toHaveBeenCalledWith('/api/languagetool/install')
+      expect(result.languagetoolReady).toBe(false)
+      expect(result.warnings[0]).toContain('corrector avanzado')
+    })
+
+    it('inicia LanguageTool si esta instalado pero parado', async () => {
+      const capsStoppedLt = {
+        ...baseCaps,
+        languagetool: { ...baseCaps.languagetool!, installed: true, running: false },
+      }
+      mockApi.get
+        .mockResolvedValueOnce(capsStoppedLt)
+        .mockResolvedValueOnce(baseCaps)
+        .mockResolvedValueOnce(baseCaps)
+      mockApi.tryGet.mockResolvedValueOnce(baseCaps)
+      mockApi.postRaw.mockResolvedValueOnce({ success: true })
+
+      const store = useSystemStore()
+      const resultPromise = store.prepareAdvancedServicesOnStartup()
+      await vi.advanceTimersByTimeAsync(3000)
+      const result = await resultPromise
+
+      expect(mockApi.postRaw).toHaveBeenCalledWith('/api/languagetool/start')
+      expect(result.languagetoolReady).toBe(true)
+      expect(result.warnings).toEqual([])
+    })
+
+    it('instala Ollama si falta y lo inicia si luego sigue parado', async () => {
+      const capsMissingOllama = {
+        ...baseCaps,
+        ollama: { ...baseCaps.ollama, installed: false, available: false },
+      }
+      const capsInstalledButStopped = {
+        ...baseCaps,
+        ollama: { ...baseCaps.ollama, installed: true, available: false },
+      }
+      mockApi.get
+        .mockResolvedValueOnce(capsMissingOllama)
+        .mockResolvedValueOnce(capsInstalledButStopped)
+        .mockResolvedValueOnce(baseCaps)
+        .mockResolvedValueOnce(baseCaps)
+      mockApi.postRaw
+        .mockResolvedValueOnce({ success: true })
+        .mockResolvedValueOnce({ success: true })
+
+      const store = useSystemStore()
+      const resultPromise = store.prepareAdvancedServicesOnStartup()
+      await vi.advanceTimersByTimeAsync(3000)
+      await Promise.resolve()
+      await vi.advanceTimersByTimeAsync(2000)
+      const result = await resultPromise
+
+      expect(mockApi.postRaw).toHaveBeenNthCalledWith(1, '/api/ollama/install')
+      expect(mockApi.postRaw).toHaveBeenNthCalledWith(2, '/api/ollama/start')
+      expect(result.ollamaReady).toBe(true)
+      expect(result.warnings).toEqual([])
+    }, 10000)
+
+    it('devuelve warning si Ollama no puede iniciarse', async () => {
+      const capsStoppedOllama = {
+        ...baseCaps,
+        ollama: { ...baseCaps.ollama, installed: true, available: false },
+      }
+      mockApi.get
+        .mockResolvedValueOnce(capsStoppedOllama)
+        .mockResolvedValueOnce(capsStoppedOllama)
+      mockApi.postRaw.mockResolvedValueOnce({ success: false })
+
+      const store = useSystemStore()
+      const result = await store.prepareAdvancedServicesOnStartup()
+
+      expect(mockApi.postRaw).toHaveBeenCalledWith('/api/ollama/start')
+      expect(result.ollamaReady).toBe(false)
+      expect(result.warnings[0]).toContain('analizador inteligente')
+    })
+  })
 
   describe('stopPolling', () => {
     it('should clear download progress', () => {

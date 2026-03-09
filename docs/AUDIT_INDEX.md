@@ -13,6 +13,7 @@ Las auditorías activas e históricas relevantes se mantienen en `docs/audits/`.
 - `docs/audits/2026-03-07_auditoria_integral_estado_actual.md`
 - `docs/audits/2026-03-07_auditoria_funcional_ux_arquitectura.md`
 - `docs/audits/2026-03-08_seguimiento_deuda_estructural.md`
+- `docs/audits/2026-03-08_auditoria_dependencias_locales_runtime.md`
 
 ### Trazabilidad histórica útil
 
@@ -26,6 +27,7 @@ Las auditorías activas e históricas relevantes se mantienen en `docs/audits/`.
 - `2026-03-07_auditoria_integral_estado_actual.md`: foto técnica actual revalidada contra el workspace.
 - `2026-03-07_auditoria_funcional_ux_arquitectura.md`: revisión centrada en funcionalidad, UX, usabilidad, accesibilidad y centralización arquitectónica.
 - `2026-03-08_seguimiento_deuda_estructural.md`: cierre de deuda estructural inmediata del frontend y lista residual de deuda no cerrada.
+- `2026-03-08_auditoria_dependencias_locales_runtime.md`: revisión específica del ciclo de vida de dependencias locales críticas, autoarranque, auto-instalación en primera ejecución y fallbacks de runtime.
 - `2026-03-02_auditoria_recursos_pipeline_reanalisis_extrema.md`: trazabilidad residual de la auditoría extrema original; ya no debe leerse como backlog operativo literal.
 - `2026-03-02_auditoria_recursos_pipeline_reanalisis.md`: versión resumida histórica del mismo bloque.
 - auditorías `2026-02-14`: contexto histórico de una fase anterior del producto.

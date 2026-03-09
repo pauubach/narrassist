@@ -47,6 +47,11 @@ function createSystemStore(overrides: Record<string, unknown> = {}) {
     loadCapabilities: vi.fn().mockResolvedValue(null),
     checkModelsStatus: vi.fn().mockResolvedValue(null),
     autoConfigOnStartup: vi.fn().mockResolvedValue(undefined),
+    prepareAdvancedServicesOnStartup: vi.fn().mockResolvedValue({
+      warnings: [],
+      ollamaReady: true,
+      languagetoolReady: true,
+    }),
     downloadModels: vi.fn().mockResolvedValue(true),
     installDependencies: vi.fn().mockResolvedValue(true),
     stopPolling: vi.fn(),
@@ -101,6 +106,7 @@ describe('ModelSetupDialog (CR-06 orchestration)', () => {
     await flushPromises()
 
     expect(h.store.autoConfigOnStartup).toHaveBeenCalledTimes(1)
+    expect(h.store.prepareAdvancedServicesOnStartup).toHaveBeenCalledTimes(1)
 
     wrapper.unmount()
   })
@@ -125,6 +131,7 @@ describe('ModelSetupDialog (CR-06 orchestration)', () => {
     await flushPromises()
 
     expect(h.store.autoConfigOnStartup).toHaveBeenCalledTimes(1)
+    expect(h.store.prepareAdvancedServicesOnStartup).toHaveBeenCalledTimes(1)
 
     wrapper.unmount()
   })
@@ -194,6 +201,45 @@ describe('ModelSetupDialog (CR-06 orchestration)', () => {
     await flushPromises()
 
     expect(h.store.autoConfigOnStartup).toHaveBeenCalledTimes(1)
+    expect(h.store.prepareAdvancedServicesOnStartup).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it('ejecuta la preparacion de servicios avanzados antes de cerrar cuando modelsReady ya era true', async () => {
+    h.store = createSystemStore({ modelsReady: true })
+
+    const wrapper = mountDialog()
+    await flushPromises()
+
+    expect(h.store.prepareAdvancedServicesOnStartup).toHaveBeenCalledTimes(1)
+    expect(h.showNotification).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Instalacion completada',
+      severity: 'success',
+    }))
+
+    wrapper.unmount()
+  })
+
+  it('muestra instalacion parcial si la preparacion de servicios devuelve warnings', async () => {
+    h.store = createSystemStore({
+      modelsReady: true,
+      prepareAdvancedServicesOnStartup: vi.fn().mockResolvedValue({
+        warnings: ['El corrector avanzado no pudo iniciarse. Se usara la revision basica.'],
+        ollamaReady: true,
+        languagetoolReady: false,
+      }),
+    })
+
+    const wrapper = mountDialog()
+    await flushPromises()
+
+    expect(h.store.prepareAdvancedServicesOnStartup).toHaveBeenCalledTimes(1)
+    expect(h.showNotification).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Instalacion parcial',
+      severity: 'warning',
+      body: expect.stringContaining('corrector avanzado'),
+    }))
 
     wrapper.unmount()
   })

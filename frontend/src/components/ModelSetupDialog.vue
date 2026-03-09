@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useSystemStore } from '@/stores/system'
-import type { DownloadProgressInfo, LLMReadiness, ModelStatus } from '@/stores/system'
+import type {
+  DownloadProgressInfo,
+  LLMReadiness,
+  ModelStatus,
+  ServicePreparationResult,
+} from '@/stores/system'
 import { useNotifications } from '@/composables/useNotifications'
 import { useOllamaManagement } from '@/composables/useOllamaManagement'
 import { api } from '@/services/apiClient'
@@ -32,6 +37,7 @@ type DownloadPhase =
   | 'checking'
   | 'installing-deps'
   | 'downloading'
+  | 'preparing-services'
   | 'downloading-llm'
   | 'completed'
   | 'error'
@@ -55,6 +61,9 @@ const visible = computed({
   set: (val: boolean) => { internalVisible.value = val },
 })
 const downloadPhase = ref<DownloadPhase>('starting')
+const servicePreparationDetail = ref('Preparando servicios avanzados...')
+const servicePreparationWarnings = ref<string[]>([])
+let advancedSetupPromise: Promise<void> | null = null
 
 // Progreso real desde el backend
 const realProgress = computed<RealProgress | null>(() => {
@@ -195,11 +204,7 @@ onMounted(async () => {
 
   // Si los modelos estan listos, cerrar el dialogo rapidamente
   if (systemStore.modelsReady) {
-    await ensureAutoConfigReady()
-    downloadPhase.value = 'completed'
-    setTimeout(() => {
-      visible.value = false
-    }, 800) // breve flash de "Listo"
+    await continueWithAdvancedSetup()
     return
   }
 
@@ -219,31 +224,25 @@ onMounted(async () => {
   }
 })
 
-// Watch for model status changes — cuando NLP está listo, verificar LLM
+// Watch for model status changes - cuando NLP esta listo, preparar servicios y LLM
 watch(() => systemStore.modelsReady, (ready) => {
-  if (ready && visible.value && downloadPhase.value !== 'downloading-llm') {
-    // NLP listo — verificar si necesitamos descargar motores de análisis (LLM)
-    startLLMDownloadIfNeeded()
+  if (ready && visible.value && downloadPhase.value !== 'downloading-llm' && downloadPhase.value !== 'preparing-services') {
+    void continueWithAdvancedSetup()
   }
 })
 
-/** Verifica si hay modelos LLM pendientes y los descarga, o cierra el diálogo. */
-async function startLLMDownloadIfNeeded() {
+/** Verifica si hay modelos LLM pendientes y los descarga, o cierra el dialogo. */
+async function startLLMDownloadIfNeeded(preparation: ServicePreparationResult) {
   try {
-    // CR-06: asegurar auto-config una sola vez (con deduplicación/reintento),
-    // antes de evaluar readiness/descargas LLM.
     await ensureAutoConfigReady()
 
-    // Consultar readiness
     const result = await api.getRaw<{ data: LLMReadiness }>('/api/services/llm/readiness')
     const readiness = result?.data
     if (!readiness || readiness.ready || !readiness.ollama_running || readiness.missing_models.length === 0) {
-      // LLM listo o no disponible — completar
-      finishSetup()
+      finishSetup(preparation)
       return
     }
 
-    // Hay modelos LLM por descargar
     downloadPhase.value = 'downloading-llm'
     llmModelsToDownload.value = readiness.missing_models
     llmModelsDownloaded.value = []
@@ -258,28 +257,61 @@ async function startLLMDownloadIfNeeded() {
 
     llmCurrentModel.value = null
     const allOk = llmModelsDownloaded.value.length === readiness.missing_models.length
-    finishSetup(allOk)
+    finishSetup(preparation, allOk)
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
     logWarn('ModelSetupDialog', '[setup] No se pudieron completar los motores avanzados:', msg)
-    // LLM download es best-effort — no bloquear
-    finishSetup(false)
+    finishSetup(preparation, false)
   }
 }
 
-function finishSetup(llmComplete: boolean = true) {
+async function continueWithAdvancedSetup() {
+  if (advancedSetupPromise) {
+    return advancedSetupPromise
+  }
+
+  advancedSetupPromise = (async () => {
+    downloadPhase.value = 'preparing-services'
+    servicePreparationDetail.value = 'Activando correctores y motores avanzados...'
+
+    await ensureAutoConfigReady()
+
+    const preparation = await systemStore.prepareAdvancedServicesOnStartup()
+    servicePreparationWarnings.value = preparation.warnings
+
+    if (!preparation.ollamaReady) {
+      servicePreparationDetail.value = 'El analisis inteligente no esta listo; se usara analisis basico.'
+    } else if (!preparation.languagetoolReady) {
+      servicePreparationDetail.value = 'El corrector avanzado no esta listo; se usara la revision basica.'
+    } else {
+      servicePreparationDetail.value = 'Servicios avanzados listos.'
+    }
+
+    await startLLMDownloadIfNeeded(preparation)
+  })()
+
+  try {
+    await advancedSetupPromise
+  } finally {
+    advancedSetupPromise = null
+  }
+}
+
+function finishSetup(preparation: ServicePreparationResult, llmComplete: boolean = true) {
   downloadPhase.value = 'completed'
-  if (llmComplete) {
+  const hasWarnings = preparation.warnings.length > 0 || !llmComplete
+  if (!hasWarnings) {
     showNotification({
-      title: 'Instalación completada',
-      body: 'Narrative Assistant está listo para usar.',
+      title: 'Instalacion completada',
+      body: 'Narrative Assistant esta listo para usar.',
       severity: 'success',
       playSound: true,
     })
   } else {
     showNotification({
-      title: 'Instalación parcial',
-      body: 'Los modelos lingüísticos están listos. Algunos motores de análisis avanzado no se pudieron instalar — puedes reintentarlo desde Configuración.',
+      title: 'Instalacion parcial',
+      body: preparation.warnings[0]
+        || 'Algunos componentes avanzados no se pudieron preparar. La aplicacion seguira funcionando con metodos alternativos.',
       severity: 'warning',
       playSound: true,
     })
@@ -396,9 +428,7 @@ async function retryStartup() {
   await systemStore.checkModelsStatus()
 
   if (systemStore.modelsReady) {
-    await ensureAutoConfigReady()
-    downloadPhase.value = 'completed'
-    setTimeout(() => { visible.value = false }, 800)
+    await continueWithAdvancedSetup()
     return
   }
   if (!systemStore.pythonAvailable) {
@@ -444,11 +474,7 @@ async function recheckPython() {
     downloadPhase.value = 'installing-deps'
     startDependenciesInstallation()
   } else if (systemStore.modelsReady) {
-    await ensureAutoConfigReady()
-    downloadPhase.value = 'completed'
-    setTimeout(() => {
-      visible.value = false
-    }, 2000)
+    await continueWithAdvancedSetup()
   } else {
     downloadPhase.value = 'downloading'
     startAutomaticDownload()
@@ -568,6 +594,34 @@ async function recheckPython() {
           <p class="download-note">
             <i class="pi pi-info-circle"></i>
             Esta descarga solo se realiza una vez. Tamaño total: ~{{ totalDownloadSize }} MB
+          </p>
+        </div>
+      </template>
+
+      <template v-else-if="downloadPhase === 'preparing-services'">
+        <div class="download-progress" role="status" aria-live="polite">
+          <div class="download-header">
+            <i class="pi pi-cog pi-spin download-icon"></i>
+            <div>
+              <h3>Preparando servicios avanzados</h3>
+              <p class="subtitle">Activando correctores y motores adicionales</p>
+            </div>
+          </div>
+
+          <DsDownloadProgress
+            :label="systemStore.ltInstallProgress?.detail || servicePreparationDetail"
+            :percentage="systemStore.ltInstallProgress?.percentage ?? null"
+            class="progress-section"
+          />
+
+          <p v-if="servicePreparationWarnings.length > 0" class="download-note">
+            <i class="pi pi-info-circle"></i>
+            {{ servicePreparationWarnings[0] }}
+          </p>
+
+          <p v-else class="download-note">
+            <i class="pi pi-info-circle"></i>
+            El sistema seguira disponible aunque algun componente avanzado no pueda prepararse.
           </p>
         </div>
       </template>

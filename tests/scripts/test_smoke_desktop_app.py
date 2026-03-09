@@ -12,6 +12,7 @@ from scripts.smoke_desktop_app import (
     is_ready_health_payload,
     run_macos_dmg_smoke,
     run_windows_installer_smoke,
+    wait_for_file_stable,
 )
 
 
@@ -82,6 +83,13 @@ def test_find_windows_installed_binary_prefers_main_executable(tmp_path: Path):
     assert find_windows_installed_binary(install_dir) == binary
 
 
+def test_wait_for_file_stable_accepts_existing_stable_binary(tmp_path: Path):
+    binary = tmp_path / "Narrative Assistant.exe"
+    binary.write_bytes(b"stable-binary")
+
+    wait_for_file_stable(binary, timeout_seconds=2, stable_checks=1)
+
+
 def test_run_windows_installer_smoke_installs_runs_and_cleans(monkeypatch, tmp_path: Path):
     installer = tmp_path / "Narrative-Assistant-Setup.exe"
     installer.write_bytes(b"stub")
@@ -102,6 +110,10 @@ def test_run_windows_installer_smoke_installs_runs_and_cleans(monkeypatch, tmp_p
     monkeypatch.setattr(
         "scripts.smoke_desktop_app.run_smoke",
         lambda binary, **kwargs: ran_binary.append(binary),
+    )
+    monkeypatch.setattr(
+        "scripts.smoke_desktop_app.wait_for_file_stable",
+        lambda path, timeout_seconds=30.0, stable_checks=3: None,
     )
 
     run_windows_installer_smoke(

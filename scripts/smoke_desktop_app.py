@@ -205,6 +205,27 @@ def find_windows_installed_binary(install_dir: Path) -> Path:
     )
 
 
+def wait_for_file_stable(path: Path, timeout_seconds: float = 30.0, stable_checks: int = 3) -> None:
+    """Espera a que un archivo exista y su tamaño se estabilice varios ciclos."""
+    deadline = time.monotonic() + timeout_seconds
+    last_size: int | None = None
+    consecutive_stable = 0
+
+    while time.monotonic() < deadline:
+        if path.exists() and path.is_file():
+            size = path.stat().st_size
+            if size > 0 and size == last_size:
+                consecutive_stable += 1
+                if consecutive_stable >= stable_checks:
+                    return
+            else:
+                consecutive_stable = 0
+                last_size = size
+        time.sleep(1)
+
+    raise TimeoutError(f"El archivo instalado no quedo estable a tiempo: {path}")
+
+
 def find_windows_uninstaller(install_dir: Path) -> Path | None:
     for candidate in sorted(install_dir.rglob("uninstall*.exe")):
         if candidate.is_file():
@@ -232,6 +253,7 @@ def run_windows_installer_smoke(
             stderr=subprocess.DEVNULL,
         )
         binary = find_windows_installed_binary(install_dir)
+        wait_for_file_stable(binary)
         run_smoke(binary, health_url=health_url, timeout_seconds=timeout_seconds, stable_checks=stable_checks)
     finally:
         uninstaller = find_windows_uninstaller(install_dir)
