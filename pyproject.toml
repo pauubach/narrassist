@@ -24,7 +24,7 @@ dependencies = [
     # Core NLP
     "spacy>=3.7.0,<4.0.0",
     # coreferee incompatible con spacy>=3.7 - hacer opcional con fallback
-    "sentence-transformers>=2.2.0,<3.0.0",
+    "sentence-transformers>=2.2.0,<6.0.0",
 
     # Spanish linguistics (S15 - hybrid a-tónica detection)
     "silabeador>=1.1.0",  # Syllabification and stress detection (99.81% accuracy)
