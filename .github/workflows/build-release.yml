@@ -169,7 +169,7 @@ jobs:
         run: python scripts/smoke_desktop_app.py --mode windows-installer
       
       - name: Upload Windows Installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: narrative-assistant-windows
           path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
@@ -350,7 +350,7 @@ jobs:
         run: python3 scripts/smoke_desktop_app.py --mode macos-dmg
       
       - name: Upload macOS DMG
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: narrative-assistant-macos
           path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
