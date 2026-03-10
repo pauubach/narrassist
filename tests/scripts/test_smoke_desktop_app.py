@@ -1,8 +1,12 @@
+import os
 from pathlib import Path
 
 import subprocess
+import pytest
 
 from scripts.smoke_desktop_app import (
+    MIN_LT_JAR_BYTES,
+    bundled_resources_root,
     candidate_artifact_paths,
     candidate_binary_paths,
     candidate_app_bundle_binaries,
@@ -12,6 +16,7 @@ from scripts.smoke_desktop_app import (
     is_ready_health_payload,
     run_macos_dmg_smoke,
     run_windows_installer_smoke,
+    validate_bundled_services,
     wait_for_file_stable,
 )
 
@@ -70,6 +75,116 @@ def test_candidate_app_bundle_binaries_lists_bundle_executable(tmp_path: Path):
     executable.write_bytes(b"stub")
 
     assert candidate_app_bundle_binaries(app_dir.parent.parent) == [executable]
+
+
+def test_bundled_resources_root_resolves_windows_layout(tmp_path: Path):
+    binary = tmp_path / "Narrative Assistant.exe"
+    resources = tmp_path / "resources"
+    resources.mkdir()
+    binary.write_bytes(b"stub")
+
+    assert bundled_resources_root(binary) == resources
+
+
+def test_validate_bundled_services_requires_java_and_languagetool(
+    monkeypatch, tmp_path: Path
+):
+    binary = tmp_path / "Narrative Assistant.exe"
+    resources = tmp_path / "resources" / "binaries"
+    java_name = "java.exe" if os.name == "nt" else "java"
+    (resources / "languagetool").mkdir(parents=True)
+    (resources / "java-jre" / "bin").mkdir(parents=True)
+    (resources / "languagetool" / "languagetool-server.jar").write_bytes(
+        b"x" * (MIN_LT_JAR_BYTES + 1)
+    )
+    (resources / "java-jre" / "bin" / java_name).write_bytes(b"java")
+    binary.write_bytes(b"stub")
+
+    monkeypatch.setattr(
+        "scripts.smoke_desktop_app.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0),
+    )
+
+    validate_bundled_services(binary)
+
+
+def test_validate_bundled_services_accepts_macos_contents_home_layout(
+    monkeypatch, tmp_path: Path
+):
+    binary = (
+        tmp_path
+        / "Narrative Assistant.app"
+        / "Contents"
+        / "MacOS"
+        / "Narrative Assistant"
+    )
+    resources = (
+        tmp_path
+        / "Narrative Assistant.app"
+        / "Contents"
+        / "Resources"
+        / "binaries"
+    )
+    (resources / "languagetool").mkdir(parents=True)
+    (resources / "java-jre" / "Contents" / "Home" / "bin").mkdir(parents=True)
+    (resources / "languagetool" / "languagetool-server.jar").write_bytes(
+        b"x" * (MIN_LT_JAR_BYTES + 1)
+    )
+    (resources / "java-jre" / "Contents" / "Home" / "bin" / "java").write_bytes(b"java")
+    (resources / "java-jre" / "Contents" / "Home" / "bin" / "java.exe").write_bytes(b"java")
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    binary.write_bytes(b"stub")
+
+    monkeypatch.setattr(
+        "scripts.smoke_desktop_app.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0),
+    )
+
+    validate_bundled_services(binary)
+
+
+def test_validate_bundled_services_rejects_small_languagetool_jar(
+    monkeypatch, tmp_path: Path
+):
+    binary = tmp_path / "Narrative Assistant.exe"
+    resources = tmp_path / "resources" / "binaries"
+    java_name = "java.exe" if os.name == "nt" else "java"
+    (resources / "languagetool").mkdir(parents=True)
+    (resources / "java-jre" / "bin").mkdir(parents=True)
+    (resources / "languagetool" / "languagetool-server.jar").write_bytes(b"jar")
+    (resources / "java-jre" / "bin" / java_name).write_bytes(b"java")
+    binary.write_bytes(b"stub")
+
+    monkeypatch.setattr(
+        "scripts.smoke_desktop_app.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0),
+    )
+
+    with pytest.raises(RuntimeError, match="corrupto o incompleto"):
+        validate_bundled_services(binary)
+
+
+def test_validate_bundled_services_rejects_non_executable_java(
+    tmp_path: Path, monkeypatch
+):
+    binary = tmp_path / "Narrative Assistant.exe"
+    resources = tmp_path / "resources" / "binaries"
+    java_name = "java.exe" if os.name == "nt" else "java"
+    (resources / "languagetool").mkdir(parents=True)
+    (resources / "java-jre" / "bin").mkdir(parents=True)
+    (resources / "languagetool" / "languagetool-server.jar").write_bytes(
+        b"x" * (MIN_LT_JAR_BYTES + 1)
+    )
+    (resources / "java-jre" / "bin" / java_name).write_bytes(b"java")
+    binary.write_bytes(b"stub")
+
+    monkeypatch.setattr(
+        "scripts.smoke_desktop_app.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 1),
+    )
+
+    with pytest.raises(RuntimeError, match="no es ejecutable"):
+        validate_bundled_services(binary)
 
 
 def test_find_windows_installed_binary_prefers_main_executable(tmp_path: Path):

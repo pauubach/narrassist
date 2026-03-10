@@ -77,8 +77,14 @@ test-results/
 
 # Tauri build artifacts
 src-tauri/target/
-src-tauri/binaries/
 src-tauri/gen/
+src-tauri/binaries/*
+!src-tauri/binaries/java-jre/
+src-tauri/binaries/java-jre/*
+!src-tauri/binaries/java-jre/.gitkeep
+!src-tauri/binaries/languagetool/
+src-tauri/binaries/languagetool/*
+!src-tauri/binaries/languagetool/.gitkeep
 
 # Evaluation outputs (development only)
 ner_eval_output.txt

@@ -22,7 +22,7 @@
 ### Software Requerido
 
 - **Node.js** 18.x o superior ([Download](https://nodejs.org/))
-- **Python** 3.11+ ([Download](https://www.python.org/))
+- **Python** 3.12+ ([Download](https://www.python.org/))
 - **Rust** 1.70+ para Tauri ([Download](https://www.rust-lang.org/))
 - **Git** para control de versiones
 
@@ -53,7 +53,7 @@ cd tfm
 
 ```bash
 # Crear entorno virtual
-python3.11 -m venv .venv
+ python3.12 -m venv .venv
 
 # Activar entorno
 # Windows:
@@ -259,6 +259,21 @@ python build.py
 # Output: dist/narrative-assistant-backend/
 # Tamaño: ~2-2.5 GB (incluye modelos)
 ```
+
+### Recursos embebidos adicionales
+
+El build desktop de producción incluye ahora, además de Python embebido y backend:
+
+- `LanguageTool` embebido
+- `Java JRE` embebido para `LanguageTool`
+
+Preparación manual local:
+
+```bash
+python scripts/download_languagetool_jre.py
+```
+
+En CI/release este paso se ejecuta antes de `cargo tauri build`.
 
 **Contenido del bundle:**
 - Ejecutable Python embebido
@@ -472,7 +487,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: '3.12'
       - run: pip install -e ".[dev]"
       - run: pytest
 

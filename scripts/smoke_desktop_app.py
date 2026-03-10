@@ -30,11 +30,95 @@ from urllib.request import urlopen
 DEFAULT_HEALTH_URL = "http://127.0.0.1:8008/api/health"
 DEFAULT_TIMEOUT_SECONDS = 90.0
 DEFAULT_STABLE_CHECKS = 2
+MIN_LT_JAR_BYTES = 50_000_000
+JAVA_VERSION_TIMEOUT_SECONDS = 15.0
 
 WINDOWS_BINARY_NAMES = (
     "Narrative Assistant.exe",
     "narrative-assistant.exe",
 )
+
+
+def bundled_resources_root(binary: Path) -> Path | None:
+    """Resolver directorio de recursos embebidos a partir del binario desktop."""
+    if binary.suffix.lower() == ".exe":
+        candidate = binary.parent / "resources"
+        return candidate if candidate.exists() else None
+
+    contents_dir = next(
+        (Path(*binary.parts[: index + 1]) for index, part in enumerate(binary.parts) if part.endswith(".app")),
+        None,
+    )
+    if contents_dir is not None:
+        candidate = contents_dir / "Contents" / "Resources"
+        return candidate if candidate.exists() else None
+
+    return None
+
+
+def resolve_bundled_java_binary(binary: Path) -> Path:
+    """Resolver el binario java embebido esperado dentro del artefacto."""
+    resources_root = bundled_resources_root(binary)
+    if resources_root is None:
+        raise FileNotFoundError(
+            f"No se encontró el directorio de recursos empaquetados junto a {binary}"
+        )
+
+    binaries_dir = resources_root / "binaries"
+    java_name = "java.exe" if os.name == "nt" else "java"
+    java_candidates = [
+        binaries_dir / "java-jre" / "bin" / java_name,
+        binaries_dir / "java-jre" / "Contents" / "Home" / "bin" / java_name,
+    ]
+    for candidate in java_candidates:
+        if candidate.exists():
+            return candidate
+
+    raise FileNotFoundError(
+        "Falta Java embebido requerido: "
+        + ", ".join(str(path) for path in java_candidates)
+    )
+
+
+def validate_bundled_java_runtime(java_binary: Path) -> None:
+    """Comprobar que el Java embebido es ejecutable y responde a -version."""
+    result = subprocess.run(
+        [str(java_binary), "-version"],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        timeout=JAVA_VERSION_TIMEOUT_SECONDS,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Java embebido no es ejecutable: {java_binary}")
+
+
+def validate_bundled_languagetool_jar(jar_path: Path) -> None:
+    """Comprobar que el JAR embebido existe y tiene tamaño razonable."""
+    if not jar_path.exists():
+        raise FileNotFoundError(f"Falta LanguageTool embebido: {jar_path}")
+
+    jar_size = jar_path.stat().st_size
+    if jar_size < MIN_LT_JAR_BYTES:
+        raise RuntimeError(
+            f"LanguageTool embebido parece corrupto o incompleto: {jar_path} ({jar_size} bytes)"
+        )
+
+
+def validate_bundled_services(binary: Path) -> None:
+    """Verificar que el artefacto empaquetado contiene LanguageTool y Java embebidos."""
+    resources_root = bundled_resources_root(binary)
+    if resources_root is None:
+        raise FileNotFoundError(
+            f"No se encontró el directorio de recursos empaquetados junto a {binary}"
+        )
+
+    binaries_dir = resources_root / "binaries"
+    lt_jar = binaries_dir / "languagetool" / "languagetool-server.jar"
+    java_binary = resolve_bundled_java_binary(binary)
+
+    validate_bundled_languagetool_jar(lt_jar)
+    validate_bundled_java_runtime(java_binary)
 
 
 def is_ready_health_payload(payload: object) -> bool:
@@ -177,6 +261,7 @@ def terminate_process_tree(process: subprocess.Popen[bytes]) -> None:
 
 
 def run_smoke(binary: Path, health_url: str, timeout_seconds: float, stable_checks: int) -> None:
+    validate_bundled_services(binary)
     process = subprocess.Popen(
         [str(binary)],
         cwd=str(binary.parent),

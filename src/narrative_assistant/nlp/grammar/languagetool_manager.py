@@ -54,10 +54,15 @@ class LanguageToolManager:
         self._lock = threading.Lock()
         self._starting = False
 
-        # Rutas - usar directorio de datos en producción, tools/ en desarrollo
-        self._tools_base = self._get_tools_base_dir()
-        self._lt_dir = self._tools_base / "languagetool" if self._tools_base else None
-        self._java_dir = self._tools_base / "java" if self._tools_base else None
+        self._refresh_paths()
+
+    def _refresh_paths(self) -> None:
+        """Refrescar rutas locales y embebidas."""
+        with self._lock:
+            self._tools_base = self._get_tools_base_dir()
+            self._bundled_base = self._get_bundled_base_dir()
+            self._lt_dir = self._resolve_languagetool_dir()
+            self._java_dir = self._resolve_java_dir()
 
     def _get_tools_base_dir(self) -> Path | None:
         """
@@ -100,6 +105,65 @@ class LanguageToolManager:
             tools_dir = project_root / "tools"
             tools_dir.mkdir(parents=True, exist_ok=True)
             return tools_dir
+
+        return None
+
+    def _get_bundled_base_dir(self) -> Path | None:
+        """
+        Obtener directorio base de recursos embebidos de la app.
+
+        - Produccion (NA_EMBEDDED=1 + NA_RESOURCE_DIR): <resources>/binaries
+        - Desarrollo o sin recurso: None
+        """
+        if os.environ.get("NA_EMBEDDED") != "1":
+            return None
+
+        resource_dir = os.environ.get("NA_RESOURCE_DIR", "").strip()
+        if not resource_dir:
+            return None
+
+        binaries_dir = Path(resource_dir) / "binaries"
+        if binaries_dir.exists():
+            return binaries_dir
+        return None
+
+    @staticmethod
+    def _get_java_dir_candidates(base_dir: Path | None) -> list[Path]:
+        if not base_dir:
+            return []
+        candidates = []
+        for name in ("java-jre", "java"):
+            java_root = base_dir / name
+            candidates.append(java_root)
+            candidates.append(java_root / "Contents" / "Home")
+        return candidates
+
+    def _resolve_languagetool_dir(self) -> Path | None:
+        """Resolver directorio efectivo de LanguageTool."""
+        bundled_dir = self._bundled_base / "languagetool" if self._bundled_base else None
+        if bundled_dir and (bundled_dir / "languagetool-server.jar").exists():
+            return bundled_dir
+
+        if self._tools_base:
+            return self._tools_base / "languagetool"
+
+        return None
+
+    def _resolve_java_dir(self) -> Path | None:
+        """Resolver directorio efectivo de Java."""
+        system = platform.system()
+        java_name = "java.exe" if system == "Windows" else "java"
+
+        for candidate in self._get_java_dir_candidates(self._bundled_base):
+            if (candidate / "bin" / java_name).exists():
+                return candidate
+
+        for candidate in self._get_java_dir_candidates(self._tools_base):
+            if (candidate / "bin" / java_name).exists():
+                return candidate
+
+        if self._tools_base:
+            return self._tools_base / "java"
 
         return None
 
@@ -158,16 +222,9 @@ class LanguageToolManager:
     def _get_java_command(self) -> str | None:
         """Obtener comando de Java (sistema o local)."""
         system = platform.system()
+        is_embedded = os.environ.get("NA_EMBEDDED") == "1"
+        local_java_cmd = None
 
-        # 1. Verificar Java del sistema
-        try:
-            result = subprocess.run(["java", "-version"], capture_output=True, timeout=5)
-            if result.returncode == 0:
-                return "java"
-        except Exception as e:
-            logger.debug("System Java not available: %s", e)
-
-        # 2. Verificar Java local
         if self._java_dir:
             if system == "Windows":
                 java_exe = self._java_dir / "bin" / "java.exe"
@@ -175,19 +232,31 @@ class LanguageToolManager:
                 java_exe = self._java_dir / "bin" / "java"
 
             if java_exe.exists():
-                # Verificar que es ejecutable (arquitectura correcta)
                 try:
                     result = subprocess.run(
                         [str(java_exe), "-version"], capture_output=True, timeout=5
                     )
                     if result.returncode == 0:
-                        return str(java_exe)
+                        local_java_cmd = str(java_exe)
                     else:
                         logger.warning(
-                            "Java local existe pero no es ejecutable (¿arquitectura incorrecta?)"
+                            "Java local existe pero no es ejecutable (arquitectura incorrecta?)"
                         )
                 except Exception as e:
                     logger.warning(f"Java local no funciona: {e}")
+
+        if is_embedded and local_java_cmd:
+            return local_java_cmd
+
+        try:
+            result = subprocess.run(["java", "-version"], capture_output=True, timeout=5)
+            if result.returncode == 0:
+                return "java"
+        except Exception as e:
+            logger.debug("System Java not available: %s", e)
+
+        if local_java_cmd:
+            return local_java_cmd
 
         return None
 
@@ -355,10 +424,11 @@ def get_languagetool_manager() -> LanguageToolManager:
     """Obtener instancia singleton del gestor."""
     global _manager
 
-    if _manager is None:
-        with _manager_lock:
-            if _manager is None:
-                _manager = LanguageToolManager()
+    with _manager_lock:
+        if _manager is None:
+            _manager = LanguageToolManager()
+        else:
+            _manager._refresh_paths()
 
     return _manager
 
@@ -580,8 +650,7 @@ class LanguageToolInstaller:
             # El usuario puede iniciarlo manualmente desde Settings.
             mgr = get_languagetool_manager()
             # Refrescar rutas del manager por si acaba de instalarse
-            mgr._lt_dir = self._lt_dir
-            mgr._java_dir = self._java_dir
+            mgr._refresh_paths()
 
             self._report(
                 "completed",
@@ -940,6 +1009,17 @@ def start_lt_installation(
         Tupla (éxito al iniciar, mensaje)
     """
     global _installing, _install_progress
+    manager = get_languagetool_manager()
+    manager._refresh_paths()
+
+    if manager.is_installed:
+        _install_progress = InstallProgress(
+            phase="completed",
+            phase_label="Corrector disponible",
+            percentage=100,
+            detail="LanguageTool ya esta incluido o instalado.",
+        )
+        return True, "LanguageTool ya esta disponible"
 
     with _install_lock:
         if _installing:

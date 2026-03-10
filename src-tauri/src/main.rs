@@ -603,6 +603,7 @@ fn spawn_embedded_backend(app: &AppHandle) -> Result<Child, String> {
         .env("PYTHONPATH", python_path_env)
         .env("PYTHONHOME", &python_home)
         .env("NA_EMBEDDED", "1")
+        .env("NA_RESOURCE_DIR", &resource_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 

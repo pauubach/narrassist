@@ -28,8 +28,9 @@ La revisión cubre:
 
 Estado actual tras el hardening:
 
-- el producto **no empaqueta** dentro del instalador final todos los motores pesados externos (`Ollama`, `LanguageTool`, `Java`) como artefactos ya listos para usar
-- pero sí tiene ahora un flujo consistente para que queden listos **en la primera ejecución** o en aperturas posteriores si faltan
+- el producto **sí empaqueta** `LanguageTool + Java` dentro del instalador final como recursos listos para usar
+- `Ollama` sigue fuera del bundle y se prepara en primera ejecución o en aperturas posteriores si falta
+- además existe un flujo consistente para reparar dependencias faltantes o servicios detenidos
 - en cada arranque de la app Tauri, el flujo inicial:
   - espera a que el backend local responda
   - comprueba modelos NLP
@@ -82,10 +83,10 @@ Cobertura actual:
 
 ### 3.3 LanguageTool + Java
 
-- `LanguageTool` no se considera preinstalado de forma garantizada por el instalador
+- `LanguageTool + Java` quedan ahora prebundled dentro del instalador desktop
 - El sistema lo prepara en app startup si falta:
-  - instala `LanguageTool`
-  - instala `Java` si no existe
+  - usa el bundle embebido si está presente
+  - solo descarga/instala en directorio de usuario si no existe bundle utilizable
   - inicia el servidor si está instalado pero parado
 - En runtime del pipeline:
   - se vuelve a intentar autoarranque antes de descartar métodos `languagetool`
@@ -124,10 +125,11 @@ Cobertura actual:
 Estado actual:
 
 - se instala la app desktop y el backend local
-- no se garantiza que `Ollama`, `LanguageTool` y `Java` queden ya operativos dentro del instalador
+- `LanguageTool + Java` quedan incluidos en el instalador
+- `Ollama` sigue sin quedar prebundled
 - la política real es:
-  - instalador ligero y seguro
-  - preparación de dependencias pesadas en primera ejecución
+  - instalador con backend + Python + corrector avanzado embebido
+  - preparación de `Ollama` y modelos en primera ejecución
 
 Evaluación:
 
@@ -238,6 +240,28 @@ Impacto:
 
 - se evita filtrar prematuramente métodos válidos solo porque el servicio estaba parado
 - el sistema intenta recuperar servicio antes de degradar
+
+### 5.3 Bundle desktop y release
+
+`src-tauri/tauri.conf.json`
+
+- el bundle desktop incluye ahora:
+  - `binaries/java-jre/`
+  - `binaries/languagetool/`
+
+`src-tauri/src/main.rs`
+
+- el backend embebido recibe `NA_RESOURCE_DIR`
+- `LanguageToolManager` puede resolver el bundle directamente desde runtime embebido
+
+CI / release workflows
+
+- descargan `LanguageTool + Java` antes de `cargo tauri build`
+- validan integridad mínima antes del empaquetado:
+  - existencia de `java-jre/bin/java(.exe)` o layout macOS `Contents/Home/bin/java`
+  - ejecución correcta de `java -version`
+  - tamaño mínimo razonable del `languagetool-server.jar`
+- en macOS se firma también el JRE embebido antes del empaquetado
 
 ## 6. Tests añadidos o actualizados
 

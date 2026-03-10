@@ -79,10 +79,12 @@ Var CleanInstall
     DetailPrint "Preparando instalacion..."
     DetailPrint ""
     DetailPrint "Se instalaran los siguientes componentes:"
-    DetailPrint "  [1/4] Aplicacion Narrative Assistant"
-    DetailPrint "  [2/4] Python 3.12 embebido"
-    DetailPrint "  [3/4] Backend FastAPI"
-    DetailPrint "  [4/4] Dependencias NLP (~1.8 GB):"
+    DetailPrint "  [1/6] Aplicacion Narrative Assistant"
+    DetailPrint "  [2/6] Python 3.12 embebido"
+    DetailPrint "  [3/6] Backend FastAPI"
+    DetailPrint "  [4/6] Java embebido para corrector avanzado"
+    DetailPrint "  [5/6] LanguageTool embebido"
+    DetailPrint "  [6/6] Dependencias NLP (~1.8 GB):"
     DetailPrint "        torch, spacy, transformers,"
     DetailPrint "        sentence-transformers, numpy,"
     DetailPrint "        pandas, scipy, scikit-learn"
@@ -103,10 +105,13 @@ Var CleanInstall
     DetailPrint "  Narrative Assistant"
     DetailPrint "  Python 3.12 embebido"
     DetailPrint "  Backend FastAPI"
+    DetailPrint "  Java embebido"
+    DetailPrint "  LanguageTool"
     DetailPrint "  Dependencias NLP (torch, spacy, etc.)"
     DetailPrint ""
     DetailPrint "Primer inicio:"
     DetailPrint "  Se descargaran modelos NLP (~1 GB)."
+    DetailPrint "  El corrector avanzado ya viene incluido."
     DetailPrint "  Este proceso solo ocurre una vez."
     DetailPrint ""
 !macroend
@@ -140,6 +145,12 @@ Var CleanInstall
     Pop $0
     DetailPrint "Eliminando backend..."
     nsExec::Exec 'cmd /c rd /s /q "$INSTDIR\binaries\backend"'
+    Pop $0
+    DetailPrint "Eliminando Java embebido..."
+    nsExec::Exec 'cmd /c rd /s /q "$INSTDIR\binaries\java-jre"'
+    Pop $0
+    DetailPrint "Eliminando LanguageTool embebido..."
+    nsExec::Exec 'cmd /c rd /s /q "$INSTDIR\binaries\languagetool"'
     Pop $0
     RMDir "$INSTDIR\binaries"
     DetailPrint "Archivos principales eliminados."

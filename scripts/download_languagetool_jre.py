@@ -52,6 +52,7 @@ EXPECTED_SIZES = {
     "java_macos": 45_000_000,     # ~45 MB comprimido
     "languagetool": 180_000_000,  # ~180 MB
 }
+MIN_LT_JAR_BYTES = 50_000_000  # mismo umbral mínimo que smoke/CI
 
 
 def get_platform_key() -> str:
@@ -156,8 +157,18 @@ def download_java_jre(target_dir: Path) -> bool:
             extracted_dir = extracted_dirs[0]
             if target_dir.exists():
                 shutil.rmtree(target_dir)
-            extracted_dir.rename(target_dir)
-            print(f"  [OK] Renombrado {extracted_dir.name} → java-jre")
+            if platform.system() == "Darwin":
+                contents_home = extracted_dir / "Contents" / "Home"
+                if contents_home.exists():
+                    shutil.move(str(contents_home), str(target_dir))
+                    shutil.rmtree(extracted_dir)
+                    print(f"  [OK] Reubicado {extracted_dir.name}/Contents/Home -> java-jre")
+                else:
+                    extracted_dir.rename(target_dir)
+                    print(f"  [OK] Renombrado {extracted_dir.name} -> java-jre")
+            else:
+                extracted_dir.rename(target_dir)
+                print(f"  [OK] Renombrado {extracted_dir.name} -> java-jre")
 
         # Limpiar archivo comprimido
         archive_path.unlink()
@@ -230,7 +241,7 @@ def download_languagetool(target_dir: Path) -> bool:
             if target_dir.exists():
                 shutil.rmtree(target_dir)
             extracted_dir.rename(target_dir)
-            print(f"  [OK] Renombrado LanguageTool-{LT_VERSION} → languagetool")
+            print(f"  [OK] Renombrado LanguageTool-{LT_VERSION} -> languagetool")
 
         # Limpiar zip
         zip_path.unlink()
@@ -270,7 +281,7 @@ def verify_installation(binaries_dir: Path) -> bool:
     if java_bin.exists():
         print(f"[OK] Java JRE: {java_bin}")
 
-        # Intentar ejecutar java -version
+        # Ejecutar java -version — falla si no es ejecutable
         try:
             result = subprocess.run(
                 [str(java_bin), "-version"],
@@ -278,18 +289,27 @@ def verify_installation(binaries_dir: Path) -> bool:
                 text=True,
                 timeout=10
             )
-            version_line = result.stderr.split('\n')[0] if result.stderr else "unknown"
-            print(f"     Version: {version_line}")
+            if result.returncode != 0:
+                errors.append(f"Java no es ejecutable (exit code {result.returncode}): {java_bin}")
+            else:
+                version_line = result.stderr.split('\n')[0] if result.stderr else "unknown"
+                print(f"     Version: {version_line}")
         except Exception as e:
-            print(f"     [WARN] No se pudo verificar versión: {e}")
+            errors.append(f"Java no se pudo ejecutar: {e}")
     else:
         errors.append(f"Java no encontrado: {java_bin}")
 
     # Verificar LanguageTool
     lt_jar = lt_dir / "languagetool-server.jar"
     if lt_jar.exists():
-        size_mb = lt_jar.stat().st_size / (1024 * 1024)
-        print(f"[OK] LanguageTool: {lt_jar} ({size_mb:.1f} MB)")
+        jar_size = lt_jar.stat().st_size
+        size_mb = jar_size / (1024 * 1024)
+        if jar_size < MIN_LT_JAR_BYTES:
+            errors.append(
+                f"LanguageTool JAR corrupto o incompleto: {lt_jar} ({size_mb:.1f} MB < {MIN_LT_JAR_BYTES // 1_000_000} MB)"
+            )
+        else:
+            print(f"[OK] LanguageTool: {lt_jar} ({size_mb:.1f} MB)")
     else:
         errors.append(f"LanguageTool JAR no encontrado: {lt_jar}")
 
