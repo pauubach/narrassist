@@ -27,7 +27,7 @@ dependencies = [
     "sentence-transformers>=2.2.0,<3.0.0",
 
     # Spanish linguistics (S15 - hybrid a-tónica detection)
-    "silabeador>=1.1.0",  # Syllabification and stress detection (99.81% accuracy)
+    "silabeador>=1.2.2.post1",  # Syllabification and stress detection (99.81% accuracy)
 
     # Spelling (pure Python, Spanish dictionary included)
     "pyspellchecker>=0.8.0",
