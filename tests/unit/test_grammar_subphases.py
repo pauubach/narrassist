@@ -22,6 +22,9 @@ class _FakeTracker:
     def update_storage(self, **kwargs):
         self.storage_updates.append(kwargs)
 
+    def update_progress(self, phase_key, fraction, message):
+        return None
+
     def update_time_remaining(self):
         return None
 
