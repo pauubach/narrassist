@@ -314,11 +314,26 @@ def verify_installation(binaries_dir: Path) -> bool:
         errors.append(f"Java no encontrado: {java_bin}")
 
     # Verificar LanguageTool
+    # Desde LT 6.x, languagetool-server.jar es un thin launcher (~0.2 MB).
+    # Las dependencias reales están en libs/. Verificar presencia del JAR + libs/.
     lt_jar = lt_dir / "languagetool-server.jar"
+    lt_libs = lt_dir / "libs"
     if lt_jar.exists():
         jar_size = lt_jar.stat().st_size
         size_mb = jar_size / (1024 * 1024)
-        if jar_size < MIN_LT_JAR_BYTES:
+        # Calcular tamaño total incluyendo libs/ (distribución 6.x usa thin launcher)
+        libs_size = sum(f.stat().st_size for f in lt_libs.rglob("*.jar")) if lt_libs.exists() else 0
+        total_mb = (jar_size + libs_size) / (1024 * 1024)
+        if libs_size > 0:
+            # Distribución 6.x: thin JAR + libs/
+            if libs_size < MIN_LT_JAR_BYTES:
+                errors.append(
+                    f"LanguageTool libs/ incompleto: {lt_libs} ({total_mb:.1f} MB total < {MIN_LT_JAR_BYTES // 1_000_000} MB)"
+                )
+            else:
+                print(f"[OK] LanguageTool: {lt_jar} + libs/ ({total_mb:.1f} MB total)")
+        elif jar_size < MIN_LT_JAR_BYTES:
+            # Distribución antigua: fat JAR — debe ser grande
             errors.append(
                 f"LanguageTool JAR corrupto o incompleto: {lt_jar} ({size_mb:.1f} MB < {MIN_LT_JAR_BYTES // 1_000_000} MB)"
             )

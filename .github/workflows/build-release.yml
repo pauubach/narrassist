@@ -106,9 +106,15 @@ jobs:
             throw "LanguageTool embebido no existe"
           }
 
-          $ltJarSize = (Get-Item $ltJar).Length
-          if ($ltJarSize -lt 50000000) {
-            throw "LanguageTool embebido parece corrupto o incompleto ($ltJarSize bytes)"
+          # LT 6.x usa thin launcher (~0.2 MB) + libs/. Verificar tamaño total.
+          $ltLibsDir = "src-tauri/binaries/languagetool/libs"
+          if (Test-Path $ltLibsDir) {
+            $ltTotalSize = (Get-ChildItem $ltLibsDir -Recurse -Filter "*.jar" | Measure-Object -Property Length -Sum).Sum
+          } else {
+            $ltTotalSize = (Get-Item $ltJar).Length
+          }
+          if ($ltTotalSize -lt 50000000) {
+            throw "LanguageTool embebido parece corrupto o incompleto ($ltTotalSize bytes total)"
           }
 
           & $javaBin -version *> $null
@@ -273,9 +279,15 @@ jobs:
             exit 1
           fi
 
-          LT_SIZE=$(stat -f%z "$LT_JAR")
+          # LT 6.x usa thin launcher (~0.2 MB) + libs/. Verificar tamaño total.
+          LT_LIBS="src-tauri/binaries/languagetool/libs"
+          if [ -d "$LT_LIBS" ]; then
+            LT_SIZE=$(find "$LT_LIBS" -name "*.jar" -exec stat -f%z {} \; | awk '{s+=$1} END {print s+0}')
+          else
+            LT_SIZE=$(stat -f%z "$LT_JAR")
+          fi
           if [ "$LT_SIZE" -lt 50000000 ]; then
-            echo "LanguageTool embebido parece corrupto o incompleto ($LT_SIZE bytes)" >&2
+            echo "LanguageTool embebido parece corrupto o incompleto ($LT_SIZE bytes total)" >&2
             exit 1
           fi
 
