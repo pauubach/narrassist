@@ -29,7 +29,7 @@ from pathlib import Path
 
 # Versiones
 JAVA_VERSION = "21.0.2_13"  # LTS release
-LT_VERSION = "6.4"
+LT_VERSION = "6.6"
 
 # URLs de descarga - OpenJDK Temurin (adoptium.net)
 # Formato: OpenJDK21U-jre_{arch}_{os}_hotspot_{version}.{ext}
@@ -41,9 +41,10 @@ JAVA_URLS = {
 }
 
 # LanguageTool URLs (múltiples mirrors)
+# Nota: languagetool.org bloquea descargas sin User-Agent — usar Request con headers
 LT_URLS = [
     f"https://languagetool.org/download/LanguageTool-{LT_VERSION}.zip",
-    f"https://github.com/languagetool-org/languagetool/releases/download/v{LT_VERSION}/LanguageTool-{LT_VERSION}.zip",
+    f"https://languagetool.org/download/LanguageTool-stable.zip",
 ]
 
 # Tamaños esperados (aproximados, para verificación)
@@ -87,7 +88,20 @@ def download_file(url: str, target_path: Path, description: str = "") -> bool:
                 mb_total = total_size / (1024 * 1024)
                 print(f"\r  Progreso: {percent:.1f}% ({mb_downloaded:.1f}/{mb_total:.1f} MB)", end="")
 
-        urllib.request.urlretrieve(url, target_path, reporthook)
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req) as response, open(target_path, "wb") as out_file:
+            total_size = int(response.headers.get("Content-Length", 0))
+            downloaded = 0
+            block_size = 8192
+            block_num = 0
+            while True:
+                chunk = response.read(block_size)
+                if not chunk:
+                    break
+                out_file.write(chunk)
+                downloaded += len(chunk)
+                block_num += 1
+                reporthook(block_num, block_size, total_size)
         print()  # Nueva línea después del progreso
 
         # Verificar tamaño mínimo
