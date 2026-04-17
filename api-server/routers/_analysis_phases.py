@@ -11,6 +11,7 @@ import json
 import threading
 import time
 from collections import Counter
+from contextlib import contextmanager
 from typing import Any
 
 import deps
@@ -72,6 +73,35 @@ class AnalysisCancelledError(Exception):
     """Excepción tipada para cancelación de análisis por el usuario."""
 
     pass
+
+
+@contextmanager
+def _with_llm_progress(tracker: "ProgressTracker", base_message: str):
+    """Activa feedback de progreso en tiempo real durante llamadas a Ollama.
+
+    Registra un hook en el cliente LLM que actualiza current_action con el
+    número de tokens generados y el tiempo transcurrido. Al salir, limpia el hook.
+    """
+    try:
+        from narrative_assistant.llm.client import get_llm_client
+
+        client = get_llm_client()
+    except Exception:
+        client = None
+
+    if client is None or not client.is_available:
+        yield
+        return
+
+    def _hook(token_count: int, elapsed: float) -> None:
+        msg = f"{base_message} ({token_count} tokens, {int(elapsed)}s)..."
+        tracker.update_storage(current_action=msg)
+
+    client.set_progress_hook(_hook)
+    try:
+        yield
+    finally:
+        client.set_progress_hook(None)
 
 
 def _to_optional_int(value: Any) -> int | None:
@@ -1984,14 +2014,15 @@ Si todas son válidas, responde: {{"invalid": []}}
 
 JSON:"""
 
-        response = llm_client.complete(
-            validation_prompt,
-            system=(
-                "Eres un experto en NER. Identifica entidades inválidas "
-                "(no son personajes, lugares u organizaciones reales)."
-            ),
-            temperature=0.1,
-        )
+        with _with_llm_progress(tracker, "Verificando personajes con modelo de lenguaje"):
+            response = llm_client.complete(
+                validation_prompt,
+                system=(
+                    "Eres un experto en NER. Identifica entidades inválidas "
+                    "(no son personajes, lugares u organizaciones reales)."
+                ),
+                temperature=0.1,
+            )
 
         if response:
             try:
@@ -2639,14 +2670,15 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                     f"resume={'yes' if _resume_state else 'no'}"
                 )
                 try:
-                    coref_result = resolve_coreferences_voting(
-                        text=full_text,
-                        chapters=chapters_data,
-                        config=coref_config,
-                        progress_callback=_on_coref_progress,
-                        checkpoint_callback=_on_coref_checkpoint,
-                        resume_state=_resume_state,
-                    )
+                    with _with_llm_progress(tracker, "Analizando referencias cruzadas con modelo de lenguaje"):
+                        coref_result = resolve_coreferences_voting(
+                            text=full_text,
+                            chapters=chapters_data,
+                            config=coref_config,
+                            progress_callback=_on_coref_progress,
+                            checkpoint_callback=_on_coref_checkpoint,
+                            resume_state=_resume_state,
+                        )
                 except AnalysisCancelledError:
                     logger.info(
                         f"[COREF_DIAG] AnalysisCancelledError caught from resolve_coreferences_voting "
@@ -3258,11 +3290,12 @@ def run_timeline(ctx: dict, tracker: ProgressTracker):
             )
             try:
                 checker = VotingTemporalChecker(voting_config)
-                voting_result = checker.check(
-                    timeline,
-                    all_markers,
-                    text=ctx.get("full_text"),
-                )
+                with _with_llm_progress(tracker, "Verificando consistencia temporal con modelo de lenguaje"):
+                    voting_result = checker.check(
+                        timeline,
+                        all_markers,
+                        text=ctx.get("full_text"),
+                    )
                 inconsistencies = voting_result.inconsistencies
                 tracker.set_metric("timeline_voting_enabled", True)
                 tracker.set_metric(
@@ -3498,11 +3531,12 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
 
                 if batch_mentions:
                     try:
-                        batch_result = attr_extractor.extract_attributes(
-                            full_text,
-                            batch_mentions,
-                            None,
-                        )
+                        with _with_llm_progress(tracker, f"Analizando características de {names_str}"):
+                            batch_result = attr_extractor.extract_attributes(
+                                full_text,
+                                batch_mentions,
+                                None,
+                            )
                         if batch_result.is_success and batch_result.value:
                             all_extracted_attrs.extend(batch_result.value.attributes)
                     except Exception as e:

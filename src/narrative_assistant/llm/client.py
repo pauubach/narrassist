@@ -182,6 +182,8 @@ class LocalLLMClient:
         self._warned_unavailable = False  # Para evitar warnings repetidos
         self._ollama_num_gpu: int | None = None  # None = Ollama decide, 0 = CPU
         self._missing_models: set[str] = set()  # Modelos que devolvieron 404
+        # Callback opcional (token_count, elapsed_secs) → None para actualizar UI durante inferencia
+        self._progress_hook: Optional[Callable[[int, float], None]] = None
         self._initialize_backend()
 
     def _initialize_backend(self) -> None:
@@ -204,6 +206,14 @@ class LocalLLMClient:
     def clear_missing_models(self) -> None:
         """Limpia la caché de modelos 404 (llamar tras descargar un nuevo modelo)."""
         self._missing_models.clear()
+
+    def set_progress_hook(self, hook: Optional[Callable[[int, float], None]]) -> None:
+        """Registra un callback para recibir actualizaciones de progreso durante inferencia Ollama.
+
+        El hook recibe (token_count, elapsed_seconds) y se llama cada ~10 tokens.
+        Pasar None para desactivar.
+        """
+        self._progress_hook = hook
 
     def _try_init_ollama(self) -> bool:
         """
@@ -579,6 +589,9 @@ class LocalLLMClient:
             - Error HTTP: (response_body, status_code)
             - Error de red: (error_message, None)
         """
+        if self._progress_hook is not None:
+            return self._send_ollama_request_streaming(messages, options, timeout_config, model_name)
+
         try:
             import httpx
 
@@ -602,6 +615,62 @@ class LocalLLMClient:
 
         except Exception as e:
             logger.error(f"Error en llamada a Ollama: {e}")
+            return str(e), None
+
+    def _send_ollama_request_streaming(
+        self,
+        messages: list[dict[str, str]],
+        options: dict[str, Any],
+        timeout_config: Any,
+        model_name: str | None = None,
+    ) -> tuple[str | None, int | None]:
+        """Variante streaming de _send_ollama_request.
+
+        Usa stream=True para recibir tokens progresivamente y llamar
+        self._progress_hook cada ~10 tokens, dando feedback al usuario.
+        """
+        try:
+            import httpx
+
+            content_parts: list[str] = []
+            token_count = 0
+            start_time = time.time()
+            hook = self._progress_hook
+
+            with httpx.stream(
+                "POST",
+                f"{self._config.ollama_host}/api/chat",
+                json={
+                    "model": model_name or self._config.ollama_model,
+                    "messages": messages,
+                    "stream": True,
+                    "options": options,
+                },
+                timeout=timeout_config,
+            ) as response:
+                if response.status_code != 200:
+                    return response.text, response.status_code
+
+                for line in response.iter_lines():
+                    if not line:
+                        continue
+                    try:
+                        chunk = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    token = chunk.get("message", {}).get("content", "")
+                    if token:
+                        content_parts.append(token)
+                        token_count += 1
+                        if hook and token_count % 10 == 0:
+                            hook(token_count, time.time() - start_time)
+                    if chunk.get("done"):
+                        break
+
+            return "".join(content_parts), 200
+
+        except Exception as e:
+            logger.error(f"Error en llamada streaming a Ollama: {e}")
             return str(e), None
 
     def _complete_ollama(

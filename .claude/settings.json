@@ -48,7 +48,8 @@
       "Bash(rg:*)",
       "Edit(/.claude/skills/scaffold/**)",
       "Edit(/.claude/skills/refactor/**)",
-      "Edit(/.claude/skills/research/**)"
+      "Edit(/.claude/skills/research/**)",
+      "Bash(git remote *)"
     ]
   }
 }
