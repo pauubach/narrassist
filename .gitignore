@@ -22,6 +22,12 @@ dist/
 
 # Claude Code local settings
 .claude/settings.local.json
+CLAUDE.local.md
+
+# Ad-hoc screenshots / debug artifacts in root
+/*.png
+/coverage.json
+/pip_audit_report.json
 *.swo
 
 # Local data
