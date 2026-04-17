@@ -89,6 +89,7 @@ async fn poll_health_ready_url(url: &str) -> bool {
     }
 }
 
+#[cfg(test)]
 async fn wait_for_health<F, Fut>(max_attempts: u32, delay_ms: u64, mut check: F) -> bool
 where
     F: FnMut() -> Fut,
