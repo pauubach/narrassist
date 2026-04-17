@@ -677,8 +677,8 @@ where
 mod tests {
     use super::*;
     use std::net::TcpListener;
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
 
     fn spawn_mock_health_server(responses: Vec<String>) -> String {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock server");
@@ -735,9 +735,15 @@ mod tests {
 
     #[test]
     fn backend_ready_body_requires_explicit_flag() {
-        assert!(is_backend_ready_body(&serde_json::json!({ "backend_loaded": true })));
-        assert!(!is_backend_ready_body(&serde_json::json!({ "backend_loaded": false })));
-        assert!(!is_backend_ready_body(&serde_json::json!({ "status": "ok" })));
+        assert!(is_backend_ready_body(
+            &serde_json::json!({ "backend_loaded": true })
+        ));
+        assert!(!is_backend_ready_body(
+            &serde_json::json!({ "backend_loaded": false })
+        ));
+        assert!(!is_backend_ready_body(
+            &serde_json::json!({ "status": "ok" })
+        ));
     }
 
     #[tokio::test]
@@ -768,7 +774,8 @@ mod tests {
 
     #[tokio::test]
     async fn poll_health_alive_rejects_non_success_http_status() {
-        let response = "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        let response =
+            "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
         let url = spawn_mock_health_server(vec![response.to_string()]);
 
         assert!(!poll_health_alive_url(&url).await);
