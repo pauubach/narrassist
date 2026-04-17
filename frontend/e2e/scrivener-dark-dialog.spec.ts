@@ -85,7 +85,7 @@ test.describe('Scrivener Dark Theme - Dialog Inspection', () => {
           const styles = window.getComputedStyle(el)
 
           // Buscar qué regla CSS está ganando
-          let matchingRules: string[] = []
+          const matchingRules: string[] = []
           try {
             const sheets = document.styleSheets
             for (let i = 0; i < sheets.length; i++) {

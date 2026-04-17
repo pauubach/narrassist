@@ -219,8 +219,16 @@ class DocumentExporter:
             options = ExportOptions()
 
         try:
-            # Intentar importar reportlab
-            from reportlab.lib.colors import HexColor, black, gray
+            # Intentar importar reportlab (auto-instalar si falta)
+            try:
+                from reportlab.lib.colors import HexColor, black, gray
+            except ImportError:
+                from ..core.auto_install import ensure_package
+
+                if not ensure_package("reportlab"):
+                    raise ImportError("reportlab")
+                from reportlab.lib.colors import HexColor, black, gray
+
             from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
             from reportlab.lib.pagesizes import A4
             from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet

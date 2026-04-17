@@ -333,7 +333,15 @@ class LocalLLMClient:
     def _verify_ollama_model(self, manager: Any) -> bool:
         """Verifica que el modelo configurado esté disponible."""
         try:
-            import httpx
+            try:
+                import httpx
+            except ImportError:
+                from ..core.auto_install import ensure_package
+
+                if ensure_package("httpx"):
+                    import httpx
+                else:
+                    raise ImportError("httpx")
 
             response = httpx.get(f"{self._config.ollama_host}/api/tags", timeout=5.0)
 
@@ -613,8 +621,13 @@ class LocalLLMClient:
         try:
             import httpx
         except ImportError:
-            logger.error("httpx no instalado, no se puede usar Ollama")
-            return None
+            from ..core.auto_install import ensure_package
+
+            if ensure_package("httpx"):
+                import httpx
+            else:
+                logger.error("httpx no instalado, no se puede usar Ollama")
+                return None
 
         messages: list[dict[str, str]] = []
         if system:

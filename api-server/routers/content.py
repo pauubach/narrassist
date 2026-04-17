@@ -1061,8 +1061,6 @@ def search_similar_text(
         result = deps.project_manager.get(project_id)  # type: ignore[attr-defined]
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
-        project = result.value
-
         # Cargar texto completo desde capítulos
         if not deps.chapter_repository:
             raise HTTPException(status_code=500, detail="Chapter repository not initialized")

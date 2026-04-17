@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import deps
+
 from narrative_assistant.llm.ollama_manager import ensure_ollama_ready
 
 # Mapa de requisitos de servicio por metodo NLP (consistente con projects.py).

@@ -75,11 +75,14 @@ def run_grammar_phase(
                 if grammar_checker.languagetool_available:
                     logger.info("LanguageTool now available after reload")
 
+            tracker.update_progress("grammar", 0.05, "Revisando gramática...")
+
             grammar_result = grammar_checker.check(
                 full_text,
                 use_languagetool=use_languagetool,
                 use_llm=use_llm,
             )
+            tracker.update_progress("grammar", 0.4, "Gramática completada")
 
             if grammar_result.is_success:
                 grammar_report = grammar_result.value
@@ -94,6 +97,7 @@ def run_grammar_phase(
             logger.warning(f"Error in grammar analysis: {e}")
     else:
         logger.info("Grammar checks omitted by project settings")
+        tracker.update_progress("grammar", 0.4, "Gramática omitida")
 
     class _SkipSpellingChecks(Exception):
         pass
@@ -150,9 +154,15 @@ def run_grammar_phase(
                                 if isinstance(alias, str) and alias.strip():
                                     known_entities.append(alias.strip())
 
+                def _spelling_progress(fraction: float, message: str) -> None:
+                    # Map spelling progress (0-1) to grammar phase (offset 0.5-1.0
+                    # since grammar check takes first half)
+                    tracker.update_progress("grammar", 0.5 + fraction * 0.5, message)
+
                 spelling_result = spelling_checker.check(
                     full_text,
                     known_entities=known_entities,
+                    progress_callback=_spelling_progress,
                 )
                 if spelling_result.is_success:
                     spelling_report = spelling_result.value

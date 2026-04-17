@@ -215,7 +215,7 @@ test.describe('E2E - CollectionsView (CRUD)', () => {
 
     // Tab to search input
     await page.keyboard.press('Tab')
-    let focused = await page.evaluate(() => document.activeElement?.tagName)
+    const focused = await page.evaluate(() => document.activeElement?.tagName)
     expect(['INPUT', 'BUTTON']).toContain(focused)
 
     // Tab to "Nueva Colección" button

@@ -781,7 +781,10 @@ defineExpose({ focusSearch })
   border-color: var(--surface-600);
 }
 
-:global(.dark) :deep(.sequential-dialog) {
+
+</style>
+<style>
+.dark .alerts-dashboard .sequential-dialog {
   background: var(--surface-900);
 }
 </style>

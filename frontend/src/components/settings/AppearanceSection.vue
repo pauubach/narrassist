@@ -32,7 +32,7 @@
         option-group-label="label"
         option-group-children="items"
         class="preset-dropdown"
-        inputId="appearance-preset"
+        input-id="appearance-preset"
         aria-label="Estilo visual"
         @update:model-value="onPresetChange"
       >
@@ -103,7 +103,7 @@
         option-group-label="label"
         option-group-children="items"
         class="font-dropdown"
-        inputId="appearance-font-ui"
+        input-id="appearance-font-ui"
         aria-label="Fuente de interfaz"
         @update:model-value="onFontFamilyChange"
       >
@@ -143,7 +143,7 @@
         option-group-label="label"
         option-group-children="items"
         class="font-dropdown"
-        inputId="appearance-font-reading"
+        input-id="appearance-font-reading"
         aria-label="Fuente de lectura"
         @update:model-value="onFontFamilyReadingChange"
       >
@@ -198,7 +198,7 @@
           :options="lineHeightOptions"
           option-label="label"
           option-value="value"
-          inputId="appearance-line-height"
+          input-id="appearance-line-height"
           aria-label="Interlineado"
           @update:model-value="onLineHeightChange"
         />
@@ -249,7 +249,7 @@
     <div class="setting-control">
       <ToggleSwitch
         :model-value="themeStore.config.reducedMotion"
-        inputId="appearance-reduced-motion"
+        input-id="appearance-reduced-motion"
         aria-label="Reducir animaciones"
         @update:model-value="onReducedMotionChange"
       />

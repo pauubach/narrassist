@@ -28,7 +28,7 @@
         option-value="id"
         placeholder="Selecciona un preset"
         class="w-full"
-        inputId="default-correction-preset"
+        input-id="default-correction-preset"
         aria-label="Preset por defecto"
         @change="onDefaultPresetChange"
       >
@@ -142,7 +142,7 @@
         option-label="label"
         option-value="value"
         placeholder="Selecciona región"
-        inputId="default-region"
+        input-id="default-region"
         aria-label="Variante regional"
         @change="onDefaultRegionChange"
       />
@@ -161,7 +161,7 @@
     <div class="setting-control">
       <ToggleSwitch
         v-model="useLLMReview"
-        inputId="settings-llm-review"
+        input-id="settings-llm-review"
         aria-label="Revisión inteligente"
         @change="onLLMReviewChange"
       />

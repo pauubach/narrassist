@@ -161,7 +161,15 @@ class TxtParser(DocumentParser):
         """
         # Intentar con chardet primero
         try:
-            import chardet
+            try:
+                import chardet
+            except ImportError:
+                from ..core.auto_install import ensure_package
+
+                if ensure_package("chardet"):
+                    import chardet
+                else:
+                    raise ImportError("chardet")
 
             with open(path, "rb") as f:
                 raw = f.read()

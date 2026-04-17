@@ -61,7 +61,7 @@ vi.mock('@/stores/license', () => ({
 }))
 
 const ButtonStub = defineComponent({
-  name: 'Button',
+  name: 'PButton',
   props: ['label', 'ariaLabel', 'disabled'],
   emits: ['click'],
   template: '<button :disabled="disabled" @click="$emit(\'click\')">{{ label || ariaLabel || "button" }}</button>',
@@ -98,7 +98,7 @@ const DividerStub = defineComponent({
 })
 
 const SelectStub = defineComponent({
-  name: 'Select',
+  name: 'PSelect',
   props: ['modelValue', 'options', 'optionLabel', 'optionValue'],
   emits: ['update:modelValue', 'change'],
   methods: {
@@ -110,7 +110,7 @@ const SelectStub = defineComponent({
       return candidate[key] ?? candidate.id ?? candidate.value
     },
   },
-  template: '<select class="select-stub" @change="$emit(\'update:modelValue\', nextValue()); $emit(\'change\')"><option v-for="(opt, index) in options || []" :key="index">{{ opt[optionLabel || \"label\"] || opt.label || opt.name }}</option></select>',
+  template: '<select class="select-stub" @change="$emit(\'update:modelValue\', nextValue()); $emit(\'change\')"><option v-for="(opt, index) in options || []" :key="index">{{ opt[optionLabel || "label"] || opt.label || opt.name }}</option></select>',
 })
 
 const DsDownloadProgressStub = defineComponent({

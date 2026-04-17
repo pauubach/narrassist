@@ -118,14 +118,15 @@ class DocxParser(DocumentParser):
         self._docx_available = self._check_dependency()
 
     def _check_dependency(self) -> bool:
-        """Verifica que python-docx está disponible."""
+        """Verifica que python-docx está disponible, auto-instala si falta."""
         try:
-            import docx
+            import docx  # noqa: F401
 
             return True
         except ImportError:
-            logger.warning("python-docx no instalado. Instalar con: pip install python-docx")
-            return False
+            from ..core.auto_install import ensure_package
+
+            return ensure_package("docx", pip_name="python-docx")
 
     def parse(self, path: Path) -> Result[RawDocument]:
         """

@@ -196,7 +196,9 @@ async function loadUserRejections() {
     if (data.success && data.data) {
       userRejections.value = data.data
     }
-  } catch {} finally {
+  } catch (err) {
+    console.error('Failed to load user rejections', err)
+  } finally {
     loadingRejections.value = false
   }
 }

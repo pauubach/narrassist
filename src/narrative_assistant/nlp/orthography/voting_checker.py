@@ -239,7 +239,15 @@ class ChunspellVoter(BaseVoter):
         super().__init__()
         try:
             # chunspell installs as 'hunspell' module
-            import hunspell
+            try:
+                import hunspell
+            except ImportError:
+                from ...core.auto_install import ensure_package
+
+                if ensure_package("chunspell"):
+                    import hunspell
+                else:
+                    raise ImportError("chunspell")
 
             # Buscar diccionarios españoles
             dict_base = self._find_spanish_dict(dict_path)
@@ -253,7 +261,7 @@ class ChunspellVoter(BaseVoter):
                 logger.warning(self._init_error)
 
         except ImportError:
-            self._init_error = "hunspell no instalado (pip install chunspell)"
+            self._init_error = "hunspell no instalado (auto-install de chunspell falló)"
             logger.warning(self._init_error)
         except Exception as e:
             self._init_error = f"Error inicializando hunspell: {e}"
@@ -321,7 +329,15 @@ class SymSpellVoter(BaseVoter):
     def __init__(self, dict_path: Path | None = None):
         super().__init__()
         try:
-            from symspellpy import SymSpell, Verbosity
+            try:
+                from symspellpy import SymSpell, Verbosity
+            except ImportError:
+                from ...core.auto_install import ensure_package
+
+                if ensure_package("symspellpy"):
+                    from symspellpy import SymSpell, Verbosity
+                else:
+                    raise ImportError("symspellpy")
 
             self._symspell = SymSpell(max_dictionary_edit_distance=2, prefix_length=7)
             self._verbosity = Verbosity.CLOSEST
@@ -337,7 +353,7 @@ class SymSpellVoter(BaseVoter):
                 logger.warning(self._init_error)
 
         except ImportError:
-            self._init_error = "symspellpy no instalado (pip install symspellpy)"
+            self._init_error = "symspellpy no instalado (auto-install falló)"
             logger.warning(self._init_error)
         except Exception as e:
             self._init_error = f"Error inicializando symspellpy: {e}"
@@ -446,7 +462,15 @@ class LanguageToolVoter(BaseVoter):
 
         # Intentar primero language_tool_python (más fácil de usar)
         try:
-            import language_tool_python
+            try:
+                import language_tool_python
+            except ImportError:
+                from ...core.auto_install import ensure_package
+
+                if ensure_package("language_tool_python"):
+                    import language_tool_python
+                else:
+                    raise ImportError("language_tool_python")
 
             self._tool = language_tool_python.LanguageTool("es")
             self._use_python_lib = True
@@ -1705,6 +1729,9 @@ Solo responde con el JSON, sin texto adicional."""
                 max_tokens=200,
             )
 
+            if not response:
+                return (False, 0.0, "LLM retornó respuesta vacía")
+
             # Parsear respuesta
             import json
             import re
@@ -1893,12 +1920,21 @@ class VotingSpellingChecker:
                 lt_results[start] = vote
                 lt_raw_results.append((word, start, end, vote))
 
-        # Fase 2: Procesar cada palabra con votantes individuales
+        # Fase 2: Procesar palabras con votantes individuales
+        # Optimización: cachear votos de voters sin contexto (dictionary-based)
+        # para evitar re-evaluar la misma palabra miles de veces
         voting_results: list[VotingResult] = []
         words_positions = {start for _, start, _, _ in words_to_check}
 
+        # Separar voters: context-free (cacheable) vs context-dependent (BETO)
+        context_free_voters = [v for v in self._voters if v.name != "beto"]
+        context_voters = [v for v in self._voters if v.name == "beto"]
+
+        # Cache: word_lower -> list[Vote] para voters sin contexto
+        word_vote_cache: dict[str, list[Vote]] = {}
+
         for i, (word, start, end, sentence) in enumerate(words_to_check):
-            if progress_callback and i % 50 == 0:
+            if progress_callback and i % 200 == 0:
                 progress = 0.1 + (0.6 * i / total_words)
                 progress_callback(progress, f"Procesando palabra {i + 1}/{total_words}...")
 
@@ -1909,21 +1945,53 @@ class VotingSpellingChecker:
                 sentence=sentence,
             )
 
-            # Recoger votos de cada votante
-            for voter in self._voters:
-                voter_vote = voter.check_word(word, sentence)
-                if voter_vote:
-                    result.votes.append(voter_vote)
+            # Votos cacheables (dictionary-based: misma palabra = mismo resultado)
+            word_lower = word.lower()
+            if word_lower not in word_vote_cache:
+                cached_votes = []
+                for voter in context_free_voters:
+                    voter_vote = voter.check_word(word, sentence)
+                    if voter_vote:
+                        cached_votes.append(voter_vote)
+                word_vote_cache[word_lower] = cached_votes
+
+            # Copiar votos cacheados (copias para no mutar)
+            for cached_vote in word_vote_cache[word_lower]:
+                result.votes.append(Vote(
+                    voter_name=cached_vote.voter_name,
+                    is_error=cached_vote.is_error,
+                    confidence=cached_vote.confidence,
+                    suggestions=cached_vote.suggestions,
+                    error_type=cached_vote.error_type,
+                ))
 
             # Añadir voto de LanguageTool si existe
             if start in lt_results:
                 result.votes.append(lt_results[start])
 
-            # Agregar votos
+            # Agregar votos (sin BETO aún)
             result = self._aggregator.aggregate(result)
 
             if result.is_error or result.needs_llm_arbitration:
                 voting_results.append(result)
+
+        # Fase 2.5: BETO solo para palabras flagged como error (mucho más rápido)
+        if context_voters:
+            beto_candidates = [r for r in voting_results if r.is_error]
+            if beto_candidates and progress_callback:
+                progress_callback(0.65, f"Verificando {len(beto_candidates)} candidatos con BETO...")
+            for r in beto_candidates:
+                for voter in context_voters:
+                    voter_vote = voter.check_word(r.word, r.sentence)
+                    if voter_vote:
+                        r.votes.append(voter_vote)
+                # Re-agregar con el voto de BETO incluido
+                r_new = self._aggregator.aggregate(r)
+                r.is_error = r_new.is_error
+                r.aggregated_confidence = r_new.aggregated_confidence
+                r.needs_llm_arbitration = r_new.needs_llm_arbitration
+                r.final_suggestions = r_new.final_suggestions
+                r.final_error_type = r_new.final_error_type
 
         # Fase 2b: Añadir errores de LanguageTool que no coinciden con palabras extraídas
         # (palabras muy cortas como "a", "e", "El" que no pasaron el filtro de longitud)
@@ -1947,17 +2015,28 @@ class VotingSpellingChecker:
         if progress_callback:
             progress_callback(0.7, "Agregando resultados...")
 
-        # Fase 3: Arbitraje LLM para casos dudosos
+        # Fase 3: Arbitraje LLM para casos dudosos (limitado para tiempo razonable)
+        MAX_LLM_ARBITRATIONS = 200
         if self._arbitrator and self._arbitrator.is_available:
             needs_arbitration = [r for r in voting_results if r.needs_llm_arbitration]
 
             if needs_arbitration:
-                if progress_callback:
-                    progress_callback(
-                        0.75, f"Consultando LLM para {len(needs_arbitration)} casos dudosos..."
-                    )
+                # Priorizar por mayor desacuerdo (más útil para LLM)
+                # y limitar para no bloquear el análisis
+                arbitration_batch = needs_arbitration[:MAX_LLM_ARBITRATIONS]
+                skipped = len(needs_arbitration) - len(arbitration_batch)
 
-                for result in needs_arbitration:
+                if progress_callback:
+                    msg = f"Consultando LLM para {len(arbitration_batch)} casos dudosos..."
+                    if skipped > 0:
+                        msg += f" ({skipped} omitidos por límite)"
+                    progress_callback(0.75, msg)
+
+                for idx, result in enumerate(arbitration_batch):
+                    if progress_callback and idx % 10 == 0:
+                        frac = 0.75 + (0.15 * idx / len(arbitration_batch))
+                        progress_callback(frac, f"LLM arbitrando {idx + 1}/{len(arbitration_batch)}...")
+
                     is_error, confidence, explanation = self._arbitrator.arbitrate(
                         result.word,
                         result.sentence,
@@ -1981,6 +2060,9 @@ class VotingSpellingChecker:
                 # Filtrar palabras que sean solo whitespace/newlines
                 if not result.word.strip():
                     continue
+                # Generar explicación descriptiva del error
+                explanation = self._build_explanation(result)
+
                 issue = SpellingIssue(
                     word=result.word,
                     start_char=result.start_char,
@@ -1993,8 +2075,7 @@ class VotingSpellingChecker:
                     suggestions=result.final_suggestions,
                     confidence=result.aggregated_confidence,
                     detection_method=DetectionMethod.DICTIONARY,
-                    explanation=result.llm_explanation
-                    or f"Detectado por {result.voters_detecting_error}/{result.voters_total} correctores",
+                    explanation=explanation,
                 )
                 report.add_issue(issue)
 
@@ -2006,6 +2087,55 @@ class VotingSpellingChecker:
             progress_callback(1.0, f"Completado: {len(report.issues)} errores encontrados")
 
         return Result.success(report)
+
+    @staticmethod
+    def _build_explanation(result: VotingResult) -> str:
+        """Genera explicación descriptiva del error para el usuario."""
+        word = result.word
+        error_type = result.final_error_type
+        suggestions = result.final_suggestions
+        confidence = result.aggregated_confidence
+        voters_for = result.voters_detecting_error
+        voters_total = result.voters_total
+
+        # Si el LLM dio una explicación, usarla como base
+        if result.llm_explanation:
+            return result.llm_explanation
+
+        # Descripción según tipo de error
+        _ERROR_DESCRIPTIONS: dict[SpellingErrorType, str] = {
+            SpellingErrorType.TYPO: f"«{word}» parece un error tipográfico",
+            SpellingErrorType.MISSPELLING: f"«{word}» no se encuentra en el diccionario",
+            SpellingErrorType.ACCENT: f"«{word}» puede tener un error de acentuación",
+            SpellingErrorType.CASE: f"«{word}» tiene un posible error de mayúsculas/minúsculas",
+            SpellingErrorType.HOMOPHONE: f"«{word}» podría confundirse con un homófono",
+            SpellingErrorType.SPLIT_WORD: f"«{word}» parece una palabra dividida incorrectamente",
+            SpellingErrorType.JOINED_WORD: f"«{word}» parece palabras unidas incorrectamente",
+            SpellingErrorType.REPEATED_CHAR: f"«{word}» tiene caracteres repetidos",
+            SpellingErrorType.FOREIGN_WORD: f"«{word}» parece un extranjerismo",
+            SpellingErrorType.OCR_ERROR: f"«{word}» parece un error de OCR/digitalización",
+            SpellingErrorType.REDUNDANCY: f"«{word}» forma parte de una expresión redundante",
+            SpellingErrorType.REPETITION: f"«{word}» aparece repetida",
+            SpellingErrorType.SEMANTIC: f"«{word}» puede ser incorrecto en este contexto",
+            SpellingErrorType.DEQUEISMO: f"Posible dequeísmo con «{word}»",
+            SpellingErrorType.QUEISMO: f"Posible queísmo: puede faltar «de» antes de «{word}»",
+            SpellingErrorType.STYLE: f"«{word}» — sugerencia de estilo",
+        }
+
+        desc = _ERROR_DESCRIPTIONS.get(error_type, f"Posible error en «{word}»")
+
+        # Añadir sugerencia si existe
+        if suggestions:
+            best = suggestions[0]
+            if best.lower() != word.lower():
+                desc += f". ¿Quizás «{best}»?"
+
+        # Añadir nivel de consenso como detalle secundario
+        if voters_total > 0:
+            pct = int(confidence * 100)
+            desc += f" (confianza: {pct}%, {voters_for}/{voters_total} correctores)"
+
+        return desc
 
     def _extract_sentence(self, text: str, position: int) -> str:
         """Extraer la oración que contiene la posición dada.

@@ -1417,11 +1417,13 @@ html:not(.dark):not(.scrivener-theme):not(.grammarly-theme),
 }
 
 /* --- Default / Standard Themes - Dark Mode --- */
+/* NOTE: In PrimeVue 4, --p-surface-0 is ALWAYS white even in dark mode.
+   Dark backgrounds must use --p-surface-900/950 or --p-content-background. */
 html.dark:not(.scrivener-theme):not(.grammarly-theme) {
-  --app-document-bg: var(--p-surface-0, #0f172a);
+  --app-document-bg: var(--p-content-background, #0f172a);
   --app-document-text: var(--p-text-color, #e2e8f0);
-  --app-toolbar-bg: var(--p-surface-50, #1e293b);
-  --app-toolbar-border: var(--p-surface-200, #334155);
+  --app-toolbar-bg: var(--p-surface-900, #1e293b);
+  --app-toolbar-border: var(--p-surface-700, #334155);
   --app-text-secondary: var(--p-text-muted-color, #94a3b8);
 }
 

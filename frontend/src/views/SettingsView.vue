@@ -216,7 +216,7 @@
         <div class="migrate-option">
           <ToggleSwitch
             v-model="migrateData"
-            inputId="settings-migrate-data"
+            input-id="settings-migrate-data"
             aria-label="Migrar datos existentes"
           />
           <div class="migrate-info">
@@ -387,7 +387,9 @@ async function loadQualityLevels() {
       settings.value.qualityLevel = cfgData.qualityLevel || 'rapida'
       settings.value.llmSensitivity = cfgData.sensitivity ?? 5
     }
-  } catch {}
+  } catch (err) {
+    console.error('Failed to load LLM config', err)
+  }
 }
 
 async function selectQualityLevel(level: string) {
@@ -927,10 +929,6 @@ const handleScroll = () => {
   border-bottom: 1px solid var(--surface-border);
 }
 
-:global(.dark) :deep(.setting-item) {
-  border-bottom-color: var(--surface-border);
-}
-
 :deep(.setting-item:last-child) {
   border-bottom: none;
 }
@@ -976,10 +974,6 @@ const handleScroll = () => {
   padding: 0.125rem 0.375rem;
   border-radius: 0.25rem;
   font-size: 0.85rem;
-}
-
-:global(.dark) :deep(.setting-description code) {
-  background: var(--p-surface-800);
 }
 
 :deep(.setting-control) {
@@ -1077,28 +1071,11 @@ const handleScroll = () => {
   font-size: 0.9rem;
 }
 
-:global(.dark) :deep(.preset-button) {
-  background: var(--p-surface-800);
-  border-color: var(--p-surface-700);
-}
-
-:global(.dark) :deep(.preset-button:hover) {
-  background: color-mix(in srgb, var(--p-primary-color) 15%, var(--p-surface-800));
-}
-
-:global(.dark) :deep(.preset-button.active) {
-  background: color-mix(in srgb, var(--p-primary-color) 20%, var(--p-surface-800));
-}
-
 :deep(.sensitivity-slider) {
   padding: 1rem 1.25rem;
   background: var(--p-surface-50);
   border-radius: var(--p-border-radius);
   margin-bottom: 1rem;
-}
-
-:global(.dark) :deep(.sensitivity-slider) {
-  background: var(--p-surface-800);
 }
 
 :deep(.slider-header) {
@@ -1134,10 +1111,6 @@ const handleScroll = () => {
   margin-top: 0.5rem;
 }
 
-:global(.dark) :deep(.advanced-panel) {
-  border-top-color: var(--p-surface-700);
-}
-
 :deep(.advanced-toggle) {
   display: flex;
   align-items: center;
@@ -1164,10 +1137,6 @@ const handleScroll = () => {
   padding: 1rem;
   background: var(--p-surface-50);
   border-radius: var(--p-border-radius);
-}
-
-:global(.dark) :deep(.advanced-content) {
-  background: var(--p-surface-800);
 }
 
 :deep(.advanced-note) {
@@ -1257,18 +1226,9 @@ const handleScroll = () => {
   transition: all 0.15s ease;
 }
 
-:global(.dark) :deep(.method-card) {
-  background: var(--p-surface-800);
-  border-color: var(--p-surface-700);
-}
-
 :deep(.method-card.enabled) {
   border-color: var(--p-primary-color);
   background: color-mix(in srgb, var(--p-primary-color) 5%, var(--p-surface-50));
-}
-
-:global(.dark) :deep(.method-card.enabled) {
-  background: color-mix(in srgb, var(--p-primary-color) 10%, var(--p-surface-800));
 }
 
 :deep(.method-card.disabled) {
@@ -1312,24 +1272,6 @@ const handleScroll = () => {
   background: var(--red-100) !important;
   color: var(--red-700) !important;
   border: 1px solid var(--red-300) !important;
-}
-
-:global(.dark) :deep(.method-card .method-tag.p-tag-info) {
-  background: var(--blue-900) !important;
-  color: var(--blue-200) !important;
-  border: 1px solid var(--blue-600) !important;
-}
-
-:global(.dark) :deep(.method-card .method-tag.p-tag-warning) {
-  background: var(--yellow-900) !important;
-  color: var(--yellow-200) !important;
-  border: 1px solid var(--ds-color-warning, #d97706) !important;
-}
-
-:global(.dark) :deep(.method-card .method-tag.p-tag-danger) {
-  background: var(--red-900) !important;
-  color: var(--red-200) !important;
-  border: 1px solid var(--red-600) !important;
 }
 
 :deep(.method-description) {
@@ -1463,24 +1405,7 @@ const handleScroll = () => {
   color: var(--p-text-secondary-color);
 }
 
-:global(.dark) :deep(.quality-level-card) {
-  background: var(--p-surface-800);
-  border-color: var(--p-surface-600);
-}
 
-:global(.dark) :deep(.quality-level-card.selected) {
-  background: var(--p-primary-900);
-  border-color: var(--p-primary-400);
-}
-
-:global(.dark) :deep(.quality-level-card:hover:not(.disabled)) {
-  background: var(--p-primary-900);
-  border-color: var(--p-primary-500);
-}
-
-:global(.dark) :deep(.motor-item) {
-  background: var(--p-surface-700);
-}
 
 :deep(.hardware-inline-badge) {
   font-size: 0.7rem !important;
@@ -1592,35 +1517,6 @@ const handleScroll = () => {
   width: 100%;
 }
 
-:global(.dark) :deep(.ollama-ready-bar) {
-  background: rgba(34, 197, 94, 0.1);
-  border-color: var(--green-800);
-}
-
-:global(.dark) :deep(.ollama-ready-info) {
-  color: var(--green-400);
-}
-
-:global(.dark) :deep(.ollama-action-card) {
-  background: rgba(234, 179, 8, 0.1);
-  border-color: var(--yellow-800);
-}
-
-:global(.dark) :deep(.ollama-action-card.ollama-state-no_models),
-:global(.dark) :deep(.ollama-action-card.ollama-state-configuring) {
-  background: color-mix(in srgb, var(--p-primary-color, #3B82F6) 10%, transparent);
-  border-color: var(--p-primary-800, #1e40af);
-}
-
-:global(.dark) :deep(.ollama-action-content > i) {
-  color: var(--yellow-400);
-}
-
-:global(.dark) :deep(.ollama-action-card.ollama-state-no_models .ollama-action-content > i),
-:global(.dark) :deep(.ollama-action-card.ollama-state-configuring .ollama-action-content > i) {
-  color: var(--blue-400);
-}
-
 /* ── Corrections section styles ─────────────────────────── */
 
 :deep(.correction-info-message) {
@@ -1638,10 +1534,6 @@ const handleScroll = () => {
   padding: 1rem;
 }
 
-:global(.dark) :deep(.correction-config-summary) {
-  background: var(--p-surface-800);
-}
-
 :deep(.config-grid) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -1652,10 +1544,6 @@ const handleScroll = () => {
   background: var(--p-surface-0);
   border-radius: var(--p-border-radius);
   padding: 1rem;
-}
-
-:global(.dark) :deep(.config-section) {
-  background: var(--p-surface-900);
 }
 
 :deep(.config-section h4) {
@@ -1803,10 +1691,6 @@ const handleScroll = () => {
   border-radius: var(--p-border-radius);
 }
 
-:global(.dark) :deep(.rejection-item) {
-  background: var(--p-surface-800);
-}
-
 :deep(.rejection-info) {
   display: flex;
   align-items: center;
@@ -1832,10 +1716,6 @@ const handleScroll = () => {
   color: var(--p-text-secondary-color);
   background: var(--p-surface-100);
   border-radius: var(--p-border-radius);
-}
-
-:global(.dark) :deep(.empty-rejections) {
-  background: var(--p-surface-800);
 }
 
 :deep(.empty-rejections i) {
@@ -1908,5 +1788,133 @@ const handleScroll = () => {
 
 .location-info-message :deep(.p-message-wrapper) {
   padding: 0.75rem 1rem;
+}
+</style>
+<style>
+/* Dark mode overrides for child components.
+   Vue scoped CSS does not support :global(.dark) :deep(.child) combined selectors,
+   so these must live in an unscoped block, namespaced under .settings-view. */
+.dark .settings-view .setting-item {
+  border-bottom-color: var(--surface-border);
+}
+
+.dark .settings-view .setting-description code {
+  background: var(--p-surface-800);
+}
+
+.dark .settings-view .preset-button {
+  background: var(--p-surface-800);
+  border-color: var(--p-surface-700);
+}
+
+.dark .settings-view .preset-button:hover {
+  background: color-mix(in srgb, var(--p-primary-color) 15%, var(--p-surface-800));
+}
+
+.dark .settings-view .preset-button.active {
+  background: color-mix(in srgb, var(--p-primary-color) 20%, var(--p-surface-800));
+}
+
+.dark .settings-view .sensitivity-slider {
+  background: var(--p-surface-800);
+}
+
+.dark .settings-view .advanced-panel {
+  border-top-color: var(--p-surface-700);
+}
+
+.dark .settings-view .advanced-content {
+  background: var(--p-surface-800);
+}
+
+.dark .settings-view .method-card {
+  background: var(--p-surface-800);
+  border-color: var(--p-surface-700);
+}
+
+.dark .settings-view .method-card.enabled {
+  background: color-mix(in srgb, var(--p-primary-color) 10%, var(--p-surface-800));
+}
+
+.dark .settings-view .method-card .method-tag.p-tag-info {
+  background: var(--blue-900) !important;
+  color: var(--blue-200) !important;
+  border: 1px solid var(--blue-600) !important;
+}
+
+.dark .settings-view .method-card .method-tag.p-tag-warning {
+  background: var(--yellow-900) !important;
+  color: var(--yellow-200) !important;
+  border: 1px solid var(--ds-color-warning, #d97706) !important;
+}
+
+.dark .settings-view .method-card .method-tag.p-tag-danger {
+  background: var(--red-900) !important;
+  color: var(--red-200) !important;
+  border: 1px solid var(--red-600) !important;
+}
+
+.dark .settings-view .quality-level-card {
+  background: var(--p-surface-800);
+  border-color: var(--p-surface-600);
+}
+
+.dark .settings-view .quality-level-card.selected {
+  background: var(--p-primary-900);
+  border-color: var(--p-primary-400);
+}
+
+.dark .settings-view .quality-level-card:hover:not(.disabled) {
+  background: var(--p-primary-900);
+  border-color: var(--p-primary-500);
+}
+
+.dark .settings-view .motor-item {
+  background: var(--p-surface-700);
+}
+
+.dark .settings-view .ollama-ready-bar {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: var(--green-800);
+}
+
+.dark .settings-view .ollama-ready-info {
+  color: var(--green-400);
+}
+
+.dark .settings-view .ollama-action-card {
+  background: rgba(234, 179, 8, 0.1);
+  border-color: var(--yellow-800);
+}
+
+.dark .settings-view .ollama-action-card.ollama-state-no_models,
+.dark .settings-view .ollama-action-card.ollama-state-configuring {
+  background: color-mix(in srgb, var(--p-primary-color, #3B82F6) 10%, transparent);
+  border-color: var(--p-primary-800, #1e40af);
+}
+
+.dark .settings-view .ollama-action-content > i {
+  color: var(--yellow-400);
+}
+
+.dark .settings-view .ollama-action-card.ollama-state-no_models .ollama-action-content > i,
+.dark .settings-view .ollama-action-card.ollama-state-configuring .ollama-action-content > i {
+  color: var(--blue-400);
+}
+
+.dark .settings-view .correction-config-summary {
+  background: var(--p-surface-800);
+}
+
+.dark .settings-view .config-section {
+  background: var(--p-surface-900);
+}
+
+.dark .settings-view .rejection-item {
+  background: var(--p-surface-800);
+}
+
+.dark .settings-view .empty-rejections {
+  background: var(--p-surface-800);
 }
 </style>

@@ -46,7 +46,7 @@ test.describe('E2E - Exportación e importación editorial', () => {
     const importDialog = page.getByRole('dialog', { name: /Importar Trabajo Editorial/i })
     await expect(importDialog).toBeVisible()
 
-    await importDialog.locator('input[type=\"file\"]').setInputFiles({
+    await importDialog.locator('input[type="file"]').setInputFiles({
       name: 'flujo-editorial.narrassist',
       mimeType: 'application/octet-stream',
       buffer: Buffer.from('mock editorial import package', 'utf-8'),
@@ -80,7 +80,7 @@ test.describe('E2E - Exportación e importación editorial', () => {
     await exportDialog.getByTestId('editorial-import-button').click()
 
     const importDialog = page.getByRole('dialog', { name: /Importar Trabajo Editorial/i })
-    await importDialog.locator('input[type=\"file\"]').setInputFiles({
+    await importDialog.locator('input[type="file"]').setInputFiles({
       name: 'flujo-editorial-roto.narrassist',
       mimeType: 'application/octet-stream',
       buffer: Buffer.from('broken import package', 'utf-8'),

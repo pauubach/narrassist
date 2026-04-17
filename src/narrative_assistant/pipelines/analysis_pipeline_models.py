@@ -62,7 +62,7 @@ class SectionInfo:
     heading_level: int
     start_char: int
     end_char: int
-    subsections: list["SectionInfo"] = field(default_factory=list)
+    subsections: list[SectionInfo] = field(default_factory=list)
 
 
 @dataclass

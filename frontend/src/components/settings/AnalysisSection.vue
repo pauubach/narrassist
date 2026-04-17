@@ -130,7 +130,7 @@
     <div class="setting-control">
       <ToggleSwitch
         v-model="ctx.settings.value.autoAnalysis"
-        inputId="settings-auto-analysis"
+        input-id="settings-auto-analysis"
         aria-label="Análisis automático"
         @change="ctx.onSettingChange"
       />
@@ -145,7 +145,7 @@
     <div class="setting-control">
       <ToggleSwitch
         v-model="ctx.settings.value.showPartialResults"
-        inputId="settings-show-partial-results"
+        input-id="settings-show-partial-results"
         aria-label="Mostrar resultados parciales"
         @change="ctx.onSettingChange"
       />
@@ -160,7 +160,7 @@
     <div class="setting-control">
       <ToggleSwitch
         v-model="ctx.settings.value.notifyAnalysisComplete"
-        inputId="settings-notify-analysis"
+        input-id="settings-notify-analysis"
         aria-label="Notificaciones de análisis"
         @change="ctx.onSettingChange"
       />
@@ -175,7 +175,7 @@
     <div class="setting-control">
       <ToggleSwitch
         v-model="ctx.settings.value.soundEnabled"
-        inputId="settings-sounds"
+        input-id="settings-sounds"
         aria-label="Sonidos"
         @change="ctx.onSettingChange"
       />

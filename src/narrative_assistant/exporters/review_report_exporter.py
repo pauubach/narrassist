@@ -343,8 +343,16 @@ class ReviewReportExporter:
             options = ReviewReportOptions()
 
         try:
-            # Intentar importar reportlab
-            from reportlab.lib.colors import HexColor, black, gray, lightgrey
+            # Intentar importar reportlab (auto-instalar si falta)
+            try:
+                from reportlab.lib.colors import HexColor, black, gray, lightgrey
+            except ImportError:
+                from ..core.auto_install import ensure_package
+
+                if not ensure_package("reportlab"):
+                    raise ImportError("reportlab")
+                from reportlab.lib.colors import HexColor, black, gray, lightgrey
+
             from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
             from reportlab.lib.pagesizes import A4
             from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet

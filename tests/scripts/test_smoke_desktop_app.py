@@ -1,15 +1,14 @@
 import os
+import subprocess
 from pathlib import Path
 
-import subprocess
 import pytest
-
 from scripts.smoke_desktop_app import (
     MIN_LT_JAR_BYTES,
     bundled_resources_root,
+    candidate_app_bundle_binaries,
     candidate_artifact_paths,
     candidate_binary_paths,
-    candidate_app_bundle_binaries,
     discover_artifact,
     discover_binary,
     find_windows_installed_binary,

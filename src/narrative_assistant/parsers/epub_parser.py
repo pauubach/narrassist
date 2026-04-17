@@ -113,15 +113,16 @@ class EpubParser(DocumentParser):
         self._ebooklib_available = self._check_dependency()
 
     def _check_dependency(self) -> bool:
-        """Verifica que ebooklib está disponible."""
+        """Verifica que ebooklib está disponible, auto-instala si falta."""
         try:
-            import ebooklib
-            from ebooklib import epub
+            import ebooklib  # noqa: F401
+            from ebooklib import epub  # noqa: F401
 
             return True
         except ImportError:
-            logger.warning("ebooklib no instalado. Instalar con: pip install ebooklib")
-            return False
+            from ..core.auto_install import ensure_package
+
+            return ensure_package("ebooklib")
 
     def parse(self, path: Path) -> Result[RawDocument]:
         """

@@ -676,6 +676,32 @@ class StructureDetector:
             if not chapter_subheadings:
                 continue
 
+            # Filtrar la primera sección si es duplicado del título del capítulo
+            # (común en EPUBs donde el heading H1 y H2 tienen el mismo texto)
+            if chapter_subheadings and chapter.title:
+                first = chapter_subheadings[0]
+                first_text = first.text.strip().lower()
+                chapter_title = chapter.title.strip().lower()
+                # Duplicado exacto, o el título del capítulo contiene el texto de la sección,
+                # o la sección es solo un numeral romano que coincide con el número de capítulo
+                is_duplicate = (
+                    first_text == chapter_title
+                    or chapter_title.startswith(first_text)
+                    or first_text.startswith(chapter_title)
+                    or (
+                        first.start_char == chapter.start_char
+                    )
+                    or (
+                        re.match(r"^[ivxlcdm]+$", first_text, re.IGNORECASE)
+                        and self._roman_to_int(first_text) == chapter.number
+                    )
+                )
+                if is_duplicate:
+                    chapter_subheadings = chapter_subheadings[1:]
+
+            if not chapter_subheadings:
+                continue
+
             # Construir árbol de secciones jerárquicamente
             chapter.sections = self._build_section_tree(chapter_subheadings, chapter.end_char)
 
@@ -739,6 +765,24 @@ class StructureDetector:
             i = j
 
         return sections
+
+    @staticmethod
+    def _roman_to_int(s: str) -> int:
+        """Convierte un numeral romano a entero. Retorna 0 si no es válido."""
+        roman_values = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100, "d": 500, "m": 1000}
+        s = s.strip().lower()
+        result = 0
+        prev = 0
+        for char in reversed(s):
+            val = roman_values.get(char, 0)
+            if val == 0:
+                return 0
+            if val < prev:
+                result -= val
+            else:
+                result += val
+            prev = val
+        return result
 
     def _detect_scenes_in_chapter(self, chapter: Chapter, full_text: str) -> list[Scene]:
         """Detecta escenas dentro de un capítulo."""

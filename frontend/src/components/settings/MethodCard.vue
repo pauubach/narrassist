@@ -5,7 +5,7 @@
   >
     <div class="method-header">
       <ToggleSwitch
-        :inputId="`method-${category}-${methodKey}`"
+        :input-id="`method-${category}-${methodKey}`"
         :model-value="enabled"
         :aria-label="method.name"
         :disabled="!method.available"

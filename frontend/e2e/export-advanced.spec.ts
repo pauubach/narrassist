@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import { test, expect } from '@playwright/test'
 import { setupMockApi } from './support/mockApi'
 import { prepareAppForE2E } from './support/app'
@@ -20,7 +21,6 @@ test.describe('E2E - Export Functionality (Advanced)', () => {
 
     // Verify file content
     const path = await download.path()
-    const fs = require('fs')
     const content = fs.readFileSync(path, 'utf-8')
     const data = JSON.parse(content)
 
@@ -41,7 +41,6 @@ test.describe('E2E - Export Functionality (Advanced)', () => {
     expect(download.suggestedFilename()).toMatch(/alerts.*\.csv/)
 
     const path = await download.path()
-    const fs = require('fs')
     const content = fs.readFileSync(path, 'utf-8')
 
     expect(content).toContain('severity,message,location')
@@ -56,7 +55,6 @@ test.describe('E2E - Export Functionality (Advanced)', () => {
 
     const download = await downloadPromise
     const path = await download.path()
-    const fs = require('fs')
     const data = JSON.parse(fs.readFileSync(path, 'utf-8'))
 
     expect(data[0]).toHaveProperty('name')
@@ -141,7 +139,6 @@ test.describe('E2E - Export Functionality (Advanced)', () => {
 
     const download = await downloadPromise
     const path = await download.path()
-    const fs = require('fs')
     const data = JSON.parse(fs.readFileSync(path, 'utf-8'))
 
     expect(data.length).toBe(2)
@@ -160,7 +157,6 @@ test.describe('E2E - Export Functionality (Advanced)', () => {
 
     const download = await downloadPromise
     const path = await download.path()
-    const fs = require('fs')
     const data = JSON.parse(fs.readFileSync(path, 'utf-8'))
 
     expect(data.every((alert: any) => alert.severity === 'high')).toBe(true)
@@ -197,7 +193,6 @@ test.describe('E2E - Export Functionality (Advanced)', () => {
 
     const download = await downloadPromise
     const path = await download.path()
-    const fs = require('fs')
     const stats = fs.statSync(path)
 
     expect(stats.size).toBeGreaterThan(100) // At least 100 bytes
@@ -213,7 +208,6 @@ test.describe('E2E - Export Functionality (Advanced)', () => {
 
     const download = await downloadPromise
     const path = await download.path()
-    const fs = require('fs')
     const data = JSON.parse(fs.readFileSync(path, 'utf-8'))
 
     expect(data).toHaveProperty('name')

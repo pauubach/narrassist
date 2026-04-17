@@ -282,7 +282,7 @@ vi.mock('@/components/LicenseDialog.vue', () => ({
 import SettingsView from './SettingsView.vue'
 
 const ButtonStub = defineComponent({
-  name: 'Button',
+  name: 'PButton',
   props: ['label', 'icon', 'disabled', 'loading'],
   emits: ['click'],
   template: '<button :disabled="disabled || loading" @click="$emit(\'click\')">{{ label || icon || "button" }}</button>',
@@ -294,7 +294,7 @@ const CardStub = defineComponent({
 })
 
 const DialogStub = defineComponent({
-  name: 'Dialog',
+  name: 'PDialog',
   props: ['visible', 'header'],
   emits: ['update:visible'],
   template: '<div v-if="visible" class="dialog-stub"><h2>{{ header }}</h2><slot /><footer><slot name="footer" /></footer></div>',
@@ -410,9 +410,9 @@ describe('SettingsView refactor', () => {
     expect(loadUserRejectionsMock).toHaveBeenCalledTimes(1)
     expect(apiMock.get).toHaveBeenCalledWith('/api/services/llm/hardware')
     expect(apiMock.getRaw).toHaveBeenCalledWith('/api/maintenance/data-location')
-    expect(wrapper.get('[data-test=\"appearance-section\"]')).toBeTruthy()
-    expect(wrapper.get('[data-test=\"corrections-section\"]')).toBeTruthy()
-    expect(wrapper.get('[data-test=\"data-location-prop\"]').text()).toBe('D:/NarrAssist')
+    expect(wrapper.get('[data-test="appearance-section"]')).toBeTruthy()
+    expect(wrapper.get('[data-test="corrections-section"]')).toBeTruthy()
+    expect(wrapper.get('[data-test="data-location-prop"]').text()).toBe('D:/NarrAssist')
   })
 
   it('routes navigation and child section events to the correct dialogs', async () => {
@@ -424,13 +424,13 @@ describe('SettingsView refactor', () => {
     await backButton!.trigger('click')
     expect(routerGoMock).toHaveBeenCalledWith(-1)
 
-    await wrapper.get('[data-test=\"maintenance-change-location\"]').trigger('click')
+    await wrapper.get('[data-test="maintenance-change-location"]').trigger('click')
     expect(wrapper.text()).toContain('Cambiar ubicación de datos')
 
-    await wrapper.get('[data-test=\"maintenance-confirm-reset\"]').trigger('click')
+    await wrapper.get('[data-test="maintenance-confirm-reset"]').trigger('click')
     expect(wrapper.text()).toContain('Confirmar restablecimiento')
 
-    await wrapper.get('[data-test=\"show-license-dialog\"]').trigger('click')
-    expect(wrapper.get('[data-test=\"license-dialog\"]')).toBeTruthy()
+    await wrapper.get('[data-test="show-license-dialog"]').trigger('click')
+    expect(wrapper.get('[data-test="license-dialog"]')).toBeTruthy()
   })
 })

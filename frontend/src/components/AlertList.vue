@@ -520,15 +520,17 @@ const statusFilteredAlerts = computed(() => {
 })
 
 // Paso 4: Filtrar por búsqueda (usa query con debounce)
+// Paso 5: Ordenar por confianza descendente (errores más claros primero)
 const filteredAlerts = computed(() => {
-  if (!debouncedSearchQuery.value) {
-    return statusFilteredAlerts.value
+  let results = statusFilteredAlerts.value
+  if (debouncedSearchQuery.value) {
+    const query = debouncedSearchQuery.value.toLowerCase()
+    results = results.filter(a =>
+      a.title?.toLowerCase().includes(query) ||
+      a.description?.toLowerCase().includes(query)
+    )
   }
-  const query = debouncedSearchQuery.value.toLowerCase()
-  return statusFilteredAlerts.value.filter(a =>
-    a.title?.toLowerCase().includes(query) ||
-    a.description?.toLowerCase().includes(query)
-  )
+  return [...results].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
 })
 
 const totalPages = computed(() => Math.ceil(filteredAlerts.value.length / props.itemsPerPage))

@@ -423,7 +423,15 @@ class OllamaManager:
     def is_running(self) -> bool:
         """Verifica si el servidor Ollama esta corriendo."""
         try:
-            import httpx
+            try:
+                import httpx
+            except ImportError:
+                from ..core.auto_install import ensure_package
+
+                if ensure_package("httpx"):
+                    import httpx
+                else:
+                    raise ImportError("httpx")
 
             response = httpx.get(
                 f"{self._config.host}/api/tags", timeout=self._config.network_timeout
@@ -1007,16 +1015,34 @@ class OllamaManager:
                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                     )
                 elif self._platform == InstallationPlatform.MACOS and ".app/" in ollama_exe:
-                    # macOS app bundle: el binario interno no tiene +x,
-                    # usar 'open -a' que arranca la app (incluye el server)
+                    # macOS app bundle: intentar 'open -a' primero,
+                    # si falla (headless / restricted env), ejecutar binario directo
                     app_path = ollama_exe.split(".app/")[0] + ".app"
                     logger.info(f"Usando 'open -a' para lanzar {app_path}")
-                    subprocess.Popen(
-                        ["open", "-a", app_path],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        env=env,
-                    )
+                    try:
+                        result = subprocess.run(
+                            ["open", "-a", app_path],
+                            capture_output=True,
+                            timeout=5,
+                            env=env,
+                        )
+                        if result.returncode != 0:
+                            raise RuntimeError(result.stderr.decode(errors="replace"))
+                    except Exception as e:
+                        logger.warning(
+                            f"'open -a' falló ({e}), ejecutando binario directo: {ollama_exe}"
+                        )
+                        # Asegurar que el binario sea ejecutable
+                        exe_path = Path(ollama_exe)
+                        if not os.access(exe_path, os.X_OK):
+                            exe_path.chmod(exe_path.stat().st_mode | 0o755)
+                        subprocess.Popen(
+                            [ollama_exe, "serve"],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            env=env,
+                            start_new_session=True,
+                        )
                 else:
                     # Linux / macOS con CLI en PATH: iniciar en nueva sesion
                     subprocess.Popen(

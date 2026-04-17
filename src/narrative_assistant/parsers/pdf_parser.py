@@ -45,14 +45,15 @@ class PdfParser(DocumentParser):
         self._pdfplumber_available = self._check_dependency()
 
     def _check_dependency(self) -> bool:
-        """Verifica que pdfplumber está disponible."""
+        """Verifica que pdfplumber está disponible, auto-instala si falta."""
         try:
-            import pdfplumber
+            import pdfplumber  # noqa: F401
 
             return True
         except ImportError:
-            logger.warning("pdfplumber no instalado. Instalar con: pip install pdfplumber")
-            return False
+            from ..core.auto_install import ensure_package
+
+            return ensure_package("pdfplumber")
 
     def parse(self, path: Path) -> Result[RawDocument]:
         """
@@ -87,6 +88,34 @@ class PdfParser(DocumentParser):
             )
 
         import pdfplumber
+
+        # Verificar magic bytes: un PDF válido empieza con %PDF
+        try:
+            with open(path, "rb") as f:
+                header = f.read(16)
+            if not header.startswith(b"%PDF"):
+                # Detectar tipo real para mejor mensaje
+                if header.startswith((b"<!DOCTYPE", b"<html", b"<HTML")):
+                    hint = "El archivo es una página HTML renombrada como .pdf (descarga incorrecta)"
+                elif header.startswith(b"PK"):
+                    hint = "El archivo parece ser un ZIP o EPUB renombrado como .pdf"
+                elif header.startswith(b"\x89PNG"):
+                    hint = "El archivo es una imagen PNG renombrada como .pdf"
+                else:
+                    hint = "El archivo no es un PDF válido (magic bytes incorrectos)"
+                return Result.failure(
+                    CorruptedDocumentError(
+                        file_path=str(path),
+                        original_error=hint,
+                    )
+                )
+        except OSError as e:
+            return Result.failure(
+                CorruptedDocumentError(
+                    file_path=str(path),
+                    original_error=f"No se pudo leer el archivo: {e}",
+                )
+            )
 
         try:
             pdf = pdfplumber.open(str(path))

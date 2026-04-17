@@ -3,6 +3,7 @@ Test rápido para verificar integración de FillerDetector en pipeline.
 """
 
 import sys
+
 sys.path.insert(0, 'src')
 
 
@@ -54,7 +55,7 @@ def test_filler_in_pipeline_context():
     assert hasattr(PipelineQualityMixin, '_run_filler_detection'), \
         "PipelineQualityMixin debe tener método _run_filler_detection"
 
-    method = getattr(PipelineQualityMixin, '_run_filler_detection')
+    method = PipelineQualityMixin._run_filler_detection
     assert callable(method), "El método debe ser callable"
 
     print("  OK Método _run_filler_detection existe en pipeline")

@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 
+from narrative_assistant.alerts.models import AlertCategory
 from narrative_assistant.analysis.attribute_consistency import AttributeInconsistency
 from narrative_assistant.analysis.emotional_coherence import EmotionalIncoherence, IncoherenceType
-from narrative_assistant.alerts.models import AlertCategory
 from narrative_assistant.core.result import Result
 from narrative_assistant.focalization.violations import (
     FocalizationViolation,

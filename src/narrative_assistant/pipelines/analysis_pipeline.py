@@ -46,7 +46,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-
 from ..alerts.engine import get_alert_engine
 from ..alerts.models import Alert, AlertCategory, AlertSeverity
 from ..analysis.attribute_consistency import (
@@ -92,24 +91,36 @@ from ..persistence.document_fingerprint import generate_fingerprint
 from ..persistence.project import ProjectManager
 from ..persistence.session import SessionManager
 from ..temporal import TemporalInconsistency
-from .analysis_pipeline_alerts import (
-    create_alerts_from_emotional_incoherences as _create_alerts_from_emotional_incoherences_impl,
-    create_alerts_from_focalization_violations as _create_alerts_from_focalization_violations_impl,
-    create_alerts_from_inconsistencies as _create_alerts_from_inconsistencies_impl,
-    create_alerts_from_temporal_inconsistencies as _create_alerts_from_temporal_inconsistencies_impl,
-    create_alerts_from_voice_deviations as _create_alerts_from_voice_deviations_impl,
-)
-from .analysis_pipeline_dialogue import (
-    extract_dialogues_for_emotional_analysis as _extract_dialogues_for_emotional_analysis,
-    extract_dialogues_from_chapter as _extract_dialogues_from_chapter,
-    run_voice_analysis as _run_voice_analysis,
-)
-from .analysis_pipeline_models import AnalysisReport, ChapterInfo, PipelineConfig, SectionInfo
-from .analysis_pipeline_temporal import _persist_timeline, _run_temporal_analysis
 from ..voice import (
     VoiceDeviation,
     VoiceProfile,
 )
+from .analysis_pipeline_alerts import (
+    create_alerts_from_emotional_incoherences as _create_alerts_from_emotional_incoherences_impl,
+)
+from .analysis_pipeline_alerts import (
+    create_alerts_from_focalization_violations as _create_alerts_from_focalization_violations_impl,
+)
+from .analysis_pipeline_alerts import (
+    create_alerts_from_inconsistencies as _create_alerts_from_inconsistencies_impl,
+)
+from .analysis_pipeline_alerts import (
+    create_alerts_from_temporal_inconsistencies as _create_alerts_from_temporal_inconsistencies_impl,
+)
+from .analysis_pipeline_alerts import (
+    create_alerts_from_voice_deviations as _create_alerts_from_voice_deviations_impl,
+)
+from .analysis_pipeline_dialogue import (
+    extract_dialogues_for_emotional_analysis as _extract_dialogues_for_emotional_analysis,
+)
+from .analysis_pipeline_dialogue import (
+    extract_dialogues_from_chapter as _extract_dialogues_from_chapter,
+)
+from .analysis_pipeline_dialogue import (
+    run_voice_analysis as _run_voice_analysis,
+)
+from .analysis_pipeline_models import AnalysisReport, ChapterInfo, PipelineConfig, SectionInfo
+from .analysis_pipeline_temporal import _persist_timeline, _run_temporal_analysis
 
 logger = logging.getLogger(__name__)
 

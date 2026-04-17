@@ -48,14 +48,14 @@ vi.mock('./ImportWorkDialog.vue', () => ({
 }))
 
 const ButtonStub = defineComponent({
-  name: 'Button',
+  name: 'PButton',
   props: ['label', 'disabled', 'loading', 'icon', 'outlined', 'size', 'text', 'rounded', 'severity'],
   emits: ['click'],
   template: '<button :disabled="disabled || loading" @click="$emit(\'click\')">{{ label || icon || "button" }}</button>',
 })
 
 const DialogStub = defineComponent({
-  name: 'Dialog',
+  name: 'PDialog',
   props: ['visible', 'header'],
   emits: ['update:visible'],
   template: '<div v-if="visible" class="dialog-stub"><h2>{{ header }}</h2><slot /></div>',

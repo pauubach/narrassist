@@ -15,6 +15,14 @@ from typing import Any
 
 import deps
 from deps import generate_person_aliases, logger
+
+from narrative_assistant.entities.clustering import compute_reduced_pairs_from_clusters
+from routers._alert_emission import (
+    emit_consistency_alerts as _emit_consistency_alerts,
+)
+from routers._alert_emission import (
+    emit_grammar_alerts as _emit_grammar_alerts,
+)
 from routers._analysis_cache_helpers import (
     _chapter_text_hash,
     _restore_chapter_mentions_from_cache,
@@ -24,25 +32,26 @@ from routers._analysis_cache_helpers import (
     _serialize_coref_result_for_cache,
     _serialize_entities_for_cache,
 )
-from routers._analysis_structure_helpers import (
-    compute_and_persist_chapter_metrics,
-    detect_and_persist_dialogues,
-    find_chapter_id_for_position as resolve_chapter_id_for_position,
-    initialize_dialogue_style_preference,
-)
-from routers._alert_emission import (
-    emit_consistency_alerts as _emit_consistency_alerts,
-    emit_grammar_alerts as _emit_grammar_alerts,
-)
 from routers._analysis_restoration import (
     apply_saved_dismissals as _apply_saved_dismissals,
+)
+from routers._analysis_restoration import (
     reapply_user_merges as _reapply_user_merges,
+)
+from routers._analysis_restoration import (
     restore_verified_attributes as _restore_verified_attributes,
 )
-from routers._grammar_subphases import run_grammar_phase
 from routers._analysis_runtime import (
     _filter_nlp_methods_by_runtime_capabilities,
     _get_runtime_service_capabilities,
+)
+from routers._analysis_structure_helpers import (
+    compute_and_persist_chapter_metrics,
+    detect_and_persist_dialogues,
+    initialize_dialogue_style_preference,
+)
+from routers._analysis_structure_helpers import (
+    find_chapter_id_for_position as resolve_chapter_id_for_position,
 )
 from routers._consistency_subphases import (
     analyze_anachronisms_subphase,
@@ -56,8 +65,7 @@ from routers._consistency_subphases import (
     prepare_chapters_for_analysis,
     prepare_entities_for_analysis,
 )
-
-from narrative_assistant.entities.clustering import compute_reduced_pairs_from_clusters
+from routers._grammar_subphases import run_grammar_phase
 
 
 class AnalysisCancelledError(Exception):

@@ -20,7 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def extract_dialogues_from_chapter(
-    chapter: "ChapterInfo",
+    chapter: ChapterInfo,
     entities: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Extrae dialogos del texto del capitulo y estima speaker por contexto."""
@@ -85,7 +85,7 @@ def extract_dialogues_from_chapter(
 
 
 def run_voice_analysis(
-    chapters: list["ChapterInfo"],
+    chapters: list[ChapterInfo],
     entities: list[Entity],
     logger: logging.Logger | None = None,
 ) -> Result[dict[str, Any]]:

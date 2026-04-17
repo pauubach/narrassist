@@ -89,7 +89,7 @@ test.describe('E2E - Performance with Large Datasets', () => {
       return new Promise<number>(resolve => {
         const list = document.querySelector('.alert-list')!
         let frames = 0
-        let lastTime = performance.now()
+        const lastTime = performance.now()
 
         const measureFPS = () => {
           const now = performance.now()
