@@ -145,14 +145,16 @@ def candidate_binary_paths(repo_root: Path) -> list[Path]:
 
     candidates: list[Path] = []
     for root in release_roots:
-        for name in product_variants:
-            candidates.append(root / f"{name}.exe")
-            candidates.append(root / name)
-
+        # .app bundle primero: contienen Contents/Resources para validate_bundled_services
         bundle_root = root / "bundle"
         if bundle_root.exists():
             for app_bundle in bundle_root.rglob("*.app"):
                 candidates.extend(candidate_app_bundle_binaries(app_bundle))
+
+        # Raw binary como fallback (Windows o builds sin bundle)
+        for name in product_variants:
+            candidates.append(root / f"{name}.exe")
+            candidates.append(root / name)
 
     return candidates
 
