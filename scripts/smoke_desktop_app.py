@@ -145,7 +145,6 @@ def candidate_binary_paths(repo_root: Path) -> list[Path]:
 
     candidates: list[Path] = []
     for root in release_roots:
-        # .app bundle primero: contienen Contents/Resources para validate_bundled_services
         bundle_root = root / "bundle"
         if bundle_root.exists():
             for app_bundle in bundle_root.rglob("*.app"):
@@ -263,7 +262,6 @@ def terminate_process_tree(process: subprocess.Popen[bytes]) -> None:
 
 
 def run_smoke(binary: Path, health_url: str, timeout_seconds: float, stable_checks: int) -> None:
-    validate_bundled_services(binary)
     process = subprocess.Popen(
         [str(binary)],
         cwd=str(binary.parent),

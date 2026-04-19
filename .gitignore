@@ -109,3 +109,4 @@ api-server/*.spec
 tools/
 *.exe
 *.zip
+.playwright-mcp/

@@ -507,6 +507,28 @@ try:
             target=_background_ollama_init, name="ollama-init", daemon=True
         ).start()
 
+        # Auto-instalar LanguageTool + Java en primera ejecución (producción)
+        if os.environ.get("NA_EMBEDDED") == "1":
+            def _background_lt_init():
+                try:
+                    from narrative_assistant.nlp.grammar.languagetool_manager import (
+                        get_languagetool_manager,
+                        start_lt_installation,
+                    )
+                    manager = get_languagetool_manager()
+                    if not manager.is_installed:
+                        logger.info("Startup: LT no detectado, descarga de primera ejecucion...")
+                        ok, msg = start_lt_installation()
+                        logger.info(f"Startup: LT install triggered: {msg} (ok={ok})")
+                    else:
+                        logger.info("Startup: LanguageTool ya instalado")
+                except Exception as e:
+                    logger.warning(f"Startup: error iniciando LT: {e}", exc_info=True)
+
+            threading.Thread(
+                target=_background_lt_init, name="lt-first-run", daemon=True
+            ).start()
+
         yield
 
     app = FastAPI(

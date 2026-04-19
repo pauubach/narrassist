@@ -465,11 +465,11 @@ def is_languagetool_installed() -> bool:
 # =============================================================================
 
 # Configuración de instalación
-LT_VERSION = "6.4"
+LT_VERSION = "6.6"
 LT_URLS = [
-    f"https://github.com/languagetool-org/languagetool/releases/download/v{LT_VERSION}/LanguageTool-{LT_VERSION}.zip",
     f"https://languagetool.org/download/LanguageTool-{LT_VERSION}.zip",
     f"https://www.languagetool.org/download/LanguageTool-{LT_VERSION}.zip",
+    "https://languagetool.org/download/LanguageTool-stable.zip",
 ]
 
 JAVA_VERSION = "21"
