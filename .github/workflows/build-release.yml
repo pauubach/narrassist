@@ -332,26 +332,39 @@ jobs:
             artifacts/macos/*.dmg
           body: |
             ## Narrative Assistant ${{ github.ref_name }}
-            
+
             **Instaladores multi-plataforma con Python embebido**
-            
+
             ### Plataformas soportadas
             - ✅ **Windows 10/11**: `Narrative-Assistant-Setup.exe` (~40-50 MB)
             - ✅ **macOS 11+**: `Narrative-Assistant.dmg` (~60-70 MB)
-            
+
             ### Características
             - ✅ No requiere Python instalado en el sistema
-            - ✅ Instalación simple para usuarios no técnicos
-            - ✅ Primera ejecución descarga modelos NLP (~900MB)
+            - ✅ Primera ejecución descarga corrector gramatical (~300 MB) y modelos NLP (~900 MB)
             - ✅ Después funciona 100% offline
-            
-            ### Notas
-            - **Windows**: Verificado funcional en v0.3.0
-            - **macOS**: Verificado funcional en v0.4.35 (Apple Silicon)
-            - **Documentación**: Ver [PYTHON_EMBED.md](https://github.com/${{ github.repository }}/blob/main/docs/PYTHON_EMBED.md)
-            
-            ### Verificación
-            Para verificar la integridad de los instaladores, consulte los checksums en los artifacts.
+
+            ### Instalación en macOS — aviso de seguridad
+
+            El instalador no lleva firma de Apple Developer. Al abrirlo macOS mostrará una advertencia. Para desbloquearlo:
+
+            **Opción A (sin terminal):** clic derecho sobre el `.dmg` → *Abrir* → *Abrir de todas formas*
+
+            **Opción B (terminal):**
+            ```bash
+            xattr -dr com.apple.quarantine ~/Downloads/Narrative\ Assistant*.dmg
+            ```
+
+            ### Instalación en Windows — aviso de seguridad
+
+            SmartScreen puede mostrar "Editor desconocido". Haz clic en *Más información* → *Ejecutar de todas formas*.
+
+            ### Primera ejecución
+            Al abrir la app por primera vez se descargarán automáticamente:
+            1. LanguageTool + Java (~300 MB) — corrector gramatical
+            2. Modelos NLP (~900 MB) — análisis narrativo
+
+            La descarga se muestra con barra de progreso. Solo ocurre una vez.
           draft: false
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
         env:
