@@ -128,7 +128,7 @@ na = "narrative_assistant.cli:main"
 Repository = "https://github.com/paubach/tfm"
 
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
+requires = ["setuptools>=82.0.1", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
