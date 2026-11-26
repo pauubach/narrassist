@@ -10,7 +10,7 @@ description: "Ejecuta los tests end-to-end con Playwright (Tauri/Electron o web)
 - Validar flujos completos antes de una release (export, import, análisis).
 - Cuando un test unitario pasa pero el flujo real parece roto.
 - Para reproducir un bug reportado por el usuario paso a paso.
-- Antes de `/ship` si hay cambios en componentes de workflow crítico.
+- Antes de `/entregar` si hay cambios en componentes de workflow crítico.
 
 ## Argumentos
 
