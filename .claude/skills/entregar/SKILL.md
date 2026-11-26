@@ -1,9 +1,9 @@
 ---
-name: ship
-description: "Pre-push completo + push + crear PR a master en un solo flujo. Invocar cuando el usuario diga 'haz ship', 'sube y abre PR', 'crea el PR', 'publícalo', 'manda esto a GitHub', 'abre un PR con lo de hoy'. Requiere confirmación explícita en cada paso destructivo. Ejemplos: 'ship el feature de exportación EPUB', 'crea PR con todos los commits de esta semana', 'sube y abre PR a master'."
+name: entregar
+description: "Pre-push completo + push + crear PR a master en un solo flujo. Invocar cuando el usuario diga 'entrega esto', 'haz ship', 'sube y abre PR', 'crea el PR', 'publícalo', 'manda esto a GitHub', 'abre un PR con lo de hoy'. Requiere confirmación explícita en cada paso destructivo. Ejemplos: 'entrega la feature de exportación EPUB', 'crea PR con todos los commits de esta semana', 'sube y abre PR a master'."
 ---
 
-# /ship — Pre-push + push + PR
+# /entregar — Pre-push + push + PR
 
 ## Flujo
 
